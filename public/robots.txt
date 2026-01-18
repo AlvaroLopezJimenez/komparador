@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /redirigir/
+
+# Sitemaps
+Sitemap: https://chollopanales.com/sitemap.xml

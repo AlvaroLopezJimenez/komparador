@@ -1,0 +1,166 @@
+INSTRUCCIONES PARA CREAR CONTROLADORES DE TIENDAS
+==================================================
+
+ESTRUCTURA DE ARCHIVOS:
+- Ubicación: app/Http/Controllers/Scraping/Tiendas/
+- Nombre: [NombreTienda]Controller.php
+- Clase: [NombreTienda]Controller
+
+EJEMPLO DE NOMBRES:
+- "EL Corte Inglés" -> ElcorteinglesController.php
+- "Primor" -> PrimorController.php
+- "Carrefour" -> CarrefourController.php
+
+ESTRUCTURA BÁSICA DEL CONTROLADOR:
+
+```php
+<?php
+
+namespace App\Http\Controllers\Scraping\Tiendas;
+
+use App\Http\Controllers\Scraping\PlantillaTiendaController;
+
+class [NombreTienda]Controller extends PlantillaTiendaController
+{
+    public function obtenerPrecio($url, $variante = null)
+    {
+        // 1. Obtener HTML de la página
+        $resultado = $this->apiHTML->obtenerHTML($url);
+        
+        if (!$resultado['success']) {
+            return response()->json([
+                'success' => false,
+                'error' => $resultado['error']
+            ]);
+        }
+        
+        $html = $resultado['html'];
+        
+        // 2. Extraer precio del HTML
+        // Usar selectores CSS, regex, o DOM según la estructura de la tienda
+        
+        // 3. Normalizar precio (cambiar comas por puntos)
+        $precio = str_replace(',', '.', $precioEncontrado);
+        
+        // 4. Devolver resultado
+        return response()->json([
+            'success' => true,
+            'precio' => (float) $precio
+        ]);
+    }
+}
+```
+
+MÉTODOS DE EXTRACCIÓN DE PRECIOS:
+
+1. REGEX (Expresiones Regulares):
+```php
+// Buscar precio en formato "12,99 €"
+preg_match('/>([0-9,]+)\s*€/', $html, $matches);
+$precio = $matches[1] ?? null;
+
+// Buscar precio en atributo data-price
+preg_match('/data-price="([0-9,]+)"/', $html, $matches);
+$precio = $matches[1] ?? null;
+```
+
+2. DOM (Document Object Model):
+```php
+$dom = new \DOMDocument();
+@$dom->loadHTML($html);
+$xpath = new \DOMXPath($dom);
+
+// Buscar por clase CSS
+$elementos = $xpath->query('//span[@class="price"]');
+$precio = $elementos->item(0)->textContent ?? null;
+
+// Buscar por ID
+$elementos = $xpath->query('//div[@id="precio"]');
+$precio = $elementos->item(0)->textContent ?? null;
+```
+
+3. STRING FUNCTIONS:
+```php
+// Buscar entre etiquetas específicas
+$inicio = strpos($html, '<span class="price">');
+$fin = strpos($html, '</span>', $inicio);
+$precio = substr($html, $inicio + 20, $fin - $inicio - 20);
+```
+
+CONSIDERACIONES IMPORTANTES:
+
+1. VARIANTES DE PRODUCTO:
+- Algunas tiendas pueden tener diferentes estructuras según la variante
+- Usar el parámetro $variante para ajustar la lógica de extracción
+
+2. MÚLTIPLES FORMATOS DE PRECIO:
+- Precio con descuento: "12,99 €" (antes "15,99 €")
+- Precio por unidad: "0,15 €/unidad"
+- Precio con IVA: "12,99 € (IVA incluido)"
+
+3. MANEJO DE ERRORES:
+- Verificar que el HTML se obtuvo correctamente
+- Verificar que se encontró el precio
+- Manejar casos donde el precio no está disponible
+
+4. NORMALIZACIÓN:
+- Cambiar comas por puntos: str_replace(',', '.', $precio)
+- Eliminar símbolos de moneda: preg_replace('/[^0-9,.]/', '', $precio)
+- Convertir a float: (float) $precio
+
+EJEMPLO COMPLETO:
+
+```php
+public function obtenerPrecio($url, $variante = null)
+{
+    // Obtener HTML
+    $resultado = $this->apiHTML->obtenerHTML($url);
+    
+    if (!$resultado['success']) {
+        return response()->json([
+            'success' => false,
+            'error' => $resultado['error']
+        ]);
+    }
+    
+    $html = $resultado['html'];
+    
+    // Intentar diferentes patrones de precio
+    $patrones = [
+        '/class="price">([0-9,]+)/',
+        '/data-price="([0-9,]+)"/',
+        '/>([0-9,]+)\s*€/',
+        '/precio[^>]*>([0-9,]+)/i'
+    ];
+    
+    $precio = null;
+    foreach ($patrones as $patron) {
+        if (preg_match($patron, $html, $matches)) {
+            $precio = $matches[1];
+            break;
+        }
+    }
+    
+    if (!$precio) {
+        return response()->json([
+            'success' => false,
+            'error' => 'No se pudo encontrar el precio en la página'
+        ]);
+    }
+    
+    // Normalizar precio
+    $precio = str_replace(',', '.', $precio);
+    $precio = preg_replace('/[^0-9.]/', '', $precio);
+    
+    return response()->json([
+        'success' => true,
+        'precio' => (float) $precio
+    ]);
+}
+```
+
+TESTING:
+- Probar con diferentes URLs de la misma tienda
+- Verificar que funciona con diferentes formatos de precio
+- Comprobar el manejo de errores
+- Validar que el precio devuelto es numérico y razonable

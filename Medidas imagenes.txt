@@ -1,0 +1,30 @@
+Categoria: 144x120
+
+producto grande: 300x250
+producto pequeña: 144x120  -thumbnail
+
+tienda 100x45
+
+La oferta que tiene esto en la url que funciona es la de sensitive talla 6+
+?pdp_npi=4%40dis%21EUR%2155.99%2155.99%21%21%21%21%21%40%21--AQUI--%21afff%21%21%21  ---donde el skuID hay que ponerlo AQUÍ
+
+#######
+application/ld+json
+offers.price
+offers.priceCurrency
+
+######
+contraseña vps: 4VRBxuecxSkA
+
+
+Telegram
+
+Comprar en :
+ 
+💵 Precio: ❌ € ✅ € [0,€/Und.]
+
+🔗 Link: 
+
+#publi #baby #pañales #bebe #chollos #oferta
+
+🏠 Para más chollos únete al canal: @MamaAhorradora (https://t.me/MamaAhorradora)
