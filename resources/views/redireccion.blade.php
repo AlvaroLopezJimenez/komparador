@@ -34,7 +34,7 @@
             width: 50px;
             height: 50px;
             border: 5px solid #ddd;
-            border-top: 5px solid #3b82f6;
+            border-top: 5px solid #e97b11;
             border-radius: 50%;
             animation: spin 1s linear infinite;
             margin: 2rem auto;
@@ -74,7 +74,7 @@
                             <strong class="text-gray-900">Jefatura de Trafico Web</strong> en:
                         </p>
                         <p class="mt-2">
-                            <a href="mailto:info@komparador.com" class="text-blue-600 hover:text-blue-800 hover:underline font-semibold">
+                            <a href="mailto:info@komparador.com" style="color: #e97b11;" class="hover:underline font-semibold" onmouseover="this.style.color='#d16a0f'" onmouseout="this.style.color='#e97b11'">
                                 info@komparador.com
                             </a>
                         </p>
@@ -113,7 +113,10 @@
                     <button type="submit" 
                             id="btn-continuar"
                             disabled
-                            class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-lg transition-colors">
+                            style="background-color: #e97b11;"
+                            class="w-full disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-lg transition-colors"
+                            onmouseover="if(!this.disabled) this.style.backgroundColor='#d16a0f'"
+                            onmouseout="if(!this.disabled) this.style.backgroundColor='#e97b11'">
                         Continuar a la tienda
                     </button>
                 </form>
@@ -139,7 +142,7 @@
             @if(isset($url) && $url)
                 <p class="text-sm text-gray-500">
                     Si no ocurre nada en unos segundos, 
-                    <a href="{{ $url }}" rel="sponsored noopener noreferrer" style="color:#3b82f6; font-weight:600;">haz clic aquí</a>.
+                    <a href="{{ $url }}" rel="sponsored noopener noreferrer" style="color:#e97b11; font-weight:600;" onmouseover="this.style.color='#d16a0f'" onmouseout="this.style.color='#e97b11'">haz clic aquí</a>.
                 </p>
             @endif
         </div>

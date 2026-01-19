@@ -879,12 +879,13 @@
     }
     
     #x18 .miniatura-imagen:hover {
-      border-color: #70b216;
+      border-color: #e97b11;
       transform: scale(1.05);
     }
     
     #x18 .miniatura-imagen.activa {
-      border-color: #9cc247;
+      border-color: #e97b11;
+      box-shadow: 0 0 0 4px rgba(233, 123, 17, 0.4);
       transform: scale(1.05);
     }
     
@@ -908,13 +909,14 @@
     
     .miniatura-pagina-desktop:hover,
     .miniatura-pagina-movil:hover {
-      border-color: #70b216;
+      border-color: #e97b11;
       transform: scale(1.05);
     }
     
     .miniatura-pagina-desktop.activa,
     .miniatura-pagina-movil.activa {
-      border-color: #9cc247;
+      border-color: #e97b11;
+      box-shadow: 0 0 0 4px rgba(233, 123, 17, 0.4);
       transform: scale(1.05);
     }
     
@@ -1105,7 +1107,7 @@
         </div>
         
         {{-- Segunda fila de ofertas --}}
-        <div class="flex gap-2 items-start mb-1 mt-1">
+        <div class="flex gap-2 items-start mb-2 mt-1">
           {{-- Tercera oferta --}}
           <div class="flex-1" id="mejor-oferta-contenedor-movil-3" style="display: none;">
             <div class="flex items-center justify-center mb-1">
@@ -1143,7 +1145,7 @@
       </div>
       
       {{-- Botón para ver todas las ofertas --}}
-      <a href="#listado-precios" class="block w-full text-center py-3 text-white rounded font-semibold mb-4 -mt-1" style="background-color: #d16a0f;" onmouseover="this.style.backgroundColor='#b85a0d'" onmouseout="this.style.backgroundColor='#d16a0f'">
+      <a href="#listado-precios" class="block w-full text-center py-3 text-white rounded font-semibold mb-4" style="background-color: #d16a0f;" onmouseover="this.style.backgroundColor='#b85a0d'" onmouseout="this.style.backgroundColor='#d16a0f'">
         Ver todas las ofertas ({{ count($ofertas) }})
       </a>
       {{-- x10: Descripción corta (móvil) --}}
@@ -1163,7 +1165,7 @@
         <a href="{{ añadirCam($relacionado->categoria->construirUrlCategorias($relacionado->slug)) }}" class="inline-block align-top bg-gray-50 rounded-lg border p-3 w-36 text-center card-hover hover:bg-gray-100">
           <img src="{{ asset('images/' . ($relacionado->imagen_pequena[0] ?? '')) }}" loading="lazy" alt="{{$relacionado->nombre}}" class="w-full h-auto object-contain mb-2">
           <div class="text-sm font-semibold">{{ $relacionado->talla }}</div>
-          <div class="text-sm" style="color: #e97b11;">{{ number_format($relacionado->precio, 2, ',', '.') }}
+          <div class="text-sm" style="color: #73b112;">{{ number_format($relacionado->precio, 2, ',', '.') }}
             @if($relacionado->unidadDeMedida === 'kilos')
               /Kg.
             @elseif($relacionado->unidadDeMedida === 'litros')
@@ -1227,7 +1229,7 @@
               <img src="{{ asset('images/' . ($relacionado->imagen_pequena[0] ?? '')) }}" loading="lazy" alt="{{$relacionado->nombre}}" class="w-[94px] max-w-full h-auto object-contain">
             </div>
             <div class="text-sm font-semibold text-black-700">{{ $relacionado->marca }} - {{ $relacionado->talla }}</div>
-            <div class="text-xl font-bold" style="color: #e97b11;">{{ number_format($relacionado->precio, 2) }}€
+            <div class="text-xl font-bold" style="color: #73b112;">{{ number_format($relacionado->precio, 2) }}€
     @if($relacionado->unidadDeMedida === 'unidad')
         <span class="text-xs text-gray-500">/Und.</span>
     @elseif($relacionado->unidadDeMedida === 'kilos')
@@ -1350,7 +1352,7 @@
                   <div class="flex-1 min-w-0">
                     <div class="text-sm font-medium text-gray-900 truncate">{{ $item['producto_nombre'] }}</div>
                     <div class="flex items-center justify-between mt-1">
-                      <div class="text-sm font-bold" style="color: #e97b11;">
+                      <div class="text-sm font-bold" style="color: #73b112;">
                         <span class="text-xs text-gray-500">Desde </span>
                         {{ $item['precio_formateado'] }}
                       </div>
@@ -1380,7 +1382,7 @@
                   <div class="flex-1 min-w-0">
                     <div class="text-sm font-medium text-gray-900 truncate">{{ $item['producto_nombre'] }}</div>
                     <div class="flex items-center justify-between mt-1">
-                      <div class="text-sm font-bold" style="color: #e97b11;">
+                      <div class="text-sm font-bold" style="color: #73b112;">
                       <span class="text-xs text-gray-500">Desde </span>
                         {{ $item['precio_formateado'] }}
                       </div>
@@ -2100,7 +2102,7 @@
             {{-- Función para generar el botón de oferta --}}
             {{-- _gbo1: generarBotonOferta - Genera el HTML del botón de oferta con badges de cupones --}}
             function _gbo1(oferta) {
-              {{-- Siempre usar el mismo botón azul con "Ir a la tienda" (igual que sin descuento) --}}
+              {{-- Botón naranja para móvil con "Ir a la tienda" --}}
               const botonBase = 'inline-block w-full py-1 px-1 text-white text-base font-semibold rounded transition-colors text-center relative cursor-pointer';
               let badgeHtml = '';
               let dataAttrs = '';
@@ -2575,13 +2577,11 @@
                     boton.style.setProperty('background-color', '#e97b11', 'important');
                     boton.style.setProperty('color', '#ffffff', 'important');
                     boton.style.setProperty('border-color', '#d16a0f', 'important');
-                    boton.style.setProperty('border-width', '1px', 'important');
                     boton.classList.remove('opacity-50', 'cursor-not-allowed');
                   } else {
                     boton.style.setProperty('background-color', '#ffffff', 'important');
                     boton.style.setProperty('color', '#111827', 'important');
                     boton.style.setProperty('border-color', '#9ca3af', 'important');
-                    boton.style.setProperty('border-width', '1px', 'important');
                     boton.classList.remove('opacity-50', 'cursor-not-allowed');
                   }
                 }
@@ -2618,7 +2618,6 @@
                     boton.style.setProperty('background-color', estaSeleccionado ? '#e97b11' : '#ffffff', 'important');
                     boton.style.setProperty('color', estaSeleccionado ? '#ffffff' : '#111827', 'important');
                     boton.style.setProperty('border-color', estaSeleccionado ? '#d16a0f' : '#9ca3af', 'important');
-                    boton.style.setProperty('border-width', estaSeleccionado ? '1px' : '1px', 'important');
                     boton.classList.remove('opacity-50', 'cursor-not-allowed');
                   }
                 }
@@ -2640,13 +2639,11 @@
                     boton.style.setProperty('background-color', '#e97b11', 'important');
                     boton.style.setProperty('color', '#ffffff', 'important');
                     boton.style.setProperty('border-color', '#d16a0f', 'important');
-                    boton.style.setProperty('border-width', '1px', 'important');
                     boton.classList.remove('opacity-50', 'cursor-not-allowed');
                   } else {
                     boton.style.setProperty('background-color', '#ffffff', 'important');
                     boton.style.setProperty('color', '#111827', 'important');
                     boton.style.setProperty('border-color', '#9ca3af', 'important');
-                    boton.style.setProperty('border-width', '1px', 'important');
                     boton.classList.remove('opacity-50', 'cursor-not-allowed');
                   }
                 }
@@ -3281,7 +3278,7 @@
                   precioTotalClass = 'text-3xl font-extrabold';
                   precioTotalLabelClass = 'text-sm text-gray-500';
                   precioUnidadClass = 'text-sm text-gray-500';
-                  precioUnidadLabelClass = 'text-xs font-semibold';
+                  precioUnidadLabelClass = 'font-semibold';
                 }
                 
                 // Determinar estructura de grid según unidadUnica
@@ -3406,7 +3403,7 @@
                   botonHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">2a al 50%</span>' +
                     '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2a-al-50="true" target="_blank">Ir a la tienda</span>';
                 } else {
-                  botonHtml = '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded">Ir a la tienda</span>';
+                  botonHtml = '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'">Ir a la tienda</span>';
                 }
                 
                 html += `
@@ -3434,13 +3431,13 @@
                     ${mostrarPrecioTotal ? `
                     <div class="precio-total text-gray-700 divider text-center min-w-0 overflow-hidden ${ordenPrecio} ${esUnidadUnicaSinColumnas ? 'precio-unidad-unica-sin-columnas' : ''}">
                       <div class="${precioTotalLabelClass}">Precio total</div>
-                      <div class="${precioTotalClass}" ${esUnidadUnica ? 'style="color: #e97b11; font-weight: 900;"' : (ordenActual === 'precio_total' ? 'style="color: #e97b11; font-weight: 900;"' : 'style="color: #111827;"')}>${primeraOferta.precio_total} <span class="text-sm text-gray-500 font-normal">€</span></div>
+                      <div class="${precioTotalClass}" ${ordenActual === 'precio_total' ? 'style="color: #e97b11;"' : ''}>${primeraOferta.precio_total} <span class="text-sm text-gray-500 font-normal">€</span></div>
                     </div>
                     ` : ''}
                     ${mostrarPrecioUnidad ? `
                     <div class="precio-und text-center text-gray-700 divider min-w-0 overflow-hidden ${ordenPrecio}">
                       <div class="${precioUnidadLabelClass}">${_glp1(unidadMedida)}</div>
-                      <div class="${precioUnidadClass}" ${esUnidadUnica ? 'style="color: #e97b11;"' : (ordenActual === 'precio_total' ? 'style="color: #111827;"' : 'style="color: #e97b11;"')}>
+                      <div class="${precioUnidadClass}" style="color: #e97b11;">
                         ${primeraOferta.precio_unidad}
                         <span class="text-sm text-gray-500 font-normal">${_gsp1(unidadMedida)}</span>
                       </div>
@@ -3523,7 +3520,7 @@
                     precioTotalClass = 'text-3xl font-extrabold';
                     precioTotalLabelClass = 'text-sm text-gray-500';
                     precioUnidadClass = 'text-sm text-gray-500';
-                    precioUnidadLabelClass = 'text-xs font-semibold';
+                    precioUnidadLabelClass = 'font-semibold';
                   }
                   
                   // Determinar estructura de grid según unidadUnica
@@ -3629,16 +3626,16 @@
                       ${mostrarPrecioTotal ? `
                       <div class="precio-total text-gray-700 divider text-center min-w-0 overflow-hidden ${ordenPrecio} ${esUnidadUnicaSinColumnas ? 'precio-unidad-unica-sin-columnas' : ''}">
                         <div class="${precioTotalLabelClass}">Precio total</div>
-                        <div class="${precioTotalClass}" ${esUnidadUnica ? 'style="color: #e97b11; font-weight: 900;"' : (ordenActual === 'precio_total' ? 'style="color: #e97b11; font-weight: 900;"' : 'style="color: #111827;"')}>${itemGrupo.precio_total} <span class="text-sm text-gray-500 font-normal">€</span></div>
+                        <div class="${precioTotalClass}" ${ordenActual === 'precio_total' ? 'style="color: #e97b11;"' : ''}>${itemGrupo.precio_total} <span class="text-sm text-gray-500 font-normal">€</span></div>
                       </div>
                       ` : ''}
                       ${mostrarPrecioUnidad ? `
                       <div class="precio-und text-center text-gray-700 divider min-w-0 overflow-hidden ${ordenPrecio}">
                         <div class="${precioUnidadLabelClass}">${_glp1(unidadMedida)}</div>
-                        <div class="${precioUnidadClass}" ${esUnidadUnica ? 'style="color: #e97b11;"' : (ordenActual === 'precio_total' ? 'style="color: #111827;"' : 'style="color: #e97b11;"')}>
-                          ${itemGrupo.precio_unidad}
-                          <span class="text-sm text-gray-500 font-normal">${_gsp1(unidadMedida)}</span>
-                        </div>
+                      <div class="${precioUnidadClass}" style="color: #e97b11;">
+                        ${itemGrupo.precio_unidad}
+                        <span class="text-sm text-gray-500 font-normal">${_gsp1(unidadMedida)}</span>
+                      </div>
                       </div>
                       ` : ''}
                       <div class="boton text-center min-w-0 relative overflow-visible ${ordenBoton}">
@@ -3668,7 +3665,7 @@
                         return '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); ' + badgeTop + ' right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold;">CUPÓN</span>' +
                                '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" ' + dataAttrs + ' target="_blank">Ir a la tienda</span>';
                       } catch (e) {
-                        return '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'">Ir a la tienda</span>';
+                        return '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded">Ir a la tienda</span>';
                       }
                     })() : 
                     itemGrupo.descuentos === 'cupon' ? 
@@ -3720,7 +3717,7 @@
                   precioTotalClass = 'text-3xl font-extrabold';
                   precioTotalLabelClass = 'text-sm text-gray-500';
                   precioUnidadClass = 'text-sm text-gray-500';
-                  precioUnidadLabelClass = 'text-xs font-semibold';
+                  precioUnidadLabelClass = 'font-semibold';
                 }
                 
                 let gridCols = 'sm:grid-cols-[100px_1fr_1fr_1fr_1fr_auto]';
@@ -3803,7 +3800,7 @@
                       : `data-cupon="true" data-valor-cupon="${valorCuponEscapado}" data-url="${urlEscapada}"`;
                     botonHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
                                '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" ' + dataAttrs + '>Ir a la tienda</span>';
-                                  } catch (e) {
+                  } catch (e) {
                     botonHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
                                '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon="true" data-url="' + item.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;') + '">Ir a la tienda</span>';
                   }
@@ -3848,19 +3845,19 @@
                     ${!mostrarPrecioTotal && !mostrarPrecioUnidad ? `
                     <div class="precio-total text-gray-700 divider text-center min-w-0 overflow-hidden ${ordenPrecio}">
                       <div class="text-sm text-gray-500">Precio total</div>
-                      <div class="text-3xl font-extrabold" style="color: #e97b11;">${item.precio_total} <span class="text-sm text-gray-500 font-normal">€</span></div>
+                        <div class="text-3xl font-extrabold" style="color: #e97b11;">${item.precio_total} <span class="text-sm text-gray-500 font-normal">€</span></div>
                     </div>
                     ` : ''}
                     ${mostrarPrecioTotal ? `
                     <div class="precio-total text-gray-700 divider text-center min-w-0 overflow-hidden ${ordenPrecio} ${esUnidadUnicaSinColumnas ? 'precio-unidad-unica-sin-columnas' : ''}">
                       <div class="${precioTotalLabelClass}">Precio total</div>
-                      <div class="${precioTotalClass}" ${esUnidadUnica ? 'style="color: #e97b11; font-weight: 900;"' : (ordenActual === 'precio_total' ? 'style="color: #e97b11; font-weight: 900;"' : 'style="color: #111827;"')}>${item.precio_total} <span class="text-sm text-gray-500 font-normal">€</span></div>
+                      <div class="${precioTotalClass}" ${ordenActual === 'precio_total' ? 'style="color: #e97b11;"' : ''}>${item.precio_total} <span class="text-sm text-gray-500 font-normal">€</span></div>
                     </div>
                     ` : ''}
                     ${mostrarPrecioUnidad ? `
                     <div class="precio-und text-center text-gray-700 divider min-w-0 overflow-hidden ${ordenPrecio}">
                       <div class="${precioUnidadLabelClass}">${_glp1(unidadMedida)}</div>
-                      <div class="${precioUnidadClass}" ${esUnidadUnica ? 'style="color: #e97b11;"' : (ordenActual === 'precio_total' ? 'style="color: #111827;"' : 'style="color: #e97b11;"')}>
+                      <div class="${precioUnidadClass}" style="color: #e97b11;">
                         ${item.precio_unidad}
                         <span class="text-sm text-gray-500 font-normal">${_gsp1(unidadMedida)}</span>
                       </div>
@@ -4507,12 +4504,12 @@
               label: 'Precio (€)',
               data: datos,
               fill: true,
-              borderColor: 'rgb(112, 178, 22)',
-              backgroundColor: 'rgba(112, 178, 22, 0.15)',
+              borderColor: 'rgb(245, 167, 66)',
+              backgroundColor: 'rgba(245, 167, 66, 0.1)',
               tension: 0.3,
               pointRadius: 0, // Quitar los puntos
               pointHoverRadius: 4, // Solo mostrar punto al hacer hover
-              pointHoverBackgroundColor: 'rgb(112, 178, 22)',
+              pointHoverBackgroundColor: 'rgb(245, 167, 66)',
               pointHoverBorderColor: '#fff',
               pointHoverBorderWidth: 2
             }]
@@ -4684,7 +4681,7 @@
         botones.forEach(btn => {
           const periodo = btn.getAttribute('data-periodo');
           if (periodo === periodoActivo) {
-            btn.style.backgroundColor = '#70b216';
+            btn.style.backgroundColor = '#e97b11';
             btn.style.color = 'white';
             btn.classList.remove('hover:bg-gray-100');
           } else {
@@ -6548,7 +6545,7 @@ function _rod1() {
       <div class="text-center mb-4 pb-4 border-b border-gray-200">
         <div class="precio-total text-gray-700">
           <div class="text-sm text-gray-500">Precio total</div>
-          <div class="text-3xl font-extrabold" style="color: #e97b11;">${primeraOferta.precio_total} <span class="text-sm text-gray-500 font-normal">€</span></div>
+          <div class="text-3xl font-extrabold" style="color: #73b112;">${primeraOferta.precio_total} <span class="text-sm text-gray-500 font-normal">€</span></div>
         </div>
       </div>
     `;
@@ -6572,7 +6569,7 @@ function _rod1() {
       <div class="text-center mb-4 pb-4 border-b border-gray-200">
         <div class="precio-und text-gray-700">
           <div class="font-semibold">${_glp1(unidadMedida)}</div>
-          <div class="text-2xl font-extrabold" style="color: #e97b11;">
+          <div class="text-2xl font-extrabold" style="color: #73b112;">
             ${primeraOferta.precio_unidad} <span class="text-sm text-gray-500 font-normal">${_gsp1(unidadMedida)}</span>
           </div>
         </div>
@@ -6585,17 +6582,17 @@ function _rod1() {
   if (primeraOferta.descuentos && typeof primeraOferta.descuentos === 'string' && primeraOferta.descuentos.startsWith('SoloAliexpress;')) {
     botonHtml = '<div class="relative">' +
       '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap; position: absolute; top: -12px; right: 8px; z-index: 10;">CUPÓN</span>' +
-      '<span class="inline-block w-full py-3 px-4 text-white text-center font-semibold rounded transition-colors cursor-pointer" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon-aliexpress="true" data-descuentos="' + primeraOferta.descuentos.replace(/"/g, '&quot;') + '" data-oferta-id="' + primeraOferta.id + '" data-url="' + primeraOferta.url + '">Ir a la tienda</span>' +
+      '<span class="inline-block w-full py-3 px-4 bg-blue-500 text-white text-center font-semibold rounded hover:bg-blue-600 transition-colors cursor-pointer" data-cupon-aliexpress="true" data-descuentos="' + primeraOferta.descuentos.replace(/"/g, '&quot;') + '" data-oferta-id="' + primeraOferta.id + '" data-url="' + primeraOferta.url + '">Ir a la tienda</span>' +
       '</div>';
   } else if (primeraOferta.descuentos && typeof primeraOferta.descuentos === 'string' && primeraOferta.descuentos.startsWith('CholloTienda1SoloCuponQueAplicaDescuento;')) {
     botonHtml = '<div class="relative">' +
       '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap; position: absolute; top: -12px; right: 8px; z-index: 10;">CUPÓN</span>' +
-      '<span class="inline-block w-full py-3 px-4 text-white text-center font-semibold rounded transition-colors cursor-pointer" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon-chollo-tienda-solo="true" data-descuentos="' + primeraOferta.descuentos.replace(/"/g, '&quot;') + '" data-oferta-id="' + primeraOferta.id + '" data-url="' + primeraOferta.url + '">Ir a la tienda</span>' +
+      '<span class="inline-block w-full py-3 px-4 bg-blue-500 text-white text-center font-semibold rounded hover:bg-blue-600 transition-colors cursor-pointer" data-cupon-chollo-tienda-solo="true" data-descuentos="' + primeraOferta.descuentos.replace(/"/g, '&quot;') + '" data-oferta-id="' + primeraOferta.id + '" data-url="' + primeraOferta.url + '">Ir a la tienda</span>' +
       '</div>';
   } else if (primeraOferta.descuentos && typeof primeraOferta.descuentos === 'string' && primeraOferta.descuentos.startsWith('CholloTienda;')) {
     botonHtml = '<div class="relative">' +
       '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap; position: absolute; top: -12px; right: 8px; z-index: 10;">CUPÓN</span>' +
-      '<span class="inline-block w-full py-3 px-4 text-white text-center font-semibold rounded transition-colors cursor-pointer" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon-chollo-tienda="true" data-descuentos="' + primeraOferta.descuentos.replace(/"/g, '&quot;') + '" data-oferta-id="' + primeraOferta.id + '" data-url="' + primeraOferta.url + '">Ir a la tienda</span>' +
+      '<span class="inline-block w-full py-3 px-4 bg-blue-500 text-white text-center font-semibold rounded hover:bg-blue-600 transition-colors cursor-pointer" data-cupon-chollo-tienda="true" data-descuentos="' + primeraOferta.descuentos.replace(/"/g, '&quot;') + '" data-oferta-id="' + primeraOferta.id + '" data-url="' + primeraOferta.url + '">Ir a la tienda</span>' +
       '</div>';
   } else if (primeraOferta.descuentos && typeof primeraOferta.descuentos === 'string' && primeraOferta.descuentos.startsWith('cupon;')) {
     try {
@@ -6610,43 +6607,43 @@ function _rod1() {
         : `data-cupon="true" data-valor-cupon="${valorCuponEscapado}" data-url="${urlEscapada}"`;
       botonHtml = '<div class="relative">' +
         '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); font-size: 0.7rem; padding: 2px 6px; font-weight: bold; position: absolute; top: -12px; right: 8px; z-index: 10;">CUPÓN</span>' +
-        '<span class="inline-block w-full py-3 px-4 text-white text-center font-semibold rounded transition-colors cursor-pointer" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" ' + dataAttrs + '>Ir a la tienda</span>' +
+        '<span class="inline-block w-full py-3 px-4 bg-blue-500 text-white text-center font-semibold rounded hover:bg-blue-600 transition-colors cursor-pointer" ' + dataAttrs + '>Ir a la tienda</span>' +
         '</div>';
     } catch (e) {
-      botonHtml = '<a href="' + primeraOferta.url + '" target="_blank" rel="sponsored noopener noreferrer" class="block w-full py-3 px-4 text-white text-center font-semibold rounded transition-colors" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'">Ir a la tienda</a>';
+      botonHtml = '<a href="' + primeraOferta.url + '" target="_blank" rel="sponsored noopener noreferrer" class="block w-full py-3 px-4 bg-blue-500 text-white text-center font-semibold rounded hover:bg-blue-600 transition-colors">Ir a la tienda</a>';
     }
   } else if (primeraOferta.descuentos === 'cupon') {
     botonHtml = '<div class="relative">' +
       '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap; position: absolute; top: -12px; right: 8px; z-index: 10;">CUPÓN</span>' +
-      '<span class="inline-block w-full py-3 px-4 text-white text-center font-semibold rounded transition-colors cursor-pointer" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon="true" data-url="' + primeraOferta.url.replace(/"/g, '&quot;') + '">Ir a la tienda</span>' +
+      '<span class="inline-block w-full py-3 px-4 bg-blue-500 text-white text-center font-semibold rounded hover:bg-blue-600 transition-colors cursor-pointer" data-cupon="true" data-url="' + primeraOferta.url.replace(/"/g, '&quot;') + '">Ir a la tienda</span>' +
       '</div>';
   } else if (primeraOferta.descuentos === '3x2') {
     botonHtml = '<div class="relative">' +
       '<span class="cupon-badge" style="background: linear-gradient(135deg, #8b5cf6, #a855f7); font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap; position: absolute; top: -12px; right: 8px; z-index: 10;">3x2</span>' +
-      '<span class="inline-block w-full py-3 px-4 text-white text-center font-semibold rounded transition-colors cursor-pointer" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-3x2="true" data-url="' + primeraOferta.url.replace(/"/g, '&quot;') + '">Ir a la tienda</span>' +
+      '<span class="inline-block w-full py-3 px-4 bg-blue-500 text-white text-center font-semibold rounded hover:bg-blue-600 transition-colors cursor-pointer" data-3x2="true" data-url="' + primeraOferta.url.replace(/"/g, '&quot;') + '">Ir a la tienda</span>' +
       '</div>';
   } else if (primeraOferta.descuentos === '2x1 - SoloCarrefour') {
     botonHtml = '<div class="relative">' +
       '<span class="cupon-badge" style="background: linear-gradient(135deg, #10b981, #059669); font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap; position: absolute; top: -12px; right: 8px; z-index: 10;">2x1</span>' +
-      '<span class="inline-block w-full py-3 px-4 text-white text-center font-semibold rounded transition-colors cursor-pointer" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2x1="true" data-url="' + primeraOferta.url.replace(/"/g, '&quot;') + '">Ir a la tienda</span>' +
+      '<span class="inline-block w-full py-3 px-4 bg-blue-500 text-white text-center font-semibold rounded hover:bg-blue-600 transition-colors cursor-pointer" data-2x1="true" data-url="' + primeraOferta.url.replace(/"/g, '&quot;') + '">Ir a la tienda</span>' +
       '</div>';
   } else if (primeraOferta.descuentos === '2a al 50 - cheque - SoloCarrefour') {
     botonHtml = '<div class="relative">' +
       '<span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap; position: absolute; top: -12px; right: 8px; z-index: 10;">2a al 50%</span>' +
-      '<span class="inline-block w-full py-3 px-4 text-white text-center font-semibold rounded transition-colors cursor-pointer" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2a-al-50-cheque="true" data-url="' + primeraOferta.url.replace(/"/g, '&quot;') + '">Ir a la tienda</span>' +
+      '<span class="inline-block w-full py-3 px-4 bg-blue-500 text-white text-center font-semibold rounded hover:bg-blue-600 transition-colors cursor-pointer" data-2a-al-50-cheque="true" data-url="' + primeraOferta.url.replace(/"/g, '&quot;') + '">Ir a la tienda</span>' +
       '</div>';
   } else if (primeraOferta.descuentos === '2a al 70') {
     botonHtml = '<div class="relative">' +
       '<span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap; position: absolute; top: -12px; right: 8px; z-index: 10;">2a al 70%</span>' +
-      '<span class="inline-block w-full py-3 px-4 text-white text-center font-semibold rounded transition-colors cursor-pointer" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2a-al-70="true" data-url="' + primeraOferta.url.replace(/"/g, '&quot;') + '">Ir a la tienda</span>' +
+      '<span class="inline-block w-full py-3 px-4 bg-blue-500 text-white text-center font-semibold rounded hover:bg-blue-600 transition-colors cursor-pointer" data-2a-al-70="true" data-url="' + primeraOferta.url.replace(/"/g, '&quot;') + '">Ir a la tienda</span>' +
       '</div>';
   } else if (primeraOferta.descuentos === '2a al 50') {
     botonHtml = '<div class="relative">' +
       '<span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap; position: absolute; top: -12px; right: 8px; z-index: 10;">2a al 50%</span>' +
-      '<span class="inline-block w-full py-3 px-4 text-white text-center font-semibold rounded transition-colors cursor-pointer" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2a-al-50="true" data-url="' + primeraOferta.url.replace(/"/g, '&quot;') + '">Ir a la tienda</span>' +
+      '<span class="inline-block w-full py-3 px-4 bg-blue-500 text-white text-center font-semibold rounded hover:bg-blue-600 transition-colors cursor-pointer" data-2a-al-50="true" data-url="' + primeraOferta.url.replace(/"/g, '&quot;') + '">Ir a la tienda</span>' +
       '</div>';
   } else {
-    botonHtml = '<a href="' + primeraOferta.url + '" target="_blank" rel="sponsored noopener noreferrer" class="block w-full py-3 px-4 text-white text-center font-semibold rounded transition-colors" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'">Ir a la tienda</a>';
+    botonHtml = '<a href="' + primeraOferta.url + '" target="_blank" rel="sponsored noopener noreferrer" class="block w-full py-3 px-4 bg-blue-500 text-white text-center font-semibold rounded hover:bg-blue-600 transition-colors">Ir a la tienda</a>';
   }
   
   html += botonHtml;

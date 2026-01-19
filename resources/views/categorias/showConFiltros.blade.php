@@ -290,16 +290,62 @@
             </div>
         </div>
 
-        {{-- BOTÓN VER FILTROS (solo móvil/tablet) --}}
-        @if($fi1->count() > 0)
-        <div class="lg:hidden mb-4">
+        {{-- BOTONES FILTROS Y ORDENAR (solo móvil/tablet) --}}
+        <div class="lg:hidden mb-4 flex gap-2">
+            @if($fi1->count() > 0)
             <button type="button" 
                     id="bvf1" 
-                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
-                Ver filtros
+                    style="background-color: #e97b11; width: 36%;"
+                    class="text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+                    onmouseover="this.style.backgroundColor='#d16a0f'"
+                    onmouseout="this.style.backgroundColor='#e97b11'">
+                Filtros
             </button>
+            @endif
+            {{-- BOTÓN ORDENAR CON DROPDOWN --}}
+            <div class="relative {{ $fi1->count() > 0 ? 'ml-auto' : 'w-full' }}" style="{{ $fi1->count() > 0 ? 'width: 36%;' : '' }}">
+                <button type="button" 
+                        id="bo1" 
+                        style="background-color: #000000;"
+                        class="w-full text-white font-semibold py-2 px-4 transition-colors flex items-center justify-center gap-2"
+                        onmouseover="this.style.backgroundColor='#333333'"
+                        onmouseout="this.style.backgroundColor='#000000'"
+                        onclick="_to1()">
+                    Ordenar
+                    <svg id="svg-ordenar" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </button>
+                {{-- DROPDOWN DE ORDENACIÓN --}}
+                <div id="dd1" class="hidden absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                    @php
+                        // $urlRelevancia -> $ur1
+                        // $urlPrecio -> $up1
+                        // $urlRebajado -> $ur2
+                        // $orden -> $o1
+                        // construirUrlFiltros() -> _f3()
+                        $ur1 = _f3($ca1->slug, $fa1 ?? [], $pm1 ?? null, $pm2 ?? null, 'relevancia', $fi1->toArray(), $r1 ?? false);
+                        $up1 = _f3($ca1->slug, $fa1 ?? [], $pm1 ?? null, $pm2 ?? null, 'precio', $fi1->toArray(), $r1 ?? false);
+                        $ur2 = _f3($ca1->slug, $fa1 ?? [], $pm1 ?? null, $pm2 ?? null, 'rebajado', $fi1->toArray(), $r1 ?? false);
+                    @endphp
+                    <a href="{{ _f2($ur1) }}" 
+                       class="block px-4 py-3 text-sm font-semibold border-b border-gray-100 transition-colors {{ ($o1 ?? 'relevancia') === 'relevancia' ? 'text-white' : 'text-gray-800 hover:bg-green-50' }}"
+                       style="{{ ($o1 ?? 'relevancia') === 'relevancia' ? 'background-color: #5f8c21;' : '' }}">
+                        Relevancia
+                    </a>
+                    <a href="{{ _f2($up1) }}" 
+                       class="block px-4 py-3 text-sm font-semibold border-b border-gray-100 transition-colors {{ ($o1 ?? 'relevancia') === 'precio' ? 'text-white' : 'text-gray-800 hover:bg-green-50' }}"
+                       style="{{ ($o1 ?? 'relevancia') === 'precio' ? 'background-color: #5f8c21;' : '' }}">
+                        Precio
+                    </a>
+                    <a href="{{ _f2($ur2) }}" 
+                       class="block px-4 py-3 text-sm font-semibold transition-colors {{ ($o1 ?? 'relevancia') === 'rebajado' ? 'text-white' : 'text-red-500 hover:bg-red-50' }}"
+                       style="{{ ($o1 ?? 'relevancia') === 'rebajado' ? 'background-color: #ef4444;' : '' }}">
+                        Rebajado
+                    </a>
+                </div>
+            </div>
         </div>
-        @endif
 
         {{-- LAYOUT CON SIDEBAR Y MAIN --}}
         <div class="flex flex-col lg:flex-row gap-6">
@@ -350,7 +396,7 @@
                                 </div>
                                 <div class="relative h-2 bg-gray-200 rounded-full" id="pst1">
                                     <div class="absolute h-2 bg-gray-200 rounded-full w-full"></div>
-                                    <div class="absolute h-2 bg-blue-500 rounded-full" id="psa1"></div>
+                                    <div class="absolute h-2 rounded-full" id="psa1" style="background-color: #73b112;"></div>
                                     <input type="range" 
                                            id="pms1" 
                                            class="absolute w-full h-0 bg-transparent appearance-none cursor-pointer z-20"
@@ -367,7 +413,10 @@
                                 </div>
                                 <button type="button" 
                                         id="bap1" 
-                                        class="mt-3 w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+                                        style="background-color: #73b112;"
+                                        class="mt-3 w-full text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+                                        onmouseover="this.style.backgroundColor='#5f8c21'"
+                                        onmouseout="this.style.backgroundColor='#73b112'">
                                     Aplicar precio
                                 </button>
                             </div>
@@ -455,7 +504,10 @@
                                 </div>
                             @if($tieneMasDe5)
                             <button type="button" 
-                                    class="btn-mostrar-mas text-sm text-blue-600 hover:text-blue-800 font-medium py-1 transition-colors cursor-pointer mt-2"
+                                    class="btn-mostrar-mas text-sm font-medium py-1 transition-colors cursor-pointer mt-2"
+                                    style="color: #5f8c21 !important;"
+                                    onmouseover="this.style.color='#4d7a1a'"
+                                    onmouseout="this.style.color='#5f8c21'"
                                     data-linea-id="{{ $filtro['id'] }}"
                                     style="padding-left: 0.5rem; padding-right: 0.5rem;">
                                 Mostrar más
@@ -483,8 +535,8 @@
 
             {{-- MAIN CON PRODUCTOS --}}
             <main class="flex-1 lg:w-3/4">
-                {{-- BOTONES DE ORDENACIÓN --}}
-                <div class="flex justify-end gap-2 mb-4">
+                {{-- BOTONES DE ORDENACIÓN (solo desktop) --}}
+                <div class="hidden lg:flex justify-end gap-2 mb-4">
                     @php
                         // $urlRelevancia -> $ur1
                         // $urlPrecio -> $up1
@@ -496,11 +548,13 @@
                         $ur2 = _f3($ca1->slug, $fa1 ?? [], $pm1 ?? null, $pm2 ?? null, 'rebajado', $fi1->toArray(), $r1 ?? false);
                     @endphp
                     <a href="{{ _f2($ur1) }}" 
-                       class="px-4 py-2 text-sm font-semibold rounded border transition-colors {{ ($o1 ?? 'relevancia') === 'relevancia' ? 'bg-blue-500 text-white border-blue-600' : 'bg-white text-blue-500 border-blue-500 hover:bg-blue-50' }}">
+                       class="px-4 py-2 text-sm font-semibold rounded border transition-colors {{ ($o1 ?? 'relevancia') === 'relevancia' ? 'text-white' : 'bg-white hover:bg-green-50' }}"
+                       style="{{ ($o1 ?? 'relevancia') === 'relevancia' ? 'background-color: #5f8c21; border-color: #4d7a1a;' : 'color: #5f8c21; border-color: #5f8c21;' }}">
                         Relevancia
                     </a>
                     <a href="{{ _f2($up1) }}" 
-                       class="px-4 py-2 text-sm font-semibold rounded border transition-colors {{ ($o1 ?? 'relevancia') === 'precio' ? 'bg-blue-500 text-white border-blue-600' : 'bg-white text-blue-500 border-blue-500 hover:bg-blue-50' }}">
+                       class="px-4 py-2 text-sm font-semibold rounded border transition-colors {{ ($o1 ?? 'relevancia') === 'precio' ? 'text-white' : 'bg-white hover:bg-green-50' }}"
+                       style="{{ ($o1 ?? 'relevancia') === 'precio' ? 'background-color: #5f8c21; border-color: #4d7a1a;' : 'color: #5f8c21; border-color: #5f8c21;' }}">
                         Precio
                     </a>
                     <a href="{{ _f2($ur2) }}" 
@@ -611,7 +665,7 @@
                             <p class="font-semibold text-gray-700 text-center text-sm mb-1 line-clamp-2">{{ $pr2->nombre }}</p>
                             <p class="text-center mb-1">
                                 <span class="text-xs text-gray-500">Desde:</span>
-                                <span class="text-xl font-bold text-pink-600">{{ $pf1 }}€
+                                <span class="text-xl font-bold" style="color: #e97b11;">{{ $pf1 }}€
                                     @if($s1)
                                         <span class="text-xs text-gray-500">{{ $s1 }}</span>
                                     @endif
@@ -679,7 +733,7 @@
                             </div>
                             <div class="relative h-2 bg-gray-200 rounded-full" id="pstm1">
                                 <div class="absolute h-2 bg-gray-200 rounded-full w-full"></div>
-                                <div class="absolute h-2 bg-blue-500 rounded-full" id="psam1"></div>
+                                <div class="absolute h-2 rounded-full" id="psam1" style="background-color: #73b112;"></div>
                                 <input type="range" 
                                        id="pmsm1" 
                                        class="absolute w-full h-0 bg-transparent appearance-none cursor-pointer z-20"
@@ -775,12 +829,14 @@
                                         <span class="contador-sublinea text-xs text-gray-500 ml-auto" data-linea-id="{{ $filtro['id'] }}" data-sublinea-id="{{ $sub['id'] }}">({{ $contador }})</span>
                                     </label>
                                 @endforeach
-                            </div>
+                                </div>
                             @if($tieneMasDe5)
                             <button type="button" 
-                                    class="btn-mostrar-mas text-sm text-blue-600 hover:text-blue-800 font-medium py-1 transition-colors cursor-pointer mt-2"
+                                    class="btn-mostrar-mas text-sm font-medium py-1 transition-colors cursor-pointer mt-2"
                                     data-linea-id="{{ $filtro['id'] }}"
-                                    style="padding-left: 0.5rem; padding-right: 0.5rem;">
+                                    style="padding-left: 0.5rem; padding-right: 0.5rem; color: #5f8c21;"
+                                    onmouseover="this.style.color='#4d7a1a'"
+                                    onmouseout="this.style.color='#5f8c21'">
                                 Mostrar más
                             </button>
                             @endif
@@ -794,7 +850,10 @@
             <div class="p-4 border-t border-gray-200 bg-white">
                 <button type="button" 
                         id="bmpp1" 
-                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors">
+                        style="background-color: #e97b11;"
+                        class="w-full text-white font-semibold py-3 px-4 rounded-lg transition-colors"
+                        onmouseover="this.style.backgroundColor='#d16a0f'"
+                        onmouseout="this.style.backgroundColor='#e97b11'">
                     Mostrar <span id="cpm1">{{ $pr1->total() }}</span> productos
                 </button>
             </div>
@@ -825,7 +884,7 @@
             appearance: none;
             width: 18px;
             height: 18px;
-            background: #3b82f6;
+            background: #73b112;
             border: 2px solid #ffffff;
             border-radius: 50%;
             cursor: pointer;
@@ -840,7 +899,7 @@
         .precio-slider-container input[type="range"]::-moz-range-thumb {
             width: 18px;
             height: 18px;
-            background: #3b82f6;
+            background: #73b112;
             border: 2px solid #ffffff;
             border-radius: 50%;
             cursor: pointer;
@@ -910,7 +969,7 @@
             left: 0;
             right: 8px; {{-- Dejar espacio para la barra de scroll --}}
             height: 0.5rem;
-            background: linear-gradient(to bottom, rgba(59, 130, 246, 0.1), transparent);
+            background: linear-gradient(to bottom, rgba(115, 177, 18, 0.1), transparent);
             pointer-events: none;
             z-index: 9;
         }
@@ -927,19 +986,19 @@
         }
         
         .sublineas-scrollable::-webkit-scrollbar-thumb {
-            background: #3b82f6;
+            background: #73b112;
             border-radius: 4px;
-            border: 1px solid #2563eb;
+            border: 1px solid #5f8c21;
         }
         
         .sublineas-scrollable::-webkit-scrollbar-thumb:hover {
-            background: #2563eb;
+            background: #5f8c21;
         }
         
         {{-- Para Firefox --}}
         .sublineas-scrollable {
             scrollbar-width: thin;
-            scrollbar-color: #3b82f6 #e5e7eb;
+            scrollbar-color: #73b112 #e5e7eb;
         }
         
         {{-- En móvil, asegurar que el scroll sea visible --}}
@@ -947,7 +1006,7 @@
             .sublineas-scrollable {
                 {{-- Forzar que la barra de scroll sea siempre visible en móvil --}}
                 scrollbar-width: thin;
-                scrollbar-color: #3b82f6 #e5e7eb;
+                scrollbar-color: #73b112 #e5e7eb;
                 {{-- Asegurar que el scroll funcione --}}
                 overflow-y: scroll !important;
                 -webkit-overflow-scrolling: touch;
@@ -965,10 +1024,10 @@
             }
             
             .sublineas-scrollable::-webkit-scrollbar-thumb {
-                background: #2563eb !important; {{-- Más oscuro en móvil --}}
+                background: #5f8c21 !important; {{-- Más oscuro en móvil --}}
                 min-height: 30px; {{-- Mínimo tamaño para mejor visibilidad --}}
                 border-radius: 4px;
-                border: 1px solid #1d4ed8;
+                border: 1px solid #5f8c21;
             }
         }
         
@@ -1767,6 +1826,47 @@
             });
         }
 
+        {{-- _to1() -> toggleOrdenar() --}}
+        {{-- Función para abrir/cerrar el dropdown de ordenación --}}
+        function _to1() {
+            const dropdown = document.getElementById('dd1');
+            const svg = document.getElementById('svg-ordenar');
+            
+            if (dropdown && svg) {
+                const estaAbierto = !dropdown.classList.contains('hidden');
+                
+                if (estaAbierto) {
+                    dropdown.classList.add('hidden');
+                    svg.style.transform = 'rotate(0deg)';
+                } else {
+                    // Cerrar modal de filtros si está abierto
+                    const modalFiltros = document.getElementById('mf1');
+                    if (modalFiltros && !modalFiltros.classList.contains('hidden')) {
+                        modalFiltros.classList.add('hidden');
+                        document.body.style.overflow = '';
+                        _ep1();
+                    }
+                    
+                    dropdown.classList.remove('hidden');
+                    svg.style.transform = 'rotate(180deg)';
+                }
+            }
+        }
+
+        {{-- Cerrar dropdown al hacer clic fuera --}}
+        document.addEventListener('click', function(e) {
+            const botonOrdenar = document.getElementById('bo1');
+            const dropdown = document.getElementById('dd1');
+            
+            if (botonOrdenar && dropdown && !botonOrdenar.contains(e.target) && !dropdown.contains(e.target)) {
+                dropdown.classList.add('hidden');
+                const svg = document.getElementById('svg-ordenar');
+                if (svg) {
+                    svg.style.transform = 'rotate(0deg)';
+                }
+            }
+        });
+
         {{-- _cmf1() -> configurarModalFiltros() --}}
         {{-- Configurar modal de filtros (móvil/tablet) --}}
         function _cmf1() {
@@ -1777,6 +1877,16 @@
             
             if (btnVerFiltros && modalFiltros) {
                 btnVerFiltros.addEventListener('click', function() {
+                    // Cerrar dropdown de ordenación si está abierto
+                    const dropdown = document.getElementById('dd1');
+                    const svg = document.getElementById('svg-ordenar');
+                    if (dropdown && !dropdown.classList.contains('hidden')) {
+                        dropdown.classList.add('hidden');
+                        if (svg) {
+                            svg.style.transform = 'rotate(0deg)';
+                        }
+                    }
+                    
                     // Abrir modal primero para que los elementos estén en el DOM
                     modalFiltros.classList.remove('hidden');
                     document.body.style.overflow = 'hidden';

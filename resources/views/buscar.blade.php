@@ -173,7 +173,7 @@ if (!function_exists('oCV6X')) {
                 <p class="text-center mb-1">
     <span class="text-xs text-gray-500">Desde:</span>
     {{-- $p5X8 -> $producto --}}
-<span class="text-xl font-bold text-pink-600">{{ number_format($p5X8->precio, 2) }}€
+<span class="text-xl font-bold" style="color: #e97b11;">{{ number_format($p5X8->precio, 2) }}€
     {{-- $p5X8 -> $producto --}}
     @if($p5X8->unidadDeMedida === 'unidad')
         <span class="text-xs text-gray-500">/Und.</span>

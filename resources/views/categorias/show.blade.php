@@ -143,7 +143,7 @@ if (!function_exists('_f1')) {
             <ol class="flex items-center space-x-2 text-sm text-gray-600">
                 <li>
                     {{-- añadirCam() -> _f1() --}}
-                    <a href="{{ _f1(route('home')) }}" class="hover:text-pink-600">Inicio</a>
+                    <a href="{{ _f1(route('home')) }}" class="hover:text-gray-800">Inicio</a>
                 </li>
                 {{-- $breadcrumb -> $b1, $item -> $it --}}
                 @foreach($b1 as $it)
@@ -152,7 +152,7 @@ if (!function_exists('_f1')) {
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                     </svg>
                     {{-- añadirCam() -> _f1() --}}
-                    <a href="{{ _f1($it['url']) }}" class="hover:text-pink-600">{{ $it['nombre'] }}</a>
+                    <a href="{{ _f1($it['url']) }}" class="hover:text-gray-800">{{ $it['nombre'] }}</a>
                 </li>
                 @endforeach
             </ol>
@@ -198,10 +198,10 @@ if (!function_exists('_f1')) {
                             </div>
                         </a>
                         {{-- añadirCam() -> _f1() --}}
-                        <a href="{{ _f1(route('categoria.show', $ct1->slug)) }}" class="text-pink-500 text-base md:text-xl font-bold hover:text-pink-600">
+                        <a href="{{ _f1(route('categoria.show', $ct1->slug)) }}" class="text-black text-base md:text-xl font-bold hover:text-gray-700">
                         <div class="flex items-center justify-center gap-1 md:gap-2 mb-1 md:mb-2">
                             {{ $ct1->nombre }}
-                            <svg class="w-3 h-3 md:w-4 md:h-4 text-pink-500 hover:text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="w-3 h-3 md:w-4 md:h-4 text-black hover:text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                             </svg>
                         </div>
@@ -255,10 +255,10 @@ if (!function_exists('_f1')) {
                                     @endif
                                 </div>
                             </a>
-                            <a href="{{ $urlCategoria }}" class="text-pink-500 text-base md:text-xl font-bold hover:text-pink-600">
+                            <a href="{{ $urlCategoria }}" class="text-black text-base md:text-xl font-bold hover:text-gray-700">
                                 <div class="flex items-center justify-center gap-1 md:gap-2 mb-1 md:mb-2">
                                     {{ $ct2->nombre }}
-                                    <svg class="w-3 h-3 md:w-4 md:h-4 text-pink-500 hover:text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg class="w-3 h-3 md:w-4 md:h-4 text-black hover:text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                                     </svg>
                                 </div>
@@ -293,7 +293,10 @@ if (!function_exists('_f1')) {
                 <div class="text-center mt-6">
                     {{-- btn-mostrar-subcategorias -> bms1 --}}
                     <button id="bms1" 
-                            class="bg-pink-500 hover:bg-pink-600 text-white px-6 py-2 rounded-lg transition-colors">
+                            style="background-color: #e97b11;"
+                            class="text-white px-6 py-2 rounded-lg transition-colors"
+                            onmouseover="this.style.backgroundColor='#d16a0f'"
+                            onmouseout="this.style.backgroundColor='#e97b11'">
                         Mostrar más categorías
                     </button>
                 </div>
@@ -309,15 +312,15 @@ if (!function_exists('_f1')) {
         {{-- $producto -> $pr2, $totalProductosDisponibles -> $tpd1 --}}
         @if($pr1->count() > 0)
     <section class="mb-12">
-        <h2 class="text-2xl font-bold text-gray-800 mb-6 border-b-4 border-blue-500 inline-block">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6 inline-block" style="border-bottom: 4px solid #73b112;">
     Productos más visitados de {{ $ca1->nombre }}
     @if(isset($tpd1))
         <span class="text-sm font-normal text-gray-600">({{ number_format($tpd1, 0, ',', '.') }} productos disponibles)</span>
     @endif
 </h2>
 
-        {{-- productos-container -> pc1 --}}
-        <div id="pc1" class="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-5 gap-6">
+        {{-- productos-container -> pcp1 (productos-container-principal) --}}
+        <div id="pcp1" class="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-5 gap-6">
             @foreach($pr1->take(10) as $pr2)
             {{-- añadirCam() -> _f1() --}}
             <a href="{{ _f1($pr2->categoria->construirUrlCategorias($pr2->slug)) }}"
@@ -338,7 +341,7 @@ if (!function_exists('_f1')) {
                 <p class="font-semibold text-gray-700 text-center text-sm mb-1 line-clamp-2">{{ $pr2->nombre }}</p>
                 <p class="text-center mb-1">
                     <span class="text-xs text-gray-500">Desde:</span>
-                    <span class="text-xl font-bold text-pink-600">{{ $pr2->unidadDeMedida === 'unidadMilesima' ? number_format($pr2->precio, 3) : number_format($pr2->precio, 2) }}€
+                    <span class="text-xl font-bold" style="color: #e97b11;">{{ $pr2->unidadDeMedida === 'unidadMilesima' ? number_format($pr2->precio, 3) : number_format($pr2->precio, 2) }}€
                         @if($pr2->unidadDeMedida === 'unidad')
                             <span class="text-xs text-gray-500">/Und.</span>
                         @elseif($pr2->unidadDeMedida === 'kilos')
@@ -380,7 +383,7 @@ if (!function_exists('_f1')) {
                     <p class="font-semibold text-gray-700 text-center text-sm mb-1 line-clamp-2">{{ $pr3->nombre }}</p>
                     <p class="text-center mb-1">
                         <span class="text-xs text-gray-500">Desde:</span>
-                        <span class="text-xl font-bold text-pink-600">{{ $pr3->unidadDeMedida === 'unidadMilesima' ? number_format($pr3->precio, 3) : number_format($pr3->precio, 2) }}€
+                        <span class="text-xl font-bold" style="color: #e97b11;">{{ $pr3->unidadDeMedida === 'unidadMilesima' ? number_format($pr3->precio, 3) : number_format($pr3->precio, 2) }}€
                             @if($pr3->unidadDeMedida === 'unidad')
                                 <span class="text-xs text-gray-500">/Und.</span>
                             @elseif($pr3->unidadDeMedida === 'kilos')
@@ -407,7 +410,10 @@ if (!function_exists('_f1')) {
             <div class="text-center mt-6">
                 {{-- btn-mostrar-productos -> bmp1 --}}
                 <button id="bmp1" 
-                        class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg transition-colors">
+                        style="background-color: #70b216;"
+                        class="text-white px-6 py-2 rounded-lg transition-colors"
+                        onmouseover="this.style.backgroundColor='#60a013'"
+                        onmouseout="this.style.backgroundColor='#70b216'">
                     Mostrar más productos
                 </button>
             </div>
@@ -452,7 +458,7 @@ if (!function_exists('_f1')) {
                     <div class="flex items-center justify-between">
                         <div>
                             <div class="flex items-baseline gap-1">
-                                <p class="text-lg font-bold text-red-600">
+                                <p class="text-lg font-bold" style="color: #e97b11;">
                                     {{ $ph2['precio_formateado'] }}
                                 </p>
                             </div>
@@ -508,7 +514,7 @@ if (!function_exists('_f1')) {
                             {{ $pr4->nombre }}
                         </h3>
                         <p class="text-center mb-1">
-                            <span class="text-xl font-bold text-pink-600">{{ $pr4->unidadDeMedida === 'unidadMilesima' ? number_format($pr4->precio, 3) : number_format($pr4->precio, 2) }}€
+                            <span class="text-xl font-bold" style="color: #e97b11;">{{ $pr4->unidadDeMedida === 'unidadMilesima' ? number_format($pr4->precio, 3) : number_format($pr4->precio, 2) }}€
                                 @if($pr4->unidadDeMedida === 'unidad')
                                     <span class="text-xs text-gray-500">/Und.</span>
                                 @elseif($pr4->unidadDeMedida === 'kilos')
@@ -680,7 +686,7 @@ if (!function_exists('_f1')) {
 
 
         {{-- Mostrar más productos usando HTML generado desde PHP (más seguro) --}}
-        {{-- nombreCategoria -> _nc1, tienePadre -> _tp1, btnMostrarProductos -> _bmp1, productos-container -> pc1 --}}
+        {{-- nombreCategoria -> _nc1, tienePadre -> _tp1, btnMostrarProductos -> _bmp1, productos-container -> pcp1 --}}
         {{-- productosAdicionales -> _pa1, botonBusquedaExistente -> _bbe1, botonBusqueda -> _bb1 --}}
         {{-- linkBusqueda -> _lb1, urlBusqueda -> _ub1, svgIcon -> _svg1, path -> _p1 --}}
         const _nc1 = @json($ca1->nombre);
@@ -688,7 +694,7 @@ if (!function_exists('_f1')) {
         const _bmp1 = document.getElementById('bmp1');
         if (_bmp1) {
             _bmp1.addEventListener('click', function () {
-                const _c3 = document.getElementById('pc1');
+                const _c3 = document.getElementById('pcp1');
                 
                 if (!_c3) return;
 
@@ -719,7 +725,10 @@ if (!function_exists('_f1')) {
                         const _lb1 = document.createElement('a');
                         const _ub1 = _f2('/buscar?q=' + encodeURIComponent(_nc1));
                         _lb1.href = _ub1;
-                        _lb1.className = 'bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg transition-colors inline-flex items-center gap-2';
+                        _lb1.style.backgroundColor = '#70b216';
+                        _lb1.className = 'text-white px-6 py-2 rounded-lg transition-colors inline-flex items-center gap-2';
+                        _lb1.onmouseover = function() { this.style.backgroundColor = '#60a013'; };
+                        _lb1.onmouseout = function() { this.style.backgroundColor = '#70b216'; };
                         
                         const _svg1 = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
                         _svg1.setAttribute('class', 'w-5 h-5');

@@ -21,6 +21,37 @@ if (!function_exists('_f1')) {
         return $url . $separator . 'cam=' . urlencode($cam);
     }
 }
+
+// Detectar si estamos en una vista que tiene el componente listado-categorias-horizontal-head
+// (index.blade.php o comparador/unidades.blade.php)
+// Si estamos en home o en una ruta con múltiples categorías (patrón categoria/categoria/slug), ocultamos el hamburguesa
+$rutaActual = request()->route();
+$esHome = $rutaActual && $rutaActual->getName() === 'home';
+
+// Detectar si es la vista comparador/unidades
+// Forma 1: Verificar si existe la variable $producto (solo está en comparador/unidades)
+$esComparadorUnidades = isset($producto) && is_object($producto);
+
+// Forma 2: Si la forma 1 no funciona, verificar el patrón de la URL
+if (!$esComparadorUnidades) {
+    $path = trim(request()->path(), '/');
+    $segmentos = array_filter(explode('/', $path));
+    
+    // La ruta de comparador/unidades tiene el patrón: categoria1/categoria2/.../slug (mínimo 2 segmentos)
+    $rutasExcluidas = ['buscar', 'categoria', 'categorias', 'contacto', 'politicas', 'api'];
+    $primerSegmento = $segmentos[0] ?? '';
+    
+    if (count($segmentos) >= 2 && !empty($primerSegmento) && !in_array($primerSegmento, $rutasExcluidas)) {
+        // Verificar que no sea ninguna de las rutas conocidas
+        $esComparadorUnidades = !request()->is('buscar*') && 
+                                !request()->is('categoria*') && 
+                                !request()->is('categorias*') &&
+                                !request()->is('politicas*') &&
+                                !request()->is('api*');
+    }
+}
+
+$ocultarHamburguesa = $esHome || $esComparadorUnidades;
 @endphp
 {{-- HEADER --}}
     <header class="bg-white shadow px-6 py-4 max-w-7xl mx-auto w-full">
@@ -49,7 +80,10 @@ if (!function_exists('_f1')) {
                        id="sim1"
                        required>
                 <button type="submit"
-                        class="px-3 py-2 bg-blue-500 text-white rounded-r-lg hover:bg-blue-600 transition-colors text-sm">
+                        style="background-color: #e97b11;"
+                        class="px-3 py-2 text-white rounded-r-lg hover:bg-[#d16a0f] transition-colors text-sm"
+                        onmouseover="this.style.backgroundColor='#d16a0f'"
+                        onmouseout="this.style.backgroundColor='#e97b11'">
                     Buscar
                 </button>
             </form>
@@ -63,12 +97,14 @@ if (!function_exists('_f1')) {
 
     {{-- BOTÓN HAMBURGUESA --}}
     {{-- btnMenu -> bm1 --}}
+    @if(!$ocultarHamburguesa)
     <button id="bm1" class="ml-3 block lg:hidden flex-shrink-0 p-1 header-menu-btn">
         <svg class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M4 6h16M4 12h16M4 18h16" />
         </svg>
     </button>
+    @endif
 </div>
 
 
@@ -84,7 +120,10 @@ if (!function_exists('_f1')) {
                            id="si1"
                            required>
                     <button type="submit"
-                            class="px-4 py-2 bg-blue-500 text-white rounded-r-lg hover:bg-blue-600 transition-colors text-base">
+                            style="background-color: #e97b11;"
+                            class="px-4 py-2 text-white rounded-r-lg hover:bg-[#d16a0f] transition-colors text-base"
+                            onmouseover="this.style.backgroundColor='#d16a0f'"
+                            onmouseout="this.style.backgroundColor='#e97b11'">
                         Buscar
                     </button>
                 </form>
@@ -108,7 +147,8 @@ if (!function_exists('_f1')) {
     </div>
 </header>
 
-
+{{-- INCLUIR EL PANEL DE CATEGORÍAS LATERAL (siempre disponible) --}}
+<x-panel-categorias-lateral />
 
     {{-- NAV MÓVIL --}}
     {{-- navMobile -> nm1 --}}
@@ -216,12 +256,23 @@ if (!function_exists('_f1')) {
         });
     }
 
-    {{-- Menú móvil --}}
+    {{-- Menú móvil / Panel de categorías --}}
     {{-- btnMenu -> bm1, navMobile -> nm1 --}}
-    document.getElementById('bm1').addEventListener('click', function() {
-        const _n1 = document.getElementById('nm1');
-        _n1.classList.toggle('hidden');
-    });
+    const _bm1 = document.getElementById('bm1');
+    if (_bm1) {
+        _bm1.addEventListener('click', function() {
+            {{-- Si el panel de categorías está disponible, abrirlo --}}
+            {{-- Si no, mostrar el menú móvil tradicional --}}
+            if (typeof window._ap1 === 'function') {
+                window._ap1();
+            } else {
+                const _n1 = document.getElementById('nm1');
+                if (_n1) {
+                    _n1.classList.toggle('hidden');
+                }
+            }
+        });
+    }
 
     {{-- Submenú Tallas (escritorio) --}}
     {{-- btnTallasDesktop -> btd1, submenuTallasDesktop -> std1 --}}
@@ -287,7 +338,7 @@ if (!function_exists('_f1')) {
                                  class="w-12 h-12 object-cover rounded">
                             <div class="flex-1 min-w-0">
                                 <p class="text-sm font-medium text-gray-900 truncate">${_n1}</p>
-                                <p class="text-xs text-blue-600 font-medium">Categoría</p>
+                                <p class="text-xs font-medium" style="color: #e97b11;">Categoría</p>
                             </div>
                         </div>
                     </a>
@@ -322,7 +373,7 @@ if (!function_exists('_f1')) {
                                  class="w-12 h-12 object-cover rounded">
                             <div class="flex-1 min-w-0">
                                 <p class="text-sm font-medium text-gray-900 truncate">${_n2}</p>
-                                <p class="text-lg font-bold text-pink-500">
+                                <p class="text-lg font-bold" style="color: #73b112;">
                                     ${_p1}€${_uh}
                                 </p>
                             </div>
@@ -337,7 +388,9 @@ if (!function_exists('_f1')) {
             const _bu1 = _e1(_f2('/buscar?q=' + encodeURIComponent(input.value)));
             _h1 += `
                 <div class="px-4">
-                    <button class="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 rounded-md transition" 
+                    <button style="background-color: #e97b11;" class="w-full text-white font-semibold py-2 rounded-md transition"
+                            onmouseover="this.style.backgroundColor='#d16a0f'"
+                            onmouseout="this.style.backgroundColor='#e97b11'"
                             onclick="window.location.href='${_bu1}'">
                         Mostrar más productos
                     </button>

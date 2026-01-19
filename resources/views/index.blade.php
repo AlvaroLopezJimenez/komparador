@@ -177,7 +177,7 @@ if (!function_exists('_f1')) {
                     <p class="font-semibold text-gray-700 text-center text-sm mb-1 line-clamp-2">{{ $p->nombre }}</p>
 <p class="text-center mb-1 flex items-center justify-center gap-1">
     <span class="text-[8px] text-gray-500">Desde:</span>
-    <span class="text-xl font-bold text-pink-600">{{ $p->unidadDeMedida === 'unidadMilesima' ? number_format($p->precio, 3) : number_format($p->precio, 2) }}€</span>
+    <span class="text-xl font-bold" style="color: #e97b11;">{{ $p->unidadDeMedida === 'unidadMilesima' ? number_format($p->precio, 3) : number_format($p->precio, 2) }}€</span>
     @if($p->unidadDeMedida === 'unidad')
         <span class="text-[10px] text-gray-500">/Und.</span>
     @elseif($p->unidadDeMedida === 'kilos')
@@ -204,14 +204,17 @@ if (!function_exists('_f1')) {
         {{-- $categoriasTop -> $d2, $categoria -> $c --}}
         {{-- carouselCategorias -> c1, flechaIzquierda -> b1, flechaDerecha -> b2 --}}
         @if(isset($d2) && $d2->count() > 0)
-<section class="w-full bg-pink-50 py-8">
+<section class="w-full py-8" style="background-color: #fef3e7;">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
         <h2 class="text-xl md:text-2xl font-bold text-gray-800 mb-4">Categorías Más Visitadas</h2>
 
         {{-- Flecha izquierda --}}
         <button type="button"
                 id="b1"
-                class="absolute left-0 top-[60%] -translate-y-1/2 z-10 bg-white hover:bg-pink-100 text-pink-600 rounded-full p-2 shadow transition">
+                class="absolute left-0 top-[60%] -translate-y-1/2 z-10 bg-white rounded-full p-2 shadow transition"
+                style="color: #e97b11;"
+                onmouseover="this.style.backgroundColor='#fef3e7';"
+                onmouseout="this.style.backgroundColor='white';">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
             </svg>
@@ -220,7 +223,10 @@ if (!function_exists('_f1')) {
         {{-- Flecha derecha --}}
         <button type="button"
                 id="b2"
-                class="absolute right-0 top-[60%] -translate-y-1/2 z-10 bg-white hover:bg-pink-100 text-pink-600 rounded-full p-2 shadow transition">
+                class="absolute right-0 top-[60%] -translate-y-1/2 z-10 bg-white rounded-full p-2 shadow transition"
+                style="color: #e97b11;"
+                onmouseover="this.style.backgroundColor='#fef3e7';"
+                onmouseout="this.style.backgroundColor='white';">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
             </svg>
@@ -295,7 +301,7 @@ if (!function_exists('_f1')) {
                     <div class="flex items-center justify-between">
                         <div>
                             <div class="flex items-baseline gap-1">
-                                <p class="text-lg font-bold text-red-600">
+                                <p class="text-lg font-bold" style="color: #e97b11;">
                                     {{ $ph['precio_formateado'] }}
                                 </p>
                             </div>
@@ -397,7 +403,7 @@ if (!function_exists('_f1')) {
                         </h3>
                         <p class="text-center mb-1 flex items-center justify-center gap-1">
                             <span class="text-[8px] text-gray-500">Desde:</span>
-                            <span class="text-xl font-bold text-pink-600">{{ $p->unidadDeMedida === 'unidadMilesima' ? number_format($p->precio, 3) : number_format($p->precio, 2) }}€</span>
+                            <span class="text-xl font-bold" style="color: #e97b11;">{{ $p->unidadDeMedida === 'unidadMilesima' ? number_format($p->precio, 3) : number_format($p->precio, 2) }}€</span>
                             @if($p->unidadDeMedida === 'unidad')
                                 <span class="text-[10px] text-gray-500">/Und.</span>
                             @elseif($p->unidadDeMedida === 'kilos')
