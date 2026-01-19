@@ -52,21 +52,21 @@ if (!function_exists('_f1')) {
                 <a href="{{ _f1(route('categorias.todas')) }}"
                    class="group flex flex-col items-center space-y-1 sm:space-y-1.5 min-w-[60px] sm:min-w-[80px] flex-shrink-0 transition-all duration-200 sm:hidden"
                 >
-                    <div class="w-10 h-10 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center transition-all duration-200 group-hover:scale-105" style="background-color: #d4e9b8;">
-                        <svg class="w-6 h-6 sm:w-8 sm:h-9" style="color: #70b216;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="w-10 h-10 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center transition-all duration-200 group-hover:scale-105" style="background-color: #fef3e7;">
+                        <svg class="w-6 h-6 sm:w-8 sm:h-9" style="color: #e97b11;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                         </svg>
                     </div>
-                    <span class="categoria-texto-movil text-[8px] sm:text-sm font-medium text-gray-700 text-center transition-colors group-hover:[color:#70b216]">Más <span style="color: #70b216;">></span></span>
+                    <span class="categoria-texto-movil text-[8px] sm:text-sm font-medium text-gray-700 text-center transition-colors group-hover:[color:#e97b11]">Más <span style="color: #e97b11;">></span></span>
                 </a>
             </div>
             {{-- añadirCam() -> _f1() --}}
             <a href="{{ _f1(route('categorias.todas')) }}"
-               style="background-color: #70b216;"
+               style="background-color: #e97b11;"
                class="hidden sm:flex items-center justify-center text-white rounded-lg transition-colors flex-shrink-0 ml-4
                text-sm font-medium min-w-[100px] px-4 py-2"
-               onmouseover="this.style.backgroundColor='#60a013'"
-               onmouseout="this.style.backgroundColor='#70b216'"
+               onmouseover="this.style.backgroundColor='#d16a0f'"
+               onmouseout="this.style.backgroundColor='#e97b11'"
             >
                 Ver todas
                 <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

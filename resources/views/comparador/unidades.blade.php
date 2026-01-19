@@ -126,7 +126,7 @@
     <script>
         (function(h,o,t,j,a,r){
             h.hj=h.hj||function(){(h.hj.q=h.hj.q||[]).push(arguments)};
-            h._hjSettings={hjid:6621734,hjsv:6};
+            h._hjSettings={hjid:6624894,hjsv:6};
             a=o.getElementsByTagName('head')[0];
             r=o.createElement('script');r.async=1;
             r.src=t+h._hjSettings.hjid+j+h._hjSettings.hjsv;
@@ -4507,12 +4507,12 @@
               label: 'Precio (€)',
               data: datos,
               fill: true,
-              borderColor: 'rgb(112, 178, 22)',
-              backgroundColor: 'rgba(112, 178, 22, 0.15)',
+              borderColor: 'rgb(125, 210, 170)',
+              backgroundColor: 'rgba(125, 210, 170, 0.25)',
               tension: 0.3,
               pointRadius: 0, // Quitar los puntos
               pointHoverRadius: 4, // Solo mostrar punto al hacer hover
-              pointHoverBackgroundColor: 'rgb(112, 178, 22)',
+              pointHoverBackgroundColor: 'rgb(125, 210, 170)',
               pointHoverBorderColor: '#fff',
               pointHoverBorderWidth: 2
             }]
@@ -4687,10 +4687,14 @@
             btn.style.backgroundColor = '#70b216';
             btn.style.color = 'white';
             btn.classList.remove('hover:bg-gray-100');
+            btn.onmouseover = function() { this.style.backgroundColor = '#60a013'; };
+            btn.onmouseout = function() { this.style.backgroundColor = '#70b216'; };
           } else {
             btn.style.backgroundColor = '';
             btn.style.color = '';
             btn.classList.add('hover:bg-gray-100');
+            btn.onmouseover = null;
+            btn.onmouseout = null;
           }
         });
       }

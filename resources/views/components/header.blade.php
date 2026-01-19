@@ -63,8 +63,8 @@ $ocultarHamburguesa = $esHome || $esComparadorUnidades;
     <div class="flex items-center flex-shrink-0 header-logo">
         {{-- añadirCam() -> _f1() --}}
         <a href="{{ _f1(route('home')) }}" class="flex items-center">
-        <img src="{{ asset('images/icono.png') }}" alt="Logo móvil" class="h-8 w-auto block sm:hidden">
-        <img src="{{ asset('images/logo.webp') }}" alt="Logo escritorio" class="h-12 w-auto hidden sm:block">
+        <img src="{{ asset('images/icono.webp') }}" alt="Logo móvil y tablet" class="h-8 w-auto block lg:hidden">
+        <img src="{{ asset('images/logo.webp') }}" alt="Logo escritorio" class="h-12 w-auto hidden lg:block">
         </a>
     </div>
 
@@ -80,10 +80,10 @@ $ocultarHamburguesa = $esHome || $esComparadorUnidades;
                        id="sim1"
                        required>
                 <button type="submit"
-                        style="background-color: #e97b11;"
-                        class="px-3 py-2 text-white rounded-r-lg hover:bg-[#d16a0f] transition-colors text-sm"
-                        onmouseover="this.style.backgroundColor='#d16a0f'"
-                        onmouseout="this.style.backgroundColor='#e97b11'">
+                        style="background-color: #5f8c21;"
+                        class="px-3 py-2 text-white rounded-r-lg hover:bg-[#4d7a1a] transition-colors text-sm"
+                        onmouseover="this.style.backgroundColor='#4d7a1a'"
+                        onmouseout="this.style.backgroundColor='#5f8c21'">
                     Buscar
                 </button>
             </form>
@@ -120,10 +120,10 @@ $ocultarHamburguesa = $esHome || $esComparadorUnidades;
                            id="si1"
                            required>
                     <button type="submit"
-                            style="background-color: #e97b11;"
-                            class="px-4 py-2 text-white rounded-r-lg hover:bg-[#d16a0f] transition-colors text-base"
-                            onmouseover="this.style.backgroundColor='#d16a0f'"
-                            onmouseout="this.style.backgroundColor='#e97b11'">
+                            style="background-color: #5f8c21;"
+                            class="px-4 py-2 text-white rounded-r-lg hover:bg-[#4d7a1a] transition-colors text-base"
+                            onmouseover="this.style.backgroundColor='#4d7a1a'"
+                            onmouseout="this.style.backgroundColor='#5f8c21'">
                         Buscar
                     </button>
                 </form>
@@ -388,9 +388,9 @@ $ocultarHamburguesa = $esHome || $esComparadorUnidades;
             const _bu1 = _e1(_f2('/buscar?q=' + encodeURIComponent(input.value)));
             _h1 += `
                 <div class="px-4">
-                    <button style="background-color: #e97b11;" class="w-full text-white font-semibold py-2 rounded-md transition"
-                            onmouseover="this.style.backgroundColor='#d16a0f'"
-                            onmouseout="this.style.backgroundColor='#e97b11'"
+                    <button style="background-color: #5f8c21;" class="w-full text-white font-semibold py-2 rounded-md transition"
+                            onmouseover="this.style.backgroundColor='#4d7a1a'"
+                            onmouseout="this.style.backgroundColor='#5f8c21'"
                             onclick="window.location.href='${_bu1}'">
                         Mostrar más productos
                     </button>
