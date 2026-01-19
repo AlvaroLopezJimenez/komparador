@@ -215,15 +215,24 @@
 
          <!-- Tabla de clicks -->
         <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-            <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-4">📋 Listado de Clicks</h3>
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200">📋 Listado de Clicks</h3>
+                <button id="btnEliminarSeleccionados" onclick="eliminarClicksSeleccionados()" disabled
+                        class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-600">
+                    🗑️ Eliminar Seleccionados
+                </button>
+            </div>
             
             @if($clicks->count() > 0)
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                         <thead class="bg-gray-50 dark:bg-gray-700">
                             <tr>
+                                <th class="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-10">
+                                    <input type="checkbox" id="seleccionarTodos" onclick="toggleSeleccionarTodos()" 
+                                           class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600">
+                                </th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">IP</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Ciudad</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Producto</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Tienda</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Posición</th>
@@ -236,38 +245,39 @@
                         <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                             @foreach($clicks as $click)
                                 <tr>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
-                                        <div class="flex items-center">
-                                            <span class="font-mono text-xs">{{ $click->ip ?? '-' }}</span>
-                                            @if($click->ip && in_array($click->ip, $ipsNuevas['lista']))
-                                                <span class="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                                                    (N)
-                                                </span>
-                                            @endif
-                                        </div>
+                                    <td class="px-2 py-4 whitespace-nowrap text-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700/70 transition-colors" onclick="toggleCheckbox({{ $click->id }}, event)">
+                                        <input type="checkbox" name="click_seleccionado" value="{{ $click->id }}" 
+                                               class="checkbox-click w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                                               onchange="actualizarBotonEliminar()"
+                                               onclick="event.stopPropagation()">
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                                        @if($click->ciudad)
-                                            @if($click->ciudad === 'error')
-                                                <div class="flex items-center gap-2">
-                                                    <span class="text-red-600 dark:text-red-400 font-medium">Error</span>
-                                                    <button onclick="regeolocalizarIP('{{ $click->ip }}', '{{ $click->created_at->format('Y-m-d') }}', {{ $click->id }})" 
-                                                            class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300 hover:bg-yellow-200 dark:hover:bg-yellow-900/40 transition-colors" 
-                                                            id="btn-regeo-{{ $click->id }}">
-                                                        🔄 Reintentar
-                                                    </button>
-                                                </div>
-                                            @else
-                                                <span class="font-medium">{{ $click->ciudad }}</span>
-                                                @if($click->latitud && $click->longitud)
-                                                    <div class="text-xs text-gray-500 dark:text-gray-400">
-                                                        📍 {{ number_format($click->latitud, 4) }}, {{ number_format($click->longitud, 4) }}
-                                                    </div>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                                        <div class="flex flex-col">
+                                            <div class="flex items-center">
+                                                <span class="font-mono text-xs">{{ $click->ip ?? '-' }}</span>
+                                                @if($click->ip && in_array($click->ip, $ipsNuevas['lista']))
+                                                    <span class="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                                        (N)
+                                                    </span>
                                                 @endif
-                                            @endif
-                                        @else
-                                            <span class="text-gray-400">-</span>
-                                        @endif
+                                            </div>
+                                            <span class="text-xs text-gray-500 dark:text-gray-400">
+                                                @if($click->ciudad)
+                                                    @if($click->ciudad === 'error')
+                                                        <span class="text-red-600 dark:text-red-400">Error</span>
+                                                        <button onclick="regeolocalizarIP('{{ $click->ip }}', '{{ $click->created_at->format('Y-m-d') }}', {{ $click->id }})" 
+                                                                class="ml-2 inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300 hover:bg-yellow-200 dark:hover:bg-yellow-900/40 transition-colors" 
+                                                                id="btn-regeo-{{ $click->id }}">
+                                                            🔄 Reintentar
+                                                        </button>
+                                                    @else
+                                                        {{ $click->ciudad }}
+                                                    @endif
+                                                @else
+                                                    <span class="text-gray-400">-</span>
+                                                @endif
+                                            </span>
+                                        </div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                                         <div class="flex flex-col">
@@ -1333,6 +1343,146 @@
                 boton.disabled = false;
                 boton.innerHTML = textoOriginal;
             });
+        }
+        
+        // Función para seleccionar/deseleccionar todos los checkboxes
+        function toggleSeleccionarTodos() {
+            const checkboxTodos = document.getElementById('seleccionarTodos');
+            const checkboxes = document.querySelectorAll('.checkbox-click');
+            
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = checkboxTodos.checked;
+            });
+            
+            actualizarBotonEliminar();
+        }
+        
+        // Función para alternar el checkbox cuando se hace clic en el contenedor
+        function toggleCheckbox(clickId, event) {
+            // Evitar que se active dos veces si se hace clic directamente en el checkbox
+            if (event.target.type === 'checkbox') {
+                return;
+            }
+            
+            // Buscar el checkbox por su valor
+            const checkbox = document.querySelector(`input[name="click_seleccionado"][value="${clickId}"]`);
+            if (checkbox) {
+                checkbox.checked = !checkbox.checked;
+                actualizarBotonEliminar();
+            }
+        }
+        
+        // Función para actualizar el estado del botón de eliminar seleccionados
+        function actualizarBotonEliminar() {
+            const checkboxes = document.querySelectorAll('.checkbox-click:checked');
+            const botonEliminar = document.getElementById('btnEliminarSeleccionados');
+            const checkboxTodos = document.getElementById('seleccionarTodos');
+            
+            // Actualizar estado del botón
+            if (checkboxes.length > 0) {
+                botonEliminar.disabled = false;
+                botonEliminar.textContent = `🗑️ Eliminar Seleccionados (${checkboxes.length})`;
+            } else {
+                botonEliminar.disabled = true;
+                botonEliminar.textContent = '🗑️ Eliminar Seleccionados';
+            }
+            
+            // Actualizar checkbox "seleccionar todos"
+            const totalCheckboxes = document.querySelectorAll('.checkbox-click').length;
+            checkboxTodos.checked = checkboxes.length === totalCheckboxes && totalCheckboxes > 0;
+        }
+        
+        // Función para eliminar múltiples clicks seleccionados
+        function eliminarClicksSeleccionados() {
+            const checkboxes = document.querySelectorAll('.checkbox-click:checked');
+            
+            if (checkboxes.length === 0) {
+                alert('⚠️ Por favor, selecciona al menos un click para eliminar.');
+                return;
+            }
+            
+            const ids = Array.from(checkboxes).map(cb => cb.value);
+            const cantidad = ids.length;
+            
+            // Confirmar eliminación
+            if (!confirm(`¿Estás seguro de que quieres eliminar ${cantidad} click(s) seleccionado(s)?\n\nEsta acción no se puede deshacer.`)) {
+                return;
+            }
+            
+            // Deshabilitar botón y mostrar loading
+            const botonEliminar = document.getElementById('btnEliminarSeleccionados');
+            const textoOriginal = botonEliminar.innerHTML;
+            botonEliminar.disabled = true;
+            botonEliminar.innerHTML = '<span class="inline-block animate-spin">⏳</span> Eliminando...';
+            
+            // Deshabilitar todos los checkboxes durante la eliminación
+            checkboxes.forEach(cb => cb.disabled = true);
+            
+            // Realizar eliminaciones en paralelo
+            const promesas = ids.map(id => {
+                return fetch(`{{ route('admin.clicks.destroy', ':id') }}`.replace(':id', id), {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        throw new Error(data.message || 'Error desconocido');
+                    }
+                    return { id, success: true };
+                })
+                .catch(error => {
+                    console.error(`Error al eliminar click ${id}:`, error);
+                    return { id, success: false, error: error.message };
+                });
+            });
+            
+            // Esperar a que todas las eliminaciones terminen
+            Promise.all(promesas)
+                .then(resultados => {
+                    const exitosas = resultados.filter(r => r.success).length;
+                    const fallidas = resultados.filter(r => !r.success).length;
+                    
+                    // Función para redirigir a una página válida
+                    const redirigirAPaginaValida = () => {
+                        // Obtener la URL actual
+                        const url = new URL(window.location);
+                        
+                        // Si hay un parámetro de página, quitarlo (o ponerlo en 1)
+                        // Esto asegura que si estamos en una página que ya no existe,
+                        // nos redirija a la primera página
+                        if (url.searchParams.has('page')) {
+                            url.searchParams.delete('page');
+                        }
+                        
+                        // Redirigir a la nueva URL
+                        window.location.href = url.toString();
+                    };
+                    
+                    if (fallidas === 0) {
+                        // Todas las eliminaciones fueron exitosas
+                        alert(`✅ Se eliminaron correctamente ${exitosas} click(s).`);
+                        // Redirigir a una página válida (sin el parámetro de página)
+                        redirigirAPaginaValida();
+                    } else {
+                        // Algunas eliminaciones fallaron
+                        const mensaje = `⚠️ Se eliminaron ${exitosas} click(s) correctamente, pero ${fallidas} fallaron.\n\nLa página se recargará para mostrar el estado actual.`;
+                        alert(mensaje);
+                        // Redirigir a una página válida
+                        redirigirAPaginaValida();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error general:', error);
+                    alert('❌ Error de conexión al intentar eliminar los clicks seleccionados.');
+                    botonEliminar.innerHTML = textoOriginal;
+                    botonEliminar.disabled = false;
+                    checkboxes.forEach(cb => cb.disabled = false);
+                });
         }
      </script>
      

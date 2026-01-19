@@ -37,7 +37,7 @@
     <div class="text-6xl mb-4">🙅‍♂️</div>
 <h1 class="text-3xl font-bold text-red-600 mb-2">403 - Acceso denegado</h1>
 <p class="text-gray-700 mb-4 max-w-md">
-  No tienes permiso para entrar aquí. Quizás este rincón es solo para padres expertos.
+  No tienes permiso para entrar aquí. Este rincón está protegido con llave y candado.
 </p>
 
 

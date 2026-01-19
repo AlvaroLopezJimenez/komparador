@@ -53,7 +53,7 @@
     <div class="text-6xl mb-4">🔍</div>
 <h1 class="text-3xl font-bold text-yellow-600 mb-2">404 - Página no encontrada</h1>
 <p class="text-gray-700 mb-4 max-w-md">
-  Parece que esta página se ha ido a cambiar el pañal. Intenta buscar otra o vuelve al inicio.
+  Parece que esta página se ha tomado unas vacaciones inesperadas. Vuelve al inicio.
 </p>
 
   </main>

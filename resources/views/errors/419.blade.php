@@ -37,7 +37,7 @@
     <div class="text-6xl mb-4">⏰</div>
         <h1 class="text-3xl font-bold text-blue-600 mb-2">419 - Sesión expirada</h1>
         <p class="text-gray-700 mb-4 max-w-md">
-        Tu sesión ha expirado, como un pañal olvidado. Recarga la página e inténtalo de nuevo.
+        Tu sesión ha expirado. Recarga la página e inténtalo de nuevo.
         </p>
   </main>
 
