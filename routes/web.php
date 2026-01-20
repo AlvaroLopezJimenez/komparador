@@ -392,13 +392,13 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
     //Listar ofertas de una tienda en especifico
     Route::get('tiendas/{tienda}/ofertas', [TiendaController::class, 'ofertas'])->name('tiendas.ofertas');
     
-    // Obtener tienda por ID (JSON)
-    Route::get('tiendas/{tienda}', [TiendaController::class, 'obtener'])->name('tiendas.obtener');
-    
-    // Gestión de tiempos de actualización de ofertas por tienda
+    // Gestión de tiempos de actualización de ofertas por tienda (DEBE IR ANTES de la ruta dinámica {tienda})
     Route::get('tiendas/tiempos-actualizacion', [TiendaController::class, 'tiemposActualizacion'])->name('tiendas.tiempos-actualizacion');
     Route::get('tiendas/{tienda}/desglose-tiempos', [TiendaController::class, 'obtenerDesgloseTiempos'])->name('tiendas.desglose-tiempos');
     Route::post('tiendas/{tienda}/actualizar-tiempos', [TiendaController::class, 'actualizarTiempos'])->name('tiendas.actualizar-tiempos');
+    
+    // Obtener tienda por ID (JSON) - DEBE IR AL FINAL para que no capture rutas más específicas
+    Route::get('tiendas/{tienda}', [TiendaController::class, 'obtener'])->name('tiendas.obtener');
     
     // Reorganizar update_at de ofertas
     Route::get('ofertas/reorganizar-update-at', [OfertaProductoController::class, 'reorganizarUpdateAt'])->name('ofertas.reorganizar.update-at');

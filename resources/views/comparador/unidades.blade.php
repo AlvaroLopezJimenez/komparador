@@ -1163,7 +1163,7 @@
         <a href="{{ añadirCam($relacionado->categoria->construirUrlCategorias($relacionado->slug)) }}" class="inline-block align-top bg-gray-50 rounded-lg border p-3 w-36 text-center card-hover hover:bg-gray-100">
           <img src="{{ asset('images/' . ($relacionado->imagen_pequena[0] ?? '')) }}" loading="lazy" alt="{{$relacionado->nombre}}" class="w-full h-auto object-contain mb-2">
           <div class="text-sm font-semibold">{{ $relacionado->talla }}</div>
-          <div class="text-sm" style="color: #e97b11;">{{ number_format($relacionado->precio, 2, ',', '.') }}
+          <div class="text-sm" style="color: #e97b11;">{{ number_format($relacionado->precio, 2, ',', '.') }} €
             @if($relacionado->unidadDeMedida === 'kilos')
               /Kg.
             @elseif($relacionado->unidadDeMedida === 'litros')
@@ -1227,7 +1227,7 @@
               <img src="{{ asset('images/' . ($relacionado->imagen_pequena[0] ?? '')) }}" loading="lazy" alt="{{$relacionado->nombre}}" class="w-[94px] max-w-full h-auto object-contain">
             </div>
             <div class="text-sm font-semibold text-black-700">{{ $relacionado->marca }} - {{ $relacionado->talla }}</div>
-            <div class="text-xl font-bold" style="color: #e97b11;">{{ number_format($relacionado->precio, 2) }}€
+            <div class="text-lg" style="color: #e97b11;">{{ number_format($relacionado->precio, 2) }} €
     @if($relacionado->unidadDeMedida === 'unidad')
         <span class="text-xs text-gray-500">/Und.</span>
     @elseif($relacionado->unidadDeMedida === 'kilos')

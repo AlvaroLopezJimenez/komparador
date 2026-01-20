@@ -139,10 +139,20 @@ $ocultarHamburguesa = $esHome || $esComparadorUnidades;
         {{-- NAV ESCRITORIO --}}
         <nav class="hidden lg:flex space-x-2">
             {{-- añadirCam() -> _f1() --}}
-            <a href="{{ _f1(route('home')) }}" class="px-4 py-2 rounded text-gray-700 font-medium hover:bg-[#ef76b6] hover:text-white hover:shadow-md">Inicio</a>
-            <div class="relative group">
-</div>
-            <a href="{{ route('politicas.contacto') }}" class="px-4 py-2 rounded text-gray-700 font-medium hover:bg-[#ef76b6] hover:text-white hover:shadow-md">Contacto</a>
+            <a href="{{ _f1(route('home')) }}" class="px-4 py-2 rounded text-gray-700 font-medium hover:bg-gray-200 hover:shadow-md">Inicio</a>
+            {{-- añadirCam() -> _f1() --}}
+            <a href="{{ _f1(route('buscar', ['q' => 'precios hot'])) }}" class="px-4 py-2 rounded text-gray-700 font-medium hover:bg-gray-200 hover:shadow-md">🔥 Precios Hot</a>
+            {{-- añadirCam() -> _f1() --}}
+            <a href="{{ _f1(route('buscar', ['q' => 'más vendidos'])) }}" class="px-4 py-2 rounded text-gray-700 font-medium hover:bg-gray-200 hover:shadow-md flex items-center gap-1">
+                <svg class="w-5 h-5" style="color: #73b112;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 4v16m8-8H4"></path>
+                </svg>
+                <span>Vendidos</span>
+            </a>
+            {{-- Mostrar Categorías solo cuando NO estemos en home ni en comparador/unidades --}}
+            @if(!$ocultarHamburguesa)
+            <a href="#" onclick="if(typeof window._ap1 === 'function') { window._ap1(); } return false;" class="px-4 py-2 rounded text-gray-700 font-medium hover:bg-gray-200 hover:shadow-md">Categorías</a>
+            @endif
         </nav>
     </div>
 </header>
@@ -155,14 +165,19 @@ $ocultarHamburguesa = $esHome || $esComparadorUnidades;
     <nav id="nm1" class="hidden bg-white shadow-lg lg:hidden">
         <div class="px-6 py-4 space-y-2">
             {{-- añadirCam() -> _f1() --}}
-            <a href="{{ _f1(route('home')) }}" class="block px-4 py-2 rounded text-gray-700 font-medium transition-all duration-200 hover:bg-[#ef76b6] hover:text-white">
+            <a href="{{ _f1(route('home')) }}" class="block px-4 py-2 rounded text-gray-700 font-medium transition-all duration-200 hover:bg-gray-200">
                 Inicio
             </a>
-            <div>
-</div>
-
-            <a href="{{ route('politicas.contacto') }}" class="block px-4 py-2 rounded text-gray-700 font-medium transition-all duration-200 hover:bg-[#ef76b6] hover:text-white">
-                Contacto
+            {{-- añadirCam() -> _f1() --}}
+            <a href="{{ _f1(route('buscar', ['q' => 'precios hot'])) }}" class="block px-4 py-2 rounded text-gray-700 font-medium transition-all duration-200 hover:bg-gray-200">
+                🔥 Precios Hot
+            </a>
+            {{-- añadirCam() -> _f1() --}}
+            <a href="{{ _f1(route('buscar', ['q' => 'más vendidos'])) }}" class="block px-4 py-2 rounded text-gray-700 font-medium transition-all duration-200 hover:bg-gray-200 flex items-center gap-2">
+                <svg class="w-5 h-5" style="color: #73b112;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 4v16m8-8H4"></path>
+                </svg>
+                <span>Vendidos</span>
             </a>
         </div>
     </nav>

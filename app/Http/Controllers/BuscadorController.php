@@ -5,8 +5,13 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Producto;
 use App\Models\Categoria;
+use App\Models\PrecioHot;
+use App\Models\Click;
 use App\Helpers\CategoriaHelper;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\Paginator;
 
 class BuscadorController extends Controller
 {
@@ -76,6 +81,21 @@ class BuscadorController extends Controller
 
         // Normalizar la consulta: convertir a minúsculas y dividir en palabras
         $queryLower = strtolower(trim($query));
+        
+        // Detectar si se busca "precios hot"
+        $esPreciosHot = in_array($queryLower, ['precios hot', 'precioshot', 'precio hot', 'preciohot']);
+        
+        if ($esPreciosHot) {
+            return $this->buscarPreciosHot($request);
+        }
+        
+        // Detectar si se busca "más vendidos"
+        $esMasVendidos = in_array($queryLower, ['más vendidos', 'mas vendidos', 'masvendidos', 'másvendidos', 'mas vendido', 'más vendido']);
+        
+        if ($esMasVendidos) {
+            return $this->buscarMasVendidos($request);
+        }
+
         $palabras = array_filter(
             explode(' ', $queryLower),
             fn($palabra) => strlen($palabra) >= 2
@@ -114,13 +134,190 @@ class BuscadorController extends Controller
             });
         }
 
-        $p4X7 = $queryBuilder
+        // Limitar a máximo 5 páginas (100 productos)
+        $maxProductos = 100;
+        $perPage = 20;
+        $currentPage = Paginator::resolveCurrentPage() ?: 1;
+        $maxPages = 5;
+        
+        // Validar que la página no sea mayor a 5 - si lo es, redirigir a página 1
+        if ($currentPage > $maxPages) {
+            $queryParams = $request->query();
+            $queryParams['page'] = 1;
+            return redirect()->route('buscar', $queryParams);
+        }
+        
+        // Obtener productos limitados
+        $productos = $queryBuilder
             ->orderBy('clicks', 'desc')
-            ->paginate(20);
+            ->limit($maxProductos)
+            ->get();
+        
+        // Paginación manual
+        $items = $productos->slice(($currentPage - 1) * $perPage, $perPage)->values();
+        $p4X7 = new LengthAwarePaginator(
+            $items,
+            $productos->count(),
+            $perPage,
+            $currentPage,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
 
         $q1X2 = $query;
 
         return view('buscar', compact('p4X7', 'q1X2'));
+    }
+
+    /**
+     * Busca productos de Precios Hot
+     */
+    private function buscarPreciosHot(Request $request)
+    {
+        $precioHot = PrecioHot::where('nombre', 'Precios Hot')->first();
+        
+        if (!$precioHot || empty($precioHot->datos)) {
+            // Si no hay precios hot, devolver búsqueda vacía
+            $p4X7 = new LengthAwarePaginator([], 0, 20, 1);
+            $q1X2 = 'precios hot';
+            return view('buscar', compact('p4X7', 'q1X2'));
+        }
+
+        // Procesar datos de precios hot
+        $datos = collect($precioHot->datos)
+            ->map(function ($item) {
+                if (!is_array($item)) {
+                    return null;
+                }
+                
+                // Obtener el producto
+                $producto = Producto::find($item['producto_id'] ?? null);
+                if (!$producto) {
+                    return null;
+                }
+                
+                return [
+                    'producto' => $producto,
+                    'porcentaje_diferencia' => (int) floatval(str_replace(',', '.', $item['porcentaje_diferencia'] ?? 0)),
+                    'precio_oferta' => $item['precio_oferta'] ?? 0,
+                    'unidad_medida' => $item['unidad_medida'] ?? $producto->unidadDeMedida,
+                    'url_producto' => $item['url_producto'] ?? ($producto->categoria ? $producto->categoria->construirUrlCategorias($producto->slug) : '#'),
+                ];
+            })
+            ->filter()
+            ->sortByDesc('porcentaje_diferencia') // Ordenar por % de descuento descendente
+            ->values();
+
+        // Limitar a máximo 5 páginas (100 productos)
+        $maxProductos = 100;
+        $datosLimitados = $datos->take($maxProductos);
+
+        // Paginación manual
+        $perPage = 20;
+        $currentPage = Paginator::resolveCurrentPage() ?: 1;
+        
+        // Validar que la página no sea mayor a 5 - si lo es, redirigir a página 1
+        $maxPages = 5;
+        if ($currentPage > $maxPages) {
+            $queryParams = $request->query();
+            $queryParams['page'] = 1;
+            return redirect()->route('buscar', $queryParams);
+        }
+        
+        $items = $datosLimitados->slice(($currentPage - 1) * $perPage, $perPage)->values();
+        $p4X7 = new LengthAwarePaginator(
+            $items,
+            $datosLimitados->count(),
+            $perPage,
+            $currentPage,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
+
+        $q1X2 = 'precios hot';
+
+        return view('buscar', compact('p4X7', 'q1X2'));
+    }
+
+    /**
+     * Busca productos más vendidos ordenados por clicks
+     */
+    private function buscarMasVendidos(Request $request)
+    {
+        // Obtener rango de días (hoy=1, 7 días=7, 30 días=30)
+        $dias = (int) $request->get('dias', 7);
+        
+        // Validar que sea uno de los valores permitidos - si no, redirigir a 7 días
+        if (!in_array($dias, [1, 7, 30])) {
+            $queryParams = $request->query();
+            $queryParams['dias'] = 7;
+            $queryParams['q'] = 'más vendidos';
+            return redirect()->route('buscar', $queryParams);
+        }
+        
+        // Calcular fecha de inicio según los días
+        $fechaInicio = $dias === 1 
+            ? now()->startOfDay() 
+            : now()->subDays($dias - 1)->startOfDay();
+        
+        // Obtener productos con sus clicks en el rango de días
+        $productos = Producto::where('obsoleto', 'no')
+            ->where('mostrar', 'si')
+            ->with(['categoria', 'ofertas'])
+            ->get()
+            ->map(function ($producto) use ($fechaInicio) {
+                // Contar clicks de las ofertas de este producto en el rango
+                $clicks = Click::whereHas('oferta', function($query) use ($producto) {
+                    $query->where('producto_id', $producto->id);
+                })
+                ->where('created_at', '>=', $fechaInicio)
+                ->count();
+                
+                return [
+                    'producto' => $producto,
+                    'clicks' => $clicks
+                ];
+            })
+            ->filter(function ($item) {
+                // Solo productos con clicks > 0
+                return $item['clicks'] > 0;
+            })
+            ->sortByDesc('clicks')
+            ->values();
+        
+        // Limitar a máximo 5 páginas (100 productos)
+        $maxProductos = 100;
+        $productosLimitados = $productos->take($maxProductos);
+        
+        // Paginación manual
+        $perPage = 20;
+        $currentPage = Paginator::resolveCurrentPage() ?: 1;
+        
+        // Validar que la página no sea mayor a 5 - si lo es, redirigir a página 1
+        $maxPages = 5;
+        if ($currentPage > $maxPages) {
+            $queryParams = $request->query();
+            $queryParams['page'] = 1;
+            return redirect()->route('buscar', $queryParams);
+        }
+        
+        $items = $productosLimitados->slice(($currentPage - 1) * $perPage, $perPage)->values();
+        
+        // Extraer solo los productos para la vista
+        $itemsProductos = $items->map(function ($item) {
+            return $item['producto'];
+        });
+        
+        $p4X7 = new LengthAwarePaginator(
+            $itemsProductos,
+            $productosLimitados->count(),
+            $perPage,
+            $currentPage,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
+        
+        $q1X2 = 'más vendidos';
+        $diasSeleccionado = $dias;
+
+        return view('buscar', compact('p4X7', 'q1X2', 'diasSeleccionado'));
     }
 
     /**

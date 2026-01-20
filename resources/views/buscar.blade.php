@@ -132,30 +132,121 @@ if (!function_exists('oCV6X')) {
 <main class="max-w-7xl mx-auto flex flex-col gap-6 py-4 px-4 bg-gray-100">
 
       <div class="mb-4">
-        <h1 class="text-xl font-bold text-gray-800">
-  {{-- $q1X2 -> $query --}}
-  Resultados para "{{ $q1X2 }}"
-</h1>
-        <p class="text-gray-600">
-          {{-- $p4X7 -> $productos --}}
-          Se encontraron {{ $p4X7->total() }} productos para "{{ $q1X2 }}"
-        </p>
+        @php
+          $esPreciosHot = strtolower(trim($q1X2 ?? '')) === 'precios hot';
+          $esMasVendidos = in_array(strtolower(trim($q1X2 ?? '')), ['más vendidos', 'mas vendidos', 'más vendido', 'mas vendido']);
+          $diasSeleccionado = $diasSeleccionado ?? 7;
+        @endphp
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 class="text-xl font-bold text-gray-800">
+              @if($esPreciosHot)
+                🔥 Precios Hot
+              @elseif($esMasVendidos)
+                + Vendidos
+              @else
+                {{-- $q1X2 -> $query --}}
+                Resultados para "{{ $q1X2 }}"
+              @endif
+            </h1>
+            <p class="text-gray-600">
+              {{-- $p4X7 -> $productos --}}
+              @if($esPreciosHot)
+                Se encontraron {{ $p4X7->total() }} productos con los mejores descuentos
+              @elseif($esMasVendidos)
+                Se encontraron {{ $p4X7->total() }} productos más vendidos
+              @else
+                Se encontraron {{ $p4X7->total() }} productos para "{{ $q1X2 }}"
+              @endif
+            </p>
+          </div>
+          
+          {{-- FILTROS DE DÍAS (solo para más vendidos) --}}
+          @if($esMasVendidos)
+            <div class="flex gap-2">
+              @php
+                $diasOpciones = [
+                  1 => 'Hoy',
+                  7 => '7 días',
+                  30 => '30 días'
+                ];
+              @endphp
+              @foreach($diasOpciones as $dias => $label)
+                @php
+                  $url = route('buscar', array_filter(['q' => 'más vendidos', 'dias' => $dias, 'cam' => oCV6X()]));
+                @endphp
+                <a href="{{ aC4X($url) }}" 
+                   class="px-4 py-2 text-sm font-semibold rounded border transition-colors {{ $diasSeleccionado == $dias ? 'text-white' : 'bg-white hover:bg-green-50' }}"
+                   style="{{ $diasSeleccionado == $dias ? 'background-color: #73b112; border-color: #5f8c21;' : 'color: #73b112; border-color: #73b112;' }}">
+                  {{ $label }}
+                </a>
+              @endforeach
+            </div>
+          @endif
+        </div>
       </div>
 
       {{-- $p4X7 -> $productos --}}
+      @php
+        // Detectar si es búsqueda de precios hot o más vendidos
+        $esPreciosHot = strtolower(trim($q1X2 ?? '')) === 'precios hot';
+        $esMasVendidos = in_array(strtolower(trim($q1X2 ?? '')), ['más vendidos', 'mas vendidos', 'más vendido', 'mas vendido']);
+      @endphp
       @if($p4X7->count() > 0)
         <div class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {{-- $p4X7 -> $productos, $p5X8 -> $producto --}}
+          {{-- $p4X7 -> $productos, $p5X8 -> $producto o $item --}}
           @foreach($p4X7 as $p5X8)
-            {{-- aC4X -> añadirCam, $p5X8 -> $producto --}}
-            <a href="{{ aC4X($p5X8->categoria->construirUrlCategorias($p5X8->slug)) }}" class="bg-white rounded-lg shadow p-4 card-hover hover:shadow-md">
+            @php
+              // Si es precios hot, el item tiene estructura diferente
+              if ($esPreciosHot && isset($p5X8['producto'])) {
+                $producto = $p5X8['producto'];
+                $porcentajeDescuento = $p5X8['porcentaje_diferencia'] ?? 0;
+                $precioOferta = $p5X8['precio_oferta'] ?? 0;
+                $unidadMedida = $p5X8['unidad_medida'] ?? $producto->unidadDeMedida;
+                $urlProducto = $p5X8['url_producto'] ?? ($producto->categoria ? $producto->categoria->construirUrlCategorias($producto->slug) : '#');
+              } else {
+                $producto = $p5X8;
+                $porcentajeDescuento = null;
+                $precioOferta = null;
+                $unidadMedida = $producto->unidadDeMedida;
+                $urlProducto = $producto->categoria ? $producto->categoria->construirUrlCategorias($producto->slug) : '#';
+              }
+              
+              // Obtener imagen
+              $imagen = is_array($producto->imagen_pequena) 
+                ? ($producto->imagen_pequena[0] ?? '') 
+                : ($producto->imagen_pequena ?? '');
+              
+              // Formatear precio
+              $precio = $precioOferta ?: $producto->precio;
+              $precioFormateado = $unidadMedida === 'unidadMilesima' 
+                ? number_format($precio, 3, ',', '.')
+                : number_format($precio, 2, ',', '.');
+              
+              // Sufijo unidad de medida
+              $sufijo = match($unidadMedida) {
+                'unidad' => '/Und.',
+                'kilos' => '/Kg.',
+                'litros' => '/L.',
+                'unidadMilesima' => '/Und.',
+                'unidadUnica' => '',
+                '800gramos' => '/800gr.',
+                '100ml' => '/100ml.',
+                default => ''
+              };
+            @endphp
+            {{-- aC4X -> añadirCam --}}
+            <a href="{{ aC4X($urlProducto) }}" class="relative bg-white rounded-lg shadow p-4 card-hover hover:shadow-md">
+              {{-- Badge de descuento (solo para precios hot) --}}
+              @if($esPreciosHot && $porcentajeDescuento > 0)
+                <div class="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-md shadow-md z-10">
+                  -{{ $porcentajeDescuento }}%
+                </div>
+              @endif
               <div class="flex justify-center mb-3">
-                {{-- $p5X8 -> $producto --}}
-                @if(!empty($p5X8->imagen_pequena[0] ?? ''))
-                    {{-- $p5X8 -> $producto --}}
-                    <img loading="lazy" src="{{ asset('images/' . ($p5X8->imagen_pequena[0] ?? '')) }}" 
-                         {{-- $p5X8 -> $producto --}}
-                         alt="{{ $p5X8->nombre }}" 
+                @if(!empty($imagen))
+                    <img loading="lazy" src="{{ asset('images/' . $imagen) }}" 
+                         alt="{{ $producto->nombre }}" 
                          class="w-24 h-24 object-contain">
                 @else
                     <div class="w-24 h-24 flex items-center justify-center rounded-lg bg-gradient-to-br from-blue-100 to-blue-200">
@@ -167,25 +258,17 @@ if (!function_exists('oCV6X')) {
               </div>
               <div class="text-center">
                 <h3 class="font-semibold text-gray-800 mb-1">
-                  {{-- $p5X8 -> $producto --}}
-                  {{ Str::limit($p5X8->nombre, 50) }}
+                  {{ Str::limit($producto->nombre, 50) }}
                 </h3>
                 <p class="text-center mb-1">
-    <span class="text-xs text-gray-500">Desde:</span>
-    {{-- $p5X8 -> $producto --}}
-<span class="text-xl font-bold" style="color: #e97b11;">{{ number_format($p5X8->precio, 2) }}€
-    {{-- $p5X8 -> $producto --}}
-    @if($p5X8->unidadDeMedida === 'unidad')
-        <span class="text-xs text-gray-500">/Und.</span>
-    {{-- $p5X8 -> $producto --}}
-    @elseif($p5X8->unidadDeMedida === 'kilos')
-        <span class="text-xs text-gray-500">/kg.</span>
-    {{-- $p5X8 -> $producto --}}
-    @elseif($p5X8->unidadDeMedida === 'litros')
-        <span class="text-xs text-gray-500">/L.</span>
-    @endif
-</span>
-</p>
+                  <span class="text-xs text-gray-500">Desde:</span>
+                  <span class="text-xl font-bold" style="color: #e97b11;">
+                    {{ $precioFormateado }}€
+                    @if($sufijo)
+                      <span class="text-xs text-gray-500">{{ $sufijo }}</span>
+                    @endif
+                  </span>
+                </p>
               </div>
             </a>
           @endforeach
@@ -193,7 +276,14 @@ if (!function_exists('oCV6X')) {
 
         <div class="mt-8">
           {{-- $p4X7 -> $productos, $q1X2 -> $query, oCV6X -> obtenerCamValidado --}}
-          {{ $p4X7->appends(array_filter(['q' => $q1X2, 'cam' => oCV6X()]))->links() }}
+          @php
+            $paramsPaginacion = array_filter([
+              'q' => $q1X2, 
+              'cam' => oCV6X(),
+              'dias' => ($esMasVendidos && isset($diasSeleccionado)) ? $diasSeleccionado : null
+            ]);
+          @endphp
+          {{ $p4X7->appends($paramsPaginacion)->links() }}
         </div>
       @else
         <div class="text-center py-8">

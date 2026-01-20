@@ -41,9 +41,9 @@ class KidinnController extends PlantillaTiendaController
         // DETECCIÓN DE SIN STOCK
         $this->detectarSinStock($html, $oferta);
 
-        // 1) <p id="js-precio" ...>6.99 €</p>
+        // 1) <p id="js-precio" ...>6.99 €</p> o <p id="js-precio" ...>11 €</p>
         if (preg_match(
-            '~<p[^>]*\bid=["\']js-precio["\'][^>]*>\s*(?<p>\d{1,3}(?:[.\s]\d{3})*(?:[.,]\d{2}))\s*(?:€|&euro;)?\s*</p>~i',
+            '~<p[^>]*\bid=["\']js-precio["\'][^>]*>\s*(?<p>\d{1,3}(?:[.\s]\d{3})*(?:[.,]\d{2})?)\s*(?:€|&euro;)?\s*</p>~i',
             $html,
             $m1
         ) && !empty($m1['p'])) {
@@ -61,7 +61,7 @@ class KidinnController extends PlantillaTiendaController
             foreach ($offersBlocks['blk'] as $blk) {
                 // Buscar price dentro del bloque Offer
                 if (stripos($blk, '"Offer"') === false) continue;
-                if (preg_match('~"price"\s*:\s*"?(\d+(?:[.,]\d{2}))"?~i', $blk, $pm) && !empty($pm[1])) {
+                if (preg_match('~"price"\s*:\s*"?(\d+(?:[.,]\d{2})?)"?~i', $blk, $pm) && !empty($pm[1])) {
                     $p = $this->normalizarImporte($pm[1]);
                     if ($p !== null) {
                         return response()->json(['success' => true, 'precio' => $p]);
@@ -70,16 +70,16 @@ class KidinnController extends PlantillaTiendaController
             }
         }
 
-        // 3) Atributo data-price="6.99"
-        if (preg_match('~\bdata-price\s*=\s*["\'](?<p>\d+(?:[.,]\d{2}))["\']~i', $html, $m3) && !empty($m3['p'])) {
+        // 3) Atributo data-price="6.99" o data-price="11"
+        if (preg_match('~\bdata-price\s*=\s*["\'](?<p>\d+(?:[.,]\d{2})?)["\']~i', $html, $m3) && !empty($m3['p'])) {
             if (($p = $this->normalizarImporte($m3['p'])) !== null) {
                 return response()->json(['success' => true, 'precio' => $p]);
             }
         }
 
-        // 4) Fallback: <p class="txt-precio">6.99 €</p>
+        // 4) Fallback: <p class="txt-precio">6.99 €</p> o <p class="txt-precio">11 €</p>
         if (preg_match(
-            '~<p[^>]*\bclass=["\'][^"\']*\btxt-precio\b[^"\']*["\'][^>]*>\s*(?<p>\d{1,3}(?:[.\s]\d{3})*(?:[.,]\d{2}))\s*(?:€|&euro;)?\s*</p>~i',
+            '~<p[^>]*\bclass=["\'][^"\']*\btxt-precio\b[^"\']*["\'][^>]*>\s*(?<p>\d{1,3}(?:[.\s]\d{3})*(?:[.,]\d{2})?)\s*(?:€|&euro;)?\s*</p>~i',
             $html,
             $m4
         ) && !empty($m4['p'])) {
@@ -95,7 +95,7 @@ class KidinnController extends PlantillaTiendaController
     }
 
     /**
-     * Convierte "6,99", "6.99" o "1.234,56" a float con punto decimal.
+     * Convierte "6,99", "6.99", "1.234,56" o "11" a float con punto decimal.
      */
     private function normalizarImporte(string $importe): ?float
     {
