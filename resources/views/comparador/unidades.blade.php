@@ -730,7 +730,7 @@
       .product-card .precio-total.precio-unidad-unica-sin-columnas > div:last-child {
         font-size: 1.875rem !important;
         font-weight: 800 !important;
-        color: #f472b6 !important;
+        color: #e97b11 !important;
       }
       .product-card .precio-total.precio-unidad-unica-sin-columnas > div:last-child > span {
         font-size: 0.875rem !important;
@@ -868,9 +868,9 @@
       
       {{-- Estilo para precio total en móvil y tablet cuando es unidad única sin columnas --}}
       .product-card .precio-total.precio-unidad-unica-sin-columnas > div:last-child {
-        font-size: 1.5rem !important;
+        font-size: 1.10rem !important;
         font-weight: 800 !important;
-        color: #f472b6 !important;
+        color: #e97b11 !important;
       }
       .product-card .precio-total.precio-unidad-unica-sin-columnas > div:last-child > span {
         font-size: 0.875rem !important;
@@ -1711,7 +1711,7 @@
                               @endphp
                               <button 
                                 type="button"
-                                class="filtro-sublinea-btn px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm border rounded transition-colors bg-white text-gray-900 border-gray-400 hover:bg-gray-100 flex flex-col items-center gap-1 flex-shrink-0"
+                                class="filtro-sublinea-btn px-2 sm:px-3 py-1 sm:py-1.5 text-sm sm:text-base border rounded transition-colors bg-white text-gray-900 border-gray-400 hover:bg-gray-100 flex flex-col items-center gap-1 flex-shrink-0"
                                 style="background-color: #ffffff !important; color: #111827 !important; border-color: #9ca3af !important; min-width: {{ $formato === 'imagen' ? '78px' : 'auto' }}; min-height: {{ $formato === 'imagen' ? '78px' : 'auto' }};"
                                 data-linea-id="{{ $filtro['id'] }}"
                                 data-sublinea-id="{{ $sub['id'] }}"
@@ -1742,22 +1742,22 @@
                                   @endif
                                 @endif
                                 @if($formato === 'imagen_texto')
-                                  <div class="flex items-center gap-1 text-xs text-center">
+                                  <div class="flex items-center gap-1 text-sm text-center">
                                     <span>{{ $sub['texto'] }}</span>
                                     <span class="contador-sublinea" data-linea-id="{{ $filtro['id'] }}" data-sublinea-id="{{ $sub['id'] }}">(0)</span>
                                   </div>
                                 @elseif($formato === 'texto' || $formato === 'texto_precio')
-                                  <span class="text-xs text-center">{{ $sub['texto'] }}</span>
+                                  <span class="text-sm text-center">{{ $sub['texto'] }}</span>
                                 @endif
                                 @if($formato === 'texto_precio' || $formato === 'imagen_precio')
                                   @if($tienePrecio)
-                                    <span class="text-sm font-semibold" style="color: #000000;">{{ $sub['precio_mas_barato'] }} €</span>
+                                    <span class="text-base font-semibold" style="color: #000000;">{{ $sub['precio_mas_barato'] }} €</span>
                                   @else
-                                    <span class="text-xs text-gray-400">-</span>
+                                    <span class="text-sm text-gray-400">-</span>
                                   @endif
                                 @endif
                                 @if($formato === 'texto' || ($formato === 'texto_precio' && !$tienePrecio))
-                                  <span class="contador-sublinea text-xs" data-linea-id="{{ $filtro['id'] }}" data-sublinea-id="{{ $sub['id'] }}">(0)</span>
+                                  <span class="contador-sublinea text-sm" data-linea-id="{{ $filtro['id'] }}" data-sublinea-id="{{ $sub['id'] }}">(0)</span>
                                 @endif
                               </button>
                             @endforeach
@@ -1786,7 +1786,7 @@
                           @endphp
                           <button 
                             type="button"
-                            class="filtro-sublinea-btn px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm border rounded transition-colors bg-white text-gray-900 border-gray-400 hover:bg-gray-100 {{ $claseFlex }}"
+                            class="filtro-sublinea-btn px-2 sm:px-3 py-1 sm:py-1.5 text-sm sm:text-base border rounded transition-colors bg-white text-gray-900 border-gray-400 hover:bg-gray-100 {{ $claseFlex }}"
                             style="background-color: #ffffff !important; color: #111827 !important; border-color: #9ca3af !important;"
                             data-linea-id="{{ $filtro['id'] }}"
                             data-sublinea-id="{{ $sub['id'] }}"
@@ -1797,9 +1797,9 @@
                             @elseif($formato === 'texto_precio')
                               <span>{{ $sub['texto'] }}</span>
                               @if($tienePrecio)
-                                <span class="text-sm font-semibold" style="color: #000000;">{{ $sub['precio_mas_barato'] }} €</span>
+                                <span class="text-base font-semibold" style="color: #000000;">{{ $sub['precio_mas_barato'] }} €</span>
                               @else
-                                <span class="text-xs text-gray-400">-</span>
+                                <span class="text-sm text-gray-400">-</span>
                               @endif
                             @endif
                           </button>

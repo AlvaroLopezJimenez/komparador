@@ -286,6 +286,11 @@ public function todasCategorias()
         // $productos -> $pr1 (se mantiene localmente pero se pasa como pr1 a la vista)
         $pr1 = $query->paginate(36)->withQueryString();
 
+        // Recalcular precios de productos basándose en ofertas que coinciden con los filtros
+        if (!empty($fa1)) {
+            $pr1 = $this->recalcularPreciosConFiltros($pr1, $fa1);
+        }
+
         // Obtener todos los productos de la categoría (para calcular contadores y rango de precios)
         $productosTodos = Producto::whereIn('categoria_id', $categoriaIds)
             ->where('mostrar', 'si')
@@ -726,6 +731,158 @@ public function todasCategorias()
         }
         
         return $query->whereIn('id', array_values($productosFiltrados));
+    }
+
+    /**
+     * Recalcula los precios de los productos basándose en las ofertas que coinciden con los filtros aplicados
+     * Elimina productos que no tienen ofertas disponibles para la combinación de filtros marcados
+     * 
+     * @param \Illuminate\Contracts\Pagination\LengthAwarePaginator $productos Colección paginada de productos
+     * @param array $filtrosAplicados Filtros aplicados (formato: [lineaId => [sublineaId1, sublineaId2, ...]])
+     * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator Productos con precios recalculados y filtrados
+     */
+    private function recalcularPreciosConFiltros($productos, $filtrosAplicados)
+    {
+        if (empty($filtrosAplicados)) {
+            return $productos;
+        }
+
+        $servicioOfertas = new \App\Services\SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos();
+
+        // Filtrar y procesar cada producto
+        $productosFiltrados = $productos->getCollection()->filter(function($producto) use ($filtrosAplicados, $servicioOfertas) {
+            // Verificar si el producto tiene las sublineas marcadas en sus especificaciones internas
+            $especificacionesProducto = $producto->categoria_especificaciones_internas_elegidas;
+            
+            if (!$especificacionesProducto || !is_array($especificacionesProducto)) {
+                // Si no tiene especificaciones, mantener el producto con precio original
+                return true;
+            }
+
+            // Verificar si el producto tiene TODAS las sublineas seleccionadas (para múltiples filtros)
+            // Necesitamos verificar que el producto tenga al menos una sublinea de cada línea principal seleccionada
+            $tieneTodasLasLineas = true;
+            foreach ($filtrosAplicados as $lineaId => $sublineasIds) {
+                if ($lineaId === 'precio_min' || $lineaId === 'precio_max') {
+                    continue;
+                }
+                
+                if (empty($sublineasIds) || !is_array($sublineasIds)) {
+                    continue;
+                }
+
+                $productoLinea = $especificacionesProducto[$lineaId] ?? null;
+                if (!$productoLinea) {
+                    // Si el producto no tiene esta línea principal, no cumple con el filtro
+                    $tieneTodasLasLineas = false;
+                    break;
+                }
+
+                $productoSublineas = is_array($productoLinea) ? $productoLinea : [$productoLinea];
+                
+                // Verificar si alguna sublínea del producto coincide con las seleccionadas de esta línea
+                $tieneSublineaDeEstaLinea = false;
+                foreach ($productoSublineas as $item) {
+                    $itemId = (is_array($item) && isset($item['id'])) ? strval($item['id']) : strval($item);
+                    if (in_array(strval($itemId), array_map('strval', $sublineasIds))) {
+                        // Verificar si tiene el campo 'm' (mostrar) o si no existe, asumir que se muestra
+                        if (is_array($item)) {
+                            // Si tiene el campo 'm' y es false, no mostrar
+                            if (isset($item['m']) && $item['m'] === false) {
+                                continue;
+                            }
+                        }
+                        $tieneSublineaDeEstaLinea = true;
+                        break;
+                    }
+                }
+                
+                // Si no tiene ninguna sublinea de esta línea, el producto no cumple
+                if (!$tieneSublineaDeEstaLinea) {
+                    $tieneTodasLasLineas = false;
+                    break;
+                }
+            }
+
+            // Si el producto no tiene todas las líneas requeridas, no mostrarlo
+            if (!$tieneTodasLasLineas) {
+                return false;
+            }
+
+            // Obtener todas las ofertas del producto
+            $ofertas = $servicioOfertas->obtenerTodas($producto);
+
+            if ($ofertas->isEmpty()) {
+                // Si no hay ofertas, no mostrar el producto
+                return false;
+            }
+
+            // Filtrar ofertas que coincidan con TODOS los filtros aplicados
+            $ofertasFiltradas = $ofertas->filter(function($oferta) use ($filtrosAplicados) {
+                $especificacionesOferta = $oferta->especificaciones_internas;
+                
+                // Si la oferta no tiene especificaciones internas, no coincide
+                if (!$especificacionesOferta || !is_array($especificacionesOferta)) {
+                    return false;
+                }
+
+                // Verificar que la oferta cumpla con TODAS las líneas principales seleccionadas
+                foreach ($filtrosAplicados as $lineaId => $sublineasIds) {
+                    if ($lineaId === 'precio_min' || $lineaId === 'precio_max') {
+                        continue;
+                    }
+                    
+                    if (empty($sublineasIds) || !is_array($sublineasIds)) {
+                        continue;
+                    }
+
+                    $ofertaLinea = $especificacionesOferta[$lineaId] ?? null;
+                    if (!$ofertaLinea) {
+                        // Si la oferta no tiene esta línea principal, no coincide
+                        return false;
+                    }
+
+                    $ofertaSublineas = is_array($ofertaLinea) ? $ofertaLinea : [$ofertaLinea];
+                    
+                    // Verificar si alguna sublínea de la oferta coincide con las seleccionadas de esta línea
+                    $coincideEstaLinea = false;
+                    foreach ($ofertaSublineas as $item) {
+                        $itemId = (is_array($item) && isset($item['id'])) ? strval($item['id']) : strval($item);
+                        if (in_array(strval($itemId), array_map('strval', $sublineasIds))) {
+                            $coincideEstaLinea = true;
+                            break;
+                        }
+                    }
+                    
+                    // Si no coincide con esta línea, la oferta no cumple con todos los filtros
+                    if (!$coincideEstaLinea) {
+                        return false;
+                    }
+                }
+
+                // Si llegamos aquí, la oferta cumple con todos los filtros
+                return true;
+            });
+
+            // Si no hay ofertas que coincidan con todos los filtros, no mostrar el producto
+            if ($ofertasFiltradas->isEmpty()) {
+                return false;
+            }
+
+            // Si hay ofertas que coinciden, usar el precio_unidad más bajo y mantener el producto
+            $precioMasBajo = $ofertasFiltradas->min('precio_unidad');
+            if ($precioMasBajo !== null) {
+                // Asignar el precio más bajo temporalmente (sin modificar la BD)
+                $producto->precio = $precioMasBajo;
+            }
+
+            return true;
+        });
+
+        // Reemplazar la colección con los productos filtrados
+        $productos->setCollection($productosFiltrados);
+
+        return $productos;
     }
 
 } 

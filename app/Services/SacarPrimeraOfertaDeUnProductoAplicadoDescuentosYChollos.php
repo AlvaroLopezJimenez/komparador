@@ -164,17 +164,36 @@ class SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos
     public function obtenerTodas(Producto $producto)
     {
         // Obtener ofertas originales
-        // Excluir ofertas con fecha_inicio superior a la fecha actual
-        // Si fecha_inicio es NULL, la oferta se incluye (comportamiento normal)
+        // Todas las ofertas deben cumplir: mostrar='si' y mostrar_tienda='si'
+        // Adicionalmente, las ofertas con chollo_id deben cumplir:
+        // - fecha_inicio <= fecha_actual (ya ha comenzado)
+        // - (fecha_final >= fecha_actual OR fecha_final IS NULL) (aún no ha terminado o no tiene fecha final)
         $ofertasOriginales = $producto->ofertas()->with('tienda')
             ->where('mostrar', 'si')
-            ->where(function($query) {
-                $query->whereNull('fecha_inicio')
-                      ->orWhere('fecha_inicio', '<=', now());
-            })
             ->whereHas('tienda', function($query) {
                 $query->where('mostrar_tienda', 'si');
-            })->get();
+            })
+            ->where(function($query) {
+                // Ofertas sin chollo_id se incluyen normalmente (solo verificando fecha_inicio si existe)
+                $query->whereNull('chollo_id')
+                      ->where(function($q) {
+                          $q->whereNull('fecha_inicio')
+                            ->orWhere('fecha_inicio', '<=', now());
+                      })
+                      // Ofertas con chollo_id deben cumplir las condiciones de fechas
+                      ->orWhere(function($q) {
+                          $q->whereNotNull('chollo_id')
+                            ->where(function($q2) {
+                                $q2->whereNull('fecha_inicio')
+                                   ->orWhere('fecha_inicio', '<=', now());
+                            })
+                            ->where(function($q2) {
+                                $q2->whereNull('fecha_final')
+                                   ->orWhere('fecha_final', '>=', now());
+                            });
+                      });
+            })
+            ->get();
         
         if ($ofertasOriginales->isEmpty()) {
             return collect();
