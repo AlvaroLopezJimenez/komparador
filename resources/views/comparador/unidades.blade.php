@@ -1030,16 +1030,40 @@
   <div class="max-w-7xl mx-auto flex flex-col gap-2 py-2 px-4 bg-gray-100">
     {{-- BREADCRUMB --}}
 <nav class="mb-1">
-    <ol class="flex items-center space-x-1 text-sm text-gray-600">
-        <li>
-            <a href="{{ añadirCam(route('home')) }}" class="hover:text-pink-600">Inicio</a>
+    @php
+        // En móvil, mostrar solo las últimas 2 categorías si hay más de 3
+        $totalCategorias = count($breadcrumb);
+        $breadcrumbMostrar = $breadcrumb;
+        
+        if ($totalCategorias > 3) {
+            // Mantener las últimas 2 categorías
+            $breadcrumbMostrar = array_slice($breadcrumb, -2);
+        }
+    @endphp
+    <ol class="flex items-center space-x-1 text-sm text-gray-600 overflow-hidden">
+        <li class="flex-shrink-0">
+            <a href="{{ añadirCam(route('home')) }}" class="flex items-center transition-colors" style="color: inherit;" onmouseover="this.style.color='#e97b11'" onmouseout="this.style.color='inherit'" title="Inicio">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                </svg>
+            </a>
         </li>
-        @foreach($breadcrumb as $item)
-        <li class="flex items-center">
-            <svg class="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        
+        @if($totalCategorias > 3)
+            <li class="flex items-center flex-shrink-0">
+                <svg class="w-4 h-4 mx-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                </svg>
+                <span class="text-gray-400">...</span>
+            </li>
+        @endif
+        
+        @foreach($breadcrumbMostrar as $item)
+        <li class="flex items-center flex-shrink-0 min-w-0">
+            <svg class="w-4 h-4 mx-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
             </svg>
-            <a href="{{ añadirCam(url('categoria/' . $item['slug'])) }}" class="hover:text-pink-600">{{ $item['nombre'] }}</a>
+            <a href="{{ añadirCam(url('categoria/' . $item['slug'])) }}" class="truncate max-w-[150px] sm:max-w-[200px] md:max-w-none transition-colors" style="color: inherit;" onmouseover="this.style.color='#e97b11'" onmouseout="this.style.color='inherit'" title="{{ $item['nombre'] }}">{{ $item['nombre'] }}</a>
         </li>
         @endforeach
     </ol>
@@ -1429,10 +1453,23 @@
             $categoriaEspecificaciones = \App\Models\Categoria::find($producto->categoria_id_especificaciones_internas);
             $especificacionesElegidas = $producto->categoria_especificaciones_internas_elegidas;
             
+            // Combinar filtros de categoría y producto antes de procesarlos
+            $filtrosCombinados = [];
+            
+            // Añadir filtros de categoría
             if ($categoriaEspecificaciones && $categoriaEspecificaciones->especificaciones_internas && 
                 isset($categoriaEspecificaciones->especificaciones_internas['filtros'])) {
-              
-              $filtrosImportantes = collect($categoriaEspecificaciones->especificaciones_internas['filtros'])
+              $filtrosCombinados = array_merge($filtrosCombinados, $categoriaEspecificaciones->especificaciones_internas['filtros']);
+            }
+            
+            // Añadir filtros del producto (si existen)
+            if (isset($especificacionesElegidas['_producto']['filtros']) && 
+                is_array($especificacionesElegidas['_producto']['filtros'])) {
+              $filtrosCombinados = array_merge($filtrosCombinados, $especificacionesElegidas['_producto']['filtros']);
+            }
+            
+            if (count($filtrosCombinados) > 0) {
+              $filtrosImportantes = collect($filtrosCombinados)
                 ->map(function($filtro) use ($especificacionesElegidas, $ofertas, $categoriaEspecificaciones, $producto) {
                   // Filtrar solo las sublíneas que están marcadas como "Mostrar" (m === 1)
                   $sublineasElegidas = $especificacionesElegidas[$filtro['id']] ?? [];
@@ -1891,13 +1928,26 @@
           $categoriaEspecificaciones = \App\Models\Categoria::find($producto->categoria_id_especificaciones_internas);
           $especificacionesElegidas = $producto->categoria_especificaciones_internas_elegidas;
           
+          // Combinar filtros de categoría y producto (igual que arriba)
+          $filtrosCombinados = [];
+          
+          // Añadir filtros de categoría
           if ($categoriaEspecificaciones && $categoriaEspecificaciones->especificaciones_internas && 
-              isset($categoriaEspecificaciones->especificaciones_internas['filtros']) &&
-              isset($especificacionesElegidas['_columnas'])) {
+              isset($categoriaEspecificaciones->especificaciones_internas['filtros'])) {
+            $filtrosCombinados = array_merge($filtrosCombinados, $categoriaEspecificaciones->especificaciones_internas['filtros']);
+          }
+          
+          // Añadir filtros del producto (si existen)
+          if (isset($especificacionesElegidas['_producto']['filtros']) && 
+              is_array($especificacionesElegidas['_producto']['filtros'])) {
+            $filtrosCombinados = array_merge($filtrosCombinados, $especificacionesElegidas['_producto']['filtros']);
+          }
+          
+          if (count($filtrosCombinados) > 0 && isset($especificacionesElegidas['_columnas'])) {
             
             // Nota: En el backend usamos las claves originales, solo se ofuscan al enviar al cliente
             $columnasIds = $especificacionesElegidas['_columnas'] ?? [];
-            $filtros = $categoriaEspecificaciones->especificaciones_internas['filtros'];
+            $filtros = $filtrosCombinados;
             
             // Crear mapa de líneas principales con sus datos
             $columnasData = [];
@@ -6351,7 +6401,7 @@ function _rmd1() {
     miniatura.className = `miniatura-pagina-desktop ${isActive ? 'activa' : ''}`;
     miniatura.style.width = '60px';
     miniatura.style.height = '60px';
-    miniatura.onmouseenter = () => _cip2(i);
+    miniatura.onclick = () => _cip2(i);
     miniatura.innerHTML = `<img src="${v6}/${imgPath}" alt="Miniatura ${i + 1}">`;
     container.appendChild(miniatura);
   }
@@ -6569,9 +6619,36 @@ function _aip1() {
   
   if (imgDesktop && imgUrl) {
     imgDesktop.src = imgUrl;
+    // Asegurar que se mantengan las clases CSS originales para desktop (max-h-60 object-contain)
+    if (!imgDesktop.classList.contains('max-h-60')) {
+      imgDesktop.classList.add('max-h-60');
+    }
+    if (!imgDesktop.classList.contains('object-contain')) {
+      imgDesktop.classList.add('object-contain');
+    }
+    // Asegurar que no tenga restricciones de ancho/alto fijas que limiten el tamaño
+    imgDesktop.classList.remove('w-28', 'h-28');
+    // Asegurar que no haya estilos inline que limiten el tamaño
+    imgDesktop.style.width = '';
+    imgDesktop.style.height = '';
+    imgDesktop.style.maxWidth = '';
   }
   if (imgMovil && imgUrl) {
     imgMovil.src = imgUrl;
+    // Asegurar que se mantengan las clases CSS originales para móvil (w-28 h-28 object-contain)
+    if (!imgMovil.classList.contains('w-28')) {
+      imgMovil.classList.add('w-28');
+    }
+    if (!imgMovil.classList.contains('h-28')) {
+      imgMovil.classList.add('h-28');
+    }
+    if (!imgMovil.classList.contains('object-contain')) {
+      imgMovil.classList.add('object-contain');
+    }
+    // Asegurar que no haya estilos inline que limiten el tamaño
+    imgMovil.style.width = '';
+    imgMovil.style.height = '';
+    imgMovil.style.maxWidth = '';
   }
 }
 

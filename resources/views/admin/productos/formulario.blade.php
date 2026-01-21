@@ -106,6 +106,20 @@
                 <input type="hidden" name="categoria_especificaciones_internas_elegidas" id="categoria_especificaciones_internas_elegidas_input" value="{{ old('categoria_especificaciones_internas_elegidas', $producto && $producto->categoria_especificaciones_internas_elegidas ? json_encode($producto->categoria_especificaciones_internas_elegidas, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : '') }}">
             </fieldset>
 
+            {{-- ESPECIFICACIONES INTERNAS DEL PRODUCTO --}}
+            <fieldset class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 space-y-6 border border-gray-200 dark:border-gray-700">
+                <legend class="text-lg font-semibold text-gray-700 dark:text-gray-200">ESPECIFICACIONES INTERNAS DEL PRODUCTO</legend>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Puedes añadir líneas principales y sublíneas específicas de este producto. Estas se guardarán junto con las especificaciones de la categoría.</p>
+                
+                <div id="especificaciones-producto-container" class="space-y-4">
+                    <!-- Las líneas principales específicas del producto se generarán dinámicamente aquí -->
+                </div>
+                
+                <button type="button" id="btn-añadir-linea-producto" class="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded shadow">
+                    + Añadir línea principal
+                </button>
+            </fieldset>
+
             {{-- DATOS PRINCIPALES --}}
             <fieldset class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 space-y-6 border border-gray-200 dark:border-gray-700">
                 <legend class="text-lg font-semibold text-gray-700 dark:text-gray-200">Información general</legend>
@@ -3254,6 +3268,42 @@
                 }
             }
             
+            // PRESERVAR PRIMERO las especificaciones del producto ANTES de procesar checkboxes de categoría
+            // Esto asegura que las especificaciones del producto siempre se guarden
+            if (especificacionesGuardadas._producto) {
+                especificaciones._producto = especificacionesGuardadas._producto;
+                
+                // Preservar TODAS las sublíneas del producto guardadas directamente por ID de línea principal
+                if (especificacionesGuardadas._producto.filtros) {
+                    especificacionesGuardadas._producto.filtros.forEach(filtro => {
+                        const principalId = filtro.id;
+                        // Si esta línea principal del producto tiene sublíneas guardadas
+                        if (especificacionesGuardadas[principalId] && Array.isArray(especificacionesGuardadas[principalId])) {
+                            // PRESERVAR las sublíneas del producto
+                            especificaciones[principalId] = especificacionesGuardadas[principalId];
+                        }
+                    });
+                }
+            }
+            
+            // También preservar cualquier otra clave que pertenezca al producto
+            if (especificacionesGuardadas._producto && especificacionesGuardadas._producto.filtros) {
+                const idsProducto = especificacionesGuardadas._producto.filtros.map(f => f.id);
+                Object.keys(especificacionesGuardadas).forEach(key => {
+                    // Si es una clave especial o ya la preservamos, saltar
+                    if (['_formatos', '_orden', '_columnas', '_producto'].includes(key)) {
+                        return;
+                    }
+                    // Si esta clave corresponde a un ID de línea principal del producto
+                    if (idsProducto.includes(key) && especificacionesGuardadas[key]) {
+                        // Ya la preservamos arriba, pero asegurarnos por si acaso
+                        if (!especificaciones[key]) {
+                            especificaciones[key] = especificacionesGuardadas[key];
+                        }
+                    }
+                });
+            }
+            
             // Verificar si es unidadUnica para guardar orden y columnas
             const unidadDeMedidaSelect = document.getElementById('unidadDeMedida');
             const esUnidadUnica = unidadDeMedidaSelect && unidadDeMedidaSelect.value === 'unidadUnica';
@@ -3261,11 +3311,21 @@
             // Inicializar _formatos preservando los formatos guardados
             especificaciones._formatos = especificacionesGuardadas._formatos || {};
             
+            // Obtener los IDs de las líneas principales del producto para evitar sobrescribirlas
+            const idsProducto = (especificacionesGuardadas._producto && especificacionesGuardadas._producto.filtros) 
+                ? especificacionesGuardadas._producto.filtros.map(f => f.id) 
+                : [];
+            
             checkboxes.forEach(checkbox => {
                 if (!checkbox.checked) return;
                 
                 const principalId = checkbox.dataset.principalId;
                 const sublineaId = checkbox.dataset.sublineaId;
+                
+                // Si este ID pertenece al producto, NO procesarlo aquí (ya está preservado)
+                if (idsProducto.includes(principalId)) {
+                    return; // Saltar este checkbox, es del producto, no de categoría
+                }
                 
                 if (!especificaciones[principalId]) {
                     especificaciones[principalId] = [];
@@ -3351,6 +3411,58 @@
                     especificaciones._columnas = columnas;
                 }
             }
+            
+            // Preservar TODAS las especificaciones del producto (_producto) si existen
+            if (especificacionesGuardadas._producto) {
+                especificaciones._producto = especificacionesGuardadas._producto;
+            }
+            
+            // Preservar TODAS las sublíneas del producto guardadas directamente por ID de línea principal
+            // Las sublíneas del producto se guardan directamente con el ID principal como clave
+            if (especificacionesGuardadas._producto && especificacionesGuardadas._producto.filtros) {
+                // Obtener todos los IDs de líneas principales del producto
+                const idsProducto = especificacionesGuardadas._producto.filtros.map(f => f.id);
+                
+                // Preservar TODAS las claves que corresponden a IDs de líneas principales del producto
+                idsProducto.forEach(principalId => {
+                    // Si esta línea principal del producto tiene sublíneas guardadas
+                    if (especificacionesGuardadas[principalId] && Array.isArray(especificacionesGuardadas[principalId])) {
+                        // SIEMPRE preservar las sublíneas del producto (tienen prioridad)
+                        // Solo sobrescribir si no hay especificaciones de categoría con el mismo ID
+                        if (!especificaciones[principalId] || especificaciones[principalId].length === 0) {
+                            especificaciones[principalId] = especificacionesGuardadas[principalId];
+                        } else {
+                            // Si hay conflicto, las del producto tienen prioridad porque se guardaron más recientemente
+                            // Pero verificar: si las especificaciones actuales son de categoría (tienen clase .especificacion-checkbox),
+                            // mantener ambas o priorizar producto
+                            // Por ahora, priorizar producto si viene de _producto.filtros
+                            especificaciones[principalId] = especificacionesGuardadas[principalId];
+                        }
+                    }
+                });
+            }
+            
+            // También preservar cualquier otra clave que podría ser del producto (por seguridad)
+            // Las claves que no son especiales (_formatos, _orden, _columnas, _producto) y que no fueron procesadas
+            // por los checkboxes de categoría, podrían ser del producto
+            Object.keys(especificacionesGuardadas).forEach(key => {
+                // Si es una clave especial, ya la manejamos
+                if (['_formatos', '_orden', '_columnas', '_producto'].includes(key)) {
+                    return;
+                }
+                
+                // Si esta clave no está en las especificaciones actuales (no fue procesada por checkboxes de categoría)
+                // y está en las guardadas, podría ser del producto
+                if (!especificaciones[key] && especificacionesGuardadas[key]) {
+                    // Verificar si pertenece al producto buscando en _producto.filtros
+                    if (especificacionesGuardadas._producto && 
+                        especificacionesGuardadas._producto.filtros &&
+                        especificacionesGuardadas._producto.filtros.some(f => f.id === key)) {
+                        // Es del producto, preservarla
+                        especificaciones[key] = especificacionesGuardadas[key];
+                    }
+                }
+            });
             
             inputHidden.value = JSON.stringify(especificaciones, null, 0);
             
@@ -3907,6 +4019,11 @@
             const form = document.querySelector('form');
             if (form) {
                 form.addEventListener('submit', function(e) {
+                    // Actualizar especificaciones antes de limpiar (si no está marcado "No añadir")
+                    if (typeof actualizarEspecificacionesElegidas === 'function' && !checkboxNoAnadir.checked) {
+                        actualizarEspecificacionesElegidas();
+                    }
+                    
                     if (checkboxNoAnadir.checked) {
                         // Asegurar que se envíe null
                         document.getElementById('categoria_especificaciones_id').value = '';
@@ -3976,28 +4093,87 @@
             document.getElementById('nombre-archivo-sublinea').textContent = 'Subiendo...';
             
             try {
-                const formData = new FormData();
-                formData.append('imagen', file);
-                formData.append('carpeta', carpeta);
-                formData.append('_token', '{{ csrf_token() }}');
+                // Cargar imagen y procesar con canvas
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
                 
-                const response = await fetch('{{ route("admin.imagenes.subir") }}', {
-                    method: 'POST',
-                    body: formData,
-                    headers: {
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                img.onload = async function() {
+                    try {
+                        // Grande: tamaño original
+                        const canvasGrande = document.createElement('canvas');
+                        canvasGrande.width = img.width;
+                        canvasGrande.height = img.height;
+                        const ctxGrande = canvasGrande.getContext('2d');
+                        ctxGrande.drawImage(img, 0, 0);
+                        
+                        // Pequeña: 300x250
+                        const canvasPequena = document.createElement('canvas');
+                        canvasPequena.width = 300;
+                        canvasPequena.height = 250;
+                        const ctxPequena = canvasPequena.getContext('2d');
+                        ctxPequena.drawImage(img, 0, 0, 300, 250);
+                        
+                        // Convertir a blob webp
+                        const blobGrande = await new Promise((resolve, reject) => {
+                            canvasGrande.toBlob((blob) => blob ? resolve(blob) : reject(new Error('Error grande')), 'image/webp', 0.9);
+                        });
+                        
+                        const blobPequena = await new Promise((resolve, reject) => {
+                            canvasPequena.toBlob((blob) => blob ? resolve(blob) : reject(new Error('Error pequeña')), 'image/webp', 0.9);
+                        });
+                        
+                        const slugInput = document.querySelector('input[name="slug"]');
+                        const nombreBase = slugInput ? slugInput.value.trim() : 'imagen';
+                        const timestamp = Date.now();
+                        
+                        // Subir ambas
+                        const formDataGrande = new FormData();
+                        formDataGrande.append('imagen', blobGrande, `${nombreBase}-${timestamp}.webp`);
+                        formDataGrande.append('carpeta', carpeta);
+                        formDataGrande.append('_token', '{{ csrf_token() }}');
+                        
+                        const formDataPequena = new FormData();
+                        formDataPequena.append('imagen', blobPequena, `${nombreBase}-${timestamp}-thumbnail.webp`);
+                        formDataPequena.append('carpeta', carpeta);
+                        formDataPequena.append('_token', '{{ csrf_token() }}');
+                        
+                        const [resGrande, resPequena] = await Promise.all([
+                            fetch('{{ route("admin.imagenes.subir-simple") }}', {
+                                method: 'POST',
+                                headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                                body: formDataGrande
+                            }),
+                            fetch('{{ route("admin.imagenes.subir-simple") }}', {
+                                method: 'POST',
+                                headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                                body: formDataPequena
+                            })
+                        ]);
+                        
+                        const dataGrande = await resGrande.json();
+                        const dataPequena = await resPequena.json();
+                        
+                        if (dataGrande.success && dataPequena.success) {
+                            // Guardar solo la ruta de la imagen grande en las sublíneas
+                            añadirImagenASublinea(dataGrande.data.ruta_relativa);
+                            cerrarModalAñadirImagenSublinea();
+                        } else {
+                            throw new Error(dataGrande.message || dataPequena.message || 'Error al subir');
+                        }
+                    } catch (error) {
+                        console.error('Error:', error);
+                        alert(`Error al procesar la imagen: ${error.message}`);
+                        document.getElementById('nombre-archivo-sublinea').textContent = '';
                     }
-                });
+                };
                 
-                const data = await response.json();
+                img.onerror = function() {
+                    alert('Error al cargar la imagen. Por favor, verifica que sea un formato válido.');
+                    document.getElementById('nombre-archivo-sublinea').textContent = '';
+                };
                 
-                if (!data.success) {
-                    throw new Error(data.message || 'Error al subir la imagen');
-                }
+                img.src = URL.createObjectURL(file);
                 
-                const rutaImagen = data.data.ruta_relativa;
-                añadirImagenASublinea(rutaImagen);
-                cerrarModalAñadirImagenSublinea();
             } catch (error) {
                 console.error('Error:', error);
                 alert(`Error al subir la imagen: ${error.message}`);
@@ -4105,38 +4281,66 @@
             }
             
             try {
-                const canvas = document.createElement('canvas');
-                canvas.width = canvasOriginal.width;
-                canvas.height = canvasOriginal.height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(canvasOriginal, 0, 0);
+                // Grande: tamaño original (obtener dimensiones originales del canvas recortado)
+                const canvasGrande = document.createElement('canvas');
+                canvasGrande.width = canvasOriginal.width;
+                canvasGrande.height = canvasOriginal.height;
+                const ctxGrande = canvasGrande.getContext('2d');
+                ctxGrande.drawImage(canvasOriginal, 0, 0);
                 
-                const blob = await new Promise((resolve, reject) => {
-                    canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('Error')), 'image/webp', 0.9);
+                // Pequeña: 300x250
+                const canvasPequena = document.createElement('canvas');
+                canvasPequena.width = 300;
+                canvasPequena.height = 250;
+                const ctxPequena = canvasPequena.getContext('2d');
+                ctxPequena.drawImage(canvasOriginal, 0, 0, 300, 250);
+                
+                // Convertir a blob webp
+                const blobGrande = await new Promise((resolve, reject) => {
+                    canvasGrande.toBlob((blob) => blob ? resolve(blob) : reject(new Error('Error grande')), 'image/webp', 0.9);
+                });
+                
+                const blobPequena = await new Promise((resolve, reject) => {
+                    canvasPequena.toBlob((blob) => blob ? resolve(blob) : reject(new Error('Error pequeña')), 'image/webp', 0.9);
                 });
                 
                 const slugInput = document.querySelector('input[name="slug"]');
                 const nombreBase = slugInput ? slugInput.value.trim() : 'imagen';
                 const timestamp = Date.now();
                 
-                const formData = new FormData();
-                formData.append('imagen', blob, `${nombreBase}-${timestamp}.webp`);
-                formData.append('carpeta', carpetaActualSublinea);
-                formData.append('_token', '{{ csrf_token() }}');
+                // Subir ambas
+                const formDataGrande = new FormData();
+                formDataGrande.append('imagen', blobGrande, `${nombreBase}-${timestamp}.webp`);
+                formDataGrande.append('carpeta', carpetaActualSublinea);
+                formDataGrande.append('_token', '{{ csrf_token() }}');
                 
-                const response = await fetch('{{ route("admin.imagenes.subir-simple") }}', {
-                    method: 'POST',
-                    headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                    body: formData
-                });
+                const formDataPequena = new FormData();
+                formDataPequena.append('imagen', blobPequena, `${nombreBase}-${timestamp}-thumbnail.webp`);
+                formDataPequena.append('carpeta', carpetaActualSublinea);
+                formDataPequena.append('_token', '{{ csrf_token() }}');
                 
-                const data = await response.json();
+                const [resGrande, resPequena] = await Promise.all([
+                    fetch('{{ route("admin.imagenes.subir-simple") }}', {
+                        method: 'POST',
+                        headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                        body: formDataGrande
+                    }),
+                    fetch('{{ route("admin.imagenes.subir-simple") }}', {
+                        method: 'POST',
+                        headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                        body: formDataPequena
+                    })
+                ]);
                 
-                if (data.success) {
-                    añadirImagenASublinea(data.data.ruta_relativa);
+                const dataGrande = await resGrande.json();
+                const dataPequena = await resPequena.json();
+                
+                if (dataGrande.success && dataPequena.success) {
+                    // Guardar solo la ruta de la imagen grande en las sublíneas
+                    añadirImagenASublinea(dataGrande.data.ruta_relativa);
                     cerrarModalAñadirImagenSublinea();
                 } else {
-                    throw new Error(data.message || 'Error al subir');
+                    throw new Error(dataGrande.message || dataPequena.message || 'Error al subir');
                 }
             } catch (error) {
                 console.error('Error:', error);
@@ -4420,22 +4624,14 @@ REGLAS IMPORTANTES:
                     });
 
                     if (!response.ok) {
-                        const errorData = await response.json().catch(() => ({}));
-                        console.error('Error HTTP:', response.status);
-                        console.error('Datos del error:', errorData);
-                        throw new Error(errorData.error || `Error HTTP: ${response.status}`);
+                        throw new Error(`Error HTTP: ${response.status}`);
                     }
 
                     progresoTexto.textContent = 'Procesando respuesta de ChatGPT...';
 
                     const data = await response.json();
-                    console.log('Respuesta recibida:', data);
 
                     if (data.error) {
-                        console.error('Error en respuesta:', data);
-                        if (data.debug) {
-                            console.error('Debug info:', data.debug);
-                        }
                         throw new Error(data.error);
                     }
 
@@ -5161,66 +5357,87 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('nombre-archivo-nueva').textContent = 'Subiendo...';
         
         try {
-            // Subir imagen original
-            const formData = new FormData();
-            formData.append('imagen', file);
-            formData.append('carpeta', carpeta);
-            formData.append('_token', '{{ csrf_token() }}');
-            
-            const response = await fetch('{{ route("admin.imagenes.subir") }}', {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                }
-            });
-            
-            const data = await response.json();
-            
-            if (!data.success) {
-                throw new Error(data.message || 'Error al subir la imagen');
-            }
-            
-            const rutaGrande = data.data.ruta_relativa;
-            
-            // Crear imagen pequeña desde la original usando canvas
+            // Cargar imagen y procesar con canvas
             const img = new Image();
             img.crossOrigin = 'anonymous';
+            
             img.onload = async function() {
-                const canvas = document.createElement('canvas');
-                canvas.width = 300;
-                canvas.height = 250;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, 300, 250);
-                
-                canvas.toBlob(async (blob) => {
+                try {
+                    // Grande: tamaño original
+                    const canvasGrande = document.createElement('canvas');
+                    canvasGrande.width = img.width;
+                    canvasGrande.height = img.height;
+                    const ctxGrande = canvasGrande.getContext('2d');
+                    ctxGrande.drawImage(img, 0, 0);
+                    
+                    // Pequeña: 300x250
+                    const canvasPequena = document.createElement('canvas');
+                    canvasPequena.width = 300;
+                    canvasPequena.height = 250;
+                    const ctxPequena = canvasPequena.getContext('2d');
+                    ctxPequena.drawImage(img, 0, 0, 300, 250);
+                    
+                    // Convertir a blob webp
+                    const blobGrande = await new Promise((resolve, reject) => {
+                        canvasGrande.toBlob((blob) => blob ? resolve(blob) : reject(new Error('Error grande')), 'image/webp', 0.9);
+                    });
+                    
+                    const blobPequena = await new Promise((resolve, reject) => {
+                        canvasPequena.toBlob((blob) => blob ? resolve(blob) : reject(new Error('Error pequeña')), 'image/webp', 0.9);
+                    });
+                    
+                    const slugInput = document.querySelector('input[name="slug"]');
+                    const nombreBase = slugInput ? slugInput.value.trim() : 'imagen';
+                    const timestamp = Date.now();
+                    
+                    // Subir ambas
+                    const formDataGrande = new FormData();
+                    formDataGrande.append('imagen', blobGrande, `${nombreBase}-${timestamp}.webp`);
+                    formDataGrande.append('carpeta', carpeta);
+                    formDataGrande.append('_token', '{{ csrf_token() }}');
+                    
                     const formDataPequena = new FormData();
-                    const nombrePequena = rutaGrande.replace(/\.([^.]+)$/, '-thumbnail.webp');
-                    formDataPequena.append('imagen', blob, nombrePequena.split('/').pop());
+                    formDataPequena.append('imagen', blobPequena, `${nombreBase}-${timestamp}-thumbnail.webp`);
                     formDataPequena.append('carpeta', carpeta);
                     formDataPequena.append('_token', '{{ csrf_token() }}');
                     
-                    const responsePequena = await fetch('{{ route("admin.imagenes.subir-simple") }}', {
-                        method: 'POST',
-                        body: formDataPequena,
-                        headers: {
-                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                        }
-                    });
+                    const [resGrande, resPequena] = await Promise.all([
+                        fetch('{{ route("admin.imagenes.subir-simple") }}', {
+                            method: 'POST',
+                            headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                            body: formDataGrande
+                        }),
+                        fetch('{{ route("admin.imagenes.subir-simple") }}', {
+                            method: 'POST',
+                            headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                            body: formDataPequena
+                        })
+                    ]);
                     
-                    const dataPequena = await responsePequena.json();
+                    const dataGrande = await resGrande.json();
+                    const dataPequena = await resPequena.json();
                     
-                    if (dataPequena.success) {
-                        imagenesGrandes.push(rutaGrande);
+                    if (dataGrande.success && dataPequena.success) {
+                        imagenesGrandes.push(dataGrande.data.ruta_relativa);
                         imagenesPequenas.push(dataPequena.data.ruta_relativa);
                         renderizarImagenes();
                         cerrarModalAñadirImagen();
                     } else {
-                        throw new Error(dataPequena.message || 'Error al crear imagen pequeña');
+                        throw new Error(dataGrande.message || dataPequena.message || 'Error al subir');
                     }
-                }, 'image/webp', 0.9);
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert(`Error al procesar la imagen: ${error.message}`);
+                    document.getElementById('nombre-archivo-nueva').textContent = '';
+                }
             };
-            img.src = `{{ asset('images/') }}/${rutaGrande}`;
+            
+            img.onerror = function() {
+                alert('Error al cargar la imagen. Por favor, verifica que sea un formato válido.');
+                document.getElementById('nombre-archivo-nueva').textContent = '';
+            };
+            
+            img.src = URL.createObjectURL(file);
             
         } catch (error) {
             console.error('Error:', error);
@@ -5768,6 +5985,697 @@ REGLAS IMPORTANTES:
             });
         }
     });
+</script>
+
+{{-- SCRIPT PARA ESPECIFICACIONES INTERNAS DEL PRODUCTO --}}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const container = document.getElementById('especificaciones-producto-container');
+    const inputHidden = document.getElementById('categoria_especificaciones_internas_elegidas_input');
+    const btnAñadir = document.getElementById('btn-añadir-linea-producto');
+    
+    if (!container || !inputHidden || !btnAñadir) {
+        return;
+    }
+
+    let contadorPrincipalProducto = 0;
+    let contadorIntermediaProducto = 0;
+    let datosCargadosProducto = false;
+    let elementoArrastradoProducto = null;
+    let tipoArrastradoProducto = null;
+    
+    // Verificar si es unidadUnica
+    const unidadDeMedidaSelect = document.getElementById('unidadDeMedida');
+    const esUnidadUnica = unidadDeMedidaSelect && unidadDeMedidaSelect.value === 'unidadUnica';
+    
+    // Generar ID único para líneas
+    function generarIdUnicoProducto() {
+        return Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    }
+    
+    // Función para generar slug desde texto
+    function generarSlugProducto(texto) {
+        return texto
+            .toString()
+            .toLowerCase()
+            .trim()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '');
+    }
+    
+    // Inicializar con datos existentes
+    function inicializarProducto() {
+        const valorActual = inputHidden.value;
+        let datos = null;
+        
+        if (valorActual && valorActual.trim() !== '') {
+            try {
+                const parsed = JSON.parse(valorActual);
+                // Buscar líneas del producto (marcadas con prefijo _producto o en _producto)
+                if (parsed && parsed._producto && parsed._producto.filtros && Array.isArray(parsed._producto.filtros) && parsed._producto.filtros.length > 0) {
+                    datos = parsed._producto.filtros;
+                }
+            } catch (e) {
+                console.error('Error parseando especificaciones del producto:', e);
+            }
+        }
+        
+        if (datos && datos.length > 0) {
+            datos.forEach((filtro) => {
+                crearLineaPrincipalProducto(filtro.texto || '', filtro.importante || false, filtro.subprincipales || [], filtro.id || null, filtro.slug || null);
+            });
+        }
+        
+        datosCargadosProducto = true;
+        if (!datos || datos.length === 0) {
+            actualizarJSONProducto();
+        }
+    }
+    
+    // Crear una línea principal del producto
+    function crearLineaPrincipalProducto(texto = '', importante = false, subprincipales = [], idUnico = null, slugUnico = null) {
+        const idPrincipal = `principal-producto-${contadorPrincipalProducto++}`;
+        const idUnicoLinea = idUnico || generarIdUnicoProducto();
+        const slugLinea = slugUnico || (texto ? generarSlugProducto(texto) : '');
+        const divPrincipal = document.createElement('div');
+        divPrincipal.className = 'linea-principal-producto border border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-800 mb-4';
+        divPrincipal.dataset.id = idPrincipal;
+        divPrincipal.dataset.idUnico = idUnicoLinea;
+        divPrincipal.dataset.slug = slugLinea;
+        divPrincipal.draggable = false;
+        
+        divPrincipal.innerHTML = `
+            <div class="flex items-center gap-3 mb-3">
+                <div class="drag-handle-principal-producto cursor-move text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" title="Arrastrar para reordenar" draggable="true">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"></path>
+                    </svg>
+                </div>
+                <input type="text" 
+                       class="linea-principal-producto-texto flex-1 px-3 py-2 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600" 
+                       placeholder="Texto principal"
+                       value="${texto}">
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" class="linea-principal-producto-importante" ${importante ? 'checked' : ''}>
+                    <span class="text-sm text-gray-700 dark:text-gray-200">Importante</span>
+                </label>
+                ${esUnidadUnica ? `
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" class="columna-oferta-producto-checkbox rounded border-gray-300 text-orange-600 focus:ring-orange-500" data-principal-id="${idUnicoLinea}">
+                    <span class="text-xs text-gray-600 dark:text-gray-400 font-medium">Columna oferta</span>
+                </label>
+                ` : ''}
+                <button type="button" class="btn-eliminar-principal-producto bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-sm" title="Eliminar línea principal">
+                    -
+                </button>
+                <button type="button" class="btn-añadir-principal-producto bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded text-sm" title="Añadir línea principal debajo">
+                    +
+                </button>
+            </div>
+            <div class="subprincipales-producto-container ml-8 space-y-2"></div>
+            <div class="formato-visualizacion-producto-container mt-3" data-principal-id="${idUnicoLinea}" style="display: none;">
+                <label class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">Formato de visualización:</label>
+                <select class="formato-visualizacion-producto-select w-full px-3 py-2 rounded bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-200 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" data-principal-id="${idUnicoLinea}">
+                    <option value="texto">Texto</option>
+                    <option value="texto_precio">Texto y precio</option>
+                    <option value="imagen">Imagen</option>
+                    <option value="imagen_texto">Imagen y texto</option>
+                    <option value="imagen_precio">Imagen y precio</option>
+                </select>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Selecciona cómo se mostrarán las sublíneas marcadas como "Mostrar" en la vista del comparador</p>
+            </div>
+        `;
+        
+        container.appendChild(divPrincipal);
+        
+        // Configurar eventos
+        const inputTexto = divPrincipal.querySelector('.linea-principal-producto-texto');
+        const checkboxImportante = divPrincipal.querySelector('.linea-principal-producto-importante');
+        const btnEliminar = divPrincipal.querySelector('.btn-eliminar-principal-producto');
+        const btnAñadir = divPrincipal.querySelector('.btn-añadir-principal-producto');
+        const containerSubprincipales = divPrincipal.querySelector('.subprincipales-producto-container');
+        const columnaCheckbox = divPrincipal.querySelector('.columna-oferta-producto-checkbox');
+        const formatoSelect = divPrincipal.querySelector('.formato-visualizacion-producto-select');
+        const formatoContainer = divPrincipal.querySelector('.formato-visualizacion-producto-container');
+        
+        inputTexto.addEventListener('dragstart', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+        
+        inputTexto.addEventListener('input', function() {
+            if (!divPrincipal.dataset.slug || divPrincipal.dataset.slug === '') {
+                divPrincipal.dataset.slug = generarSlugProducto(this.value);
+            }
+            actualizarJSONProducto();
+        });
+        
+        checkboxImportante.addEventListener('change', actualizarJSONProducto);
+        
+        // Event listener para el selector de formato
+        if (formatoSelect) {
+            formatoSelect.addEventListener('change', function() {
+                actualizarJSONProducto();
+            });
+        }
+        
+        if (columnaCheckbox) {
+            columnaCheckbox.addEventListener('change', function() {
+                // Mostrar/ocultar campos de texto alternativo
+                const principalId = this.dataset.principalId;
+                const camposTextoAlternativo = container.querySelectorAll(`.texto-alternativo-sublinea-producto-input[data-principal-id="${principalId}"]`);
+                camposTextoAlternativo.forEach(campo => {
+                    if (this.checked) {
+                        campo.style.display = 'block';
+                        const sublineaCheckbox = container.querySelector(`.especificacion-producto-checkbox[data-principal-id="${principalId}"][data-sublinea-id="${campo.dataset.sublineaId}"]`);
+                        campo.disabled = !sublineaCheckbox || !sublineaCheckbox.checked;
+                    } else {
+                        campo.style.display = 'none';
+                    }
+                });
+                actualizarJSONProducto();
+            });
+        }
+        
+        btnEliminar.addEventListener('click', () => {
+            divPrincipal.remove();
+            actualizarJSONProducto();
+        });
+        
+        btnAñadir.addEventListener('click', () => {
+            const nuevaLinea = crearLineaPrincipalProducto('', false, []);
+            divPrincipal.insertAdjacentElement('afterend', nuevaLinea);
+            actualizarJSONProducto();
+        });
+        
+        // Configurar drag and drop
+        const dragHandle = divPrincipal.querySelector('.drag-handle-principal-producto');
+        configurarDragAndDropDesdeIconoProducto(dragHandle, divPrincipal, 'principal');
+        
+        // Cargar subprincipales si existen
+        if (subprincipales && subprincipales.length > 0) {
+            subprincipales.forEach(sub => {
+                crearLineaIntermediaProducto(containerSubprincipales, divPrincipal, sub.texto || '', sub.id || null, sub.slug || null);
+            });
+        } else {
+            crearLineaIntermediaProducto(containerSubprincipales, divPrincipal);
+        }
+        
+        // Actualizar visibilidad del selector de formato después de cargar sublíneas
+        setTimeout(() => {
+            actualizarVisibilidadFormatoProducto(divPrincipal);
+        }, 100);
+        
+        return divPrincipal;
+    }
+    
+    // Crear una línea intermedia (sublínea) del producto
+    function crearLineaIntermediaProducto(containerPadre, lineaPrincipal, texto = '', idUnico = null, slugUnico = null) {
+        const idIntermedia = `intermedia-producto-${contadorIntermediaProducto++}`;
+        const idUnicoLinea = idUnico || generarIdUnicoProducto();
+        const slugLinea = slugUnico || (texto ? generarSlugProducto(texto) : '');
+        const principalId = lineaPrincipal.dataset.idUnico;
+        const esColumna = esUnidadUnica && lineaPrincipal.querySelector('.columna-oferta-producto-checkbox')?.checked;
+        
+        // Obtener datos guardados para esta sublínea
+        let sublineaData = null;
+        // Buscar en el campo correcto (inputHidden que contiene las especificaciones de categoría y producto)
+        if (inputHidden && inputHidden.value) {
+            try {
+                const especificaciones = JSON.parse(inputHidden.value);
+                // Buscar la sublínea en el array directo con el ID de la línea principal
+                if (especificaciones && especificaciones[principalId] && Array.isArray(especificaciones[principalId])) {
+                    sublineaData = especificaciones[principalId].find(item => {
+                        if (typeof item === 'string' || typeof item === 'number') {
+                            return String(item) === String(idUnicoLinea);
+                        } else if (item && item.id) {
+                            return String(item.id) === String(idUnicoLinea);
+                        }
+                        return false;
+                    });
+                }
+            } catch (e) {
+                console.error('Error parseando especificaciones:', e);
+            }
+        }
+        
+        // El checkbox principal está marcado si hay datos guardados para esta sublínea
+        const isChecked = sublineaData !== null;
+        const mostrarChecked = sublineaData && (sublineaData.m === 1 || sublineaData.mostrar === true);
+        const ofertaChecked = sublineaData && (sublineaData.o === 1 || sublineaData.oferta === true);
+        const usarImagenesProducto = sublineaData && sublineaData.usarImagenesProducto === true;
+        const imagenesSublinea = sublineaData && Array.isArray(sublineaData.img) ? sublineaData.img : [];
+        const numImagenes = imagenesSublinea.length;
+        const textoAlternativo = sublineaData && sublineaData.textoAlternativo ? sublineaData.textoAlternativo : '';
+        
+        const divIntermedia = document.createElement('div');
+        divIntermedia.className = 'linea-intermedia-producto flex items-center gap-3 border-l-4 border-blue-400 pl-3 py-2 bg-blue-50 dark:bg-blue-900/20 rounded mb-2';
+        divIntermedia.dataset.id = idIntermedia;
+        divIntermedia.dataset.idUnico = idUnicoLinea;
+        divIntermedia.dataset.slug = slugLinea;
+        divIntermedia.draggable = false;
+        
+        divIntermedia.innerHTML = `
+            <div class="drag-handle-intermedia-producto cursor-move text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" title="Arrastrar para reordenar" draggable="true">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"></path>
+                </svg>
+            </div>
+            <label class="flex items-center gap-2 cursor-pointer flex-1">
+                <input type="checkbox" class="especificacion-producto-checkbox rounded border-gray-300 text-green-600 focus:ring-green-500" data-principal-id="${principalId}" data-sublinea-id="${idUnicoLinea}" data-sublinea-texto="${texto.replace(/"/g, '&quot;')}" ${isChecked ? 'checked' : ''}>
+                <input type="text" 
+                       class="linea-intermedia-producto-texto flex-1 px-3 py-2 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600" 
+                       placeholder="Texto sublínea"
+                       value="${texto}">
+            </label>
+            ${esColumna ? `
+            <input type="text" class="texto-alternativo-sublinea-producto-input flex-1 max-w-xs px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500" data-principal-id="${principalId}" data-sublinea-id="${idUnicoLinea}" placeholder="Texto alternativo (opcional)" value="${textoAlternativo.replace(/"/g, '&quot;')}" ${!isChecked ? 'disabled' : ''} style="display: ${esColumna ? 'block' : 'none'};">
+            ` : ''}
+            <div class="flex items-center gap-1">
+                <label class="flex items-center gap-1 ${isChecked ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}" title="Mostrar en comparador">
+                    <input type="checkbox" class="especificacion-producto-mostrar-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500" data-principal-id="${principalId}" data-sublinea-id="${idUnicoLinea}" ${mostrarChecked ? 'checked' : ''} ${!isChecked ? 'disabled' : ''}>
+                    <span class="text-xs text-gray-600 dark:text-gray-400">Mostrar</span>
+                </label>
+            </div>
+            <div class="flex items-center gap-1">
+                <label class="flex items-center gap-1 ${isChecked ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}" title="Disponible para ofertas">
+                    <input type="checkbox" class="especificacion-producto-oferta-checkbox rounded border-gray-300 text-purple-600 focus:ring-purple-500" data-principal-id="${principalId}" data-sublinea-id="${idUnicoLinea}" ${ofertaChecked ? 'checked' : ''} ${!isChecked ? 'disabled' : ''}>
+                    <span class="text-xs text-gray-600 dark:text-gray-400">Oferta</span>
+                </label>
+            </div>
+            <div class="flex items-center gap-2">
+                ${numImagenes > 0 ? `
+                <button type="button" class="btn-ver-imagenes-sublinea-producto text-xs px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors ${!isChecked || usarImagenesProducto ? 'opacity-50 cursor-not-allowed' : ''}" data-principal-id="${principalId}" data-sublinea-id="${idUnicoLinea}" title="Ver ${numImagenes} imagen${numImagenes > 1 ? 'es' : ''}" ${!isChecked || usarImagenesProducto ? 'disabled' : ''}>${numImagenes} img</button>
+                ` : ''}
+                <button type="button" class="btn-añadir-imagen-sublinea-producto text-xs px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded transition-colors ${!isChecked || usarImagenesProducto ? 'opacity-50 cursor-not-allowed' : ''}" data-principal-id="${principalId}" data-sublinea-id="${idUnicoLinea}" title="Añadir imágenes" ${!isChecked || usarImagenesProducto ? 'disabled' : ''}>+imágenes</button>
+                <div class="flex items-center gap-1">
+                    <label class="flex items-center gap-1 ${isChecked ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}" title="Usar imágenes del producto">
+                        <input type="checkbox" class="especificacion-producto-usar-imagenes-producto-checkbox rounded border-gray-300 text-orange-600 focus:ring-orange-500" data-principal-id="${principalId}" data-sublinea-id="${idUnicoLinea}" ${usarImagenesProducto ? 'checked' : ''} ${!isChecked ? 'disabled' : ''}>
+                        <span class="text-xs text-gray-600 dark:text-gray-400">Imag. Producto</span>
+                    </label>
+                </div>
+            </div>
+            <button type="button" class="btn-eliminar-intermedia-producto bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs" title="Eliminar línea intermedia">
+                -
+            </button>
+            <button type="button" class="btn-añadir-intermedia-producto bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs" title="Añadir línea intermedia debajo">
+                +
+            </button>
+        `;
+        
+        containerPadre.appendChild(divIntermedia);
+        
+        // Configurar eventos
+        const inputTexto = divIntermedia.querySelector('.linea-intermedia-producto-texto');
+        const checkboxPrincipal = divIntermedia.querySelector('.especificacion-producto-checkbox');
+        const mostrarCheckbox = divIntermedia.querySelector('.especificacion-producto-mostrar-checkbox');
+        const ofertaCheckbox = divIntermedia.querySelector('.especificacion-producto-oferta-checkbox');
+        const usarImagenesCheckbox = divIntermedia.querySelector('.especificacion-producto-usar-imagenes-producto-checkbox');
+        const btnEliminar = divIntermedia.querySelector('.btn-eliminar-intermedia-producto');
+        const btnAñadir = divIntermedia.querySelector('.btn-añadir-intermedia-producto');
+        const textoAlternativoInput = divIntermedia.querySelector('.texto-alternativo-sublinea-producto-input');
+        
+        inputTexto.addEventListener('dragstart', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+        
+        inputTexto.addEventListener('input', function() {
+            if (!divIntermedia.dataset.slug || divIntermedia.dataset.slug === '') {
+                divIntermedia.dataset.slug = generarSlugProducto(this.value);
+            }
+            actualizarJSONProducto();
+        });
+        
+        checkboxPrincipal.addEventListener('change', function() {
+            const checked = this.checked;
+            if (mostrarCheckbox) {
+                mostrarCheckbox.disabled = !checked;
+                const labelMostrar = mostrarCheckbox.closest('label');
+                if (labelMostrar) {
+                    if (checked) {
+                        labelMostrar.classList.remove('opacity-50', 'cursor-not-allowed');
+                        labelMostrar.classList.add('cursor-pointer');
+                    } else {
+                        labelMostrar.classList.remove('cursor-pointer');
+                        labelMostrar.classList.add('opacity-50', 'cursor-not-allowed');
+                        mostrarCheckbox.checked = false;
+                    }
+                }
+            }
+            if (ofertaCheckbox) {
+                ofertaCheckbox.disabled = !checked;
+                const labelOferta = ofertaCheckbox.closest('label');
+                if (labelOferta) {
+                    if (checked) {
+                        labelOferta.classList.remove('opacity-50', 'cursor-not-allowed');
+                        labelOferta.classList.add('cursor-pointer');
+                    } else {
+                        labelOferta.classList.remove('cursor-pointer');
+                        labelOferta.classList.add('opacity-50', 'cursor-not-allowed');
+                        ofertaCheckbox.checked = false;
+                    }
+                }
+            }
+            if (usarImagenesCheckbox) {
+                usarImagenesCheckbox.disabled = !checked;
+                const labelImag = usarImagenesCheckbox.closest('label');
+                if (labelImag) {
+                    if (checked) {
+                        labelImag.classList.remove('opacity-50', 'cursor-not-allowed');
+                        labelImag.classList.add('cursor-pointer');
+                    } else {
+                        labelImag.classList.remove('cursor-pointer');
+                        labelImag.classList.add('opacity-50', 'cursor-not-allowed');
+                        usarImagenesCheckbox.checked = false;
+                    }
+                }
+            }
+            if (textoAlternativoInput) {
+                textoAlternativoInput.disabled = !checked;
+            }
+            actualizarJSONProducto();
+            // Actualizar visibilidad del selector de formato
+            actualizarVisibilidadFormatoProducto(lineaPrincipal);
+        });
+        
+        mostrarCheckbox.addEventListener('change', function() {
+            actualizarJSONProducto();
+            // Actualizar visibilidad del selector de formato
+            actualizarVisibilidadFormatoProducto(lineaPrincipal);
+        });
+        ofertaCheckbox.addEventListener('change', actualizarJSONProducto);
+        usarImagenesCheckbox.addEventListener('change', actualizarJSONProducto);
+        if (textoAlternativoInput) {
+            textoAlternativoInput.addEventListener('input', actualizarJSONProducto);
+        }
+        
+        btnEliminar.addEventListener('click', () => {
+            divIntermedia.remove();
+            actualizarJSONProducto();
+            // Actualizar visibilidad del selector de formato
+            actualizarVisibilidadFormatoProducto(lineaPrincipal);
+        });
+        
+        btnAñadir.addEventListener('click', () => {
+            const nuevaLinea = crearLineaIntermediaProducto(containerPadre, lineaPrincipal, '');
+            divIntermedia.insertAdjacentElement('afterend', nuevaLinea);
+            actualizarJSONProducto();
+        });
+        
+        // Configurar drag and drop
+        const dragHandle = divIntermedia.querySelector('.drag-handle-intermedia-producto');
+        configurarDragAndDropDesdeIconoProducto(dragHandle, divIntermedia, 'intermedia');
+        
+        return divIntermedia;
+    }
+    
+    // Función para actualizar la visibilidad del selector de formato
+    function actualizarVisibilidadFormatoProducto(lineaPrincipal) {
+        const principalId = lineaPrincipal.dataset.idUnico;
+        const formatoContainer = lineaPrincipal.querySelector('.formato-visualizacion-producto-container');
+        
+        if (!formatoContainer) return;
+        
+        // Verificar si hay sublíneas marcadas como "mostrar"
+        const mostrarCheckboxes = lineaPrincipal.querySelectorAll(`.especificacion-producto-mostrar-checkbox[data-principal-id="${principalId}"]:checked`);
+        const tieneSublineasMarcadasComoMostrar = mostrarCheckboxes.length > 0;
+        
+        // Mostrar/ocultar el selector de formato
+        formatoContainer.style.display = tieneSublineasMarcadasComoMostrar ? 'block' : 'none';
+    }
+    
+    // Configurar drag and drop desde el icono
+    function configurarDragAndDropDesdeIconoProducto(icono, elementoPadre, tipo) {
+        icono.addEventListener('dragstart', (e) => {
+            elementoArrastradoProducto = elementoPadre;
+            tipoArrastradoProducto = tipo;
+            elementoPadre.style.opacity = '0.5';
+            e.dataTransfer.effectAllowed = 'move';
+            if (tipo === 'intermedia') {
+                e.stopPropagation();
+            }
+        });
+        
+        icono.addEventListener('dragend', (e) => {
+            elementoPadre.style.opacity = '1';
+            if (elementoArrastradoProducto && tipoArrastradoProducto === tipo) {
+                actualizarJSONProducto();
+            }
+            elementoArrastradoProducto = null;
+            tipoArrastradoProducto = null;
+        });
+        
+        configurarDragAndDropProducto(elementoPadre, tipo);
+    }
+    
+    // Configurar drag and drop para reordenar
+    function configurarDragAndDropProducto(elemento, tipo) {
+        elemento.addEventListener('dragover', (e) => {
+            if (!elementoArrastradoProducto || elementoArrastradoProducto === elemento) return;
+            if (tipoArrastradoProducto !== tipo) return;
+            
+            const parent = elemento.parentNode;
+            if (!parent) return;
+            
+            if (tipo === 'intermedia') {
+                const draggedParent = elementoArrastradoProducto.parentNode;
+                const targetParent = elemento.parentNode;
+                if (draggedParent !== targetParent) {
+                    e.dataTransfer.dropEffect = 'none';
+                    return;
+                }
+            }
+            
+            e.preventDefault();
+            e.stopPropagation();
+            e.dataTransfer.dropEffect = 'move';
+            
+            const rect = elemento.getBoundingClientRect();
+            const mouseY = e.clientY;
+            const elementMiddle = rect.top + rect.height / 2;
+            const insertAfter = mouseY > elementMiddle;
+            
+            const siblings = Array.from(parent.children).filter(child => {
+                if (tipo === 'principal') {
+                    return child.classList.contains('linea-principal-producto');
+                } else {
+                    return child.classList.contains('linea-intermedia-producto');
+                }
+            });
+            
+            const currentIndex = siblings.indexOf(elemento);
+            const draggedIndex = siblings.indexOf(elementoArrastradoProducto);
+            
+            if (draggedIndex === -1) return;
+            if (insertAfter && draggedIndex === currentIndex + 1) return;
+            if (!insertAfter && draggedIndex === currentIndex - 1) return;
+            
+            if (insertAfter) {
+                const nextSibling = elemento.nextSibling;
+                if (nextSibling && nextSibling !== elementoArrastradoProducto) {
+                    parent.insertBefore(elementoArrastradoProducto, nextSibling);
+                } else if (!nextSibling) {
+                    parent.appendChild(elementoArrastradoProducto);
+                }
+            } else {
+                if (elemento !== elementoArrastradoProducto) {
+                    parent.insertBefore(elementoArrastradoProducto, elemento);
+                }
+            }
+        });
+        
+        elemento.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+    }
+    
+    // Actualizar el JSON en el campo oculto (combinando con las especificaciones de categoría)
+    function actualizarJSONProducto() {
+        if (!datosCargadosProducto) return;
+        
+        // Leer el JSON actual (que contiene las especificaciones de categoría)
+        let especificacionesCompletas = {};
+        if (inputHidden.value) {
+            try {
+                especificacionesCompletas = JSON.parse(inputHidden.value);
+            } catch (e) {
+                console.error('Error parseando especificaciones completas:', e);
+                especificacionesCompletas = {};
+            }
+        }
+        
+        // Asegurar que existe la sección _producto
+        if (!especificacionesCompletas._producto) {
+            especificacionesCompletas._producto = {};
+        }
+        
+        const filtros = [];
+        const lineasPrincipales = container.querySelectorAll('.linea-principal-producto');
+        
+        lineasPrincipales.forEach(lineaPrincipal => {
+            const texto = lineaPrincipal.querySelector('.linea-principal-producto-texto').value.trim();
+            const importante = lineaPrincipal.querySelector('.linea-principal-producto-importante').checked;
+            const idUnicoPrincipal = lineaPrincipal.dataset.idUnico;
+            const slugPrincipal = lineaPrincipal.dataset.slug || generarSlugProducto(texto);
+            const columnaCheckbox = lineaPrincipal.querySelector('.columna-oferta-producto-checkbox');
+            const esColumna = columnaCheckbox && columnaCheckbox.checked;
+            
+            if (texto && !lineaPrincipal.dataset.slug) {
+                lineaPrincipal.dataset.slug = slugPrincipal;
+            }
+            
+            const containerSubprincipales = lineaPrincipal.querySelector('.subprincipales-producto-container');
+            const lineasIntermedias = containerSubprincipales ? containerSubprincipales.querySelectorAll('.linea-intermedia-producto') : [];
+            
+            const subprincipales = [];
+            const sublineasElegidas = [];
+            
+            lineasIntermedias.forEach(lineaIntermedia => {
+                const textoIntermedia = lineaIntermedia.querySelector('.linea-intermedia-producto-texto').value.trim();
+                const idUnicoIntermedia = lineaIntermedia.dataset.idUnico;
+                const slugIntermedia = lineaIntermedia.dataset.slug || generarSlugProducto(textoIntermedia);
+                const checkboxPrincipal = lineaIntermedia.querySelector('.especificacion-producto-checkbox');
+                // Usar selectores más específicos con data attributes, igual que en categorías
+                // IMPORTANTE: usar idUnicoPrincipal (no principalId) que es el ID único de la línea principal
+                const mostrarCheckbox = document.querySelector(`.especificacion-producto-mostrar-checkbox[data-principal-id="${idUnicoPrincipal}"][data-sublinea-id="${idUnicoIntermedia}"]`);
+                const ofertaCheckbox = document.querySelector(`.especificacion-producto-oferta-checkbox[data-principal-id="${idUnicoPrincipal}"][data-sublinea-id="${idUnicoIntermedia}"]`);
+                const usarImagenesCheckbox = document.querySelector(`.especificacion-producto-usar-imagenes-producto-checkbox[data-principal-id="${idUnicoPrincipal}"][data-sublinea-id="${idUnicoIntermedia}"]`);
+                const textoAlternativoInput = document.querySelector(`.texto-alternativo-sublinea-producto-input[data-principal-id="${idUnicoPrincipal}"][data-sublinea-id="${idUnicoIntermedia}"]`);
+                
+                if (textoIntermedia && !lineaIntermedia.dataset.slug) {
+                    lineaIntermedia.dataset.slug = slugIntermedia;
+                }
+                
+                // Añadir a subprincipales siempre (para la estructura)
+                subprincipales.push({
+                    texto: textoIntermedia,
+                    id: idUnicoIntermedia,
+                    slug: slugIntermedia
+                });
+                
+                // Si tiene texto e ID, guardar la sublínea si el checkbox principal está marcado
+                if (textoIntermedia && idUnicoIntermedia) {
+                    // Leer los checkboxes directamente del DOM para asegurar que obtenemos el estado actual
+                    const principalMarcado = checkboxPrincipal ? checkboxPrincipal.checked : false;
+                    
+                    // Si el checkbox principal está marcado, guardar la sublínea (igual que en categorías)
+                    if (principalMarcado) {
+                        // Leer los checkboxes igual que en categorías
+                        const mostrarMarcado = mostrarCheckbox ? mostrarCheckbox.checked : false;
+                        const ofertaMarcada = ofertaCheckbox ? ofertaCheckbox.checked : false;
+                        const usarImagenesMarcado = usarImagenesCheckbox ? usarImagenesCheckbox.checked : false;
+                        const textoAlternativoValue = textoAlternativoInput ? textoAlternativoInput.value.trim() : '';
+                        const tieneTextoAlternativo = textoAlternativoValue.length > 0;
+                        
+                        // Leer imágenes guardadas de esta sublínea
+                        let imagenesSublinea = [];
+                        if (especificacionesCompletas[idUnicoPrincipal] && Array.isArray(especificacionesCompletas[idUnicoPrincipal])) {
+                            const sublineaGuardada = especificacionesCompletas[idUnicoPrincipal].find(item => {
+                                if (typeof item === 'string' || typeof item === 'number') {
+                                    return String(item) === String(idUnicoIntermedia);
+                                } else if (item && item.id) {
+                                    return String(item.id) === String(idUnicoIntermedia);
+                                }
+                                return false;
+                            });
+                            if (sublineaGuardada && sublineaGuardada.img && Array.isArray(sublineaGuardada.img)) {
+                                imagenesSublinea = sublineaGuardada.img;
+                            }
+                        }
+                        
+                        const sub = { id: idUnicoIntermedia };
+                        
+                        // Guardar todos los checkboxes marcados (igual que en categorías)
+                        if (mostrarMarcado) {
+                            sub.m = 1;
+                        }
+                        if (ofertaMarcada) {
+                            sub.o = 1;
+                        }
+                        if (usarImagenesMarcado) {
+                            sub.usarImagenesProducto = true;
+                        }
+                        // Solo guardar imágenes si no se está usando las del producto
+                        if (!usarImagenesMarcado && imagenesSublinea.length > 0) {
+                            sub.img = imagenesSublinea;
+                        }
+                        if (tieneTextoAlternativo) {
+                            sub.textoAlternativo = textoAlternativoValue;
+                        }
+                        
+                        sublineasElegidas.push(sub);
+                    }
+                }
+            });
+            
+            if (texto) {
+                const filtro = {
+                    id: idUnicoPrincipal,
+                    texto: texto,
+                    slug: slugPrincipal,
+                    importante: importante,
+                    subprincipales: subprincipales
+                };
+                
+                if (esColumna) {
+                    filtro._esColumna = true;
+                }
+                
+                filtros.push(filtro);
+                
+                // Guardar las sublíneas elegidas en el formato del JSON (usando idUnicoPrincipal como clave)
+                if (sublineasElegidas.length > 0) {
+                    especificacionesCompletas[idUnicoPrincipal] = sublineasElegidas;
+                } else {
+                    // Si no hay sublíneas elegidas, eliminar la entrada
+                    delete especificacionesCompletas[idUnicoPrincipal];
+                }
+                
+                // Guardar formato si existe
+                const formatoSelect = lineaPrincipal.querySelector('.formato-visualizacion-producto-select');
+                if (formatoSelect && formatoSelect.value) {
+                    if (!especificacionesCompletas._formatos) {
+                        especificacionesCompletas._formatos = {};
+                    }
+                    especificacionesCompletas._formatos[idUnicoPrincipal] = formatoSelect.value;
+                }
+            }
+        });
+        
+        // Guardar las líneas principales del producto en _producto.filtros
+        especificacionesCompletas._producto.filtros = filtros;
+        
+        // Guardar el JSON completo
+        inputHidden.value = JSON.stringify(especificacionesCompletas, null, 0);
+    }
+    
+    // Botón añadir línea principal
+    btnAñadir.addEventListener('click', () => {
+        crearLineaPrincipalProducto('', false, []);
+        actualizarJSONProducto();
+    });
+    
+    // Inicializar al cargar
+    inicializarProducto();
+    
+    // Actualizar JSON antes de enviar el formulario
+    const form = document.querySelector('form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            // Actualizar especificaciones internas del producto PRIMERO
+            actualizarJSONProducto();
+            // Actualizar especificaciones internas de la categoría (sublíneas)
+            // Esta función ahora preservará correctamente las especificaciones del producto
+            if (typeof actualizarEspecificacionesElegidas === 'function') {
+                actualizarEspecificacionesElegidas();
+            }
+        });
+    }
+});
 </script>
 
 </x-app-layout>

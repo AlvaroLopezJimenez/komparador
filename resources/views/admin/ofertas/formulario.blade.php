@@ -2903,8 +2903,23 @@ async function cargarEspecificacionesInternas(productoId) {
         const especificacionesCategoria = dataCategoria.especificaciones_internas;
         const especificacionesElegidas = producto.categoria_especificaciones_internas_elegidas;
         
+        // Combinar filtros de categoría y producto antes de procesarlos
+        const filtrosCombinados = [];
+        
+        // Añadir filtros de categoría
+        if (especificacionesCategoria.filtros && Array.isArray(especificacionesCategoria.filtros)) {
+            filtrosCombinados.push(...especificacionesCategoria.filtros);
+        }
+        
+        // Añadir filtros del producto (si existen)
+        if (especificacionesElegidas._producto && 
+            especificacionesElegidas._producto.filtros && 
+            Array.isArray(especificacionesElegidas._producto.filtros)) {
+            filtrosCombinados.push(...especificacionesElegidas._producto.filtros);
+        }
+        
         // Filtrar solo las líneas principales que tienen sublíneas marcadas como "Oferta"
-        const filtrosFiltrados = especificacionesCategoria.filtros
+        const filtrosFiltrados = filtrosCombinados
             .map(filtro => {
                 const sublineasElegidas = especificacionesElegidas[filtro.id] || [];
                 // Filtrar solo las sublíneas marcadas como "Oferta" (o === 1)
