@@ -565,43 +565,7 @@ class ImagenController extends Controller
                 ], 500);
             }
 
-            // Crear thumbnail (144x120)
-            $nombreThumbnail = $nombreBase . '-thumbnail.webp';
-            $rutaThumbnail = $carpeta . '/' . $nombreThumbnail;
-            $rutaCompletaThumbnail = Storage::disk('web_images')->path($rutaThumbnail);
-
-            $anchoThumbnail = 144;
-            $altoThumbnail = 120;
-            $ratioOriginal = $anchoOriginal / $altoOriginal;
-            
-            if ($ratioOriginal > ($anchoThumbnail / $altoThumbnail)) {
-                $altoThumbnail = (int)($anchoThumbnail / $ratioOriginal);
-            } else {
-                $anchoThumbnail = (int)($altoThumbnail * $ratioOriginal);
-            }
-
-            $imagenThumbnail = @imagecreatetruecolor($anchoThumbnail, $altoThumbnail);
-            if (!$imagenThumbnail) {
-                imagedestroy($sourceImage);
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Error al crear el thumbnail'
-                ], 500);
-            }
-
-            imagealphablending($imagenThumbnail, false);
-            imagesavealpha($imagenThumbnail, true);
-            imagecopyresampled($imagenThumbnail, $sourceImage, 0, 0, 0, 0, $anchoThumbnail, $altoThumbnail, $anchoOriginal, $altoOriginal);
-
-            if (!@imagewebp($imagenThumbnail, $rutaCompletaThumbnail, 90)) {
-                imagedestroy($imagenThumbnail);
-                imagedestroy($sourceImage);
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Error al guardar el thumbnail'
-                ], 500);
-            }
-            imagedestroy($imagenThumbnail);
+            // Liberar memoria de la imagen
             imagedestroy($sourceImage);
 
             $url = Storage::disk('web_images')->url($rutaRelativa);

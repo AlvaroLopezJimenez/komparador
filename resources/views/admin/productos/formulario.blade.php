@@ -3398,7 +3398,7 @@
                 }
             });
             
-            // Si es unidadUnica, guardar orden y columnas
+            // Si es unidadUnica, guardar orden y columnas (combinando con las del producto)
             if (esUnidadUnica) {
                 const contenedorPrincipal = document.querySelector('#especificaciones-principales-container');
                 if (contenedorPrincipal) {
@@ -3406,9 +3406,21 @@
                     const orden = lineasPrincipales.map(linea => linea.dataset.principalId);
                     especificaciones._orden = orden;
                     
+                    // Obtener columnas de categoría (solo las marcadas actualmente)
                     const columnasCheckboxes = contenedorPrincipal.querySelectorAll('.columna-oferta-checkbox:checked');
-                    const columnas = Array.from(columnasCheckboxes).map(cb => cb.dataset.principalId);
-                    especificaciones._columnas = columnas;
+                    const columnasCategoria = Array.from(columnasCheckboxes).map(cb => cb.dataset.principalId);
+                    
+                    // Obtener columnas del producto (del contenedor de producto, solo las marcadas actualmente)
+                    const contenedorProducto = document.querySelector('#especificaciones-producto-container');
+                    let columnasProducto = [];
+                    if (contenedorProducto) {
+                        const columnasCheckboxesProducto = contenedorProducto.querySelectorAll('.columna-oferta-producto-checkbox:checked');
+                        columnasProducto = Array.from(columnasCheckboxesProducto).map(cb => cb.dataset.principalId);
+                    }
+                    
+                    // Combinar solo las columnas actualmente marcadas: categoría + producto, eliminando duplicados
+                    const todasLasColumnas = [...new Set([...columnasCategoria, ...columnasProducto])];
+                    especificaciones._columnas = todasLasColumnas;
                 }
             }
             
@@ -6029,6 +6041,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function inicializarProducto() {
         const valorActual = inputHidden.value;
         let datos = null;
+        let columnasGuardadas = [];
         
         if (valorActual && valorActual.trim() !== '') {
             try {
@@ -6037,6 +6050,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (parsed && parsed._producto && parsed._producto.filtros && Array.isArray(parsed._producto.filtros) && parsed._producto.filtros.length > 0) {
                     datos = parsed._producto.filtros;
                 }
+                // Obtener columnas guardadas (pueden estar en _columnas o en _esColumna dentro de cada filtro)
+                if (parsed && parsed._columnas && Array.isArray(parsed._columnas)) {
+                    columnasGuardadas = parsed._columnas;
+                }
             } catch (e) {
                 console.error('Error parseando especificaciones del producto:', e);
             }
@@ -6044,7 +6061,9 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (datos && datos.length > 0) {
             datos.forEach((filtro) => {
-                crearLineaPrincipalProducto(filtro.texto || '', filtro.importante || false, filtro.subprincipales || [], filtro.id || null, filtro.slug || null);
+                // Verificar si es columna: primero en _columnas, luego en _esColumna
+                const esColumna = columnasGuardadas.includes(filtro.id) || filtro._esColumna === true;
+                crearLineaPrincipalProducto(filtro.texto || '', filtro.importante || false, filtro.subprincipales || [], filtro.id || null, filtro.slug || null, esColumna);
             });
         }
         
@@ -6055,7 +6074,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Crear una línea principal del producto
-    function crearLineaPrincipalProducto(texto = '', importante = false, subprincipales = [], idUnico = null, slugUnico = null) {
+    function crearLineaPrincipalProducto(texto = '', importante = false, subprincipales = [], idUnico = null, slugUnico = null, esColumna = false) {
         const idPrincipal = `principal-producto-${contadorPrincipalProducto++}`;
         const idUnicoLinea = idUnico || generarIdUnicoProducto();
         const slugLinea = slugUnico || (texto ? generarSlugProducto(texto) : '');
@@ -6083,7 +6102,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 </label>
                 ${esUnidadUnica ? `
                 <label class="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" class="columna-oferta-producto-checkbox rounded border-gray-300 text-orange-600 focus:ring-orange-500" data-principal-id="${idUnicoLinea}">
+                    <input type="checkbox" class="columna-oferta-producto-checkbox rounded border-gray-300 text-orange-600 focus:ring-orange-500" data-principal-id="${idUnicoLinea}" ${esColumna ? 'checked' : ''}>
                     <span class="text-xs text-gray-600 dark:text-gray-400 font-medium">Columna oferta</span>
                 </label>
                 ` : ''}
@@ -6648,6 +6667,29 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Guardar las líneas principales del producto en _producto.filtros
         especificacionesCompletas._producto.filtros = filtros;
+        
+        // Si es unidadUnica, guardar orden y columnas (combinando con las de categoría)
+        if (esUnidadUnica) {
+            const lineasPrincipales = Array.from(container.querySelectorAll('.linea-principal-producto'));
+            const orden = lineasPrincipales.map(linea => linea.dataset.idUnico);
+            especificacionesCompletas._orden = orden;
+            
+            // Obtener columnas del producto (solo las marcadas actualmente)
+            const columnasCheckboxes = container.querySelectorAll('.columna-oferta-producto-checkbox:checked');
+            const columnasProducto = Array.from(columnasCheckboxes).map(cb => cb.dataset.principalId);
+            
+            // Obtener columnas de categoría (del contenedor de categoría, solo las marcadas actualmente)
+            const contenedorCategoria = document.querySelector('#especificaciones-principales-container');
+            let columnasCategoria = [];
+            if (contenedorCategoria) {
+                const columnasCheckboxesCategoria = contenedorCategoria.querySelectorAll('.columna-oferta-checkbox:checked');
+                columnasCategoria = Array.from(columnasCheckboxesCategoria).map(cb => cb.dataset.principalId);
+            }
+            
+            // Combinar solo las columnas actualmente marcadas: categoría + producto, eliminando duplicados
+            const todasLasColumnas = [...new Set([...columnasCategoria, ...columnasProducto])];
+            especificacionesCompletas._columnas = todasLasColumnas;
+        }
         
         // Guardar el JSON completo
         inputHidden.value = JSON.stringify(especificacionesCompletas, null, 0);

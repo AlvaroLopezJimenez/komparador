@@ -19,7 +19,7 @@ return new class extends Migration
             $table->decimal('unidades', 8, 2);
             $table->decimal('precio_total', 8, 2);
             $table->unsignedInteger('frecuencia_actualizar_precio_minutos')->default(1440);
-            $table->decimal('precio_unidad', 6, 3);
+            $table->decimal('precio_unidad', 7, 3);
             $table->string('url'); // URL de la oferta concreta
             $table->string('variante')->nullable(); // Variante de la oferta (número, texto, etc.)
             $table->string('mostrar');

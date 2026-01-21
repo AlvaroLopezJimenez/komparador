@@ -135,6 +135,19 @@
     </script>
     @endif
   <style>
+    /* Line clamp para productos relacionados - máximo 2 líneas */
+    .line-clamp-2 {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      max-width: 100%;
+      white-space: normal;
+      line-height: 1.4;
+    }
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       font-size: 1.05rem;
@@ -1189,10 +1202,10 @@
       </div>
       <div class="bloque-movil-scroll overflow-x-auto whitespace-nowrap pb-2">
         @foreach ($relacionados as $relacionado)
-        <a href="{{ añadirCam($relacionado->categoria->construirUrlCategorias($relacionado->slug)) }}" class="inline-block align-top bg-gray-50 rounded-lg border p-3 w-36 text-center card-hover hover:bg-gray-100">
-          <img src="{{ asset('images/' . ($relacionado->imagen_pequena[0] ?? '')) }}" loading="lazy" alt="{{$relacionado->nombre}}" class="w-full h-auto object-contain mb-2">
-          <div class="text-sm font-semibold">{{ $relacionado->talla }}</div>
-          <div class="text-sm" style="color: #e97b11;">{{ number_format($relacionado->precio, 2, ',', '.') }} €
+        <a href="{{ añadirCam($relacionado->categoria->construirUrlCategorias($relacionado->slug)) }}" class="inline-flex flex-col align-top bg-gray-50 rounded-lg border px-1.5 py-1.5 w-36 text-center card-hover hover:bg-gray-100">
+          <img src="{{ asset('images/' . ($relacionado->imagen_pequena[0] ?? '')) }}" loading="lazy" alt="{{$relacionado->nombre}}" class="w-full h-auto object-contain mb-1">
+          <div class="text-sm line-clamp-2 min-h-[2.5em] mb-1 w-full px-0.5" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; white-space: normal; word-break: break-word; line-height: 1.4;">{{ $relacionado->nombre }}</div>
+          <div class="text-sm mt-auto pb-0" style="color: #e97b11; margin-bottom: -2px;">{{ number_format($relacionado->precio, 2, ',', '.') }} €
             @if($relacionado->unidadDeMedida === 'kilos')
               /Kg.
             @elseif($relacionado->unidadDeMedida === 'litros')
@@ -1251,12 +1264,12 @@
         {{-- CARRUSEL DE PRODUCTOS --}}
         <div class="overflow-x-auto whitespace-nowrap pb-2 px-4">
           @foreach ($relacionados as $relacionado)
-          <a href="{{ añadirCam($relacionado->categoria->construirUrlCategorias($relacionado->slug)) }}" class="inline-block align-top card-hover p-4 border border-gray-200 rounded-lg text-center hover:bg-gray-50 transition-transform duration-200 w-[160px] mr-2">
-            <div class="flex justify-center mb-2">
+          <a href="{{ añadirCam($relacionado->categoria->construirUrlCategorias($relacionado->slug)) }}" class="inline-flex flex-col align-top card-hover px-1.5 py-1.5 border border-gray-200 rounded-lg text-center hover:bg-gray-50 transition-transform duration-200 w-[160px] mr-2">
+            <div class="flex justify-center mb-1">
               <img src="{{ asset('images/' . ($relacionado->imagen_pequena[0] ?? '')) }}" loading="lazy" alt="{{$relacionado->nombre}}" class="w-[94px] max-w-full h-auto object-contain">
             </div>
-            <div class="text-sm font-semibold text-black-700">{{ $relacionado->marca }} - {{ $relacionado->talla }}</div>
-            <div class="text-lg" style="color: #e97b11;">{{ number_format($relacionado->precio, 2) }} €
+            <div class="text-sm text-black-700 line-clamp-2 min-h-[2.5em] mb-1 w-full px-0.5" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; white-space: normal; word-break: break-word; line-height: 1.4;">{{ $relacionado->nombre }}</div>
+            <div class="text-lg mt-auto pb-0" style="color: #e97b11; margin-bottom: -2px;">{{ number_format($relacionado->precio, 2) }} €
     @if($relacionado->unidadDeMedida === 'unidad')
         <span class="text-xs text-gray-500">/Und.</span>
     @elseif($relacionado->unidadDeMedida === 'kilos')
@@ -2478,7 +2491,7 @@
                     precioHtml = `
                       <div class="text-center">
                         <div id="mejor-oferta-precio-movil-${index}" class="text-lg font-extrabold mb-1" style="color: #e97b11;">
-                          <span class="text-xl font-extrabold" style="color: #e97b11;">${oferta.precio_unidad} <span class="text-xs text-gray-500 font-normal">${_gsp1(unidadMedida)}</span></span>
+                          <span class="text-lg font-extrabold" style="color: #e97b11;">${oferta.precio_unidad} <span class="text-xs text-gray-500 font-normal">${_gsp1(unidadMedida)}</span></span>
                         </div>
                       </div>
                     `;
@@ -2517,7 +2530,7 @@
                           </div>
                           <div class="text-center">
                             <div id="mejor-oferta-precio-movil-${index}" class="text-lg font-extrabold mb-1" style="color: #e97b11;">
-                              <span class="text-xl font-extrabold" style="color: #e97b11;">${oferta.precio_unidad} <span class="text-xs text-gray-500 font-normal">${_gsp1(unidadMedida)}</span></span>
+                              <span class="text-lg font-extrabold" style="color: #e97b11;">${oferta.precio_unidad} <span class="text-xs text-gray-500 font-normal">${_gsp1(unidadMedida)}</span></span>
                             </div>
                             <div id="mejor-oferta-boton-movil-${index}" class="w-full">
                               ${_gbo1(oferta)}
@@ -2545,7 +2558,7 @@
                       </div>
                       <div class="text-center">
                         <div id="mejor-oferta-precio-movil-${index}" class="text-lg font-extrabold mb-1" style="color: #e97b11;">
-                          <span class="text-xl font-extrabold" style="color: #e97b11;">${oferta.precio_unidad} <span class="text-xs text-gray-500 font-normal">${_gsp1(unidadMedida)}</span></span>
+                          <span class="text-lg font-extrabold" style="color: #e97b11;">${oferta.precio_unidad} <span class="text-xs text-gray-500 font-normal">${_gsp1(unidadMedida)}</span></span>
                         </div>
                         <div id="mejor-oferta-boton-movil-${index}" class="w-full">
                           ${_gbo1(oferta)}
@@ -3735,10 +3748,10 @@
                 // Intercambiar estilos según filtro activo
                 let precioTotalClass = 'text-sm text-gray-500';
                 let precioTotalLabelClass = 'font-semibold';
-                let precioUnidadClass = 'text-3xl font-extrabold';
+                let precioUnidadClass = 'text-2xl font-extrabold';
                 let precioUnidadLabelClass = 'text-sm text-gray-500';
                 if (ordenActual === 'precio_total') {
-                  precioTotalClass = 'text-3xl font-extrabold';
+                  precioTotalClass = 'text-2xl font-extrabold';
                   precioTotalLabelClass = 'text-sm text-gray-500';
                   precioUnidadClass = 'text-sm text-gray-500';
                   precioUnidadLabelClass = 'text-xs font-semibold';
@@ -3888,7 +3901,7 @@
                     ${!mostrarPrecioTotal && !mostrarPrecioUnidad ? `
                     <div class="precio-total text-gray-700 divider text-center min-w-0 overflow-hidden ${ordenPrecio}">
                       <div class="text-sm text-gray-500">Precio total</div>
-                      <div class="text-3xl font-extrabold" style="color: #e97b11;">${primeraOferta.precio_total} <span class="text-sm text-gray-500 font-normal">€</span></div>
+                      <div class="text-2xl font-extrabold" style="color: #e97b11;">${primeraOferta.precio_total} <span class="text-sm text-gray-500 font-normal">€</span></div>
                     </div>
                     ` : ''}
                     ${mostrarPrecioTotal ? `
@@ -3977,10 +3990,10 @@
                   // Intercambiar estilos según filtro activo
                   let precioTotalClass = 'text-sm text-gray-500';
                   let precioTotalLabelClass = 'font-semibold';
-                  let precioUnidadClass = 'text-3xl font-extrabold';
+                  let precioUnidadClass = 'text-2xl font-extrabold';
                   let precioUnidadLabelClass = 'text-sm text-gray-500';
                   if (ordenActual === 'precio_total') {
-                    precioTotalClass = 'text-3xl font-extrabold';
+                    precioTotalClass = 'text-2xl font-extrabold';
                     precioTotalLabelClass = 'text-sm text-gray-500';
                     precioUnidadClass = 'text-sm text-gray-500';
                     precioUnidadLabelClass = 'text-xs font-semibold';
@@ -4083,7 +4096,7 @@
                       ${!mostrarPrecioTotal && !mostrarPrecioUnidad ? `
                       <div class="precio-total text-gray-700 divider text-center min-w-0 overflow-hidden ${ordenPrecio}">
                         <div class="text-sm text-gray-500">Precio total</div>
-                        <div class="text-3xl font-extrabold" style="color: #e97b11;">${itemGrupo.precio_total} <span class="text-sm text-gray-500 font-normal">€</span></div>
+                        <div class="text-2xl font-extrabold" style="color: #e97b11;">${itemGrupo.precio_total} <span class="text-sm text-gray-500 font-normal">€</span></div>
                       </div>
                       ` : ''}
                       ${mostrarPrecioTotal ? `
@@ -4174,10 +4187,10 @@
                   // Usar el mismo código que se usaba en el forEach eliminado
                   let precioTotalClass = 'text-sm text-gray-500';
                 let precioTotalLabelClass = 'font-semibold';
-                let precioUnidadClass = 'text-3xl font-extrabold';
+                let precioUnidadClass = 'text-2xl font-extrabold';
                 let precioUnidadLabelClass = 'text-sm text-gray-500';
                 if (ordenActual === 'precio_total') {
-                  precioTotalClass = 'text-3xl font-extrabold';
+                  precioTotalClass = 'text-2xl font-extrabold';
                   precioTotalLabelClass = 'text-sm text-gray-500';
                   precioUnidadClass = 'text-sm text-gray-500';
                   precioUnidadLabelClass = 'text-xs font-semibold';
@@ -4308,7 +4321,7 @@
                     ${!mostrarPrecioTotal && !mostrarPrecioUnidad ? `
                     <div class="precio-total text-gray-700 divider text-center min-w-0 overflow-hidden ${ordenPrecio}">
                       <div class="text-sm text-gray-500">Precio total</div>
-                      <div class="text-3xl font-extrabold" style="color: #e97b11;">${item.precio_total} <span class="text-sm text-gray-500 font-normal">€</span></div>
+                      <div class="text-2xl font-extrabold" style="color: #e97b11;">${item.precio_total} <span class="text-sm text-gray-500 font-normal">€</span></div>
                     </div>
                     ` : ''}
                     ${mostrarPrecioTotal ? `
@@ -6183,97 +6196,12 @@ function _am1() {
   {{-- x18: Modal de imágenes --}}
   const modal = document.getElementById('x18');
   if (modal) {
+    // Mostrar el modal inmediatamente
     modal.classList.remove('hidden');
     document.body.style.overflow = 'hidden';
     
-    // Calcular altura máxima de todas las imágenes para fijar el tamaño del modal
-    const contenedorImagen = modal.querySelector('.flex-1.flex.items-center.justify-center.bg-gray-50');
-    if (contenedorImagen && !contenedorImagen.hasAttribute('data-height-calculated')) {
-      let maxHeight = 0;
-      let imagesLoaded = 0;
-      const totalImages = v1.length;
-      
-      // Calcular ancho máximo disponible (considerando miniaturas y padding)
-      const modalWidth = window.innerWidth * 0.9; // 90% del ancho de la ventana
-      const miniaturasWidth = 144; // 36 * 4 (w-36 = 144px)
-      const padding = 96; // padding izquierdo y derecho (3rem * 2 = 96px)
-      const maxWidth = modalWidth - miniaturasWidth - padding;
-      
-      // Función para procesar cuando todas las imágenes estén listas
-      const procesarAltura = function() {
-        if (imagesLoaded === totalImages) {
-          // Limitar altura máxima a 70vh para no exceder el viewport
-          const maxViewportHeight = window.innerHeight * 0.7;
-          const finalHeight = Math.min(Math.ceil(maxHeight) + 40, maxViewportHeight);
-          
-          contenedorImagen.style.minHeight = finalHeight + 'px';
-          contenedorImagen.style.height = finalHeight + 'px';
-          contenedorImagen.setAttribute('data-height-calculated', 'true');
-          
-          // Actualizar el modal después de establecer la altura
-          _am2();
-        }
-      };
-      
-      // Pre-cargar todas las imágenes para obtener sus dimensiones
-      v1.forEach((_, index) => {
-        const imgPath = v2[index] || v3[index] || '';
-        if (imgPath) {
-          const img = new Image();
-          
-          // Manejar tanto imágenes en caché como nuevas
-          const checkImage = function() {
-            if (img.complete && img.naturalHeight !== 0) {
-              // Imagen ya cargada (en caché)
-              calcularAltura();
-            } else {
-              // Esperar a que cargue
-              img.onload = calcularAltura;
-              img.onerror = function() {
-                imagesLoaded++;
-                procesarAltura();
-              };
-            }
-          };
-          
-          const calcularAltura = function() {
-            // Calcular altura considerando el ancho máximo disponible
-            const aspectRatio = img.width / img.height;
-            let calculatedHeight = img.height;
-            
-            // Si la imagen es más ancha que el espacio disponible, ajustar altura
-            if (img.width > maxWidth) {
-              calculatedHeight = maxWidth / aspectRatio;
-            }
-            
-            if (calculatedHeight > maxHeight) {
-              maxHeight = calculatedHeight;
-            }
-            
-            imagesLoaded++;
-            procesarAltura();
-          };
-          
-          img.src = `${v6}/${imgPath}`;
-          checkImage();
-        } else {
-          imagesLoaded++;
-          procesarAltura();
-        }
-      });
-      
-      // Si no hay imágenes, establecer altura por defecto
-      if (totalImages === 0) {
-        const defaultHeight = 500;
-        contenedorImagen.style.minHeight = defaultHeight + 'px';
-        contenedorImagen.style.height = defaultHeight + 'px';
-        contenedorImagen.setAttribute('data-height-calculated', 'true');
-        _am2();
-      }
-    } else {
-      // Si ya se calculó la altura, solo actualizar
-      _am2();
-    }
+    // Actualizar el modal inmediatamente (mostrará spinner mientras carga la imagen principal)
+    _am2();
   }
 }
 
@@ -6754,12 +6682,50 @@ function _am2() {
   const imagenGrande = document.getElementById('imagen-grande-modal');
   const btnFlechaIzq = document.getElementById('btn-flecha-izq');
   const btnFlechaDer = document.getElementById('btn-flecha-der');
+  const modal = document.getElementById('x18');
+  const contenedorImagen = modal ? modal.querySelector('.flex-1.flex.items-center.justify-center.bg-gray-50') : null;
   
   if (imagenGrande) {
+    // Mostrar spinner de carga
+    const spinner = contenedorImagen ? contenedorImagen.querySelector('.imagen-loading-spinner') : null;
+    if (spinner) spinner.classList.remove('hidden');
+    imagenGrande.classList.add('opacity-0');
+    
     // Usar imagen_grande para la imagen grande del modal
     const imagenActual = v2[v17] || v3[v17] || '';
-    imagenGrande.src = imagenActual ? `${v6}/${imagenActual}` : '';
-    imagenGrande.alt = 'Imagen ' + (v17 + 1) + ' del producto';
+    
+    if (imagenActual) {
+      const img = new Image();
+      
+      img.onload = function() {
+        // Ocultar spinner y mostrar imagen
+        if (spinner) spinner.classList.add('hidden');
+        imagenGrande.src = `${v6}/${imagenActual}`;
+        imagenGrande.alt = 'Imagen ' + (v17 + 1) + ' del producto';
+        imagenGrande.classList.remove('opacity-0');
+        
+        // Después de cargar la imagen principal, pre-cargar las demás
+        _cpi1();
+      };
+      
+      img.onerror = function() {
+        // Si falla la carga, ocultar spinner
+        if (spinner) spinner.classList.add('hidden');
+        imagenGrande.classList.remove('opacity-0');
+      };
+      
+      // Cargar la imagen
+      img.src = `${v6}/${imagenActual}`;
+      
+      // Si la imagen ya está en caché, se ejecutará onload inmediatamente
+      if (img.complete) {
+        img.onload();
+      }
+    } else {
+      // Si no hay imagen, ocultar spinner
+      if (spinner) spinner.classList.add('hidden');
+      imagenGrande.classList.remove('opacity-0');
+    }
     
     // Configurar swipe para móvil (solo una vez)
     if (!imagenGrande.hasAttribute('data-swipe-configured')) {
@@ -6783,6 +6749,24 @@ function _am2() {
   
   // Renderizar oferta en desktop
   _rod1();
+}
+
+// Función para pre-cargar las demás imágenes grandes de forma diferida
+{{-- _cpi1: cargarPreImagenes - Pre-carga las imágenes grandes restantes de forma diferida --}}
+function _cpi1() {
+  // Esperar un poco después de que se cargue la imagen principal
+  setTimeout(function() {
+    // Pre-cargar todas las imágenes grandes excepto la actual
+    for (let i = 0; i < v1.length; i++) {
+      if (i !== v17) {
+        const imgPath = v2[i] || v3[i] || '';
+        if (imgPath) {
+          const img = new Image();
+          img.src = `${v6}/${imgPath}`;
+        }
+      }
+    }
+  }, 500); // Esperar 500ms después de abrir el modal
 }
 
 // Función para configurar swipe en móvil
@@ -6883,6 +6867,7 @@ function _rm1() {
       miniatura.style.width = '96px';
       miniatura.style.height = '96px';
       miniatura.onclick = () => _si1(i);
+      // Las miniaturas se cargan normalmente (sin lazy)
       miniatura.innerHTML = `<img src="${v6}/${imgPath}" alt="Miniatura ${i + 1}">`;
       miniaturasDesktop.appendChild(miniatura);
     }
@@ -6905,6 +6890,7 @@ function _rm1() {
       miniatura.style.width = '64px';
       miniatura.style.height = '64px';
       miniatura.onclick = () => _si1(i);
+      // Las miniaturas se cargan normalmente (sin lazy)
       miniatura.innerHTML = `<img src="${v6}/${imgPath}" alt="Miniatura ${i + 1}">`;
       miniaturasMovil.appendChild(miniatura);
     }
@@ -7120,7 +7106,7 @@ function _rod1() {
       <div class="text-center mb-4 pb-4 border-b border-gray-200">
         <div class="precio-total text-gray-700">
           <div class="text-sm text-gray-500">Precio total</div>
-          <div class="text-3xl font-extrabold" style="color: #e97b11;">${primeraOferta.precio_total} <span class="text-sm text-gray-500 font-normal">€</span></div>
+          <div class="text-2xl font-extrabold" style="color: #e97b11;">${primeraOferta.precio_total} <span class="text-sm text-gray-500 font-normal">€</span></div>
         </div>
       </div>
     `;
@@ -7368,8 +7354,13 @@ if (document.readyState === 'loading') {
         </div>
         
         {{-- Contenedor central: Imagen grande --}}
-        <div class="flex-1 flex items-center justify-center bg-gray-50 p-4 lg:p-6">
-          <div class="relative flex items-center justify-center w-full" style="padding-left: 3rem; padding-right: 3rem;">
+        <div class="flex-1 flex items-center justify-center bg-gray-50 p-4 lg:p-6" style="max-height: 70vh; min-height: 400px;">
+          <div class="relative flex items-center justify-center w-full h-full" style="padding-left: 3rem; padding-right: 3rem;">
+            {{-- Spinner de carga --}}
+            <div class="imagen-loading-spinner absolute inset-0 flex items-center justify-center bg-gray-50 z-20">
+              <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600"></div>
+            </div>
+            
             {{-- Flecha izquierda --}}
             <button id="btn-flecha-izq" onclick="_ci1(-1)" class="absolute left-0 top-1/2 transform -translate-y-1/2 bg-white rounded-full p-2 shadow-lg hover:bg-gray-100 transition-all z-10 opacity-50 hover:opacity-100 disabled:opacity-30 disabled:cursor-not-allowed">
               <svg class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -7378,7 +7369,7 @@ if (document.readyState === 'loading') {
             </button>
             
             {{-- Imagen grande --}}
-            <img id="imagen-grande-modal" src="" alt="Imagen del producto" class="max-w-full max-h-full object-contain" style="height: 100%;">
+            <img id="imagen-grande-modal" src="" alt="Imagen del producto" class="max-w-full max-h-full object-contain transition-opacity duration-300">
             
             {{-- Flecha derecha --}}
             <button id="btn-flecha-der" onclick="_ci1(1)" class="absolute right-0 top-1/2 transform -translate-y-1/2 bg-white rounded-full p-2 shadow-lg hover:bg-gray-100 transition-all z-10 opacity-50 hover:opacity-100 disabled:opacity-30 disabled:cursor-not-allowed">
