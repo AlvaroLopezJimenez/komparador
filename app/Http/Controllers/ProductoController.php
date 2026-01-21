@@ -288,6 +288,26 @@ class ProductoController extends Controller
         $especificacionesElegidas = null;
         if ($request->has('categoria_especificaciones_internas_elegidas') && !empty($request->categoria_especificaciones_internas_elegidas)) {
             $especificacionesElegidas = json_decode($request->categoria_especificaciones_internas_elegidas, true);
+            
+            // Validar que si el formato es "imagen", todas las sublíneas marcadas como mostrar tienen imágenes
+            if (is_array($especificacionesElegidas)) {
+                foreach ($especificacionesElegidas as $lineaId => $sublineas) {
+                    // Verificar si es un array de sublíneas y si tiene formato
+                    if (is_array($sublineas) && isset($sublineas['_formato']) && $sublineas['_formato'] === 'imagen') {
+                        // Obtener todas las sublíneas marcadas como mostrar
+                        foreach ($sublineas as $item) {
+                            if (is_array($item) && isset($item['id']) && isset($item['m']) && $item['m'] === 1) {
+                                // Verificar si tiene imágenes
+                                if (!isset($item['img']) || !is_array($item['img']) || count($item['img']) === 0) {
+                                    return back()->withErrors([
+                                        'categoria_especificaciones_internas_elegidas' => "La línea principal con ID {$lineaId} tiene formato 'Imagen' pero la sublínea con ID {$item['id']} marcada como 'Mostrar' no tiene imágenes."
+                                    ])->withInput();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
         
         // Si el checkbox "No añadir" está marcado, guardar null en ambos campos
@@ -658,39 +678,31 @@ public function generarContenido(Request $request)
             $prompt .= $infoAdicionalCategoria;
         }
 
-        $apiKey = config('services.openai.api_key');
-
-        // Fallback de pruebas si no hay API key
-        // if (!$apiKey) {
-//             $data = [
-//                 'titulo' => 'Comparador de ' . $nombre,
-//                 'subtitulo' => 'Descripción corta del producto ' . $marca . ' ' . $modelo,
-//                 'descripcion_corta' => 'Descripción más detallada del producto ' . $nombre . ' de la marca ' . $marca,
-//                 'descripcion_larga' => '<h3>Características principales</h3><p>Descripción larga de ejemplo.</p>',
-//                 'caracteristicas' => "Característica 1\nCaracterística 2\nCaracterística 3\nCaracterística 4\nCaracterística 5\nCaracterística 6",
-//                 'meta_titulo' => 'Meta título para ' . $nombre,
-//                 'meta_descripcion' => 'Meta descripción para ' . $nombre,
-//                 'pros' => ['Pro 1', 'Pro 2', 'Pro 3', 'Pro 4', 'Pro 5'],
-//                 'contras' => ['Contra 1', 'Contra 2', 'Contra 3'],
-//                 'preguntas_frecuentes' => [
-//                     ['pregunta' => 'Pregunta 1', 'respuesta' => 'Respuesta 1'],
-//                     ['pregunta' => 'Pregunta 2', 'respuesta' => 'Respuesta 2'],
-//                     ['pregunta' => 'Pregunta 3', 'respuesta' => 'Respuesta 3'],
-//                 ],
-//             ];
-//             return response()->json($data);
-//         }
-
-        // Cliente OpenAI
+        // Cliente OpenAI - usar el facade que ya tiene la API key configurada
         try {
-            $client = \OpenAI::client($apiKey);
+            \Log::info('DEBUG: Intentando obtener cliente OpenAI...');
+            $apiKey = config('services.openai.api_key');
+            \Log::info('DEBUG: API Key configurada: ' . ($apiKey ? 'SÍ (longitud: ' . strlen($apiKey) . ')' : 'NO'));
+            
+            $client = \OpenAI::client();
+            \Log::info('DEBUG: Cliente OpenAI obtenido correctamente');
         } catch (\Exception $e) {
             \Log::error('Error al obtener cliente OpenAI: ' . $e->getMessage());
-            return response()->json(['error' => 'Error inicializando cliente OpenAI'], 500);
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
+            return response()->json([
+                'error' => 'Error inicializando cliente OpenAI: ' . $e->getMessage(),
+                'debug' => [
+                    'message' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine()
+                ]
+            ], 500);
         }
 
         // Llamada: se usa EXACTAMENTE el prompt que envía el front
-        $response = $client->chat()->create([
+        try {
+            \Log::info('DEBUG: Enviando petición a OpenAI...');
+            $response = $client->chat()->create([
             'model' => 'gpt-4o-mini',
             'messages' => [
                 // Mantengo una instrucción mínima para obligar JSON, sin tocar tu prompt
@@ -706,7 +718,20 @@ public function generarContenido(Request $request)
             'temperature' => 0.2,
             'max_tokens' => 2000,
             'response_format' => ['type' => 'json_object'], // si el SDK no lo soporta, se ignora
-        ]);
+            ]);
+            \Log::info('DEBUG: Respuesta recibida de OpenAI');
+        } catch (\Exception $e) {
+            \Log::error('Error al hacer petición a OpenAI: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
+            return response()->json([
+                'error' => 'Error al hacer petición a OpenAI: ' . $e->getMessage(),
+                'debug' => [
+                    'message' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine()
+                ]
+            ], 500);
+        }
 
         $content = $response->choices[0]->message->content ?? '';
         \Log::info('Respuesta OpenAI (raw):', ['content' => $content]);
@@ -759,7 +784,16 @@ public function generarContenido(Request $request)
         return response()->json(['error' => 'Datos de entrada inválidos: ' . implode(', ', $flat)], 422);
     } catch (\Exception $e) {
         \Log::error('Error al generar contenido con ChatGPT: ' . $e->getMessage());
-        return response()->json(['error' => 'Error al generar contenido: ' . $e->getMessage()], 500);
+        \Log::error('Stack trace completo: ' . $e->getTraceAsString());
+        return response()->json([
+            'error' => 'Error al generar contenido: ' . $e->getMessage(),
+            'debug' => [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'class' => get_class($e)
+            ]
+        ], 500);
     }
 }
 

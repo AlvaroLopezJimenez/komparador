@@ -1067,79 +1067,84 @@
       
       {{-- Segunda fila: Las mejores ofertas (máximo 4, distribuidas en filas de 2) --}}
       <div id="mejor-oferta-grid-movil">
-        {{-- Primera fila de ofertas --}}
-        <div class="flex gap-2 items-start mb-2">
-          {{-- Primera oferta --}}
-          <div class="flex-1" id="mejor-oferta-contenedor-movil-1">
-            <div class="flex items-center justify-center mb-1">
-              <div id="mejor-oferta-logo-movil-1" class="flex items-center justify-center">
-                <div class="w-12 h-5 bg-gray-200 rounded animate-pulse"></div>
+        @if(count($ofertas) === 0)
+          {{-- Si no hay ofertas, mostrar mensaje directamente --}}
+          <div class='bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-6 rounded text-lg text-center mb-4'>No hay ofertas disponibles actualmente para este producto.</div>
+        @else
+          {{-- Primera fila de ofertas --}}
+          <div class="flex gap-2 items-start mb-2">
+            {{-- Primera oferta --}}
+            <div class="flex-1" id="mejor-oferta-contenedor-movil-1">
+              <div class="flex items-center justify-center mb-1">
+                <div id="mejor-oferta-logo-movil-1" class="flex items-center justify-center">
+                  <div class="w-12 h-5 bg-gray-200 rounded animate-pulse"></div>
+                </div>
+              </div>
+              <div class="text-center">
+                <div id="mejor-oferta-precio-movil-1" class="text-lg font-extrabold mb-1" style="color: #e97b11;">
+                  <div class="w-12 h-6 bg-gray-200 rounded animate-pulse mx-auto"></div>
+                </div>
+                <div id="mejor-oferta-boton-movil-1" class="w-full">
+                  <div class="w-full h-6 bg-gray-200 rounded animate-pulse"></div>
+                </div>
               </div>
             </div>
-            <div class="text-center">
-              <div id="mejor-oferta-precio-movil-1" class="text-lg font-extrabold mb-1" style="color: #e97b11;">
-                <div class="w-12 h-6 bg-gray-200 rounded animate-pulse mx-auto"></div>
+            
+            {{-- Segunda oferta --}}
+            <div class="flex-1" id="mejor-oferta-contenedor-movil-2">
+              <div class="flex items-center justify-center mb-1">
+                <div id="mejor-oferta-logo-movil-2" class="flex items-center justify-center">
+                  <div class="w-12 h-5 bg-gray-200 rounded animate-pulse"></div>
+                </div>
               </div>
-              <div id="mejor-oferta-boton-movil-1" class="w-full">
-                <div class="w-full h-6 bg-gray-200 rounded animate-pulse"></div>
-              </div>
-            </div>
-          </div>
-          
-          {{-- Segunda oferta --}}
-          <div class="flex-1" id="mejor-oferta-contenedor-movil-2">
-            <div class="flex items-center justify-center mb-1">
-              <div id="mejor-oferta-logo-movil-2" class="flex items-center justify-center">
-                <div class="w-12 h-5 bg-gray-200 rounded animate-pulse"></div>
-              </div>
-            </div>
-            <div class="text-center">
-              <div id="mejor-oferta-precio-movil-2" class="text-lg font-extrabold mb-1" style="color: #e97b11;">
-                <div class="w-12 h-6 bg-gray-200 rounded animate-pulse mx-auto"></div>
-              </div>
-              <div id="mejor-oferta-boton-movil-2" class="w-full">
-                <div class="w-full h-6 bg-gray-200 rounded animate-pulse"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        {{-- Segunda fila de ofertas --}}
-        <div class="flex gap-2 items-start mb-1 mt-1">
-          {{-- Tercera oferta --}}
-          <div class="flex-1" id="mejor-oferta-contenedor-movil-3" style="display: none;">
-            <div class="flex items-center justify-center mb-1">
-              <div id="mejor-oferta-logo-movil-3" class="flex items-center justify-center">
-                <div class="w-12 h-5 bg-gray-200 rounded animate-pulse"></div>
-              </div>
-            </div>
-            <div class="text-center">
-              <div id="mejor-oferta-precio-movil-3" class="text-lg font-extrabold mb-1" style="color: #e97b11;">
-                <div class="w-12 h-6 bg-gray-200 rounded animate-pulse mx-auto"></div>
-              </div>
-              <div id="mejor-oferta-boton-movil-3" class="w-full">
-                <div class="w-full h-6 bg-gray-200 rounded animate-pulse"></div>
+              <div class="text-center">
+                <div id="mejor-oferta-precio-movil-2" class="text-lg font-extrabold mb-1" style="color: #e97b11;">
+                  <div class="w-12 h-6 bg-gray-200 rounded animate-pulse mx-auto"></div>
+                </div>
+                <div id="mejor-oferta-boton-movil-2" class="w-full">
+                  <div class="w-full h-6 bg-gray-200 rounded animate-pulse"></div>
+                </div>
               </div>
             </div>
           </div>
           
-          {{-- Cuarta oferta --}}
-          <div class="flex-1" id="mejor-oferta-contenedor-movil-4" style="display: none;">
-            <div class="flex items-center justify-center mb-1">
-              <div id="mejor-oferta-logo-movil-4" class="flex items-center justify-center">
-                <div class="w-12 h-5 bg-gray-200 rounded animate-pulse"></div>
+          {{-- Segunda fila de ofertas --}}
+          <div class="flex gap-2 items-start mb-1 mt-1">
+            {{-- Tercera oferta --}}
+            <div class="flex-1" id="mejor-oferta-contenedor-movil-3" style="display: none;">
+              <div class="flex items-center justify-center mb-1">
+                <div id="mejor-oferta-logo-movil-3" class="flex items-center justify-center">
+                  <div class="w-12 h-5 bg-gray-200 rounded animate-pulse"></div>
+                </div>
+              </div>
+              <div class="text-center">
+                <div id="mejor-oferta-precio-movil-3" class="text-lg font-extrabold mb-1" style="color: #e97b11;">
+                  <div class="w-12 h-6 bg-gray-200 rounded animate-pulse mx-auto"></div>
+                </div>
+                <div id="mejor-oferta-boton-movil-3" class="w-full">
+                  <div class="w-full h-6 bg-gray-200 rounded animate-pulse"></div>
+                </div>
               </div>
             </div>
-            <div class="text-center">
-              <div id="mejor-oferta-precio-movil-4" class="text-lg font-extrabold mb-1" style="color: #e97b11;">
-                <div class="w-12 h-6 bg-gray-200 rounded animate-pulse mx-auto"></div>
+            
+            {{-- Cuarta oferta --}}
+            <div class="flex-1" id="mejor-oferta-contenedor-movil-4" style="display: none;">
+              <div class="flex items-center justify-center mb-1">
+                <div id="mejor-oferta-logo-movil-4" class="flex items-center justify-center">
+                  <div class="w-12 h-5 bg-gray-200 rounded animate-pulse"></div>
+                </div>
               </div>
-              <div id="mejor-oferta-boton-movil-4" class="w-full">
-                <div class="w-full h-6 bg-gray-200 rounded animate-pulse"></div>
+              <div class="text-center">
+                <div id="mejor-oferta-precio-movil-4" class="text-lg font-extrabold mb-1" style="color: #e97b11;">
+                  <div class="w-12 h-6 bg-gray-200 rounded animate-pulse mx-auto"></div>
+                </div>
+                <div id="mejor-oferta-boton-movil-4" class="w-full">
+                  <div class="w-full h-6 bg-gray-200 rounded animate-pulse"></div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        @endif
       </div>
       
       {{-- Botón para ver todas las ofertas --}}
@@ -1428,16 +1433,20 @@
                 isset($categoriaEspecificaciones->especificaciones_internas['filtros'])) {
               
               $filtrosImportantes = collect($categoriaEspecificaciones->especificaciones_internas['filtros'])
-                ->map(function($filtro) use ($especificacionesElegidas) {
+                ->map(function($filtro) use ($especificacionesElegidas, $ofertas, $categoriaEspecificaciones, $producto) {
                   // Filtrar solo las sublíneas que están marcadas como "Mostrar" (m === 1)
                   $sublineasElegidas = $especificacionesElegidas[$filtro['id']] ?? [];
+                  // Obtener el formato de visualización de la línea principal desde _formatos
+                  // Nota: En el backend usamos las claves originales, solo se ofuscan al enviar al cliente
+                  $formatoVisualizacion = $especificacionesElegidas['_formatos'][$filtro['id']] ?? 'texto';
+                  $filtro['formato'] = $formatoVisualizacion;
                   
                   $filtro['subprincipales'] = collect($filtro['subprincipales'] ?? [])
-                    ->map(function($sub) use ($sublineasElegidas) {
+                    ->map(function($sub) use ($sublineasElegidas, $filtro, $ofertas, $especificacionesElegidas, $categoriaEspecificaciones, $producto) {
                       // Buscar los datos de la sublínea en las elegidas (incluyendo imágenes)
                       $sublineaData = collect($sublineasElegidas)->first(function($item) use ($sub) {
-                        $sublineaId = is_array($item) && isset($item['id']) ? $item['id'] : $item;
-                        return (string)$sublineaId === (string)$sub['id'];
+                        if (!is_array($item) || !isset($item['id'])) return false;
+                        return (string)$item['id'] === (string)$sub['id'];
                       });
                       
                       // Verificar si está marcada como "Mostrar"
@@ -1449,11 +1458,155 @@
                         return null; // No incluir esta sublínea
                       }
                       
-                      // Añadir imágenes a la sublínea si existen
-                      if (is_array($sublineaData) && isset($sublineaData['img']) && is_array($sublineaData['img']) && count($sublineaData['img']) > 0) {
+                      // Añadir imágenes a la sublínea si existen o si debe usar las del producto
+                      $usarImagenesProducto = is_array($sublineaData) && isset($sublineaData['usarImagenesProducto']) && $sublineaData['usarImagenesProducto'] === true;
+                      
+                      if ($usarImagenesProducto) {
+                        // Usar imágenes del producto - Laravel ya las castea como array
+                        // Obtener directamente como array (puede ser null si no tiene imágenes)
+                        $imagenesProducto = $producto->imagen_grande;
+                        
+                        // Si es null, usar array vacío
+                        if ($imagenesProducto === null) {
+                          $imagenesProducto = [];
+                        }
+                        
+                        // Si es un array y tiene al menos una imagen
+                        if (is_array($imagenesProducto) && count($imagenesProducto) > 0) {
+                          // Filtrar valores vacíos o null
+                          $imagenesProducto = array_filter($imagenesProducto, function($img) {
+                            return !empty($img) && $img !== null;
+                          });
+                          
+                          // Reindexar array y asignar a la sublínea
+                          if (count($imagenesProducto) > 0) {
+                            $sub['imagenes'] = array_values($imagenesProducto);
+                          } else {
+                            $sub['imagenes'] = [];
+                          }
+                        } elseif (is_string($imagenesProducto) && !empty($imagenesProducto)) {
+                          // Si es string, intentar parsearlo como JSON
+                          $imagenesProductoParsed = json_decode($imagenesProducto, true);
+                          if (is_array($imagenesProductoParsed) && count($imagenesProductoParsed) > 0) {
+                            $imagenesProductoParsed = array_filter($imagenesProductoParsed, function($img) {
+                              return !empty($img) && $img !== null;
+                            });
+                            $sub['imagenes'] = count($imagenesProductoParsed) > 0 ? array_values($imagenesProductoParsed) : [];
+                          } else {
+                            $sub['imagenes'] = [];
+                          }
+                        } else {
+                          $sub['imagenes'] = [];
+                        }
+                        $sub['usar_imagenes_producto'] = true; // Marcar para usar en la vista
+                      } elseif (is_array($sublineaData) && isset($sublineaData['img']) && is_array($sublineaData['img']) && count($sublineaData['img']) > 0) {
+                        // Usar imágenes propias de la sublínea
                         $sub['imagenes'] = $sublineaData['img'];
+                        $sub['usar_imagenes_producto'] = false;
                       } else {
                         $sub['imagenes'] = [];
+                        $sub['usar_imagenes_producto'] = false;
+                      }
+                      
+                      // Calcular el precio más barato para esta sublínea
+                      $precioMasBarato = null;
+                      $ofertasFiltradasPorSublinea = collect($ofertas)->filter(function($oferta) use ($filtro, $sub, $especificacionesElegidas) {
+                        if (!$oferta->especificaciones_internas || !is_array($oferta->especificaciones_internas)) {
+                          return false;
+                        }
+                        
+                        // Verificar que la oferta tiene esta sublínea específica
+                        $ofertaLinea = $oferta->especificaciones_internas[$filtro['id']] ?? null;
+                        if ($ofertaLinea === null) {
+                          return false;
+                        }
+                        
+                        // Convertir a array si es necesario y comparar IDs
+                        $ofertaLineaArray = is_array($ofertaLinea) ? $ofertaLinea : [$ofertaLinea];
+                        $sublineaIdStr = (string)$sub['id'];
+                        
+                        // Verificar si alguna de las sublíneas de la oferta coincide con la sublínea que buscamos
+                        $tieneSublinea = collect($ofertaLineaArray)->contains(function($id) use ($sublineaIdStr) {
+                          return (string)$id === $sublineaIdStr;
+                        });
+                        
+                        if (!$tieneSublinea) {
+                          return false;
+                        }
+                        
+                        // Aplicar filtros de otras líneas principales (si existen y tienen sublíneas marcadas como mostrar)
+                        foreach ($especificacionesElegidas as $otraLineaId => $otraLineaData) {
+                          // Saltar si es la línea actual o si es un objeto especial (_formatos, _orden, _columnas)
+                          // Nota: En el backend usamos las claves originales, solo se ofuscan al enviar al cliente
+                          if ($otraLineaId === $filtro['id'] || $otraLineaId === '_formatos' || $otraLineaId === '_orden' || $otraLineaId === '_columnas') {
+                            continue;
+                          }
+                          
+                          // Manejar estructura antigua (array directo) o nueva (objeto con _sublineas)
+                          $sublineasOtraLinea = [];
+                          if (is_array($otraLineaData)) {
+                            if (isset($otraLineaData['_sublineas']) && is_array($otraLineaData['_sublineas'])) {
+                              $sublineasOtraLinea = $otraLineaData['_sublineas'];
+                            } else {
+                              $sublineasOtraLinea = $otraLineaData;
+                            }
+                          }
+                          
+                          // Filtrar solo las sublíneas marcadas como "mostrar"
+                          $sublineasMostrarOtraLinea = collect($sublineasOtraLinea)->filter(function($item) {
+                            if (!is_array($item)) return false;
+                            return isset($item['m']) && $item['m'] === 1;
+                          })->pluck('id')->map(function($id) {
+                            return (string)$id;
+                          })->toArray();
+                          
+                          // Si hay sublíneas marcadas como mostrar en esta otra línea, verificar que la oferta las cumple
+                          if (count($sublineasMostrarOtraLinea) > 0) {
+                            $ofertaOtraLinea = $oferta->especificaciones_internas[$otraLineaId] ?? null;
+                            if ($ofertaOtraLinea === null) {
+                              return false;
+                            }
+                            
+                            $ofertaOtraLineaArray = is_array($ofertaOtraLinea) ? $ofertaOtraLinea : [$ofertaOtraLinea];
+                            $ofertaOtraLineaArrayStr = collect($ofertaOtraLineaArray)->map(function($id) {
+                              return (string)$id;
+                            })->toArray();
+                            
+                            // Verificar si alguna de las sublíneas de la oferta está en las marcadas como mostrar
+                            $cumpleOtraLinea = !empty(array_intersect($ofertaOtraLineaArrayStr, $sublineasMostrarOtraLinea));
+                            
+                            if (!$cumpleOtraLinea) {
+                              return false;
+                            }
+                          }
+                        }
+                        
+                        return true;
+                      });
+                      
+                      if ($ofertasFiltradasPorSublinea->count() > 0) {
+                        $ofertasOrdenadas = $ofertasFiltradasPorSublinea->sortBy(function($oferta) {
+                          return floatval(str_replace(',', '.', $oferta->precio_unidad ?? '999999'));
+                        });
+                        $ofertaMasBarata = $ofertasOrdenadas->first();
+                        $precioMasBarato = $ofertaMasBarata->precio_unidad ?? null;
+                        
+                        // Formatear el precio con el mismo formato que se usa en la vista
+                        if ($precioMasBarato !== null) {
+                          $precioMasBarato = number_format(floatval(str_replace(',', '.', $precioMasBarato)), 2, ',', '');
+                        }
+                      }
+                      
+                      $sub['precio_mas_barato'] = $precioMasBarato;
+                      
+                      // Verificar si la línea principal está marcada como columna oferta y si la sublínea tiene texto alternativo
+                      $esColumnaOferta = isset($especificacionesElegidas['_columnas']) && 
+                                        is_array($especificacionesElegidas['_columnas']) && 
+                                        in_array($filtro['id'], $especificacionesElegidas['_columnas']);
+                      
+                      // Si es columna oferta y tiene texto alternativo, usarlo
+                      if ($esColumnaOferta && is_array($sublineaData) && isset($sublineaData['textoAlternativo']) && !empty($sublineaData['textoAlternativo'])) {
+                        $sub['texto'] = $sublineaData['textoAlternativo'];
                       }
                       
                       return $sub;
@@ -1488,42 +1641,73 @@
                       }
                     }
                   @endphp
-                  <div class="filtro-linea-principal" data-linea-id="{{ $filtro['id'] }}">
+                  <div class="filtro-linea-principal" data-linea-id="{{ $filtro['id'] }}" data-formato="{{ $filtro['formato'] ?? 'texto' }}">
                     <div class="font-bold text-sm sm:text-base text-black mb-2" style="color: #000000 !important; font-weight: bold !important;">{{ $filtro['texto'] }}</div>
-                    @if($tieneImagenes)
+                    @php
+                      $formato = $filtro['formato'] ?? 'texto';
+                      $necesitaCarrusel = in_array($formato, ['imagen', 'imagen_texto', 'imagen_precio']);
+                    @endphp
+                    @if($necesitaCarrusel)
                       {{-- Carrusel para sublíneas con imágenes --}}
                       <div class="relative sublineas-carrusel-container" data-linea-id="{{ $filtro['id'] }}">
                         <div class="overflow-hidden">
                           <div class="sublineas-carrusel flex gap-2 sm:gap-3 overflow-x-auto scrollbar-hide" style="scroll-behavior: smooth; -webkit-overflow-scrolling: touch; touch-action: pan-x; overscroll-behavior-x: contain;">
                             @foreach($filtro['subprincipales'] as $sub)
+                              @php
+                                $tieneImagen = isset($sub['imagenes']) && is_array($sub['imagenes']) && count($sub['imagenes']) > 0;
+                                $tienePrecio = isset($sub['precio_mas_barato']) && $sub['precio_mas_barato'] !== null;
+                                // Verificar si usa imágenes del producto (ya viene en el array $sub)
+                                $usarImagenesProducto = isset($sub['usar_imagenes_producto']) && $sub['usar_imagenes_producto'] === true;
+                              @endphp
                               <button 
                                 type="button"
-                                class="filtro-sublinea-btn px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm border rounded transition-colors bg-white text-gray-900 border-gray-400 hover:bg-gray-100 flex items-center gap-1 flex-shrink-0"
-                                style="background-color: #ffffff !important; color: #111827 !important; border-color: #9ca3af !important;"
+                                class="filtro-sublinea-btn px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm border rounded transition-colors bg-white text-gray-900 border-gray-400 hover:bg-gray-100 flex flex-col items-center gap-1 flex-shrink-0"
+                                style="background-color: #ffffff !important; color: #111827 !important; border-color: #9ca3af !important; min-width: {{ $formato === 'imagen' ? '78px' : 'auto' }}; min-height: {{ $formato === 'imagen' ? '78px' : 'auto' }};"
                                 data-linea-id="{{ $filtro['id'] }}"
                                 data-sublinea-id="{{ $sub['id'] }}"
                                 data-sublinea-texto="{{ htmlspecialchars($sub['texto'], ENT_QUOTES, 'UTF-8') }}"
-                                @if(isset($sub['imagenes']) && is_array($sub['imagenes']) && count($sub['imagenes']) > 0)
+                                @if($tieneImagen && !$usarImagenesProducto)
                                   data-imagenes='{!! json_encode($sub['imagenes'], JSON_HEX_QUOT | JSON_HEX_APOS | JSON_UNESCAPED_UNICODE) !!}'
                                 @endif>
-                                @if(isset($sub['imagenes']) && is_array($sub['imagenes']) && count($sub['imagenes']) > 0)
-                                  {{-- Mostrar imagen pequeña si existe --}}
+                                @if($formato === 'imagen' || $formato === 'imagen_texto' || $formato === 'imagen_precio')
                                   @php
-                                    $imagenOriginal = $sub['imagenes'][0];
-                                    // Intentar usar la versión thumbnail si existe
-                                    $imagenPequena = preg_replace('/\.(jpg|jpeg|png|gif|webp)$/i', '-thumbnail.webp', $imagenOriginal);
-                                    // Verificar si existe el thumbnail, si no, usar la original
-                                    $rutaThumbnail = public_path('images/' . $imagenPequena);
-                                    $imagenFinal = file_exists($rutaThumbnail) ? $imagenPequena : $imagenOriginal;
+                                    // Verificar si hay imágenes disponibles
+                                    $imagenDisponible = false;
+                                    $imagenOriginal = null;
+                                    $imagenFinal = null;
+                                    
+                                    if ($tieneImagen && isset($sub['imagenes']) && is_array($sub['imagenes']) && count($sub['imagenes']) > 0) {
+                                      $imagenOriginal = $sub['imagenes'][0];
+                                      if (!empty($imagenOriginal)) {
+                                        $imagenDisponible = true;
+                                        // Buscar thumbnail si existe
+                                        $imagenPequena = preg_replace('/\.(jpg|jpeg|png|gif|webp)$/i', '-thumbnail.webp', $imagenOriginal);
+                                        $rutaThumbnail = public_path('images/' . $imagenPequena);
+                                        $imagenFinal = file_exists($rutaThumbnail) ? $imagenPequena : $imagenOriginal;
+                                      }
+                                    }
                                   @endphp
-                                  <img src="{{ asset('images/' . $imagenFinal) }}" alt="{{ $producto->nombre }} {{ $sub['texto'] }}" class="object-cover rounded" style="width: 78px; height: 78px; flex-shrink: 0;">
-                                @else
-                                  {{-- Mostrar texto si no hay imagen --}}
-                                  {{ $sub['texto'] }}
+                                  @if($imagenDisponible && $imagenFinal)
+                                    <img src="{{ asset('images/' . $imagenFinal) }}" alt="{{ $producto->nombre }} {{ $sub['texto'] }}" class="object-cover rounded" style="width: 78px; height: 78px; flex-shrink: 0;" onerror="this.style.display='none';">
+                                  @endif
                                 @endif
-                                @if(!isset($sub['imagenes']) || !is_array($sub['imagenes']) || count($sub['imagenes']) == 0)
-                                  {{-- Mostrar contador solo si no hay imagen --}}
-                                  <span class="contador-sublinea" data-linea-id="{{ $filtro['id'] }}" data-sublinea-id="{{ $sub['id'] }}">(0)</span>
+                                @if($formato === 'imagen_texto')
+                                  <div class="flex items-center gap-1 text-xs text-center">
+                                    <span>{{ $sub['texto'] }}</span>
+                                    <span class="contador-sublinea" data-linea-id="{{ $filtro['id'] }}" data-sublinea-id="{{ $sub['id'] }}">(0)</span>
+                                  </div>
+                                @elseif($formato === 'texto' || $formato === 'texto_precio')
+                                  <span class="text-xs text-center">{{ $sub['texto'] }}</span>
+                                @endif
+                                @if($formato === 'texto_precio' || $formato === 'imagen_precio')
+                                  @if($tienePrecio)
+                                    <span class="text-sm font-semibold" style="color: #000000;">{{ $sub['precio_mas_barato'] }} €</span>
+                                  @else
+                                    <span class="text-xs text-gray-400">-</span>
+                                  @endif
+                                @endif
+                                @if($formato === 'texto' || ($formato === 'texto_precio' && !$tienePrecio))
+                                  <span class="contador-sublinea text-xs" data-linea-id="{{ $filtro['id'] }}" data-sublinea-id="{{ $sub['id'] }}">(0)</span>
                                 @endif
                               </button>
                             @endforeach
@@ -1545,15 +1729,29 @@
                       {{-- Layout normal (flex-wrap) para sublíneas sin imágenes --}}
                       <div class="flex flex-wrap gap-2 sm:gap-3">
                         @foreach($filtro['subprincipales'] as $sub)
+                          @php
+                            $tienePrecio = isset($sub['precio_mas_barato']) && $sub['precio_mas_barato'] !== null;
+                            // Para formato "texto", usar flex-row, para "texto_precio" usar flex-col
+                            $claseFlex = $formato === 'texto' ? 'flex items-center gap-1' : 'flex flex-col items-center gap-1';
+                          @endphp
                           <button 
                             type="button"
-                            class="filtro-sublinea-btn px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm border rounded transition-colors bg-white text-gray-900 border-gray-400 hover:bg-gray-100 flex items-center gap-1"
+                            class="filtro-sublinea-btn px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm border rounded transition-colors bg-white text-gray-900 border-gray-400 hover:bg-gray-100 {{ $claseFlex }}"
                             style="background-color: #ffffff !important; color: #111827 !important; border-color: #9ca3af !important;"
                             data-linea-id="{{ $filtro['id'] }}"
                             data-sublinea-id="{{ $sub['id'] }}"
                             data-sublinea-texto="{{ htmlspecialchars($sub['texto'], ENT_QUOTES, 'UTF-8') }}">
-                            {{ $sub['texto'] }}
-                            <span class="contador-sublinea" data-linea-id="{{ $filtro['id'] }}" data-sublinea-id="{{ $sub['id'] }}">(0)</span>
+                            @if($formato === 'texto')
+                              <span>{{ $sub['texto'] }}</span>
+                              <span class="contador-sublinea" data-linea-id="{{ $filtro['id'] }}" data-sublinea-id="{{ $sub['id'] }}">(0)</span>
+                            @elseif($formato === 'texto_precio')
+                              <span>{{ $sub['texto'] }}</span>
+                              @if($tienePrecio)
+                                <span class="text-sm font-semibold" style="color: #000000;">{{ $sub['precio_mas_barato'] }} €</span>
+                              @else
+                                <span class="text-xs text-gray-400">-</span>
+                              @endif
+                            @endif
                           </button>
                         @endforeach
                       </div>
@@ -1697,6 +1895,7 @@
               isset($categoriaEspecificaciones->especificaciones_internas['filtros']) &&
               isset($especificacionesElegidas['_columnas'])) {
             
+            // Nota: En el backend usamos las claves originales, solo se ofuscan al enviar al cliente
             $columnasIds = $especificacionesElegidas['_columnas'] ?? [];
             $filtros = $categoriaEspecificaciones->especificaciones_internas['filtros'];
             
@@ -1704,15 +1903,36 @@
             $columnasData = [];
             foreach ($filtros as $filtro) {
               if (in_array($filtro['id'], $columnasIds)) {
+                // Procesar sublíneas para añadir texto alternativo si existe
+                $subprincipales = [];
+                foreach ($filtro['subprincipales'] ?? [] as $sub) {
+                  // Buscar datos de la sublínea en las elegidas
+                  $sublineaData = null;
+                  if (isset($especificacionesElegidas[$filtro['id']]) && is_array($especificacionesElegidas[$filtro['id']])) {
+                    $sublineaData = collect($especificacionesElegidas[$filtro['id']])->first(function($item) use ($sub) {
+                      if (!is_array($item) || !isset($item['id'])) return false;
+                      return (string)$item['id'] === (string)$sub['id'];
+                    });
+                  }
+                  
+                  // Si tiene texto alternativo, usarlo
+                  if (is_array($sublineaData) && isset($sublineaData['textoAlternativo']) && !empty($sublineaData['textoAlternativo'])) {
+                    $sub['texto'] = $sublineaData['textoAlternativo'];
+                  }
+                  
+                  $subprincipales[] = $sub;
+                }
+                
                 $columnasData[] = [
                   'id' => $filtro['id'],
                   'texto' => $filtro['texto'],
-                  'subprincipales' => $filtro['subprincipales'] ?? []
+                  'subprincipales' => $subprincipales
                 ];
               }
             }
             
             // Ordenar según _orden si existe
+            // Nota: En el backend usamos las claves originales, solo se ofuscan al enviar al cliente
             if (isset($especificacionesElegidas['_orden']) && is_array($especificacionesElegidas['_orden'])) {
               $orden = $especificacionesElegidas['_orden'];
               usort($columnasData, function($a, $b) use ($orden) {
@@ -1726,8 +1946,60 @@
           }
         }
         
+        // Función para ofuscar claves descriptivas en especificaciones_internas
+        $ofuscarEspecificaciones = function($especificaciones) use (&$ofuscarEspecificaciones) {
+          // Si no es array ni objeto, devolver tal cual
+          if (!is_array($especificaciones) && !is_object($especificaciones)) {
+            return $especificaciones;
+          }
+          
+          // Convertir objeto a array si es necesario
+          if (is_object($especificaciones)) {
+            $especificaciones = (array) $especificaciones;
+          }
+          
+          // Si está vacío, devolver array vacío
+          if (empty($especificaciones)) {
+            return [];
+          }
+          
+          // Verificar si es un array numérico (índices secuenciales desde 0)
+          $keys = array_keys($especificaciones);
+          $isNumericArray = !empty($keys) && $keys === range(0, count($especificaciones) - 1);
+          
+          // Si es un array numérico, mantener la estructura y procesar recursivamente cada elemento
+          if ($isNumericArray) {
+            return array_map(function($item) use ($ofuscarEspecificaciones) {
+              return $ofuscarEspecificaciones($item);
+            }, $especificaciones);
+          }
+          
+          // Para arrays asociativos, ofuscar las claves específicas
+          $resultado = [];
+          foreach ($especificaciones as $clave => $valor) {
+            // Ofuscar solo las claves descriptivas específicas
+            $claveOfuscada = $clave;
+            if ($clave === '_formatos') {
+              $claveOfuscada = '_f';
+            } elseif ($clave === '_columnas') {
+              $claveOfuscada = '_c';
+            } elseif ($clave === '_orden') {
+              $claveOfuscada = '_o';
+            }
+            
+            // Recursivamente ofuscar valores que sean arrays u objetos
+            if (is_array($valor) || is_object($valor)) {
+              $resultado[$claveOfuscada] = $ofuscarEspecificaciones($valor);
+            } else {
+              $resultado[$claveOfuscada] = $valor;
+            }
+          }
+          
+          return $resultado;
+        };
+        
         // Las ofertas ya vienen con descuentos aplicados desde la ruta
-        $ofertasArray = $ofertas->map(function($item) use ($producto) {
+        $ofertasArray = $ofertas->map(function($item) use ($producto, $ofuscarEspecificaciones) {
           try {
             // Formatear unidades para mostrar números enteros cuando sea posible
             $unidadesFormateadas = ($item->unidades == intval($item->unidades)) ? 
@@ -1752,6 +2024,25 @@
               return null;
             }
             
+            // Ofuscar especificaciones_internas antes de enviarlas al cliente
+            $especificacionesOfuscadas = null;
+            if ($item->especificaciones_internas !== null && !empty($item->especificaciones_internas)) {
+              try {
+                $especificacionesOfuscadas = $ofuscarEspecificaciones($item->especificaciones_internas);
+                // Validar que el resultado sea válido
+                if (!is_array($especificacionesOfuscadas) && !is_object($especificacionesOfuscadas) && $especificacionesOfuscadas !== null) {
+                  $especificacionesOfuscadas = null;
+                }
+              } catch (\Exception $e) {
+                \Log::error('Error al ofuscar especificaciones:', [
+                  'oferta_id' => $item->id ?? 'N/A',
+                  'error' => $e->getMessage()
+                ]);
+                // En caso de error, enviar sin ofuscar para no romper la funcionalidad
+                $especificacionesOfuscadas = $item->especificaciones_internas;
+              }
+            }
+            
             return [
               "id" => $item->id,
               "nombre" => $item->tienda->nombre ?? 'N/A',
@@ -1765,7 +2056,7 @@
               "precio_unidad" => number_format($item->precio_unidad ?? 0, $decimalesPrecioUnidad, ',', ''),
               "descuentos" => $item->descuentos ?? '',
               "url" => añadirCam(route('click.redirigir', ['ofertaId' => $item->id])),
-              "especificaciones_internas" => $item->especificaciones_internas ?? null,
+              "especificaciones_internas" => $especificacionesOfuscadas,
             ];
           } catch (\Exception $e) {
             \Log::error('Error al procesar oferta:', [
@@ -1972,17 +2263,136 @@
           {{-- Función para actualizar las mejores ofertas en móvil --}}
           {{-- _amom1: actualizarMejorOfertaMovil - Actualiza las mejores ofertas mostradas en la vista móvil --}}
           function _amom1(filtradas) {
-            if (filtradas.length === 0) return;
+            const gridContenedor = document.getElementById('mejor-oferta-grid-movil');
+            
+            {{-- Si no hay ofertas, mostrar mensaje en lugar de ocultar --}}
+            if (filtradas.length === 0) {
+              if (gridContenedor) {
+                gridContenedor.style.display = 'block';
+                {{-- Ocultar todos los contenedores individuales --}}
+                for (let i = 1; i <= 4; i++) {
+                  const contenedor = document.getElementById(`mejor-oferta-contenedor-movil-${i}`);
+                  if (contenedor) {
+                    contenedor.style.display = 'none';
+                  }
+                }
+                {{-- Mostrar mensaje según si hay filtros aplicados --}}
+                let mensajeHtml = '';
+                if (filtroInteractuado) {
+                  mensajeHtml = `<div class='bg-red-100 border-l-4 border-red-500 text-red-800 p-6 rounded text-lg text-center mb-4'>No hay ofertas que coincidan con los filtros seleccionados.</div>`;
+                } else {
+                  mensajeHtml = `<div class='bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-6 rounded text-lg text-center mb-4'>No hay ofertas disponibles actualmente para este producto.</div>`;
+                }
+                gridContenedor.innerHTML = mensajeHtml;
+              }
+              return;
+            }
+            
+            {{-- Mostrar el contenedor padre si estaba oculto y restaurar estructura HTML --}}
+            if (gridContenedor) {
+              gridContenedor.style.display = 'block';
+              {{-- Restaurar la estructura HTML original si fue reemplazada por un mensaje --}}
+              if (!gridContenedor.querySelector('#mejor-oferta-contenedor-movil-1')) {
+                gridContenedor.innerHTML = `
+                  <div class="flex gap-2 items-start mb-2">
+                    <div class="flex-1" id="mejor-oferta-contenedor-movil-1">
+                      <div class="flex items-center justify-center mb-1">
+                        <div id="mejor-oferta-logo-movil-1" class="flex items-center justify-center">
+                          <div class="w-12 h-5 bg-gray-200 rounded animate-pulse"></div>
+                        </div>
+                      </div>
+                      <div class="text-center">
+                        <div id="mejor-oferta-precio-movil-1" class="text-lg font-extrabold mb-1" style="color: #e97b11;">
+                          <div class="w-12 h-6 bg-gray-200 rounded animate-pulse mx-auto"></div>
+                        </div>
+                        <div id="mejor-oferta-boton-movil-1" class="w-full">
+                          <div class="w-full h-6 bg-gray-200 rounded animate-pulse"></div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="flex-1" id="mejor-oferta-contenedor-movil-2">
+                      <div class="flex items-center justify-center mb-1">
+                        <div id="mejor-oferta-logo-movil-2" class="flex items-center justify-center">
+                          <div class="w-12 h-5 bg-gray-200 rounded animate-pulse"></div>
+                        </div>
+                      </div>
+                      <div class="text-center">
+                        <div id="mejor-oferta-precio-movil-2" class="text-lg font-extrabold mb-1" style="color: #e97b11;">
+                          <div class="w-12 h-6 bg-gray-200 rounded animate-pulse mx-auto"></div>
+                        </div>
+                        <div id="mejor-oferta-boton-movil-2" class="w-full">
+                          <div class="w-full h-6 bg-gray-200 rounded animate-pulse"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="flex gap-2 items-start mb-1 mt-1">
+                    <div class="flex-1" id="mejor-oferta-contenedor-movil-3" style="display: none;">
+                      <div class="flex items-center justify-center mb-1">
+                        <div id="mejor-oferta-logo-movil-3" class="flex items-center justify-center">
+                          <div class="w-12 h-5 bg-gray-200 rounded animate-pulse"></div>
+                        </div>
+                      </div>
+                      <div class="text-center">
+                        <div id="mejor-oferta-precio-movil-3" class="text-lg font-extrabold mb-1" style="color: #e97b11;">
+                          <div class="w-12 h-6 bg-gray-200 rounded animate-pulse mx-auto"></div>
+                        </div>
+                        <div id="mejor-oferta-boton-movil-3" class="w-full">
+                          <div class="w-full h-6 bg-gray-200 rounded animate-pulse"></div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="flex-1" id="mejor-oferta-contenedor-movil-4" style="display: none;">
+                      <div class="flex items-center justify-center mb-1">
+                        <div id="mejor-oferta-logo-movil-4" class="flex items-center justify-center">
+                          <div class="w-12 h-5 bg-gray-200 rounded animate-pulse"></div>
+                        </div>
+                      </div>
+                      <div class="text-center">
+                        <div id="mejor-oferta-precio-movil-4" class="text-lg font-extrabold mb-1" style="color: #e97b11;">
+                          <div class="w-12 h-6 bg-gray-200 rounded animate-pulse mx-auto"></div>
+                        </div>
+                        <div id="mejor-oferta-boton-movil-4" class="w-full">
+                          <div class="w-full h-6 bg-gray-200 rounded animate-pulse"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                `;
+              }
+            }
             
             {{-- Calcular el precio mínimo entre todas las ofertas --}}
             const preciosUnidad = filtradas.map(o => parseFloat(o.precio_unidad.replace(',', '.')));
-            const precioMinimo = Math.min(...preciosUnidad);
+            const precioMinimo = preciosUnidad.length > 0 ? Math.min(...preciosUnidad) : Infinity;
             
             {{-- Filtrar todas las ofertas que tienen el mejor precio y tomar máximo 4 --}}
             const ofertasMejorPrecio = filtradas
               .map(o => ({...o, precioUnidadNum: parseFloat(o.precio_unidad.replace(',', '.'))}))
               .filter(o => o.precioUnidadNum === precioMinimo)
               .slice(0, 4);
+            
+            {{-- Si no hay ofertas con mejor precio, mostrar mensaje --}}
+            if (ofertasMejorPrecio.length === 0) {
+              if (gridContenedor) {
+                {{-- Ocultar todos los contenedores individuales --}}
+                for (let i = 1; i <= 4; i++) {
+                  const contenedor = document.getElementById(`mejor-oferta-contenedor-movil-${i}`);
+                  if (contenedor) {
+                    contenedor.style.display = 'none';
+                  }
+                }
+                {{-- Mostrar mensaje según si hay filtros aplicados --}}
+                let mensajeHtml = '';
+                if (filtroInteractuado) {
+                  mensajeHtml = `<div class='bg-red-100 border-l-4 border-red-500 text-red-800 p-6 rounded text-lg text-center mb-4'>No hay ofertas que coincidan con los filtros seleccionados.</div>`;
+                } else {
+                  mensajeHtml = `<div class='bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-6 rounded text-lg text-center mb-4'>No hay ofertas disponibles actualmente para este producto.</div>`;
+                }
+                gridContenedor.innerHTML = mensajeHtml;
+              }
+              return;
+            }
             
             {{-- Función para actualizar una oferta específica --}}
             function actualizarOferta(oferta, index) {
@@ -2866,7 +3276,7 @@
             
             const numColumnas = columnasData.length;
             const especificacionesOferta = oferta.especificaciones_internas || {};
-            const columnasOferta = especificacionesOferta._columnas || {};
+            const columnasOferta = especificacionesOferta._c || {}; // _c = ofuscado de _columnas
             
             let html = '';
             
@@ -3030,7 +3440,7 @@
               
               ofertasGrupo.forEach(oferta => {
                 const especificaciones = oferta.especificaciones_internas || {};
-                const columnasOferta = especificaciones._columnas || {};
+                const columnasOferta = especificaciones._c || {}; // _c = ofuscado de _columnas
                 const sublineaId = columnasOferta[linea.id];
                 
                 if (sublineaId) {
@@ -5725,7 +6135,95 @@ function _am1() {
   if (modal) {
     modal.classList.remove('hidden');
     document.body.style.overflow = 'hidden';
-    _am2();
+    
+    // Calcular altura máxima de todas las imágenes para fijar el tamaño del modal
+    const contenedorImagen = modal.querySelector('.flex-1.flex.items-center.justify-center.bg-gray-50');
+    if (contenedorImagen && !contenedorImagen.hasAttribute('data-height-calculated')) {
+      let maxHeight = 0;
+      let imagesLoaded = 0;
+      const totalImages = v1.length;
+      
+      // Calcular ancho máximo disponible (considerando miniaturas y padding)
+      const modalWidth = window.innerWidth * 0.9; // 90% del ancho de la ventana
+      const miniaturasWidth = 144; // 36 * 4 (w-36 = 144px)
+      const padding = 96; // padding izquierdo y derecho (3rem * 2 = 96px)
+      const maxWidth = modalWidth - miniaturasWidth - padding;
+      
+      // Función para procesar cuando todas las imágenes estén listas
+      const procesarAltura = function() {
+        if (imagesLoaded === totalImages) {
+          // Limitar altura máxima a 70vh para no exceder el viewport
+          const maxViewportHeight = window.innerHeight * 0.7;
+          const finalHeight = Math.min(Math.ceil(maxHeight) + 40, maxViewportHeight);
+          
+          contenedorImagen.style.minHeight = finalHeight + 'px';
+          contenedorImagen.style.height = finalHeight + 'px';
+          contenedorImagen.setAttribute('data-height-calculated', 'true');
+          
+          // Actualizar el modal después de establecer la altura
+          _am2();
+        }
+      };
+      
+      // Pre-cargar todas las imágenes para obtener sus dimensiones
+      v1.forEach((_, index) => {
+        const imgPath = v2[index] || v3[index] || '';
+        if (imgPath) {
+          const img = new Image();
+          
+          // Manejar tanto imágenes en caché como nuevas
+          const checkImage = function() {
+            if (img.complete && img.naturalHeight !== 0) {
+              // Imagen ya cargada (en caché)
+              calcularAltura();
+            } else {
+              // Esperar a que cargue
+              img.onload = calcularAltura;
+              img.onerror = function() {
+                imagesLoaded++;
+                procesarAltura();
+              };
+            }
+          };
+          
+          const calcularAltura = function() {
+            // Calcular altura considerando el ancho máximo disponible
+            const aspectRatio = img.width / img.height;
+            let calculatedHeight = img.height;
+            
+            // Si la imagen es más ancha que el espacio disponible, ajustar altura
+            if (img.width > maxWidth) {
+              calculatedHeight = maxWidth / aspectRatio;
+            }
+            
+            if (calculatedHeight > maxHeight) {
+              maxHeight = calculatedHeight;
+            }
+            
+            imagesLoaded++;
+            procesarAltura();
+          };
+          
+          img.src = `${v6}/${imgPath}`;
+          checkImage();
+        } else {
+          imagesLoaded++;
+          procesarAltura();
+        }
+      });
+      
+      // Si no hay imágenes, establecer altura por defecto
+      if (totalImages === 0) {
+        const defaultHeight = 500;
+        contenedorImagen.style.minHeight = defaultHeight + 'px';
+        contenedorImagen.style.height = defaultHeight + 'px';
+        contenedorImagen.setAttribute('data-height-calculated', 'true');
+        _am2();
+      }
+    } else {
+      // Si ya se calculó la altura, solo actualizar
+      _am2();
+    }
   }
 }
 
@@ -6308,13 +6806,6 @@ function _rm1() {
       miniatura.style.width = '96px';
       miniatura.style.height = '96px';
       miniatura.onclick = () => _si1(i);
-      // Cambiar imagen grande al pasar el ratón (solo en desktop)
-      miniatura.onmouseenter = () => {
-        if (i !== v17) {
-          v17 = i;
-          _am2();
-        }
-      };
       miniatura.innerHTML = `<img src="${v6}/${imgPath}" alt="Miniatura ${i + 1}">`;
       miniaturasDesktop.appendChild(miniatura);
     }
@@ -6460,7 +6951,7 @@ function _rod1() {
     
     const numColumnas = columnasDataModal.length;
     const especificacionesOferta = oferta.especificaciones_internas || {};
-    const columnasOferta = especificacionesOferta._columnas || {};
+    const columnasOferta = especificacionesOferta._c || {}; // _c = ofuscado de _columnas
     
     let html = '';
     
@@ -6810,7 +7301,7 @@ if (document.readyState === 'loading') {
             </button>
             
             {{-- Imagen grande --}}
-            <img id="imagen-grande-modal" src="" alt="Imagen del producto" class="max-w-full max-h-[60vh] object-contain">
+            <img id="imagen-grande-modal" src="" alt="Imagen del producto" class="max-w-full max-h-full object-contain" style="height: 100%;">
             
             {{-- Flecha derecha --}}
             <button id="btn-flecha-der" onclick="_ci1(1)" class="absolute right-0 top-1/2 transform -translate-y-1/2 bg-white rounded-full p-2 shadow-lg hover:bg-gray-100 transition-all z-10 opacity-50 hover:opacity-100 disabled:opacity-30 disabled:cursor-not-allowed">

@@ -2294,6 +2294,8 @@
             // Escuchar cambios en el valor del campo
             categoriaFinal.addEventListener('change', function() {
                 setTimeout(autoSeleccionarCategoriaPrincipal, 300);
+                // Auto-seleccionar categoría para especificaciones internas si no hay una seleccionada
+                autoSeleccionarCategoriaEspecificaciones();
             });
             
             // También observar cambios programáticos en el valor
@@ -2301,11 +2303,39 @@
                 mutations.forEach(function(mutation) {
                     if (mutation.type === 'attributes' && mutation.attributeName === 'value') {
                         setTimeout(autoSeleccionarCategoriaPrincipal, 300);
+                        // Auto-seleccionar categoría para especificaciones internas si no hay una seleccionada
+                        autoSeleccionarCategoriaEspecificaciones();
                     }
                 });
             });
             
             observer.observe(categoriaFinal, { attributes: true, attributeFilter: ['value'] });
+        }
+        
+        // Función para auto-seleccionar categoría para especificaciones internas
+        function autoSeleccionarCategoriaEspecificaciones() {
+            const categoriaEspecificacionesId = document.getElementById('categoria_especificaciones_id');
+            const categoriaEspecificacionesNombre = document.getElementById('categoria_especificaciones_nombre');
+            const categoriaFinal = document.getElementById('categoria-final');
+            
+            // Solo si no hay una categoría ya seleccionada para especificaciones internas
+            if (categoriaEspecificacionesId && !categoriaEspecificacionesId.value && categoriaFinal && categoriaFinal.value) {
+                // Buscar la categoría seleccionada
+                fetch(`/panel-privado/productos/buscar/categorias?q=`)
+                    .then(response => response.json())
+                    .then(categorias => {
+                        const categoriaSeleccionada = categorias.find(cat => cat.id == categoriaFinal.value);
+                        if (categoriaSeleccionada) {
+                            // Establecer la categoría en el campo de especificaciones internas
+                            categoriaEspecificacionesId.value = categoriaSeleccionada.id;
+                            categoriaEspecificacionesNombre.value = categoriaSeleccionada.nombre;
+                            
+                            // Cargar las especificaciones internas de esta categoría
+                            obtenerEspecificacionesInternas(categoriaSeleccionada.id);
+                        }
+                    })
+                    .catch(error => console.error('Error al auto-seleccionar categoría para especificaciones:', error));
+            }
         }
 
         // Limpiar campo si el usuario sale sin seleccionar
@@ -2638,10 +2668,17 @@
                     const imagenesSublinea = sublineaData && Array.isArray(sublineaData.img) ? sublineaData.img : [];
                     const numImagenes = imagenesSublinea.length;
                     
+                    // Leer texto alternativo guardado si existe
+                    const textoAlternativo = sublineaData && sublineaData.textoAlternativo ? sublineaData.textoAlternativo : '';
+                    
                     html += `<div class="flex items-center gap-3 p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700">`;
                     html += `<label class="flex items-center gap-2 cursor-pointer flex-1">`;
                     html += `<input type="checkbox" class="especificacion-checkbox rounded border-gray-300 text-green-600 focus:ring-green-500" data-principal-id="${idPrincipal}" data-sublinea-id="${idSublinea}" data-sublinea-texto="${textoSublinea.replace(/"/g, '&quot;')}" ${isChecked ? 'checked' : ''}>`;
                     html += `<span class="text-sm text-gray-700 dark:text-gray-300">${textoSublinea}</span>`;
+                    html += `</label>`;
+                    
+                    // Campo de texto alternativo (siempre se crea, pero solo se muestra si la línea principal está marcada como columna oferta)
+                    html += `<input type="text" class="texto-alternativo-sublinea-input flex-1 max-w-xs px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500" data-principal-id="${idPrincipal}" data-sublinea-id="${idSublinea}" placeholder="Texto alternativo (opcional)" value="${textoAlternativo.replace(/"/g, '&quot;')}" ${!isChecked ? 'disabled' : ''} style="display: ${esColumna ? 'block' : 'none'};">`;
                     
                     // Icono de ayuda "?" solo en la primera sublínea
                     if (esPrimeraSublinea) {
@@ -2654,11 +2691,9 @@
                         html += `</div>`;
                     }
                     
-                    html += `</label>`;
-                    
                     // Checkbox "Mostrar" con icono de ayuda (solo en la primera sublínea)
                     html += `<div class="flex items-center gap-1">`;
-                    html += `<label class="flex items-center gap-1 cursor-pointer" title="Mostrar en comparador">`;
+                    html += `<label class="flex items-center gap-1 ${isChecked ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}" title="Mostrar en comparador">`;
                     html += `<input type="checkbox" class="especificacion-mostrar-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500" data-principal-id="${idPrincipal}" data-sublinea-id="${idSublinea}" ${mostrarChecked ? 'checked' : ''} ${!isChecked ? 'disabled' : ''}>`;
                     html += `<span class="text-xs text-gray-600 dark:text-gray-400">Mostrar</span>`;
                     html += `</label>`;
@@ -2675,7 +2710,7 @@
                     
                     // Checkbox "Oferta" con icono de ayuda (solo en la primera sublínea)
                     html += `<div class="flex items-center gap-1">`;
-                    html += `<label class="flex items-center gap-1 cursor-pointer" title="Disponible para ofertas">`;
+                    html += `<label class="flex items-center gap-1 ${isChecked ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}" title="Disponible para ofertas">`;
                     html += `<input type="checkbox" class="especificacion-oferta-checkbox rounded border-gray-300 text-purple-600 focus:ring-purple-500" data-principal-id="${idPrincipal}" data-sublinea-id="${idSublinea}" ${ofertaChecked ? 'checked' : ''} ${!isChecked ? 'disabled' : ''}>`;
                     html += `<span class="text-xs text-gray-600 dark:text-gray-400">Oferta</span>`;
                     html += `</label>`;
@@ -2691,11 +2726,28 @@
                     html += `</div>`;
                     
                     // Botón de imágenes para la sublínea
+                    // Leer si está marcado como usar imágenes del producto
+                    const usarImagenesProducto = sublineaData && sublineaData.usarImagenesProducto === true;
                     html += `<div class="flex items-center gap-2">`;
                     if (numImagenes > 0) {
-                        html += `<button type="button" class="btn-ver-imagenes-sublinea text-xs px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors" data-principal-id="${idPrincipal}" data-sublinea-id="${idSublinea}" title="Ver ${numImagenes} imagen${numImagenes > 1 ? 'es' : ''}">${numImagenes} img</button>`;
+                        const btnVerDeshabilitado = !isChecked || usarImagenesProducto;
+                        html += `<button type="button" class="btn-ver-imagenes-sublinea text-xs px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors ${btnVerDeshabilitado ? 'opacity-50 cursor-not-allowed' : ''}" data-principal-id="${idPrincipal}" data-sublinea-id="${idSublinea}" title="Ver ${numImagenes} imagen${numImagenes > 1 ? 'es' : ''}" ${btnVerDeshabilitado ? 'disabled' : ''}>${numImagenes} img</button>`;
                     }
-                    html += `<button type="button" class="btn-añadir-imagen-sublinea text-xs px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded transition-colors" data-principal-id="${idPrincipal}" data-sublinea-id="${idSublinea}" title="Añadir imágenes">+imágenes</button>`;
+                    html += `<button type="button" class="btn-añadir-imagen-sublinea text-xs px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded transition-colors ${!isChecked || usarImagenesProducto ? 'opacity-50 cursor-not-allowed' : ''}" data-principal-id="${idPrincipal}" data-sublinea-id="${idSublinea}" title="Añadir imágenes" ${!isChecked || usarImagenesProducto ? 'disabled' : ''}>+imágenes</button>`;
+                    // Checkbox "Imag. Producto" con icono de ayuda
+                    html += `<div class="flex items-center gap-1">`;
+                    html += `<label class="flex items-center gap-1 ${isChecked ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}" title="Usar imágenes del producto">`;
+                    html += `<input type="checkbox" class="especificacion-usar-imagenes-producto-checkbox rounded border-gray-300 text-orange-600 focus:ring-orange-500" data-principal-id="${idPrincipal}" data-sublinea-id="${idSublinea}" ${usarImagenesProducto ? 'checked' : ''} ${!isChecked ? 'disabled' : ''}>`;
+                    html += `<span class="text-xs text-gray-600 dark:text-gray-400">Imag. Producto</span>`;
+                    html += `</label>`;
+                    html += `<div class="relative">`;
+                    html += `<button type="button" class="tooltip-btn text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-help focus:outline-none" aria-label="Ayuda" data-tooltip='Si marcamos este check, esta sublínea utilizará las imágenes del producto'>`;
+                    html += `<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">`;
+                    html += `<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path>`;
+                    html += `</svg>`;
+                    html += `</button>`;
+                    html += `</div>`;
+                    html += `</div>`;
                     html += `</div>`;
                     html += `</div>`;
                 });
@@ -2729,6 +2781,21 @@
                 }
                 
                 html += `</div>`;
+                
+                // Desplegable de formato de visualización (solo si hay sublíneas marcadas como "mostrar")
+                const formatoGuardado = (opcionesGuardadas._formatos && opcionesGuardadas._formatos[idPrincipal]) || 'texto';
+                html += `<div class="mt-3 formato-visualizacion-container" data-principal-id="${idPrincipal}" style="display: none;">`;
+                html += `<label class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">Formato de visualización:</label>`;
+                html += `<select class="formato-visualizacion-select w-full px-3 py-2 rounded bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-200 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" data-principal-id="${idPrincipal}">`;
+                html += `<option value="texto" ${formatoGuardado === 'texto' ? 'selected' : ''}>Texto</option>`;
+                html += `<option value="texto_precio" ${formatoGuardado === 'texto_precio' ? 'selected' : ''}>Texto y precio</option>`;
+                html += `<option value="imagen" ${formatoGuardado === 'imagen' ? 'selected' : ''}>Imagen</option>`;
+                html += `<option value="imagen_texto" ${formatoGuardado === 'imagen_texto' ? 'selected' : ''}>Imagen y texto</option>`;
+                html += `<option value="imagen_precio" ${formatoGuardado === 'imagen_precio' ? 'selected' : ''}>Imagen y precio</option>`;
+                html += `</select>`;
+                html += `<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Selecciona cómo se mostrarán las sublíneas marcadas como "Mostrar" en la vista del comparador</p>`;
+                html += `</div>`;
+                
                 html += `</div>`;
             });
             
@@ -2744,6 +2811,17 @@
             if (esUnidadUnica) {
                 const columnaCheckboxes = contenedor.querySelectorAll('.columna-oferta-checkbox');
                 columnaCheckboxes.forEach(checkbox => {
+                    // Mostrar campos de texto alternativo si ya está marcado al cargar
+                    if (checkbox.checked) {
+                        const principalId = checkbox.dataset.principalId;
+                        const camposTextoAlternativo = contenedor.querySelectorAll(`.texto-alternativo-sublinea-input[data-principal-id="${principalId}"]`);
+                        camposTextoAlternativo.forEach(campo => {
+                            campo.style.display = 'block';
+                            const sublineaCheckbox = contenedor.querySelector(`.especificacion-checkbox[data-principal-id="${principalId}"][data-sublinea-id="${campo.dataset.sublineaId}"]`);
+                            campo.disabled = !sublineaCheckbox || !sublineaCheckbox.checked;
+                        });
+                    }
+                    
                     checkbox.addEventListener('change', function() {
                         const columnasMarcadas = Array.from(contenedor.querySelectorAll('.columna-oferta-checkbox:checked'));
                         if (columnasMarcadas.length > 4) {
@@ -2751,38 +2829,137 @@
                             alert('Solo se pueden marcar hasta 4 líneas principales como columna oferta.');
                             return;
                         }
+                        
+                        // Mostrar/ocultar campos de texto alternativo para las sublíneas de esta línea principal
+                        const principalId = this.dataset.principalId;
+                        const camposTextoAlternativo = contenedor.querySelectorAll(`.texto-alternativo-sublinea-input[data-principal-id="${principalId}"]`);
+                        camposTextoAlternativo.forEach(campo => {
+                            if (this.checked) {
+                                campo.style.display = 'block';
+                                // Habilitar el campo solo si la sublínea está marcada
+                                const sublineaCheckbox = contenedor.querySelector(`.especificacion-checkbox[data-principal-id="${principalId}"][data-sublinea-id="${campo.dataset.sublineaId}"]`);
+                                campo.disabled = !sublineaCheckbox || !sublineaCheckbox.checked;
+                            } else {
+                                campo.style.display = 'none';
+                            }
+                        });
                         actualizarEspecificacionesElegidas();
                     });
                 });
             }
             
+            // Añadir event listeners a los campos de texto alternativo para actualizar cuando cambien
+            const camposTextoAlternativo = contenedor.querySelectorAll('.texto-alternativo-sublinea-input');
+            camposTextoAlternativo.forEach(campo => {
+                campo.addEventListener('input', function() {
+                    actualizarEspecificacionesElegidas();
+                });
+            });
+            
             // Añadir event listeners a los checkboxes principales
             const checkboxes = contenedor.querySelectorAll('.especificacion-checkbox');
             checkboxes.forEach(checkbox => {
                 checkbox.addEventListener('change', function() {
-                    // Habilitar/deshabilitar checkboxes de "Mostrar" y "Oferta"
+                    // Habilitar/deshabilitar checkboxes de "Mostrar", "Oferta" y "Imag. Producto"
                     const principalId = this.dataset.principalId;
                     const sublineaId = this.dataset.sublineaId;
                     const mostrarCheckbox = contenedor.querySelector(`.especificacion-mostrar-checkbox[data-principal-id="${principalId}"][data-sublinea-id="${sublineaId}"]`);
                     const ofertaCheckbox = contenedor.querySelector(`.especificacion-oferta-checkbox[data-principal-id="${principalId}"][data-sublinea-id="${sublineaId}"]`);
+                    const usarImagenesProductoCheckbox = contenedor.querySelector(`.especificacion-usar-imagenes-producto-checkbox[data-principal-id="${principalId}"][data-sublinea-id="${sublineaId}"]`);
                     
-                    if (mostrarCheckbox) mostrarCheckbox.disabled = !this.checked;
-                    if (ofertaCheckbox) ofertaCheckbox.disabled = !this.checked;
+                    if (mostrarCheckbox) {
+                        mostrarCheckbox.disabled = !this.checked;
+                        // Actualizar estilos visuales
+                        const mostrarLabel = mostrarCheckbox.closest('label');
+                        if (mostrarLabel) {
+                            if (this.checked) {
+                                mostrarLabel.classList.remove('opacity-50', 'cursor-not-allowed');
+                                mostrarLabel.classList.add('cursor-pointer');
+                            } else {
+                                mostrarLabel.classList.remove('cursor-pointer');
+                                mostrarLabel.classList.add('opacity-50', 'cursor-not-allowed');
+                            }
+                        }
+                    }
+                    if (ofertaCheckbox) {
+                        ofertaCheckbox.disabled = !this.checked;
+                        // Actualizar estilos visuales
+                        const ofertaLabel = ofertaCheckbox.closest('label');
+                        if (ofertaLabel) {
+                            if (this.checked) {
+                                ofertaLabel.classList.remove('opacity-50', 'cursor-not-allowed');
+                                ofertaLabel.classList.add('cursor-pointer');
+                            } else {
+                                ofertaLabel.classList.remove('cursor-pointer');
+                                ofertaLabel.classList.add('opacity-50', 'cursor-not-allowed');
+                            }
+                        }
+                    }
+                    if (usarImagenesProductoCheckbox) {
+                        usarImagenesProductoCheckbox.disabled = !this.checked;
+                        // Actualizar estilos visuales
+                        const imagProductoLabel = usarImagenesProductoCheckbox.closest('label');
+                        if (imagProductoLabel) {
+                            if (this.checked) {
+                                imagProductoLabel.classList.remove('opacity-50', 'cursor-not-allowed');
+                                imagProductoLabel.classList.add('cursor-pointer');
+                            } else {
+                                imagProductoLabel.classList.remove('cursor-pointer');
+                                imagProductoLabel.classList.add('opacity-50', 'cursor-not-allowed');
+                            }
+                        }
+                    }
                     
-                    // Si se desmarca, desmarcar también "Mostrar" y "Oferta"
+                    // Actualizar botones de imágenes
+                    const btnVerImagen = contenedor.querySelector(`.btn-ver-imagenes-sublinea[data-principal-id="${principalId}"][data-sublinea-id="${sublineaId}"]`);
+                    const btnAñadirImagen = contenedor.querySelector(`.btn-añadir-imagen-sublinea[data-principal-id="${principalId}"][data-sublinea-id="${sublineaId}"]`);
+                    
+                    // Verificar si "Imag. Producto" está marcado (si está marcado, los botones deben estar deshabilitados)
+                    const usarImagenesProducto = usarImagenesProductoCheckbox && usarImagenesProductoCheckbox.checked;
+                    const debenEstarDeshabilitados = !this.checked || usarImagenesProducto;
+                    
+                    if (btnVerImagen) {
+                        btnVerImagen.disabled = debenEstarDeshabilitados;
+                        if (debenEstarDeshabilitados) {
+                            btnVerImagen.classList.add('opacity-50', 'cursor-not-allowed');
+                        } else {
+                            btnVerImagen.classList.remove('opacity-50', 'cursor-not-allowed');
+                        }
+                    }
+                    if (btnAñadirImagen) {
+                        btnAñadirImagen.disabled = debenEstarDeshabilitados;
+                        if (debenEstarDeshabilitados) {
+                            btnAñadirImagen.classList.add('opacity-50', 'cursor-not-allowed');
+                        } else {
+                            btnAñadirImagen.classList.remove('opacity-50', 'cursor-not-allowed');
+                        }
+                    }
+                    
+                    // Si se desmarca, desmarcar también "Mostrar", "Oferta" y "Usar imágenes del producto"
                     if (!this.checked) {
                         if (mostrarCheckbox) mostrarCheckbox.checked = false;
                         if (ofertaCheckbox) ofertaCheckbox.checked = false;
+                        if (usarImagenesProductoCheckbox) usarImagenesProductoCheckbox.checked = false;
+                    }
+                    
+                    // Habilitar/deshabilitar campo de texto alternativo si existe
+                    const textoAlternativoInput = contenedor.querySelector(`.texto-alternativo-sublinea-input[data-principal-id="${principalId}"][data-sublinea-id="${sublineaId}"]`);
+                    if (textoAlternativoInput) {
+                        textoAlternativoInput.disabled = !this.checked;
                     }
                     
                     actualizarEspecificacionesElegidas();
+                    actualizarVisibilidadFormatoVisualizacion(contenedor);
                 });
             });
             
             // Añadir event listeners a los checkboxes de "Mostrar", "Oferta" y "Columna"
             const mostrarCheckboxes = contenedor.querySelectorAll('.especificacion-mostrar-checkbox');
             mostrarCheckboxes.forEach(checkbox => {
-                checkbox.addEventListener('change', actualizarEspecificacionesElegidas);
+                checkbox.addEventListener('change', function() {
+                    actualizarEspecificacionesElegidas();
+                    actualizarVisibilidadFormatoVisualizacion(contenedor);
+                });
             });
             
             const ofertaCheckboxes = contenedor.querySelectorAll('.especificacion-oferta-checkbox');
@@ -2790,11 +2967,68 @@
                 checkbox.addEventListener('change', actualizarEspecificacionesElegidas);
             });
             
+            // Añadir event listeners a los checkboxes de "Usar imágenes del producto"
+            const usarImagenesProductoCheckboxes = contenedor.querySelectorAll('.especificacion-usar-imagenes-producto-checkbox');
+            usarImagenesProductoCheckboxes.forEach(checkbox => {
+                checkbox.addEventListener('change', function() {
+                    const principalId = this.dataset.principalId;
+                    const sublineaId = this.dataset.sublineaId;
+                    
+                    // Si se marca "usar imágenes del producto", deshabilitar botones de imágenes
+                    if (this.checked) {
+                        const btnVer = contenedor.querySelector(`.btn-ver-imagenes-sublinea[data-principal-id="${principalId}"][data-sublinea-id="${sublineaId}"]`);
+                        const btnAñadir = contenedor.querySelector(`.btn-añadir-imagen-sublinea[data-principal-id="${principalId}"][data-sublinea-id="${sublineaId}"]`);
+                        if (btnVer) {
+                            btnVer.disabled = true;
+                            btnVer.classList.add('opacity-50', 'cursor-not-allowed');
+                        }
+                        if (btnAñadir) {
+                            btnAñadir.disabled = true;
+                            btnAñadir.classList.add('opacity-50', 'cursor-not-allowed');
+                        }
+                    } else {
+                        // Verificar si el checkbox principal está marcado antes de habilitar
+                        const sublineaCheckbox = contenedor.querySelector(`.especificacion-checkbox[data-principal-id="${principalId}"][data-sublinea-id="${sublineaId}"]`);
+                        const estaMarcada = sublineaCheckbox && sublineaCheckbox.checked;
+                        
+                        const btnVer = contenedor.querySelector(`.btn-ver-imagenes-sublinea[data-principal-id="${principalId}"][data-sublinea-id="${sublineaId}"]`);
+                        const btnAñadir = contenedor.querySelector(`.btn-añadir-imagen-sublinea[data-principal-id="${principalId}"][data-sublinea-id="${sublineaId}"]`);
+                        if (btnVer) {
+                            btnVer.disabled = !estaMarcada;
+                            if (estaMarcada) {
+                                btnVer.classList.remove('opacity-50', 'cursor-not-allowed');
+                            } else {
+                                btnVer.classList.add('opacity-50', 'cursor-not-allowed');
+                            }
+                        }
+                        if (btnAñadir) {
+                            btnAñadir.disabled = !estaMarcada;
+                            if (estaMarcada) {
+                                btnAñadir.classList.remove('opacity-50', 'cursor-not-allowed');
+                            } else {
+                                btnAñadir.classList.add('opacity-50', 'cursor-not-allowed');
+                            }
+                        }
+                    }
+                    
+                    actualizarEspecificacionesElegidas();
+                });
+            });
+            
+            // Añadir event listeners a los desplegables de formato de visualización
+            const formatoSelects = contenedor.querySelectorAll('.formato-visualizacion-select');
+            formatoSelects.forEach(select => {
+                select.addEventListener('change', actualizarEspecificacionesElegidas);
+            });
+            
             // Configurar tooltips con click
             configurarTooltips(contenedor);
             
             // Configurar event listeners para botones de imágenes de sublíneas
             configurarBotonesImagenesSublineas(contenedor);
+            
+            // Actualizar visibilidad de los desplegables de formato
+            actualizarVisibilidadFormatoVisualizacion(contenedor);
             
             // Actualizar JSON inicial
             actualizarEspecificacionesElegidas();
@@ -2983,6 +3217,28 @@
         }
 
         // Función para actualizar el JSON de especificaciones elegidas
+        // Función para actualizar la visibilidad del desplegable de formato de visualización
+        function actualizarVisibilidadFormatoVisualizacion(contenedor) {
+            const contenedorPrincipal = contenedor || document.querySelector('#especificaciones-principales-container');
+            if (!contenedorPrincipal) return;
+            
+            const lineasPrincipales = contenedorPrincipal.querySelectorAll('.linea-principal-especificaciones');
+            
+            lineasPrincipales.forEach(linea => {
+                const principalId = linea.dataset.principalId;
+                const formatoContainer = linea.querySelector(`.formato-visualizacion-container[data-principal-id="${principalId}"]`);
+                
+                if (!formatoContainer) return;
+                
+                // Verificar si hay sublíneas marcadas como "mostrar"
+                const mostrarCheckboxes = linea.querySelectorAll(`.especificacion-mostrar-checkbox[data-principal-id="${principalId}"]:checked`);
+                const tieneSublineasMarcadasComoMostrar = mostrarCheckboxes.length > 0;
+                
+                // Mostrar/ocultar el desplegable
+                formatoContainer.style.display = tieneSublineasMarcadasComoMostrar ? 'block' : 'none';
+            });
+        }
+        
         function actualizarEspecificacionesElegidas() {
             const inputHidden = document.getElementById('categoria_especificaciones_internas_elegidas_input');
             const checkboxes = document.querySelectorAll('.especificacion-checkbox');
@@ -3002,6 +3258,9 @@
             const unidadDeMedidaSelect = document.getElementById('unidadDeMedida');
             const esUnidadUnica = unidadDeMedidaSelect && unidadDeMedidaSelect.value === 'unidadUnica';
             
+            // Inicializar _formatos preservando los formatos guardados
+            especificaciones._formatos = especificacionesGuardadas._formatos || {};
+            
             checkboxes.forEach(checkbox => {
                 if (!checkbox.checked) return;
                 
@@ -3012,13 +3271,17 @@
                     especificaciones[principalId] = [];
                 }
                 
-                // Obtener estado de "Mostrar", "Oferta" y "Columna"
+                // Obtener estado de "Mostrar", "Oferta", "Columna" y "Usar imágenes del producto"
                 const mostrarCheckbox = document.querySelector(`.especificacion-mostrar-checkbox[data-principal-id="${principalId}"][data-sublinea-id="${sublineaId}"]`);
                 const ofertaCheckbox = document.querySelector(`.especificacion-oferta-checkbox[data-principal-id="${principalId}"][data-sublinea-id="${sublineaId}"]`);
                 const columnaCheckbox = document.querySelector(`.columna-sublinea-checkbox[data-principal-id="${principalId}"][data-sublinea-id="${sublineaId}"]`);
+                const usarImagenesProductoCheckbox = document.querySelector(`.especificacion-usar-imagenes-producto-checkbox[data-principal-id="${principalId}"][data-sublinea-id="${sublineaId}"]`);
+                const textoAlternativoInput = document.querySelector(`.texto-alternativo-sublinea-input[data-principal-id="${principalId}"][data-sublinea-id="${sublineaId}"]`);
                 
                 const mostrar = mostrarCheckbox ? mostrarCheckbox.checked : false;
                 const oferta = ofertaCheckbox ? ofertaCheckbox.checked : false;
+                const usarImagenesProducto = usarImagenesProductoCheckbox ? usarImagenesProductoCheckbox.checked : false;
+                const textoAlternativo = textoAlternativoInput ? textoAlternativoInput.value.trim() : '';
                 
                 // Leer imágenes guardadas de esta sublínea
                 let imagenesSublinea = [];
@@ -3040,10 +3303,33 @@
                 const item = { id: sublineaId };
                 if (mostrar) item.m = 1; // 'm' = mostrar (optimizado)
                 if (oferta) item.o = 1; // 'o' = oferta (optimizado)
-                if (imagenesSublinea.length > 0) item.img = imagenesSublinea; // 'img' = imágenes (array)
+                if (usarImagenesProducto) item.usarImagenesProducto = true; // Usar imágenes del producto
+                // Solo guardar imágenes si no se está usando las del producto
+                if (!usarImagenesProducto && imagenesSublinea.length > 0) item.img = imagenesSublinea; // 'img' = imágenes (array)
+                // Guardar texto alternativo si existe (solo para líneas marcadas como columna oferta)
+                if (textoAlternativo) item.textoAlternativo = textoAlternativo;
                 
                 especificaciones[principalId].push(item);
             });
+            
+            // Guardar formato de visualización para cada línea principal
+            if (!especificaciones._formatos) {
+                especificaciones._formatos = {};
+            }
+            
+            const contenedorPrincipal = document.querySelector('#especificaciones-principales-container');
+            if (contenedorPrincipal) {
+                const lineasPrincipales = contenedorPrincipal.querySelectorAll('.linea-principal-especificaciones');
+                lineasPrincipales.forEach(linea => {
+                    const principalId = linea.dataset.principalId;
+                    const formatoSelect = linea.querySelector(`.formato-visualizacion-select[data-principal-id="${principalId}"]`);
+                    
+                    if (formatoSelect) {
+                        // Guardar el formato en el objeto _formatos
+                        especificaciones._formatos[principalId] = formatoSelect.value;
+                    }
+                });
+            }
             
             // Limpiar arrays vacíos
             Object.keys(especificaciones).forEach(key => {
@@ -3070,6 +3356,28 @@
             
             // Actualizar los chips visuales
             actualizarChipsSeleccionados();
+        }
+        
+        // Función para actualizar la visibilidad del desplegable de formato de visualización
+        function actualizarVisibilidadFormatoVisualizacion(contenedor) {
+            const contenedorPrincipal = contenedor || document.querySelector('#especificaciones-principales-container');
+            if (!contenedorPrincipal) return;
+            
+            const lineasPrincipales = contenedorPrincipal.querySelectorAll('.linea-principal-especificaciones');
+            
+            lineasPrincipales.forEach(linea => {
+                const principalId = linea.dataset.principalId;
+                const formatoContainer = linea.querySelector(`.formato-visualizacion-container[data-principal-id="${principalId}"]`);
+                
+                if (!formatoContainer) return;
+                
+                // Verificar si hay sublíneas marcadas como "mostrar"
+                const mostrarCheckboxes = linea.querySelectorAll(`.especificacion-mostrar-checkbox[data-principal-id="${principalId}"]:checked`);
+                const tieneSublineasMarcadasComoMostrar = mostrarCheckboxes.length > 0;
+                
+                // Mostrar/ocultar el desplegable
+                formatoContainer.style.display = tieneSublineasMarcadasComoMostrar ? 'block' : 'none';
+            });
         }
 
         // Variables globales para gestión de imágenes de sublíneas
@@ -4112,14 +4420,22 @@ REGLAS IMPORTANTES:
                     });
 
                     if (!response.ok) {
-                        throw new Error(`Error HTTP: ${response.status}`);
+                        const errorData = await response.json().catch(() => ({}));
+                        console.error('Error HTTP:', response.status);
+                        console.error('Datos del error:', errorData);
+                        throw new Error(errorData.error || `Error HTTP: ${response.status}`);
                     }
 
                     progresoTexto.textContent = 'Procesando respuesta de ChatGPT...';
 
                     const data = await response.json();
+                    console.log('Respuesta recibida:', data);
 
                     if (data.error) {
+                        console.error('Error en respuesta:', data);
+                        if (data.debug) {
+                            console.error('Debug info:', data.debug);
+                        }
                         throw new Error(data.error);
                     }
 
@@ -4197,7 +4513,9 @@ REGLAS IMPORTANTES:
                     progresoTexto.className = 'text-green-600 dark:text-green-400';
 
                 } catch (error) {
-                    console.error('Error:', error);
+                    console.error('Error completo:', error);
+                    console.error('Mensaje:', error.message);
+                    console.error('Stack:', error.stack);
                     progresoTexto.textContent = `Error: ${error.message}`;
                     progresoTexto.className = 'text-red-600 dark:text-red-400';
                 } finally {

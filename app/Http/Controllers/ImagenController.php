@@ -29,13 +29,151 @@ class ImagenController extends Controller
                 ], 400);
             }
 
+            // Verificar que la extensión GD esté disponible
+            if (!function_exists('imagecreatefromstring')) {
+                \Log::error('GD extension not available');
+                return response()->json([
+                    'success' => false,
+                    'message' => 'La extensión GD de PHP no está disponible.'
+                ], 500);
+            }
+
+            // Verificar soporte para WebP
+            if (!function_exists('imagewebp')) {
+                \Log::error('GD WebP support not available');
+                return response()->json([
+                    'success' => false,
+                    'message' => 'La extensión GD no soporta WebP.'
+                ], 500);
+            }
+
             $extension = $imagen->getClientOriginalExtension();
-            $nombreArchivo = Str::slug(pathinfo($imagen->getClientOriginalName(), PATHINFO_FILENAME)) . '_' . time() . '.' . $extension;
+            $nombreBase = Str::slug(pathinfo($imagen->getClientOriginalName(), PATHINFO_FILENAME)) . '_' . time();
+            $nombreArchivo = $nombreBase . '.webp';
 
-            // Guardar usando el disco web_images
-            Storage::disk('web_images')->putFileAs($carpeta, $imagen, $nombreArchivo);
+            // Leer la imagen
+            $imagenPath = $imagen->getRealPath();
+            $imagenData = file_get_contents($imagenPath);
+            
+            if ($imagenData === false) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se pudo leer el archivo de imagen'
+                ], 400);
+            }
 
+            $sourceImage = @imagecreatefromstring($imagenData);
+            if (!$sourceImage) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se pudo procesar la imagen. Verifica que sea un formato válido.'
+                ], 400);
+            }
+
+            // Obtener dimensiones de la imagen
+            $anchoOriginal = imagesx($sourceImage);
+            $altoOriginal = imagesy($sourceImage);
+
+            if ($anchoOriginal === false || $altoOriginal === false) {
+                imagedestroy($sourceImage);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se pudieron obtener las dimensiones de la imagen'
+                ], 500);
+            }
+
+            // Asegurar que el directorio existe
+            if (!Storage::disk('web_images')->exists($carpeta)) {
+                Storage::disk('web_images')->makeDirectory($carpeta);
+            }
+
+            // Guardar imagen original en WebP
             $rutaRelativa = $carpeta . '/' . $nombreArchivo;
+            $rutaCompleta = Storage::disk('web_images')->path($rutaRelativa);
+            $directorio = dirname($rutaCompleta);
+            if (!is_dir($directorio)) {
+                mkdir($directorio, 0755, true);
+            }
+
+            // Redimensionar a tamaño razonable si es muy grande (máximo 300x250)
+            $anchoMaximo = 300;
+            $altoMaximo = 250;
+            $ratioOriginal = $anchoOriginal / $altoOriginal;
+            
+            if ($anchoOriginal > $anchoMaximo || $altoOriginal > $altoMaximo) {
+                if ($ratioOriginal > ($anchoMaximo / $altoMaximo)) {
+                    $anchoFinal = $anchoMaximo;
+                    $altoFinal = (int)($anchoMaximo / $ratioOriginal);
+                } else {
+                    $altoFinal = $altoMaximo;
+                    $anchoFinal = (int)($altoMaximo * $ratioOriginal);
+                }
+            } else {
+                $anchoFinal = $anchoOriginal;
+                $altoFinal = $altoOriginal;
+            }
+
+            $imagenFinal = @imagecreatetruecolor($anchoFinal, $altoFinal);
+            if (!$imagenFinal) {
+                imagedestroy($sourceImage);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Error al crear la imagen redimensionada'
+                ], 500);
+            }
+
+            imagealphablending($imagenFinal, false);
+            imagesavealpha($imagenFinal, true);
+            imagecopyresampled($imagenFinal, $sourceImage, 0, 0, 0, 0, $anchoFinal, $altoFinal, $anchoOriginal, $altoOriginal);
+
+            if (!@imagewebp($imagenFinal, $rutaCompleta, 90)) {
+                imagedestroy($imagenFinal);
+                imagedestroy($sourceImage);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Error al guardar la imagen'
+                ], 500);
+            }
+            imagedestroy($imagenFinal);
+
+            // Crear thumbnail (144x120)
+            $nombreThumbnail = $nombreBase . '-thumbnail.webp';
+            $rutaThumbnail = $carpeta . '/' . $nombreThumbnail;
+            $rutaCompletaThumbnail = Storage::disk('web_images')->path($rutaThumbnail);
+
+            $anchoThumbnail = 144;
+            $altoThumbnail = 120;
+            
+            if ($ratioOriginal > ($anchoThumbnail / $altoThumbnail)) {
+                $altoThumbnail = (int)($anchoThumbnail / $ratioOriginal);
+            } else {
+                $anchoThumbnail = (int)($altoThumbnail * $ratioOriginal);
+            }
+
+            $imagenThumbnail = @imagecreatetruecolor($anchoThumbnail, $altoThumbnail);
+            if (!$imagenThumbnail) {
+                imagedestroy($sourceImage);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Error al crear el thumbnail'
+                ], 500);
+            }
+
+            imagealphablending($imagenThumbnail, false);
+            imagesavealpha($imagenThumbnail, true);
+            imagecopyresampled($imagenThumbnail, $sourceImage, 0, 0, 0, 0, $anchoThumbnail, $altoThumbnail, $anchoOriginal, $altoOriginal);
+
+            if (!@imagewebp($imagenThumbnail, $rutaCompletaThumbnail, 90)) {
+                imagedestroy($imagenThumbnail);
+                imagedestroy($sourceImage);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Error al guardar el thumbnail'
+                ], 500);
+            }
+            imagedestroy($imagenThumbnail);
+            imagedestroy($sourceImage);
+
             $url = Storage::disk('web_images')->url($rutaRelativa);
 
             return response()->json([
@@ -45,12 +183,13 @@ class ImagenController extends Controller
                     'ruta' => $rutaRelativa,
                     'ruta_relativa' => $rutaRelativa,
                     'url' => $url,
-                    'tamaño' => $imagen->getSize(),
-                    'tipo' => $imagen->getMimeType()
+                    'tamaño' => filesize($rutaCompleta),
+                    'tipo' => 'image/webp'
                 ],
                 'message' => 'Imagen subida correctamente'
             ]);
         } catch (\Exception $e) {
+            \Log::error('Error en subir: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Error al subir la imagen: ' . $e->getMessage()
@@ -341,6 +480,24 @@ class ImagenController extends Controller
                 ], 400);
             }
 
+            // Verificar que la extensión GD esté disponible
+            if (!function_exists('imagecreatefromstring')) {
+                \Log::error('GD extension not available');
+                return response()->json([
+                    'success' => false,
+                    'message' => 'La extensión GD de PHP no está disponible.'
+                ], 500);
+            }
+
+            // Verificar soporte para WebP
+            if (!function_exists('imagewebp')) {
+                \Log::error('GD WebP support not available');
+                return response()->json([
+                    'success' => false,
+                    'message' => 'La extensión GD no soporta WebP.'
+                ], 500);
+            }
+
             // Obtener el nombre del archivo del request
             $nombreArchivo = $imagen->getClientOriginalName();
             
@@ -349,15 +506,104 @@ class ImagenController extends Controller
                 $nombreArchivo = 'imagen_' . time() . '.webp';
             }
 
+            // Extraer nombre base (sin extensión)
+            $nombreBase = pathinfo($nombreArchivo, PATHINFO_FILENAME);
+            // Asegurar que termina en .webp
+            if (!str_ends_with($nombreArchivo, '.webp')) {
+                $nombreArchivo = $nombreBase . '.webp';
+            }
+
+            // Leer la imagen
+            $imagenPath = $imagen->getRealPath();
+            $imagenData = file_get_contents($imagenPath);
+            
+            if ($imagenData === false) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se pudo leer el archivo de imagen'
+                ], 400);
+            }
+
+            $sourceImage = @imagecreatefromstring($imagenData);
+            if (!$sourceImage) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se pudo procesar la imagen. Verifica que sea un formato válido.'
+                ], 400);
+            }
+
+            // Obtener dimensiones de la imagen
+            $anchoOriginal = imagesx($sourceImage);
+            $altoOriginal = imagesy($sourceImage);
+
+            if ($anchoOriginal === false || $altoOriginal === false) {
+                imagedestroy($sourceImage);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se pudieron obtener las dimensiones de la imagen'
+                ], 500);
+            }
+
             // Asegurar que el directorio existe
             if (!Storage::disk('web_images')->exists($carpeta)) {
                 Storage::disk('web_images')->makeDirectory($carpeta);
             }
 
-            // Guardar usando el disco web_images
-            Storage::disk('web_images')->putFileAs($carpeta, $imagen, $nombreArchivo);
-
+            // Guardar imagen original
             $rutaRelativa = $carpeta . '/' . $nombreArchivo;
+            $rutaCompleta = Storage::disk('web_images')->path($rutaRelativa);
+            $directorio = dirname($rutaCompleta);
+            if (!is_dir($directorio)) {
+                mkdir($directorio, 0755, true);
+            }
+
+            if (!@imagewebp($sourceImage, $rutaCompleta, 90)) {
+                imagedestroy($sourceImage);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Error al guardar la imagen'
+                ], 500);
+            }
+
+            // Crear thumbnail (144x120)
+            $nombreThumbnail = $nombreBase . '-thumbnail.webp';
+            $rutaThumbnail = $carpeta . '/' . $nombreThumbnail;
+            $rutaCompletaThumbnail = Storage::disk('web_images')->path($rutaThumbnail);
+
+            $anchoThumbnail = 144;
+            $altoThumbnail = 120;
+            $ratioOriginal = $anchoOriginal / $altoOriginal;
+            
+            if ($ratioOriginal > ($anchoThumbnail / $altoThumbnail)) {
+                $altoThumbnail = (int)($anchoThumbnail / $ratioOriginal);
+            } else {
+                $anchoThumbnail = (int)($altoThumbnail * $ratioOriginal);
+            }
+
+            $imagenThumbnail = @imagecreatetruecolor($anchoThumbnail, $altoThumbnail);
+            if (!$imagenThumbnail) {
+                imagedestroy($sourceImage);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Error al crear el thumbnail'
+                ], 500);
+            }
+
+            imagealphablending($imagenThumbnail, false);
+            imagesavealpha($imagenThumbnail, true);
+            imagecopyresampled($imagenThumbnail, $sourceImage, 0, 0, 0, 0, $anchoThumbnail, $altoThumbnail, $anchoOriginal, $altoOriginal);
+
+            if (!@imagewebp($imagenThumbnail, $rutaCompletaThumbnail, 90)) {
+                imagedestroy($imagenThumbnail);
+                imagedestroy($sourceImage);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Error al guardar el thumbnail'
+                ], 500);
+            }
+            imagedestroy($imagenThumbnail);
+            imagedestroy($sourceImage);
+
             $url = Storage::disk('web_images')->url($rutaRelativa);
 
             return response()->json([
@@ -367,8 +613,8 @@ class ImagenController extends Controller
                     'ruta' => $rutaRelativa,
                     'ruta_relativa' => $rutaRelativa,
                     'url' => $url,
-                    'tamaño' => $imagen->getSize(),
-                    'tipo' => $imagen->getMimeType()
+                    'tamaño' => filesize($rutaCompleta),
+                    'tipo' => 'image/webp'
                 ],
                 'message' => 'Imagen subida correctamente'
             ]);
