@@ -2676,8 +2676,9 @@
                     
                     const isChecked = sublineaData !== null && sublineaData !== undefined;
                     // Leer flags optimizados: 'm' = mostrar, 'o' = oferta
-                    const mostrarChecked = sublineaData && (sublineaData.m === 1 || sublineaData.mostrar === true);
-                    const ofertaChecked = sublineaData && (sublineaData.o === 1 || sublineaData.oferta === true);
+                    // Comparación flexible para manejar números y strings
+                    const mostrarChecked = sublineaData && (sublineaData.m === 1 || sublineaData.m === '1' || sublineaData.mostrar === true);
+                    const ofertaChecked = sublineaData && (sublineaData.o === 1 || sublineaData.o === '1' || sublineaData.oferta === true);
                     // Leer imágenes de la sublínea
                     const imagenesSublinea = sublineaData && Array.isArray(sublineaData.img) ? sublineaData.img : [];
                     const numImagenes = imagenesSublinea.length;
@@ -2806,6 +2807,7 @@
                 html += `<option value="imagen" ${formatoGuardado === 'imagen' ? 'selected' : ''}>Imagen</option>`;
                 html += `<option value="imagen_texto" ${formatoGuardado === 'imagen_texto' ? 'selected' : ''}>Imagen y texto</option>`;
                 html += `<option value="imagen_precio" ${formatoGuardado === 'imagen_precio' ? 'selected' : ''}>Imagen y precio</option>`;
+                html += `<option value="imagen_texto_precio" ${formatoGuardado === 'imagen_texto_precio' ? 'selected' : ''}>Imagen, texto y precio</option>`;
                 html += `</select>`;
                 html += `<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Selecciona cómo se mostrarán las sublíneas marcadas como "Mostrar" en la vista del comparador</p>`;
                 html += `</div>`;
@@ -3808,12 +3810,22 @@
             select.innerHTML = '';
             select.appendChild(primeraOpcion);
             
+            let carpetaProductoExiste = false;
             carpetas.forEach(carpeta => {
                 const option = document.createElement('option');
                 option.value = carpeta;
                 option.textContent = carpeta.charAt(0).toUpperCase() + carpeta.slice(1);
                 select.appendChild(option);
+                // Verificar si existe la carpeta "producto" (case insensitive)
+                if (carpeta.toLowerCase() === 'producto') {
+                    carpetaProductoExiste = true;
+                }
             });
+            
+            // Si existe la carpeta "producto", seleccionarla por defecto
+            if (carpetaProductoExiste) {
+                select.value = 'producto';
+            }
         }
         
         // Función para actualizar los chips de opciones seleccionadas
@@ -4168,7 +4180,11 @@
                         if (dataGrande.success && dataPequena.success) {
                             // Guardar solo la ruta de la imagen grande en las sublíneas
                             añadirImagenASublinea(dataGrande.data.ruta_relativa);
-                            cerrarModalAñadirImagenSublinea();
+                            // Limpiar el modal y volver a abrirlo
+                            limpiarModalAñadirSublinea();
+                            // Mantener el modal abierto y recargar carpetas
+                            cargarCarpetasModalSublinea();
+                            cambiarTabModalSublinea('subir');
                         } else {
                             throw new Error(dataGrande.message || dataPequena.message || 'Error al subir');
                         }
@@ -4350,7 +4366,11 @@
                 if (dataGrande.success && dataPequena.success) {
                     // Guardar solo la ruta de la imagen grande en las sublíneas
                     añadirImagenASublinea(dataGrande.data.ruta_relativa);
-                    cerrarModalAñadirImagenSublinea();
+                    // Limpiar el modal y volver a abrirlo
+                    limpiarModalAñadirSublinea();
+                    // Mantener el modal abierto y recargar carpetas
+                    cargarCarpetasModalSublinea();
+                    cambiarTabModalSublinea('url');
                 } else {
                     throw new Error(dataGrande.message || dataPequena.message || 'Error al subir');
                 }
@@ -4415,6 +4435,42 @@
             const categoriaId = document.getElementById('categoria_especificaciones_id').value;
             if (categoriaId) {
                 obtenerEspecificacionesInternas(categoriaId);
+            }
+            
+            // Actualizar JSON del producto si existe la función
+            if (typeof actualizarJSONProducto === 'function') {
+                actualizarJSONProducto();
+            }
+            
+            // Actualizar contador del botón de ver imágenes en la sección del producto
+            const btnVerImagenProducto = document.querySelector(`.btn-ver-imagenes-sublinea-producto[data-principal-id="${sublineaImagenesActual.principalId}"][data-sublinea-id="${sublineaImagenesActual.sublineaId}"]`);
+            if (btnVerImagenProducto) {
+                // Obtener el número actual de imágenes
+                const especificacionesParseadas = JSON.parse(inputHidden.value);
+                let numImagenes = 0;
+                if (especificacionesParseadas[sublineaImagenesActual.principalId]) {
+                    const sublineaData = especificacionesParseadas[sublineaImagenesActual.principalId].find(item => {
+                        if (typeof item === 'string' || typeof item === 'number') {
+                            return String(item) === String(sublineaImagenesActual.sublineaId);
+                        } else if (item && item.id) {
+                            return String(item.id) === String(sublineaImagenesActual.sublineaId);
+                        }
+                        return false;
+                    });
+                    if (sublineaData && sublineaData.img && Array.isArray(sublineaData.img)) {
+                        numImagenes = sublineaData.img.length;
+                    }
+                }
+                
+                if (numImagenes > 0) {
+                    btnVerImagenProducto.textContent = `${numImagenes} img`;
+                    btnVerImagenProducto.title = `Ver ${numImagenes} imagen${numImagenes > 1 ? 'es' : ''}`;
+                    if (btnVerImagenProducto.classList.contains('hidden')) {
+                        btnVerImagenProducto.classList.remove('hidden');
+                    }
+                } else {
+                    btnVerImagenProducto.classList.add('hidden');
+                }
             }
         }
 
@@ -5311,12 +5367,22 @@ document.addEventListener('DOMContentLoaded', function() {
         select.innerHTML = '';
         select.appendChild(primeraOpcion);
         
+        let carpetaProductoExiste = false;
         carpetas.forEach(carpeta => {
             const option = document.createElement('option');
             option.value = carpeta;
             option.textContent = carpeta.charAt(0).toUpperCase() + carpeta.slice(1);
             select.appendChild(option);
+            // Verificar si existe la carpeta "producto" (case insensitive)
+            if (carpeta.toLowerCase() === 'producto') {
+                carpetaProductoExiste = true;
+            }
         });
+        
+        // Si existe la carpeta "producto", seleccionarla por defecto
+        if (carpetaProductoExiste) {
+            select.value = 'producto';
+        }
     }
     
     // Configurar subida de archivo
@@ -6042,6 +6108,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const valorActual = inputHidden.value;
         let datos = null;
         let columnasGuardadas = [];
+        let formatosGuardados = {};
         
         if (valorActual && valorActual.trim() !== '') {
             try {
@@ -6054,6 +6121,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (parsed && parsed._columnas && Array.isArray(parsed._columnas)) {
                     columnasGuardadas = parsed._columnas;
                 }
+                // Obtener formatos guardados
+                if (parsed && parsed._formatos && typeof parsed._formatos === 'object') {
+                    formatosGuardados = parsed._formatos;
+                }
             } catch (e) {
                 console.error('Error parseando especificaciones del producto:', e);
             }
@@ -6063,7 +6134,9 @@ document.addEventListener('DOMContentLoaded', function() {
             datos.forEach((filtro) => {
                 // Verificar si es columna: primero en _columnas, luego en _esColumna
                 const esColumna = columnasGuardadas.includes(filtro.id) || filtro._esColumna === true;
-                crearLineaPrincipalProducto(filtro.texto || '', filtro.importante || false, filtro.subprincipales || [], filtro.id || null, filtro.slug || null, esColumna);
+                // Obtener formato guardado para esta línea principal
+                const formatoGuardado = formatosGuardados[filtro.id] || 'texto';
+                crearLineaPrincipalProducto(filtro.texto || '', filtro.importante || false, filtro.subprincipales || [], filtro.id || null, filtro.slug || null, esColumna, formatoGuardado);
             });
         }
         
@@ -6074,7 +6147,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Crear una línea principal del producto
-    function crearLineaPrincipalProducto(texto = '', importante = false, subprincipales = [], idUnico = null, slugUnico = null, esColumna = false) {
+    function crearLineaPrincipalProducto(texto = '', importante = false, subprincipales = [], idUnico = null, slugUnico = null, esColumna = false, formatoGuardado = 'texto') {
         const idPrincipal = `principal-producto-${contadorPrincipalProducto++}`;
         const idUnicoLinea = idUnico || generarIdUnicoProducto();
         const slugLinea = slugUnico || (texto ? generarSlugProducto(texto) : '');
@@ -6117,11 +6190,12 @@ document.addEventListener('DOMContentLoaded', function() {
             <div class="formato-visualizacion-producto-container mt-3" data-principal-id="${idUnicoLinea}" style="display: none;">
                 <label class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">Formato de visualización:</label>
                 <select class="formato-visualizacion-producto-select w-full px-3 py-2 rounded bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-200 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" data-principal-id="${idUnicoLinea}">
-                    <option value="texto">Texto</option>
-                    <option value="texto_precio">Texto y precio</option>
-                    <option value="imagen">Imagen</option>
-                    <option value="imagen_texto">Imagen y texto</option>
-                    <option value="imagen_precio">Imagen y precio</option>
+                    <option value="texto" ${formatoGuardado === 'texto' ? 'selected' : ''}>Texto</option>
+                    <option value="texto_precio" ${formatoGuardado === 'texto_precio' ? 'selected' : ''}>Texto y precio</option>
+                    <option value="imagen" ${formatoGuardado === 'imagen' ? 'selected' : ''}>Imagen</option>
+                    <option value="imagen_texto" ${formatoGuardado === 'imagen_texto' ? 'selected' : ''}>Imagen y texto</option>
+                    <option value="imagen_precio" ${formatoGuardado === 'imagen_precio' ? 'selected' : ''}>Imagen y precio</option>
+                    <option value="imagen_texto_precio" ${formatoGuardado === 'imagen_texto_precio' ? 'selected' : ''}>Imagen, texto y precio</option>
                 </select>
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Selecciona cómo se mostrarán las sublíneas marcadas como "Mostrar" en la vista del comparador</p>
             </div>
@@ -6242,8 +6316,9 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // El checkbox principal está marcado si hay datos guardados para esta sublínea
         const isChecked = sublineaData !== null;
-        const mostrarChecked = sublineaData && (sublineaData.m === 1 || sublineaData.mostrar === true);
-        const ofertaChecked = sublineaData && (sublineaData.o === 1 || sublineaData.oferta === true);
+        // Comparación flexible para manejar números y strings
+        const mostrarChecked = sublineaData && (sublineaData.m === 1 || sublineaData.m === '1' || sublineaData.mostrar === true);
+        const ofertaChecked = sublineaData && (sublineaData.o === 1 || sublineaData.o === '1' || sublineaData.oferta === true);
         const usarImagenesProducto = sublineaData && sublineaData.usarImagenesProducto === true;
         const imagenesSublinea = sublineaData && Array.isArray(sublineaData.img) ? sublineaData.img : [];
         const numImagenes = imagenesSublinea.length;
@@ -6372,6 +6447,30 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
             }
+            
+            // Actualizar botones de imágenes
+            const btnVerImagen = divIntermedia.querySelector('.btn-ver-imagenes-sublinea-producto');
+            const btnAñadirImagen = divIntermedia.querySelector('.btn-añadir-imagen-sublinea-producto');
+            const usarImagenesProducto = usarImagenesCheckbox && usarImagenesCheckbox.checked;
+            const debenEstarDeshabilitados = !checked || usarImagenesProducto;
+            
+            if (btnVerImagen) {
+                btnVerImagen.disabled = debenEstarDeshabilitados;
+                if (debenEstarDeshabilitados) {
+                    btnVerImagen.classList.add('opacity-50', 'cursor-not-allowed');
+                } else {
+                    btnVerImagen.classList.remove('opacity-50', 'cursor-not-allowed');
+                }
+            }
+            if (btnAñadirImagen) {
+                btnAñadirImagen.disabled = debenEstarDeshabilitados;
+                if (debenEstarDeshabilitados) {
+                    btnAñadirImagen.classList.add('opacity-50', 'cursor-not-allowed');
+                } else {
+                    btnAñadirImagen.classList.remove('opacity-50', 'cursor-not-allowed');
+                }
+            }
+            
             if (textoAlternativoInput) {
                 textoAlternativoInput.disabled = !checked;
             }
@@ -6386,7 +6485,34 @@ document.addEventListener('DOMContentLoaded', function() {
             actualizarVisibilidadFormatoProducto(lineaPrincipal);
         });
         ofertaCheckbox.addEventListener('change', actualizarJSONProducto);
-        usarImagenesCheckbox.addEventListener('change', actualizarJSONProducto);
+        usarImagenesCheckbox.addEventListener('change', function() {
+            // Actualizar estado de botones de imágenes cuando cambia el checkbox de "usar imágenes del producto"
+            const btnVerImagen = divIntermedia.querySelector('.btn-ver-imagenes-sublinea-producto');
+            const btnAñadirImagen = divIntermedia.querySelector('.btn-añadir-imagen-sublinea-producto');
+            const checkboxPrincipal = divIntermedia.querySelector('.especificacion-producto-checkbox');
+            const isChecked = checkboxPrincipal && checkboxPrincipal.checked;
+            const usarImagenesProducto = this.checked;
+            const debenEstarDeshabilitados = !isChecked || usarImagenesProducto;
+            
+            if (btnVerImagen) {
+                btnVerImagen.disabled = debenEstarDeshabilitados;
+                if (debenEstarDeshabilitados) {
+                    btnVerImagen.classList.add('opacity-50', 'cursor-not-allowed');
+                } else {
+                    btnVerImagen.classList.remove('opacity-50', 'cursor-not-allowed');
+                }
+            }
+            if (btnAñadirImagen) {
+                btnAñadirImagen.disabled = debenEstarDeshabilitados;
+                if (debenEstarDeshabilitados) {
+                    btnAñadirImagen.classList.add('opacity-50', 'cursor-not-allowed');
+                } else {
+                    btnAñadirImagen.classList.remove('opacity-50', 'cursor-not-allowed');
+                }
+            }
+            
+            actualizarJSONProducto();
+        });
         if (textoAlternativoInput) {
             textoAlternativoInput.addEventListener('input', actualizarJSONProducto);
         }
@@ -6403,6 +6529,52 @@ document.addEventListener('DOMContentLoaded', function() {
             divIntermedia.insertAdjacentElement('afterend', nuevaLinea);
             actualizarJSONProducto();
         });
+        
+        // Configurar event listeners para botones de imágenes
+        const btnVerImagenes = divIntermedia.querySelector('.btn-ver-imagenes-sublinea-producto');
+        const btnAñadirImagen = divIntermedia.querySelector('.btn-añadir-imagen-sublinea-producto');
+        
+        if (btnVerImagenes) {
+            btnVerImagenes.addEventListener('click', function() {
+                const principalId = this.dataset.principalId;
+                const sublineaId = this.dataset.sublineaId;
+                abrirModalImagenesSublinea(principalId, sublineaId);
+            });
+        }
+        
+        if (btnAñadirImagen) {
+            btnAñadirImagen.addEventListener('click', function() {
+                const principalId = this.dataset.principalId;
+                const sublineaId = this.dataset.sublineaId;
+                abrirModalAñadirImagenSublinea(principalId, sublineaId);
+            });
+            
+            // Inicializar estado del botón según el estado actual
+            const checkboxPrincipal = divIntermedia.querySelector('.especificacion-producto-checkbox');
+            const usarImagenesCheckbox = divIntermedia.querySelector('.especificacion-producto-usar-imagenes-producto-checkbox');
+            const isChecked = checkboxPrincipal && checkboxPrincipal.checked;
+            const usarImagenesProducto = usarImagenesCheckbox && usarImagenesCheckbox.checked;
+            const debeEstarDeshabilitado = !isChecked || usarImagenesProducto;
+            
+            if (debeEstarDeshabilitado) {
+                btnAñadirImagen.disabled = true;
+                btnAñadirImagen.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+        }
+        
+        if (btnVerImagenes) {
+            // Inicializar estado del botón según el estado actual
+            const checkboxPrincipal = divIntermedia.querySelector('.especificacion-producto-checkbox');
+            const usarImagenesCheckbox = divIntermedia.querySelector('.especificacion-producto-usar-imagenes-producto-checkbox');
+            const isChecked = checkboxPrincipal && checkboxPrincipal.checked;
+            const usarImagenesProducto = usarImagenesCheckbox && usarImagenesCheckbox.checked;
+            const debeEstarDeshabilitado = !isChecked || usarImagenesProducto;
+            
+            if (debeEstarDeshabilitado) {
+                btnVerImagenes.disabled = true;
+                btnVerImagenes.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+        }
         
         // Configurar drag and drop
         const dragHandle = divIntermedia.querySelector('.drag-handle-intermedia-producto');

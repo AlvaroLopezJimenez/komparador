@@ -1695,7 +1695,7 @@
                     <div class="font-bold text-sm sm:text-base text-black mb-2" style="color: #000000 !important; font-weight: bold !important;">{{ $filtro['texto'] }}</div>
                     @php
                       $formato = $filtro['formato'] ?? 'texto';
-                      $necesitaCarrusel = in_array($formato, ['imagen', 'imagen_texto', 'imagen_precio']);
+                      $necesitaCarrusel = in_array($formato, ['imagen', 'imagen_texto', 'imagen_precio', 'imagen_texto_precio']);
                     @endphp
                     @if($necesitaCarrusel)
                       {{-- Carrusel para sublíneas con imágenes --}}
@@ -1712,14 +1712,14 @@
                               <button 
                                 type="button"
                                 class="filtro-sublinea-btn px-2 sm:px-3 py-1 sm:py-1.5 text-sm sm:text-base border rounded transition-colors bg-white text-gray-900 border-gray-400 hover:bg-gray-100 flex flex-col items-center gap-1 flex-shrink-0"
-                                style="background-color: #ffffff !important; color: #111827 !important; border-color: #9ca3af !important; min-width: {{ $formato === 'imagen' ? '78px' : 'auto' }}; min-height: {{ $formato === 'imagen' ? '78px' : 'auto' }};"
+                                style="background-color: #ffffff !important; color: #111827 !important; border-color: #9ca3af !important; min-width: {{ in_array($formato, ['imagen', 'imagen_texto', 'imagen_precio', 'imagen_texto_precio']) ? '78px' : 'auto' }}; min-height: {{ in_array($formato, ['imagen', 'imagen_texto', 'imagen_precio', 'imagen_texto_precio']) ? '78px' : 'auto' }};"
                                 data-linea-id="{{ $filtro['id'] }}"
                                 data-sublinea-id="{{ $sub['id'] }}"
                                 data-sublinea-texto="{{ htmlspecialchars($sub['texto'], ENT_QUOTES, 'UTF-8') }}"
                                 @if($tieneImagen && !$usarImagenesProducto)
                                   data-imagenes='{!! json_encode($sub['imagenes'], JSON_HEX_QUOT | JSON_HEX_APOS | JSON_UNESCAPED_UNICODE) !!}'
                                 @endif>
-                                @if($formato === 'imagen' || $formato === 'imagen_texto' || $formato === 'imagen_precio')
+                                @if($formato === 'imagen' || $formato === 'imagen_texto' || $formato === 'imagen_precio' || $formato === 'imagen_texto_precio')
                                   @php
                                     // Verificar si hay imágenes disponibles
                                     $imagenDisponible = false;
@@ -1741,7 +1741,7 @@
                                     <img src="{{ asset('images/' . $imagenFinal) }}" alt="{{ $producto->nombre }} {{ $sub['texto'] }}" class="object-cover rounded" style="width: 78px; height: 78px; flex-shrink: 0;" onerror="this.style.display='none';">
                                   @endif
                                 @endif
-                                @if($formato === 'imagen_texto')
+                                @if($formato === 'imagen_texto' || $formato === 'imagen_texto_precio')
                                   <div class="flex items-center gap-1 text-sm text-center">
                                     <span>{{ $sub['texto'] }}</span>
                                     <span class="contador-sublinea" data-linea-id="{{ $filtro['id'] }}" data-sublinea-id="{{ $sub['id'] }}">(0)</span>
@@ -1749,7 +1749,7 @@
                                 @elseif($formato === 'texto' || $formato === 'texto_precio')
                                   <span class="text-sm text-center">{{ $sub['texto'] }}</span>
                                 @endif
-                                @if($formato === 'texto_precio' || $formato === 'imagen_precio')
+                                @if($formato === 'texto_precio' || $formato === 'imagen_precio' || $formato === 'imagen_texto_precio')
                                   @if($tienePrecio)
                                     <span class="text-base font-semibold" style="color: #000000;">{{ $sub['precio_mas_barato'] }} €</span>
                                   @else
