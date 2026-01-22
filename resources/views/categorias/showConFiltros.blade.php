@@ -266,17 +266,41 @@
     <main class="max-w-7xl mx-auto px-4 sm:px-6 py-2 bg-gray-100">
         
         {{-- BREADCRUMB --}}
-        <nav class="mb-2">
-            <ol class="flex items-center space-x-2 text-sm text-gray-600">
-                <li>
-                    <a href="{{ _f1(route('home')) }}" class="hover:text-pink-600">Inicio</a>
+        <nav class="mb-1">
+            @php
+                // En móvil, mostrar solo las últimas 2 categorías si hay más de 3
+                $totalCategorias = count($b1);
+                $breadcrumbMostrar = $b1;
+                
+                if ($totalCategorias > 3) {
+                    // Mantener las últimas 2 categorías
+                    $breadcrumbMostrar = array_slice($b1, -2);
+                }
+            @endphp
+            <ol class="flex items-center space-x-1 text-sm text-gray-600 overflow-hidden">
+                <li class="flex-shrink-0">
+                    <a href="{{ _f1(route('home')) }}" class="flex items-center transition-colors" style="color: inherit;" onmouseover="this.style.color='#e97b11'" onmouseout="this.style.color='inherit'" title="Inicio">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                        </svg>
+                    </a>
                 </li>
-                @foreach($b1 as $it)
-                <li class="flex items-center">
-                    <svg class="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                
+                @if($totalCategorias > 3)
+                    <li class="flex items-center flex-shrink-0">
+                        <svg class="w-4 h-4 mx-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                        <span class="text-gray-400">...</span>
+                    </li>
+                @endif
+                
+                @foreach($breadcrumbMostrar as $it)
+                <li class="flex items-center flex-shrink-0 min-w-0">
+                    <svg class="w-4 h-4 mx-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                     </svg>
-                    <a href="{{ _f1($it['url']) }}" class="hover:text-pink-600">{{ $it['nombre'] }}</a>
+                    <a href="{{ _f1($it['url']) }}" class="truncate max-w-[150px] sm:max-w-[200px] md:max-w-none transition-colors" style="color: inherit;" onmouseover="this.style.color='#e97b11'" onmouseout="this.style.color='inherit'" title="{{ $it['nombre'] }}">{{ $it['nombre'] }}</a>
                 </li>
                 @endforeach
             </ol>

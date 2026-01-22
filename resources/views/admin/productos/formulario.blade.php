@@ -4431,10 +4431,108 @@
             
             inputHidden.value = JSON.stringify(especificaciones, null, 0);
             
-            // Recargar especificaciones para actualizar el contador
-            const categoriaId = document.getElementById('categoria_especificaciones_id').value;
-            if (categoriaId) {
-                obtenerEspecificacionesInternas(categoriaId);
+            // Obtener el número actual de imágenes después de añadir
+            const especificacionesParseadas = JSON.parse(inputHidden.value);
+            let numImagenes = 0;
+            if (especificacionesParseadas[sublineaImagenesActual.principalId]) {
+                const sublineaData = especificacionesParseadas[sublineaImagenesActual.principalId].find(item => {
+                    if (typeof item === 'string' || typeof item === 'number') {
+                        return String(item) === String(sublineaImagenesActual.sublineaId);
+                    } else if (item && item.id) {
+                        return String(item.id) === String(sublineaImagenesActual.sublineaId);
+                    }
+                    return false;
+                });
+                if (sublineaData && sublineaData.img && Array.isArray(sublineaData.img)) {
+                    numImagenes = sublineaData.img.length;
+                }
+            }
+            
+            // Actualizar contador del botón de ver imágenes en la sección de CATEGORÍA
+            const btnVerImagenCategoria = document.querySelector(`.btn-ver-imagenes-sublinea[data-principal-id="${sublineaImagenesActual.principalId}"][data-sublinea-id="${sublineaImagenesActual.sublineaId}"]`);
+            if (btnVerImagenCategoria) {
+                // El botón ya existe, actualizar su contador
+                btnVerImagenCategoria.textContent = `${numImagenes} img`;
+                btnVerImagenCategoria.title = `Ver ${numImagenes} imagen${numImagenes > 1 ? 'es' : ''}`;
+            } else if (numImagenes > 0) {
+                // El botón no existe pero hay imágenes, crearlo
+                const btnAñadirCategoria = document.querySelector(`.btn-añadir-imagen-sublinea[data-principal-id="${sublineaImagenesActual.principalId}"][data-sublinea-id="${sublineaImagenesActual.sublineaId}"]`);
+                if (btnAñadirCategoria) {
+                    // Obtener el contenedor padre y el checkbox para verificar estado
+                    const contenedorPadre = btnAñadirCategoria.closest('.flex.items-center.gap-2');
+                    const checkboxPrincipal = document.querySelector(`.especificacion-checkbox[data-principal-id="${sublineaImagenesActual.principalId}"][data-sublinea-id="${sublineaImagenesActual.sublineaId}"]`);
+                    const usarImagenesCheckbox = document.querySelector(`.especificacion-usar-imagenes-producto-checkbox[data-principal-id="${sublineaImagenesActual.principalId}"][data-sublinea-id="${sublineaImagenesActual.sublineaId}"]`);
+                    const isChecked = checkboxPrincipal && checkboxPrincipal.checked;
+                    const usarImagenesProducto = usarImagenesCheckbox && usarImagenesCheckbox.checked;
+                    const btnVerDeshabilitado = !isChecked || usarImagenesProducto;
+                    
+                    // Crear el botón de ver imágenes
+                    const nuevoBtn = document.createElement('button');
+                    nuevoBtn.type = 'button';
+                    nuevoBtn.className = `btn-ver-imagenes-sublinea text-xs px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors ${btnVerDeshabilitado ? 'opacity-50 cursor-not-allowed' : ''}`;
+                    nuevoBtn.setAttribute('data-principal-id', sublineaImagenesActual.principalId);
+                    nuevoBtn.setAttribute('data-sublinea-id', sublineaImagenesActual.sublineaId);
+                    nuevoBtn.title = `Ver ${numImagenes} imagen${numImagenes > 1 ? 'es' : ''}`;
+                    nuevoBtn.textContent = `${numImagenes} img`;
+                    if (btnVerDeshabilitado) {
+                        nuevoBtn.disabled = true;
+                    }
+                    
+                    // Añadir event listener
+                    nuevoBtn.addEventListener('click', function() {
+                        const principalId = this.dataset.principalId;
+                        const sublineaId = this.dataset.sublineaId;
+                        abrirModalImagenesSublinea(principalId, sublineaId);
+                    });
+                    
+                    // Insertar antes del botón de añadir
+                    contenedorPadre.insertBefore(nuevoBtn, btnAñadirCategoria);
+                }
+            }
+            
+            // Actualizar contador del botón de ver imágenes en la sección del PRODUCTO
+            const btnVerImagenProducto = document.querySelector(`.btn-ver-imagenes-sublinea-producto[data-principal-id="${sublineaImagenesActual.principalId}"][data-sublinea-id="${sublineaImagenesActual.sublineaId}"]`);
+            if (btnVerImagenProducto) {
+                // El botón ya existe, actualizar su contador
+                btnVerImagenProducto.textContent = `${numImagenes} img`;
+                btnVerImagenProducto.title = `Ver ${numImagenes} imagen${numImagenes > 1 ? 'es' : ''}`;
+                if (btnVerImagenProducto.classList.contains('hidden')) {
+                    btnVerImagenProducto.classList.remove('hidden');
+                }
+            } else if (numImagenes > 0) {
+                // El botón no existe pero hay imágenes, crearlo
+                const btnAñadirProducto = document.querySelector(`.btn-añadir-imagen-sublinea-producto[data-principal-id="${sublineaImagenesActual.principalId}"][data-sublinea-id="${sublineaImagenesActual.sublineaId}"]`);
+                if (btnAñadirProducto) {
+                    // Obtener el contenedor padre y el checkbox para verificar estado
+                    const contenedorPadre = btnAñadirProducto.closest('.flex.items-center.gap-2');
+                    const checkboxPrincipal = document.querySelector(`.especificacion-producto-checkbox[data-principal-id="${sublineaImagenesActual.principalId}"][data-sublinea-id="${sublineaImagenesActual.sublineaId}"]`);
+                    const usarImagenesCheckbox = document.querySelector(`.especificacion-producto-usar-imagenes-producto-checkbox[data-principal-id="${sublineaImagenesActual.principalId}"][data-sublinea-id="${sublineaImagenesActual.sublineaId}"]`);
+                    const isChecked = checkboxPrincipal && checkboxPrincipal.checked;
+                    const usarImagenesProducto = usarImagenesCheckbox && usarImagenesCheckbox.checked;
+                    const btnVerDeshabilitado = !isChecked || usarImagenesProducto;
+                    
+                    // Crear el botón de ver imágenes
+                    const nuevoBtn = document.createElement('button');
+                    nuevoBtn.type = 'button';
+                    nuevoBtn.className = `btn-ver-imagenes-sublinea-producto text-xs px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors ${btnVerDeshabilitado ? 'opacity-50 cursor-not-allowed' : ''}`;
+                    nuevoBtn.setAttribute('data-principal-id', sublineaImagenesActual.principalId);
+                    nuevoBtn.setAttribute('data-sublinea-id', sublineaImagenesActual.sublineaId);
+                    nuevoBtn.title = `Ver ${numImagenes} imagen${numImagenes > 1 ? 'es' : ''}`;
+                    nuevoBtn.textContent = `${numImagenes} img`;
+                    if (btnVerDeshabilitado) {
+                        nuevoBtn.disabled = true;
+                    }
+                    
+                    // Añadir event listener
+                    nuevoBtn.addEventListener('click', function() {
+                        const principalId = this.dataset.principalId;
+                        const sublineaId = this.dataset.sublineaId;
+                        abrirModalImagenesSublinea(principalId, sublineaId);
+                    });
+                    
+                    // Insertar antes del botón de añadir
+                    contenedorPadre.insertBefore(nuevoBtn, btnAñadirProducto);
+                }
             }
             
             // Actualizar JSON del producto si existe la función
@@ -4442,36 +4540,8 @@
                 actualizarJSONProducto();
             }
             
-            // Actualizar contador del botón de ver imágenes en la sección del producto
-            const btnVerImagenProducto = document.querySelector(`.btn-ver-imagenes-sublinea-producto[data-principal-id="${sublineaImagenesActual.principalId}"][data-sublinea-id="${sublineaImagenesActual.sublineaId}"]`);
-            if (btnVerImagenProducto) {
-                // Obtener el número actual de imágenes
-                const especificacionesParseadas = JSON.parse(inputHidden.value);
-                let numImagenes = 0;
-                if (especificacionesParseadas[sublineaImagenesActual.principalId]) {
-                    const sublineaData = especificacionesParseadas[sublineaImagenesActual.principalId].find(item => {
-                        if (typeof item === 'string' || typeof item === 'number') {
-                            return String(item) === String(sublineaImagenesActual.sublineaId);
-                        } else if (item && item.id) {
-                            return String(item.id) === String(sublineaImagenesActual.sublineaId);
-                        }
-                        return false;
-                    });
-                    if (sublineaData && sublineaData.img && Array.isArray(sublineaData.img)) {
-                        numImagenes = sublineaData.img.length;
-                    }
-                }
-                
-                if (numImagenes > 0) {
-                    btnVerImagenProducto.textContent = `${numImagenes} img`;
-                    btnVerImagenProducto.title = `Ver ${numImagenes} imagen${numImagenes > 1 ? 'es' : ''}`;
-                    if (btnVerImagenProducto.classList.contains('hidden')) {
-                        btnVerImagenProducto.classList.remove('hidden');
-                    }
-                } else {
-                    btnVerImagenProducto.classList.add('hidden');
-                }
-            }
+            // Nota: No recargamos las especificaciones aquí porque ya actualizamos los botones manualmente
+            // Esto evita recargas innecesarias y mantiene la UI más fluida
         }
 
         // Ejecutar al cargar la página si hay una categoría final o una categoría de especificaciones guardada

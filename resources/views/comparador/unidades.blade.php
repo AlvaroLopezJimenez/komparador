@@ -1491,7 +1491,8 @@
                   $formatoVisualizacion = $especificacionesElegidas['_formatos'][$filtro['id']] ?? 'texto';
                   $filtro['formato'] = $formatoVisualizacion;
                   
-                  $filtro['subprincipales'] = collect($filtro['subprincipales'] ?? [])
+                  // Procesar todas las sublíneas primero
+                  $subprincipalesProcesadas = collect($filtro['subprincipales'] ?? [])
                     ->map(function($sub) use ($sublineasElegidas, $filtro, $ofertas, $especificacionesElegidas, $categoriaEspecificaciones, $producto) {
                       // Buscar los datos de la sublínea en las elegidas (incluyendo imágenes)
                       $sublineaData = collect($sublineasElegidas)->first(function($item) use ($sub) {
@@ -1514,7 +1515,8 @@
                       if ($usarImagenesProducto) {
                         // Usar imágenes del producto - Laravel ya las castea como array
                         // Obtener directamente como array (puede ser null si no tiene imágenes)
-                        $imagenesProducto = $producto->imagen_grande;
+                        // Usar imagen_pequena en lugar de imagen_grande para los botones
+                        $imagenesProducto = $producto->imagen_pequena;
                         
                         // Si es null, usar array vacío
                         if ($imagenesProducto === null) {
@@ -1584,7 +1586,8 @@
                           return false;
                         }
                         
-                        // Aplicar filtros de otras líneas principales (si existen y tienen sublíneas marcadas como mostrar)
+                        // Aplicar filtros de otras líneas principales (solo si tienen sublíneas SELECCIONADAS, no solo marcadas como mostrar)
+                        // Esto permite que se calculen precios para todas las sublíneas disponibles, no solo las que cumplen filtros no seleccionados
                         foreach ($especificacionesElegidas as $otraLineaId => $otraLineaData) {
                           // Saltar si es la línea actual o si es un objeto especial (_formatos, _orden, _columnas)
                           // Nota: En el backend usamos las claves originales, solo se ofuscan al enviar al cliente
@@ -1602,16 +1605,20 @@
                             }
                           }
                           
-                          // Filtrar solo las sublíneas marcadas como "mostrar"
-                          $sublineasMostrarOtraLinea = collect($sublineasOtraLinea)->filter(function($item) {
+                          // Filtrar solo las sublíneas que están SELECCIONADAS (no solo marcadas como mostrar)
+                          // Para el cálculo inicial del precio, no aplicamos filtros de otras líneas que no están seleccionadas
+                          // Esto permite que todas las sublíneas muestren su precio disponible
+                          $sublineasSeleccionadasOtraLinea = collect($sublineasOtraLinea)->filter(function($item) {
                             if (!is_array($item)) return false;
-                            return isset($item['m']) && $item['m'] === 1;
+                            // Solo aplicar filtro si la sublínea está seleccionada (no solo marcada como mostrar)
+                            // Por ahora, no aplicamos este filtro para permitir que se calculen todos los precios
+                            return false; // No aplicar filtros de otras líneas en el cálculo inicial
                           })->pluck('id')->map(function($id) {
                             return (string)$id;
                           })->toArray();
                           
-                          // Si hay sublíneas marcadas como mostrar en esta otra línea, verificar que la oferta las cumple
-                          if (count($sublineasMostrarOtraLinea) > 0) {
+                          // Solo aplicar filtro si hay sublíneas seleccionadas (que nunca habrá con el código actual)
+                          if (count($sublineasSeleccionadasOtraLinea) > 0) {
                             $ofertaOtraLinea = $oferta->especificaciones_internas[$otraLineaId] ?? null;
                             if ($ofertaOtraLinea === null) {
                               return false;
@@ -1622,8 +1629,8 @@
                               return (string)$id;
                             })->toArray();
                             
-                            // Verificar si alguna de las sublíneas de la oferta está en las marcadas como mostrar
-                            $cumpleOtraLinea = !empty(array_intersect($ofertaOtraLineaArrayStr, $sublineasMostrarOtraLinea));
+                            // Verificar si alguna de las sublíneas de la oferta está en las seleccionadas
+                            $cumpleOtraLinea = !empty(array_intersect($ofertaOtraLineaArrayStr, $sublineasSeleccionadasOtraLinea));
                             
                             if (!$cumpleOtraLinea) {
                               return false;
@@ -1663,6 +1670,41 @@
                     })
                     ->filter(function($sub) {
                       return $sub !== null; // Filtrar los null
+                    })
+                    ->values() // Reindexar para tener índices consecutivos
+                    ->map(function($sub, $index) {
+                      // Guardar el índice original para mantener el orden dentro de cada grupo
+                      $sub['_indice_original'] = $index;
+                      return $sub;
+                    });
+                  
+                  // Separar en dos grupos: con precio y sin precio
+                  $conPrecio = collect();
+                  $sinPrecio = collect();
+                  
+                  foreach ($subprincipalesProcesadas as $sub) {
+                    // Verificar si tiene precio (oferta disponible)
+                    $tienePrecio = isset($sub['precio_mas_barato']) && 
+                                  $sub['precio_mas_barato'] !== null && 
+                                  $sub['precio_mas_barato'] !== '';
+                      
+                    if ($tienePrecio) {
+                      $conPrecio->push($sub);
+                    } else {
+                      $sinPrecio->push($sub);
+                    }
+                  }
+                  
+                  // Ordenar cada grupo por su índice original para mantener el orden natural
+                  $conPrecio = $conPrecio->sortBy('_indice_original')->values();
+                  $sinPrecio = $sinPrecio->sortBy('_indice_original')->values();
+                  
+                  // Concatenar: primero las que tienen precio, luego las que no, y eliminar índice temporal
+                  $filtro['subprincipales'] = $conPrecio->concat($sinPrecio)
+                    ->map(function($sub) {
+                      // Eliminar el índice temporal antes de devolver
+                      unset($sub['_indice_original']);
+                      return $sub;
                     })
                     ->values()
                     ->toArray();

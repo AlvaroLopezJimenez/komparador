@@ -12,26 +12,32 @@
 {{-- cookie-bar -> cb1 --}}
 <div id="cb1" class="fixed inset-x-0 bottom-0 z-[9999]">
   {{-- Franja completa --}}
-  <div class="w-full bg-white border-t border-pink-200 shadow-lg">
+  <div class="w-full bg-white border-t shadow-lg" style="border-color: rgba(236, 122, 10, 0.3);">
     {{-- Contenido centrado y limitado al ancho de la web --}}
     <div class="max-w-6xl mx-auto px-4 py-5">
       <div class="text-center space-y-4">
         <p class="text-sm md:text-base text-gray-800">
           Usamos cookies necesarias para el funcionamiento del sitio. Puedes consultar la
-          <a href="{{ $u1 }}" class="text-pink-600 hover:underline">Política de cookies</a>
+          <a href="{{ $u1 }}" class="hover:underline" style="color: #ec7a0a;">Política de cookies</a>
           y la
-          <a href="{{ $u2 }}" class="text-pink-600 hover:underline">Política de privacidad</a>.
+          <a href="{{ $u2 }}" class="hover:underline" style="color: #ec7a0a;">Política de privacidad</a>.
         </p>
 
         {{-- Botones iguales (mismo ancho) --}}
         <div class="flex flex-col md:flex-row justify-center gap-3">
           {{-- cookie-accept -> ca1, cookie-reject -> cr1 --}}
           <button id="ca1"
-                  class="inline-flex justify-center items-center w-full md:w-56 px-8 py-3 rounded-xl text-base font-semibold text-white bg-pink-500 hover:bg-pink-600 transition">
+                  class="inline-flex justify-center items-center w-full md:w-56 px-8 py-3 rounded-xl text-base font-semibold text-white transition"
+                  style="background-color: #ec7a0a;"
+                  onmouseover="this.style.backgroundColor='#d16a09'"
+                  onmouseout="this.style.backgroundColor='#ec7a0a'">
             Aceptar
           </button>
           <button id="cr1"
-                  class="inline-flex justify-center items-center w-full md:w-56 px-8 py-3 rounded-xl text-base font-semibold text-white bg-pink-500 hover:bg-pink-600 transition">
+                  class="inline-flex justify-center items-center w-full md:w-56 px-8 py-3 rounded-xl text-base font-semibold text-white transition"
+                  style="background-color: #ec7a0a;"
+                  onmouseover="this.style.backgroundColor='#d16a09'"
+                  onmouseout="this.style.backgroundColor='#ec7a0a'">
             Rechazar todo
           </button>
         </div>

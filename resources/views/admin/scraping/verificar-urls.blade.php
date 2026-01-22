@@ -598,17 +598,17 @@
                         <div class="flex-shrink-0 mt-0.5">
                             ${statusIcon}
                         </div>
-                        <div class="flex-1">
+                        <div class="flex-1 min-w-0">
                             <div class="flex items-center gap-2 mb-2">
                                 <span class="font-medium ${statusColor}">${statusText}</span>
                             </div>
                             <div class="text-sm text-gray-600 dark:text-gray-300 mb-1">
                                 <strong>URL original:</strong> 
-                                <a href="${resultado.url_original}" target="_blank" class="text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 underline">${resultado.url_original}</a>
+                                <a href="${resultado.url_original}" target="_blank" class="text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 underline block truncate max-w-full" title="${resultado.url_original}">${resultado.url_original}</a>
                             </div>
                             <div class="text-sm text-gray-500 dark:text-gray-300 mb-2">
                                 <strong>URL normalizada:</strong> 
-                                <a href="${resultado.url_normalizada}" target="_blank" class="text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 underline">${resultado.url_normalizada}</a>
+                                <a href="${resultado.url_normalizada}" target="_blank" class="text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 underline block truncate max-w-full" title="${resultado.url_normalizada}">${resultado.url_normalizada}</a>
                             </div>
                              ${botonCrearOferta}
                              ${ofertaInfo}
@@ -939,16 +939,207 @@
                 renderizarUrlsConColores();
             });
             
+            // Función auxiliar para obtener la posición del cursor recorriendo los nodos
+            function obtenerPosicionCursor() {
+                const seleccion = window.getSelection();
+                if (seleccion.rangeCount === 0) return 0;
+                
+                const rango = seleccion.getRangeAt(0);
+                let posicion = 0;
+                
+                // Recorrer todos los nodos del div editable
+                const walker = document.createTreeWalker(
+                    urlsEditable,
+                    NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+                    null,
+                    false
+                );
+                
+                let nodo;
+                while (nodo = walker.nextNode()) {
+                    // Si el nodo es un elemento div, agregar un salto de línea
+                    if (nodo.nodeType === Node.ELEMENT_NODE && nodo.tagName === 'DIV') {
+                        // Si este div es anterior al contenedor del cursor, agregar salto de línea
+                        if (rango.startContainer !== nodo && !nodo.contains(rango.startContainer)) {
+                            posicion += 1; // Salto de línea entre divs
+                        }
+                    }
+                    
+                    // Si el nodo es texto
+                    if (nodo.nodeType === Node.TEXT_NODE) {
+                        // Si este es el nodo donde está el cursor
+                        if (nodo === rango.startContainer) {
+                            posicion += rango.startOffset;
+                            break;
+                        } else if (nodo.compareDocumentPosition(rango.startContainer) & Node.DOCUMENT_POSITION_PRECEDING) {
+                            // Este nodo está antes del cursor, agregar su longitud
+                            posicion += nodo.textContent.length;
+                        }
+                    }
+                }
+                
+                return posicion;
+            }
+            
             // Sincronizar cuando se pega contenido
             urlsEditable.addEventListener('paste', function(e) {
                 e.preventDefault();
-                const texto = (e.clipboardData || window.clipboardData).getData('text');
-                const seleccion = window.getSelection();
-                const rango = seleccion.getRangeAt(0);
-                rango.deleteContents();
-                rango.insertNode(document.createTextNode(texto));
-                sincronizarTextarea();
-                renderizarUrlsConColores();
+                
+                try {
+                    const texto = (e.clipboardData || window.clipboardData).getData('text');
+                    if (!texto) return;
+                    
+                    // Obtener el texto actual del textarea (más confiable que innerText)
+                    const textoActual = urlsTextarea.value || '';
+                    const seleccion = window.getSelection();
+                    
+                    let nuevoTexto = '';
+                    let indiceLineaObjetivo = 0;
+                    
+                    if (seleccion && seleccion.rangeCount > 0) {
+                        const rango = seleccion.getRangeAt(0);
+                        
+                        // Calcular en qué línea está el cursor
+                        const divs = urlsEditable.querySelectorAll('div');
+                        let lineaActual = -1;
+                        let offsetEnLinea = 0;
+                        
+                        // Encontrar en qué div (línea) está el cursor
+                        for (let i = 0; i < divs.length; i++) {
+                            const div = divs[i];
+                            try {
+                                if (div.contains(rango.startContainer) || div === rango.startContainer) {
+                                    lineaActual = i;
+                                    // Calcular la posición exacta dentro de la línea
+                                    if (rango.startContainer && rango.startContainer.nodeType === Node.TEXT_NODE && div.contains(rango.startContainer)) {
+                                        // El cursor está en un nodo de texto dentro de este div
+                                        offsetEnLinea = rango.startOffset || 0;
+                                    } else {
+                                        // Si el contenedor es el div o está al inicio, el cursor está al inicio
+                                        offsetEnLinea = 0;
+                                    }
+                                    break;
+                                }
+                            } catch (err) {
+                                // Si hay error al verificar contains, continuar
+                                continue;
+                            }
+                        }
+                        
+                        // Si no encontramos la línea, usar la última o agregar al final
+                        if (lineaActual === -1) {
+                            if (divs.length > 0) {
+                                lineaActual = divs.length - 1;
+                                offsetEnLinea = 0;
+                            } else {
+                                // No hay divs, agregar al final del texto
+                                const textoConSalto = texto.endsWith('\n') ? texto : texto + '\n';
+                                nuevoTexto = textoActual + textoConSalto;
+                                const lineas = nuevoTexto.split('\n');
+                                indiceLineaObjetivo = lineas.length - 1;
+                                
+                                urlsTextarea.value = nuevoTexto;
+                                renderizarUrlsConColores();
+                                setTimeout(() => {
+                                    const divs = urlsEditable.querySelectorAll('div');
+                                    if (divs.length > 0) {
+                                        const ultimoDiv = divs[divs.length - 1];
+                                        const nuevoRango = document.createRange();
+                                        const seleccion = window.getSelection();
+                                        
+                                        if (ultimoDiv.firstChild && ultimoDiv.firstChild.nodeType === Node.TEXT_NODE) {
+                                            const nodoTexto = ultimoDiv.firstChild;
+                                            nuevoRango.setStart(nodoTexto, nodoTexto.textContent.length);
+                                            nuevoRango.setEnd(nodoTexto, nodoTexto.textContent.length);
+                                        } else {
+                                            const nodoTexto = document.createTextNode('');
+                                            ultimoDiv.appendChild(nodoTexto);
+                                            nuevoRango.setStart(nodoTexto, 0);
+                                            nuevoRango.setEnd(nodoTexto, 0);
+                                        }
+                                        
+                                        seleccion.removeAllRanges();
+                                        seleccion.addRange(nuevoRango);
+                                        urlsEditable.focus();
+                                    }
+                                }, 0);
+                                return;
+                            }
+                        }
+                        
+                        // Construir el nuevo texto usando las líneas del textarea
+                        const lineas = textoActual.split('\n');
+                        const textoConSalto = texto.endsWith('\n') ? texto : texto + '\n';
+                        
+                        // Insertar el texto en la línea correcta
+                        if (lineaActual < lineas.length) {
+                            // Insertar en la línea actual en la posición del cursor
+                            const linea = lineas[lineaActual] || '';
+                            const nuevaLinea = linea.substring(0, offsetEnLinea) + textoConSalto + linea.substring(offsetEnLinea);
+                            lineas[lineaActual] = nuevaLinea;
+                            nuevoTexto = lineas.join('\n');
+                            
+                            // Calcular en qué línea quedará el cursor (después del texto pegado)
+                            indiceLineaObjetivo = lineaActual + 1;
+                        } else {
+                            // Si está más allá de las líneas existentes, agregar al final
+                            nuevoTexto = textoActual + textoConSalto;
+                            const lineasNuevas = nuevoTexto.split('\n');
+                            indiceLineaObjetivo = lineasNuevas.length - 1;
+                        }
+                    } else {
+                        // Si no hay selección, agregar al final
+                        const textoConSalto = texto.endsWith('\n') ? texto : texto + '\n';
+                        nuevoTexto = textoActual + textoConSalto;
+                        // El cursor irá a la última línea
+                        const lineas = nuevoTexto.split('\n');
+                        indiceLineaObjetivo = lineas.length - 1;
+                    }
+                    
+                    // Actualizar el textarea
+                    urlsTextarea.value = nuevoTexto;
+                    
+                    // Renderizar con colores
+                    renderizarUrlsConColores();
+                    
+                    // Posicionar el cursor en la línea correcta después del renderizado
+                    setTimeout(() => {
+                        const divs = urlsEditable.querySelectorAll('div');
+                        if (divs.length > 0) {
+                            // Encontrar el div correspondiente a la línea objetivo
+                            const indiceDiv = Math.min(indiceLineaObjetivo, divs.length - 1);
+                            const divObjetivo = divs[indiceDiv];
+                            const nuevoRango = document.createRange();
+                            const seleccion = window.getSelection();
+                            
+                            // Posicionar al final del div objetivo
+                            if (divObjetivo.firstChild && divObjetivo.firstChild.nodeType === Node.TEXT_NODE) {
+                                // Si tiene un nodo de texto, posicionar al final de ese nodo
+                                const nodoTexto = divObjetivo.firstChild;
+                                nuevoRango.setStart(nodoTexto, nodoTexto.textContent.length);
+                                nuevoRango.setEnd(nodoTexto, nodoTexto.textContent.length);
+                            } else {
+                                // Si no tiene nodo de texto, crear uno y posicionar ahí
+                                const nodoTexto = document.createTextNode('');
+                                divObjetivo.appendChild(nodoTexto);
+                                nuevoRango.setStart(nodoTexto, 0);
+                                nuevoRango.setEnd(nodoTexto, 0);
+                            }
+                            
+                            seleccion.removeAllRanges();
+                            seleccion.addRange(nuevoRango);
+                            urlsEditable.focus();
+                        }
+                    }, 0);
+                } catch (error) {
+                    console.error('Error al pegar:', error);
+                    // En caso de error, hacer un pegado simple
+                    const texto = (e.clipboardData || window.clipboardData).getData('text');
+                    const textoActual = urlsTextarea.value || '';
+                    const textoConSalto = texto.endsWith('\n') ? texto : texto + '\n';
+                    urlsTextarea.value = textoActual + textoConSalto;
+                    renderizarUrlsConColores();
+                }
             });
             
             // Inicializar renderizado

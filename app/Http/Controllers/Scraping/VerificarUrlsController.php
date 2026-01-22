@@ -237,13 +237,29 @@ class VerificarUrlsController extends Controller
         
         // Casos especiales por tienda
         if (str_contains($host, 'amazon')) {
-            // Para Amazon, mantener solo el path hasta /dp/ o /gp/
-            if (preg_match('/(\/dp\/[A-Z0-9]+|\/gp\/product\/[A-Z0-9]+)/', $path, $matches)) {
-                $path = $matches[0];
+            // Para Amazon, extraer el ASIN del path o del query
+            // Los ASINs de Amazon tienen 10 caracteres alfanuméricos
+            $asin = null;
+            
+            // Buscar ASIN en el path (formato /dp/ASIN o /gp/product/ASIN)
+            if (preg_match('/\/(?:dp|gp\/product)\/([A-Z0-9]{10})/', $path, $matches)) {
+                $asin = $matches[1];
+            }
+            // Si no se encuentra en el path, buscar en la URL completa (por si el parse_url no funcionó bien)
+            elseif (preg_match('/\/(?:dp|gp\/product)\/([A-Z0-9]{10})/', $url, $matches)) {
+                $asin = $matches[1];
+            }
+            
+            if ($asin) {
+                // Construir la URL normalizada: https://www.amazon.es/dp/ASIN
+                $path = '/dp/' . $asin;
                 // Para Amazon, mantener algunos parámetros específicos como ?smid=
                 if (preg_match('/smid=([^&]+)/', $query, $smidMatch)) {
                     $path .= '?smid=' . $smidMatch[1];
                 }
+            } else {
+                // Si no se encuentra ASIN, mantener el path original pero sin query params
+                $path = preg_replace('/\?.*$/', '', $path);
             }
         } elseif (str_contains($host, 'miravia')) {
             // Para Miravia, extraer solo el ID del producto
