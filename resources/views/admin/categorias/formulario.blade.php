@@ -1754,9 +1754,10 @@
             });
             
             inputTexto.addEventListener('input', function() {
-                // Actualizar slug cuando cambia el texto (solo si no tiene slug guardado)
-                if (!divPrincipal.dataset.slug || divPrincipal.dataset.slug === '') {
-                    divPrincipal.dataset.slug = generarSlug(this.value);
+                // Actualizar slug cuando cambia el texto (siempre regenerar para asegurar que esté correcto)
+                const textoActual = this.value.trim();
+                if (textoActual) {
+                    divPrincipal.dataset.slug = generarSlug(textoActual);
                 }
                 actualizarJSON();
             });
@@ -1834,7 +1835,10 @@
         function crearLineaIntermedia(containerPadre, texto = '', idUnico = null, slugUnico = null) {
             const idIntermedia = `intermedia-${contadorIntermedia++}`;
             const idUnicoLinea = idUnico || generarIdUnico();
+            
+            // Generar slug desde el texto (si viene slugUnico, usarlo, pero al guardar se regenerará)
             const slugLinea = slugUnico || (texto ? generarSlug(texto) : '');
+            
             const divIntermedia = document.createElement('div');
             divIntermedia.className = 'linea-intermedia flex items-center gap-3 border-l-4 border-blue-400 pl-3 py-2 bg-blue-50 dark:bg-blue-900/20 rounded';
             divIntermedia.dataset.id = idIntermedia;
@@ -1873,7 +1877,17 @@
                 e.stopPropagation();
             });
             
-            inputTexto.addEventListener('input', actualizarJSON);
+            inputTexto.addEventListener('input', function() {
+                const textoActual = this.value.trim();
+                
+                // Actualizar slug en tiempo real cuando se escribe
+                if (textoActual) {
+                    const nuevoSlug = generarSlug(textoActual);
+                    divIntermedia.dataset.slug = nuevoSlug;
+                }
+                
+                actualizarJSON();
+            });
             
             btnEliminar.addEventListener('click', () => {
                 divIntermedia.remove();
@@ -2158,12 +2172,10 @@
                 const texto = lineaPrincipal.querySelector('.linea-principal-texto').value.trim();
                 const importante = lineaPrincipal.querySelector('.linea-principal-importante').checked;
                 const idUnicoPrincipal = lineaPrincipal.dataset.idUnico;
-                const slugPrincipal = lineaPrincipal.dataset.slug || generarSlug(texto);
                 
-                // Actualizar slug en el dataset si cambió el texto
-                if (texto && !lineaPrincipal.dataset.slug) {
-                    lineaPrincipal.dataset.slug = slugPrincipal;
-                }
+                // SIEMPRE regenerar el slug desde el texto para asegurar que esté correcto
+                const slugPrincipal = texto ? generarSlug(texto) : '';
+                lineaPrincipal.dataset.slug = slugPrincipal;
                 
                 const containerSubprincipales = lineaPrincipal.querySelector('.subprincipales-container');
                 const lineasIntermedias = containerSubprincipales ? containerSubprincipales.querySelectorAll('.linea-intermedia') : [];
@@ -2172,12 +2184,10 @@
                 lineasIntermedias.forEach(lineaIntermedia => {
                     const textoIntermedia = lineaIntermedia.querySelector('.linea-intermedia-texto').value.trim();
                     const idUnicoIntermedia = lineaIntermedia.dataset.idUnico;
-                    const slugIntermedia = lineaIntermedia.dataset.slug || generarSlug(textoIntermedia);
                     
-                    // Actualizar slug en el dataset si cambió el texto
-                    if (textoIntermedia && !lineaIntermedia.dataset.slug) {
-                        lineaIntermedia.dataset.slug = slugIntermedia;
-                    }
+                    // SIEMPRE regenerar el slug desde el texto para asegurar que esté correcto
+                    const slugIntermedia = textoIntermedia ? generarSlug(textoIntermedia) : '';
+                    lineaIntermedia.dataset.slug = slugIntermedia;
                     
                     // Solo incluir sublíneas que tengan texto
                     if (textoIntermedia && idUnicoIntermedia) {

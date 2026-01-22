@@ -1119,7 +1119,7 @@
             
             estructuraFiltros.forEach(filtro => {
                 filtro.subprincipales.forEach(sub => {
-                    const slug = sub.slug || generarSlugDesdeTexto(sub.texto);
+                    const slug = sub.slug || _gs1(sub.texto || '');
                     mapaIdsASlugs[sub.id] = slug;
                 });
             });
