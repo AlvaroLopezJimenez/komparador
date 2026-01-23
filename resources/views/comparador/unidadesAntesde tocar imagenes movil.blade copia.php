@@ -1082,20 +1082,21 @@
     </ol>
 </nav>
 
-    {{-- H1 ÚNICO para ambas versiones - se mueve a posición desktop mediante JS --}}
-    <h1 id="titulo-producto-unico" class="text-base font-bold mb-1 block lg:hidden">{{ $producto->nombre}}</h1>
-    
     {{-- BLOQUE MÓVIL ÚNICAMENTE --}}
-    <div class="block lg:hidden bg-white rounded-lg shadow pt-2 pb-2 px-4">
+    <div class="block lg:hidden bg-white rounded-lg shadow pt-2 pb-4 px-4">
       {{-- Primera fila: Imagen del producto con miniaturas a los lados --}}
-      <div class="flex flex-col items-center mb-4">
+      <div class="flex items-center justify-center gap-2 mb-4">
+        {{-- Miniaturas izquierda --}}
+        <div id="carrusel-miniaturas-movil-izq" class="flex flex-col gap-2">
+          {{-- Las miniaturas se insertarán aquí dinámicamente --}}
+        </div>
         {{-- Imagen principal --}}
-        <div class="flex justify-center mb-1.5">
+        <div class="flex-1 flex justify-center">
           <img src="{{ asset('images/' . ($producto->imagen_pequena[0] ?? '')) }}" loading="lazy" alt="Imagen de {{$producto->nombre}}" class="w-48 h-48 max-w-[200px] max-h-[200px] object-contain cursor-pointer" id="imagen-producto-movil" onclick="_am1()">
         </div>
-        {{-- Puntos indicadores --}}
-        <div id="puntos-indicadores-movil" class="flex items-center justify-center gap-2 pt-1 pb-1">
-          {{-- Los puntos se insertarán aquí dinámicamente --}}
+        {{-- Miniaturas derecha --}}
+        <div id="carrusel-miniaturas-movil-der" class="flex flex-col gap-2">
+          {{-- Las miniaturas se insertarán aquí dinámicamente --}}
         </div>
       </div>
       
@@ -1186,16 +1187,41 @@
         Ver todas las ofertas ({{ count($ofertas) }})
       </a>
       {{-- x10: Descripción corta (móvil) --}}
-      <div class="text-sm text-gray-600 leading-relaxed relative overflow-hidden max-h-[3em] mt-4 mb-2" id="x10">
+      <div class="text-sm text-gray-600 leading-relaxed relative overflow-hidden max-h-[3em] my-4" id="x10">
         {{ $producto->descripcion_corta}}
         {{-- x11: Botón leer más (móvil) --}}
         <span class="absolute bottom-0 right-0 bg-white pl-2 font-semibold cursor-pointer" id="x11" style="color: #d16a0f;" onmouseover="this.style.color='#e97b11'" onmouseout="this.style.color='#d16a0f'">Leer más</span>
       </div>
       {{-- x12: Descripción completa (móvil) --}}
-      <div class="text-sm text-gray-600 leading-relaxed hidden mt-4 mb-2" id="x12">
+      <div class="text-sm text-gray-600 leading-relaxed hidden my-4" id="x12">
         {{ $producto->descripcion_corta}}
         {{-- x13: Botón leer menos (móvil) --}}
         <span class="font-semibold cursor-pointer" id="x13" style="color: #d16a0f;" onmouseover="this.style.color='#e97b11'" onmouseout="this.style.color='#d16a0f'">Leer menos</span>
+      </div>
+      <div class="bloque-movil-scroll overflow-x-auto whitespace-nowrap pb-2">
+        @foreach ($relacionados as $relacionado)
+        <a href="{{ añadirCam($relacionado->categoria->construirUrlCategorias($relacionado->slug)) }}" class="inline-flex flex-col align-top bg-gray-50 rounded-lg border px-1.5 py-1.5 w-36 text-center card-hover hover:bg-gray-100">
+          <img src="{{ asset('images/' . ($relacionado->imagen_pequena[0] ?? '')) }}" loading="lazy" alt="{{$relacionado->nombre}}" class="w-full h-auto object-contain mb-1">
+          <div class="text-sm line-clamp-2 min-h-[2.5em] mb-1 w-full px-0.5" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; white-space: normal; word-break: break-word; line-height: 1.4;">{{ $relacionado->nombre }}</div>
+          <div class="text-sm mt-auto pb-0" style="color: #e97b11; margin-bottom: -2px;">{{ number_format($relacionado->precio, 2, ',', '.') }} €
+            @if($relacionado->unidadDeMedida === 'kilos')
+              /Kg.
+            @elseif($relacionado->unidadDeMedida === 'litros')
+              /L.
+            @elseif($relacionado->unidadDeMedida === 'unidadMilesima')
+              /Und.
+            @elseif($relacionado->unidadDeMedida === 'unidadUnica')
+              {{-- No mostrar sufijo --}}
+            @elseif($relacionado->unidadDeMedida === 'unidad')
+              /Und.
+            @elseif($relacionado->unidadDeMedida === '800gramos')
+              /800gr.
+            @elseif($relacionado->unidadDeMedida === '100ml')
+              /100ml.
+            @endif
+          </div>
+        </a>
+        @endforeach
       </div>
     </div>
 
@@ -1210,8 +1236,8 @@
       </div>
 
       <div class="col-span-2 bg-white rounded-lg shadow overflow-hidden flex flex-col">
-        <div class="pt-4 pb-2 px-4" id="contenedor-titulo-desktop">
-          {{-- H1 único se moverá aquí en desktop mediante JavaScript --}}
+        <div class="pt-4 pb-2 px-4">
+          <h1 class="text-xl font-bold mb-2">{{ $producto->titulo}}</h1>
           {{-- x14: Descripción corta (desktop) --}}
           <div class="text-gray-600 text-sm leading-relaxed relative overflow-hidden max-h-[3em]" id="x14">
             {{ $producto->descripcion_corta}}
@@ -1429,8 +1455,8 @@
       </div>
 
       <main id="listado-precios" class="w-full lg:w-3/4">
-        <h2 id="subtitulo-producto-unico" class="text-base font-bold mb-1 block lg:hidden">Comparador de precios {{ $producto->nombre}}</h2>
-        <div id="contenedor-subtitulo-desktop"></div>
+        <h1 class="text-2xl font-semibold mb-4 block lg:hidden">{{ $producto->titulo}}</h1>
+        <h2 class="text-2xl font-semibold mb-4 hidden lg:block">{{ $producto->subtitulo}}</h2>
         
         {{-- Filtros de especificaciones internas --}}
         @if($producto->categoria_id_especificaciones_internas && $producto->categoria_especificaciones_internas_elegidas)
@@ -1943,40 +1969,10 @@
         {{-- x7: Contenedor del botón mostrar más --}}
         <div id="x7" class="text-center mt-6 hidden">
           {{-- x8: Botón mostrar más ofertas --}}
-          <button id="x8" class="text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200" style="background-color: #ba6212;" onmouseover="this.style.backgroundColor='#a55810'" onmouseout="this.style.backgroundColor='#ba6212'">
+          <button id="x8" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200">
             {{-- x9: Contador de ofertas restantes --}}
             Mostrar más ofertas (<span id="x9">0</span>)
           </button>
-        </div>
-        
-        {{-- Productos similares (solo móvil) --}}
-        <div class="block lg:hidden mt-6">
-          <h3 class="text-lg font-semibold mb-3">Productos similares</h3>
-          <div class="bloque-movil-scroll overflow-x-auto whitespace-nowrap pb-2">
-            @foreach ($relacionados as $relacionado)
-            <a href="{{ añadirCam($relacionado->categoria->construirUrlCategorias($relacionado->slug)) }}" class="inline-flex flex-col align-top bg-gray-50 rounded-lg border px-1.5 py-1.5 w-36 text-center card-hover hover:bg-gray-100">
-              <img src="{{ asset('images/' . ($relacionado->imagen_pequena[0] ?? '')) }}" loading="lazy" alt="{{$relacionado->nombre}}" class="w-full h-auto object-contain mb-1">
-              <div class="text-sm line-clamp-2 min-h-[2.5em] mb-1 w-full px-0.5" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; white-space: normal; word-break: break-word; line-height: 1.4;">{{ $relacionado->nombre }}</div>
-              <div class="text-sm mt-auto pb-0" style="color: #e97b11; margin-bottom: -2px;">{{ number_format($relacionado->precio, 2, ',', '.') }} €
-                @if($relacionado->unidadDeMedida === 'kilos')
-                  /Kg.
-                @elseif($relacionado->unidadDeMedida === 'litros')
-                  /L.
-                @elseif($relacionado->unidadDeMedida === 'unidadMilesima')
-                  /Und.
-                @elseif($relacionado->unidadDeMedida === 'unidadUnica')
-                  {{-- No mostrar sufijo --}}
-                @elseif($relacionado->unidadDeMedida === 'unidad')
-                  /Und.
-                @elseif($relacionado->unidadDeMedida === '800gramos')
-                  /800gr.
-                @elseif($relacionado->unidadDeMedida === '100ml')
-                  /100ml.
-                @endif
-              </div>
-            </a>
-            @endforeach
-          </div>
         </div>
         @php
         // Preparar datos de columnas para unidadUnica
@@ -2206,50 +2202,6 @@
           }
           
           document.addEventListener('DOMContentLoaded', function() {
-            {{-- _mt1: moverTitulo - Mueve el H1 a la posición correcta según el dispositivo --}}
-            const v19 = document.getElementById('titulo-producto-unico');
-            const v20 = document.getElementById('contenedor-titulo-desktop');
-            if (v19 && v20) {
-              function _mt1() {
-                if (window.innerWidth >= 1024) {
-                  if (v19.parentNode !== v20) {
-                    v20.insertBefore(v19, v20.firstChild);
-                    v19.className = 'text-xl font-bold mb-2';
-                  }
-                } else {
-                  const v21 = document.querySelector('.block.lg\\:hidden.bg-white');
-                  if (v21 && v19.parentNode !== v21.parentNode) {
-                    v21.parentNode.insertBefore(v19, v21);
-                    v19.className = 'text-base font-bold mb-1 block lg:hidden';
-                  }
-                }
-              }
-              _mt1();
-              window.addEventListener('resize', _mt1);
-            }
-            
-            {{-- _mt2: moverSubtitulo - Mueve el H2 a la posición correcta según el dispositivo --}}
-            const v22 = document.getElementById('subtitulo-producto-unico');
-            const v23 = document.getElementById('contenedor-subtitulo-desktop');
-            if (v22 && v23) {
-              function _mt2() {
-                if (window.innerWidth >= 1024) {
-                  if (v22.parentNode !== v23) {
-                    v23.appendChild(v22);
-                    v22.className = 'text-2xl font-semibold mb-4';
-                  }
-                } else {
-                  const v24 = document.getElementById('listado-precios');
-                  if (v24 && v22.parentNode !== v24) {
-                    v24.insertBefore(v22, v24.firstChild.nextSibling);
-                    v22.className = 'text-base font-bold mb-1 block lg:hidden';
-                  }
-                }
-              }
-              _mt2();
-              window.addEventListener('resize', _mt2);
-            }
-            
             if (btnOrdenUnidades && btnOrdenPrecio) {
               _sob1();
             }
@@ -6440,29 +6392,92 @@ function _rmd1() {
 }
 
 // Renderizar miniaturas móvil (3 a la izquierda, 2-3 a la derecha)
-{{-- _rmm1: renderizarMiniaturasMovil - Renderiza los puntos indicadores en la vista móvil --}}
+{{-- _rmm1: renderizarMiniaturasMovil - Renderiza las miniaturas en la vista móvil --}}
 function _rmm1() {
-  const containerPuntos = document.getElementById('puntos-indicadores-movil');
-  if (!containerPuntos) return;
+  const containerIzq = document.getElementById('carrusel-miniaturas-movil-izq');
+  const containerDer = document.getElementById('carrusel-miniaturas-movil-der');
+  if (!containerIzq || !containerDer) return;
   
-  containerPuntos.innerHTML = '';
+  containerIzq.innerHTML = '';
+  containerDer.innerHTML = '';
   
-  if (v1.length === 0) return;
+  const hayMasImagenes = v1.length > 5;
   
-  // Crear un punto por cada imagen
-  for (let i = 0; i < v1.length; i++) {
-    const punto = document.createElement('button');
-    punto.type = 'button';
-    punto.className = 'rounded-full transition-all border-0 cursor-pointer';
-    punto.style.width = '12px';
-    punto.style.height = '12px';
-    punto.style.minWidth = '12px';
-    punto.style.minHeight = '12px';
-    punto.style.backgroundColor = i === v4 ? '#000000' : '#9ca3af';
-    punto.style.opacity = i === v4 ? '1' : '0.6';
-    punto.onclick = () => _cip2(i);
-    punto.setAttribute('aria-label', `Ver imagen ${i + 1}`);
-    containerPuntos.appendChild(punto);
+  // Miniaturas izquierda: imágenes 0, 1, 2 (las 3 primeras)
+  for (let i = 0; i < Math.min(3, v1.length); i++) {
+    const imgPath = v3[i] || v2[i] || '';
+    const isActive = i === v4;
+    const miniatura = document.createElement('div');
+    miniatura.className = `miniatura-pagina-movil ${isActive ? 'activa' : ''}`;
+    miniatura.style.width = '48px';
+    miniatura.style.height = '48px';
+    miniatura.onclick = () => _cip2(i);
+    miniatura.innerHTML = `<img src="${v6}/${imgPath}" alt="Miniatura ${i + 1}">`;
+    containerIzq.appendChild(miniatura);
+  }
+  
+  // Rellenar con espacios vacíos si hay menos de 3
+  while (containerIzq.children.length < 3) {
+    const espacio = document.createElement('div');
+    espacio.style.width = '48px';
+    espacio.style.height = '48px';
+    espacio.style.flexShrink = '0';
+    containerIzq.appendChild(espacio);
+  }
+  
+  // Miniaturas derecha: imágenes 3, 4 (si existen) + botón + si hay más de 5
+  // Imagen 3 (índice 3)
+  if (v1.length > 3) {
+    const i = 3;
+    const imgPath = v3[i] || v2[i] || '';
+    const isActive = i === v4;
+    const miniatura = document.createElement('div');
+    miniatura.className = `miniatura-pagina-movil ${isActive ? 'activa' : ''}`;
+    miniatura.style.width = '48px';
+    miniatura.style.height = '48px';
+    miniatura.onclick = () => _cip2(i);
+    miniatura.innerHTML = `<img src="${v6}/${imgPath}" alt="Miniatura ${i + 1}">`;
+    containerDer.appendChild(miniatura);
+  }
+  
+  // Imagen 4 (índice 4)
+  if (v1.length > 4) {
+    const i = 4;
+    const imgPath = v3[i] || v2[i] || '';
+    const isActive = i === v4;
+    const miniatura = document.createElement('div');
+    miniatura.className = `miniatura-pagina-movil ${isActive ? 'activa' : ''}`;
+    miniatura.style.width = '48px';
+    miniatura.style.height = '48px';
+    miniatura.onclick = () => _cip2(i);
+    miniatura.innerHTML = `<img src="${v6}/${imgPath}" alt="Miniatura ${i + 1}">`;
+    containerDer.appendChild(miniatura);
+  }
+  
+  // Botón + como 6º cuadrado (3er de la derecha) si hay más de 5 imágenes
+  if (hayMasImagenes) {
+    const botonMas = document.createElement('div');
+    botonMas.className = 'miniatura-pagina-movil boton-mas';
+    botonMas.style.width = '48px';
+    botonMas.style.height = '48px';
+    botonMas.onclick = _am1;
+    botonMas.innerHTML = `
+      <div class="w-full h-full flex items-center justify-center bg-gray-100 rounded border-2 border-dashed border-gray-300 cursor-pointer hover:bg-gray-200 transition-colors">
+        <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+        </svg>
+      </div>
+    `;
+    containerDer.appendChild(botonMas);
+  }
+  
+  // Rellenar con espacios vacíos si hay menos de 3
+  while (containerDer.children.length < 3) {
+    const espacio = document.createElement('div');
+    espacio.style.width = '48px';
+    espacio.style.height = '48px';
+    espacio.style.flexShrink = '0';
+    containerDer.appendChild(espacio);
   }
 }
 
@@ -6589,12 +6604,12 @@ function _aip1() {
   }
   if (imgMovil && imgUrl) {
     imgMovil.src = imgUrl;
-    // Asegurar que se mantengan las clases CSS originales para móvil (w-48 h-48 object-contain)
-    if (!imgMovil.classList.contains('w-48')) {
-      imgMovil.classList.add('w-48');
+    // Asegurar que se mantengan las clases CSS originales para móvil (w-28 h-28 object-contain)
+    if (!imgMovil.classList.contains('w-28')) {
+      imgMovil.classList.add('w-28');
     }
-    if (!imgMovil.classList.contains('h-48')) {
-      imgMovil.classList.add('h-48');
+    if (!imgMovil.classList.contains('h-28')) {
+      imgMovil.classList.add('h-28');
     }
     if (!imgMovil.classList.contains('object-contain')) {
       imgMovil.classList.add('object-contain');
@@ -6603,16 +6618,6 @@ function _aip1() {
     imgMovil.style.width = '';
     imgMovil.style.height = '';
     imgMovil.style.maxWidth = '';
-  }
-  
-  // Actualizar puntos indicadores móvil
-  const containerPuntos = document.getElementById('puntos-indicadores-movil');
-  if (containerPuntos) {
-    const puntos = containerPuntos.querySelectorAll('button');
-    puntos.forEach((punto, index) => {
-      punto.style.backgroundColor = index === v4 ? '#000000' : '#9ca3af';
-      punto.style.opacity = index === v4 ? '1' : '0.6';
-    });
   }
 }
 

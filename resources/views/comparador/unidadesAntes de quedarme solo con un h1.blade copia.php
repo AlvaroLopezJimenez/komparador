@@ -1082,10 +1082,9 @@
     </ol>
 </nav>
 
-    {{-- H1 ÚNICO para ambas versiones - se mueve a posición desktop mediante JS --}}
-    <h1 id="titulo-producto-unico" class="text-base font-bold mb-1 block lg:hidden">{{ $producto->nombre}}</h1>
-    
     {{-- BLOQUE MÓVIL ÚNICAMENTE --}}
+    <h1 class="text-base font-bold mb-1 block lg:hidden">{{ $producto->nombre}}</h1>
+    
     <div class="block lg:hidden bg-white rounded-lg shadow pt-2 pb-2 px-4">
       {{-- Primera fila: Imagen del producto con miniaturas a los lados --}}
       <div class="flex flex-col items-center mb-4">
@@ -1210,8 +1209,8 @@
       </div>
 
       <div class="col-span-2 bg-white rounded-lg shadow overflow-hidden flex flex-col">
-        <div class="pt-4 pb-2 px-4" id="contenedor-titulo-desktop">
-          {{-- H1 único se moverá aquí en desktop mediante JavaScript --}}
+        <div class="pt-4 pb-2 px-4">
+          <h1 class="text-xl font-bold mb-2">{{ $producto->titulo}}</h1>
           {{-- x14: Descripción corta (desktop) --}}
           <div class="text-gray-600 text-sm leading-relaxed relative overflow-hidden max-h-[3em]" id="x14">
             {{ $producto->descripcion_corta}}
@@ -1429,8 +1428,8 @@
       </div>
 
       <main id="listado-precios" class="w-full lg:w-3/4">
-        <h2 id="subtitulo-producto-unico" class="text-base font-bold mb-1 block lg:hidden">Comparador de precios {{ $producto->nombre}}</h2>
-        <div id="contenedor-subtitulo-desktop"></div>
+        <h2 class="text-base font-bold mb-1 block lg:hidden">Comparador de precios {{ $producto->nombre}}</h2>
+        <h2 class="text-2xl font-semibold mb-4 hidden lg:block">{{ $producto->subtitulo}}</h2>
         
         {{-- Filtros de especificaciones internas --}}
         @if($producto->categoria_id_especificaciones_internas && $producto->categoria_especificaciones_internas_elegidas)
@@ -1943,7 +1942,7 @@
         {{-- x7: Contenedor del botón mostrar más --}}
         <div id="x7" class="text-center mt-6 hidden">
           {{-- x8: Botón mostrar más ofertas --}}
-          <button id="x8" class="text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200" style="background-color: #ba6212;" onmouseover="this.style.backgroundColor='#a55810'" onmouseout="this.style.backgroundColor='#ba6212'">
+          <button id="x8" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200">
             {{-- x9: Contador de ofertas restantes --}}
             Mostrar más ofertas (<span id="x9">0</span>)
           </button>
@@ -2206,50 +2205,6 @@
           }
           
           document.addEventListener('DOMContentLoaded', function() {
-            {{-- _mt1: moverTitulo - Mueve el H1 a la posición correcta según el dispositivo --}}
-            const v19 = document.getElementById('titulo-producto-unico');
-            const v20 = document.getElementById('contenedor-titulo-desktop');
-            if (v19 && v20) {
-              function _mt1() {
-                if (window.innerWidth >= 1024) {
-                  if (v19.parentNode !== v20) {
-                    v20.insertBefore(v19, v20.firstChild);
-                    v19.className = 'text-xl font-bold mb-2';
-                  }
-                } else {
-                  const v21 = document.querySelector('.block.lg\\:hidden.bg-white');
-                  if (v21 && v19.parentNode !== v21.parentNode) {
-                    v21.parentNode.insertBefore(v19, v21);
-                    v19.className = 'text-base font-bold mb-1 block lg:hidden';
-                  }
-                }
-              }
-              _mt1();
-              window.addEventListener('resize', _mt1);
-            }
-            
-            {{-- _mt2: moverSubtitulo - Mueve el H2 a la posición correcta según el dispositivo --}}
-            const v22 = document.getElementById('subtitulo-producto-unico');
-            const v23 = document.getElementById('contenedor-subtitulo-desktop');
-            if (v22 && v23) {
-              function _mt2() {
-                if (window.innerWidth >= 1024) {
-                  if (v22.parentNode !== v23) {
-                    v23.appendChild(v22);
-                    v22.className = 'text-2xl font-semibold mb-4';
-                  }
-                } else {
-                  const v24 = document.getElementById('listado-precios');
-                  if (v24 && v22.parentNode !== v24) {
-                    v24.insertBefore(v22, v24.firstChild.nextSibling);
-                    v22.className = 'text-base font-bold mb-1 block lg:hidden';
-                  }
-                }
-              }
-              _mt2();
-              window.addEventListener('resize', _mt2);
-            }
-            
             if (btnOrdenUnidades && btnOrdenPrecio) {
               _sob1();
             }
