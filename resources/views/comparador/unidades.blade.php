@@ -1745,10 +1745,14 @@
                                       $imagenOriginal = $sub['imagenes'][0];
                                       if (!empty($imagenOriginal)) {
                                         $imagenDisponible = true;
-                                        // Buscar thumbnail si existe
-                                        $imagenPequena = preg_replace('/\.(jpg|jpeg|png|gif|webp)$/i', '-thumbnail.webp', $imagenOriginal);
-                                        $rutaThumbnail = public_path('images/' . $imagenPequena);
-                                        $imagenFinal = file_exists($rutaThumbnail) ? $imagenPequena : $imagenOriginal;
+                                        // Si viene de usar_imagenes_producto, ya es imagen_pequena (thumbnail), usar directamente
+                                        // Si viene de imágenes propias de la sublínea, convertir a thumbnail
+                                        if (isset($sub['usar_imagenes_producto']) && $sub['usar_imagenes_producto'] === true) {
+                                          $imagenFinal = $imagenOriginal;
+                                        } else {
+                                          // Convertir imagen grande a thumbnail
+                                          $imagenFinal = preg_replace('/\.(jpg|jpeg|png|gif|webp)$/i', '-thumbnail.webp', $imagenOriginal);
+                                        }
                                       }
                                     }
                                   @endphp

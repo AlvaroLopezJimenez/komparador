@@ -2701,6 +2701,56 @@ document.addEventListener('DOMContentLoaded', function() {
             guardarEstadoValidacion();
         }
     
+    // Función para limpiar URL de Amazon
+    function limpiarUrlAmazon(url) {
+        try {
+            // Detectar URLs de Amazon (diferentes dominios: .es, .com, .co.uk, etc.)
+            const amazonRegex = /^https?:\/\/(www\.)?amazon\.(es|com|co\.uk|de|fr|it|ca|com\.au|co\.jp|in|com\.mx|com\.br|nl|se|pl|com\.tr|ae|sa|sg|com\.tw|com\.hk)\//i;
+            
+            if (!amazonRegex.test(url)) {
+                return url; // No es Amazon, devolver URL original
+            }
+            
+            // Extraer el dominio de Amazon (es, com, etc.)
+            const dominioMatch = url.match(/amazon\.([a-z.]+)/i);
+            if (!dominioMatch) {
+                return url;
+            }
+            const dominio = dominioMatch[1];
+            
+            // Buscar el código del producto después de /dp/ o /gp/product/
+            const dpMatch = url.match(/\/dp\/([A-Z0-9]+)/i) || url.match(/\/gp\/product\/([A-Z0-9]+)/i);
+            
+            if (dpMatch && dpMatch[1]) {
+                const codigoProducto = dpMatch[1];
+                // Construir URL limpia: https://www.amazon.{dominio}/dp/CODIGO
+                return `https://www.amazon.${dominio}/dp/${codigoProducto}`;
+            }
+            
+            // Si no se encuentra el código, devolver URL original
+            return url;
+        } catch (error) {
+            console.error('Error al limpiar URL de Amazon:', error);
+            return url; // En caso de error, devolver URL original
+        }
+    }
+    
+    // Event listener para pegar URL (limpiar automáticamente URLs de Amazon)
+    urlInput.addEventListener('paste', function(e) {
+        // Usar setTimeout para acceder al valor después de que se pegue
+        setTimeout(() => {
+            const urlPegada = urlInput.value.trim();
+            if (urlPegada) {
+                const urlLimpia = limpiarUrlAmazon(urlPegada);
+                if (urlLimpia !== urlPegada) {
+                    urlInput.value = urlLimpia;
+                    // Disparar evento input para que se ejecute la validación
+                    urlInput.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+            }
+        }, 10);
+    });
+    
     // Event listener para cambios en el campo URL
     urlInput.addEventListener('input', function(e) {
         const url = e.target.value.trim();
