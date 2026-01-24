@@ -2577,13 +2577,36 @@
                 return;
             }
             
+            // Normalizadores para compatibilidad con estructuras antiguas/rotas:
+            // - _orden/_columnas pueden venir como ["id"] o [{id:"id", c:0}]
+            // - _formatos puede venir como {"idLinea": "texto"} o {"idLinea": {id:"texto", c:0}}
+            const normalizarId = (v) => {
+                if (v && typeof v === 'object' && !Array.isArray(v)) {
+                    return (typeof v.id === 'string' || typeof v.id === 'number') ? v.id : null;
+                }
+                return v;
+            };
+            const normalizarArrayIds = (arr) => {
+                if (!Array.isArray(arr)) return [];
+                return arr
+                    .map(normalizarId)
+                    .filter(v => (typeof v === 'string' || typeof v === 'number'))
+                    .map(v => String(v));
+            };
+            const normalizarFormato = (v) => {
+                if (v && typeof v === 'object' && !Array.isArray(v)) {
+                    return typeof v.id === 'string' ? v.id : 'texto';
+                }
+                return (typeof v === 'string') ? v : 'texto';
+            };
+
             // Verificar si la unidad de medida es "Unidad Única"
             const unidadDeMedidaSelect = document.getElementById('unidadDeMedida');
             const esUnidadUnica = unidadDeMedidaSelect && unidadDeMedidaSelect.value === 'unidadUnica';
             
             // Obtener orden guardado y columnas marcadas
-            const ordenGuardado = opcionesGuardadas._orden || [];
-            const columnasGuardadas = opcionesGuardadas._columnas || [];
+            const ordenGuardado = normalizarArrayIds(opcionesGuardadas._orden || []);
+            const columnasGuardadas = normalizarArrayIds(opcionesGuardadas._columnas || []);
             
             // Ordenar filtros según el orden guardado, o mantener el orden original
             let filtrosOrdenados = [...especificaciones.filtros];
@@ -2798,7 +2821,7 @@
                 html += `</div>`;
                 
                 // Desplegable de formato de visualización (solo si hay sublíneas marcadas como "mostrar")
-                const formatoGuardado = (opcionesGuardadas._formatos && opcionesGuardadas._formatos[idPrincipal]) || 'texto';
+                const formatoGuardado = normalizarFormato(opcionesGuardadas._formatos && opcionesGuardadas._formatos[idPrincipal]);
                 html += `<div class="mt-3 formato-visualizacion-container" data-principal-id="${idPrincipal}" style="display: none;">`;
                 html += `<label class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">Formato de visualización:</label>`;
                 html += `<select class="formato-visualizacion-select w-full px-3 py-2 rounded bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-200 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" data-principal-id="${idPrincipal}">`;
@@ -3310,8 +3333,20 @@
             const unidadDeMedidaSelect = document.getElementById('unidadDeMedida');
             const esUnidadUnica = unidadDeMedidaSelect && unidadDeMedidaSelect.value === 'unidadUnica';
             
-            // Inicializar _formatos preservando los formatos guardados
-            especificaciones._formatos = especificacionesGuardadas._formatos || {};
+            // Inicializar _formatos preservando los formatos guardados (compatibilidad con {id,c})
+            const formatosRaw = especificacionesGuardadas._formatos || {};
+            especificaciones._formatos = {};
+            if (formatosRaw && typeof formatosRaw === 'object') {
+                Object.entries(formatosRaw).forEach(([k, v]) => {
+                    if (v && typeof v === 'object' && !Array.isArray(v)) {
+                        if (typeof v.id === 'string') {
+                            especificaciones._formatos[k] = v.id;
+                        }
+                    } else if (typeof v === 'string') {
+                        especificaciones._formatos[k] = v;
+                    }
+                });
+            }
             
             // Obtener los IDs de las líneas principales del producto para evitar sobrescribirlas
             const idsProducto = (especificacionesGuardadas._producto && especificacionesGuardadas._producto.filtros) 
@@ -6189,11 +6224,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 // Obtener columnas guardadas (pueden estar en _columnas o en _esColumna dentro de cada filtro)
                 if (parsed && parsed._columnas && Array.isArray(parsed._columnas)) {
-                    columnasGuardadas = parsed._columnas;
+                    // Compatibilidad: puede venir como ["id"] o [{id:"id", c:0}]
+                    columnasGuardadas = parsed._columnas
+                        .map(v => (v && typeof v === 'object' && !Array.isArray(v)) ? v.id : v)
+                        .filter(v => (typeof v === 'string' || typeof v === 'number'))
+                        .map(v => String(v));
                 }
                 // Obtener formatos guardados
                 if (parsed && parsed._formatos && typeof parsed._formatos === 'object') {
-                    formatosGuardados = parsed._formatos;
+                    // Compatibilidad: puede venir como {"idLinea":"texto"} o {"idLinea":{id:"texto",c:0}}
+                    formatosGuardados = {};
+                    Object.entries(parsed._formatos).forEach(([k, v]) => {
+                        if (v && typeof v === 'object' && !Array.isArray(v)) {
+                            if (typeof v.id === 'string') {
+                                formatosGuardados[k] = v.id;
+                            }
+                        } else if (typeof v === 'string') {
+                            formatosGuardados[k] = v;
+                        }
+                    });
                 }
             } catch (e) {
                 console.error('Error parseando especificaciones del producto:', e);
@@ -6205,7 +6254,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Verificar si es columna: primero en _columnas, luego en _esColumna
                 const esColumna = columnasGuardadas.includes(filtro.id) || filtro._esColumna === true;
                 // Obtener formato guardado para esta línea principal
-                const formatoGuardado = formatosGuardados[filtro.id] || 'texto';
+                const formatoGuardado = (typeof formatosGuardados[filtro.id] === 'string') ? formatosGuardados[filtro.id] : 'texto';
                 crearLineaPrincipalProducto(filtro.texto || '', filtro.importante || false, filtro.subprincipales || [], filtro.id || null, filtro.slug || null, esColumna, formatoGuardado);
             });
         }
@@ -6795,6 +6844,45 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.error('Error parseando especificaciones completas:', e);
                 especificacionesCompletas = {};
             }
+        }
+
+        // Normalizar metacampos por compatibilidad con estructuras rotas ({id,c})
+        const normalizarId = (v) => {
+            if (v && typeof v === 'object' && !Array.isArray(v)) {
+                return (typeof v.id === 'string' || typeof v.id === 'number') ? v.id : null;
+            }
+            return v;
+        };
+        const normalizarArrayIds = (arr) => {
+            if (!Array.isArray(arr)) return [];
+            return arr
+                .map(normalizarId)
+                .filter(v => (typeof v === 'string' || typeof v === 'number'))
+                .map(v => String(v));
+        };
+        const normalizarFormatosMap = (mapa) => {
+            const out = {};
+            if (!mapa || typeof mapa !== 'object') return out;
+            Object.entries(mapa).forEach(([k, v]) => {
+                if (v && typeof v === 'object' && !Array.isArray(v)) {
+                    if (typeof v.id === 'string') {
+                        out[k] = v.id;
+                    }
+                } else if (typeof v === 'string') {
+                    out[k] = v;
+                }
+            });
+            return out;
+        };
+
+        if (especificacionesCompletas._orden) {
+            especificacionesCompletas._orden = normalizarArrayIds(especificacionesCompletas._orden);
+        }
+        if (especificacionesCompletas._columnas) {
+            especificacionesCompletas._columnas = normalizarArrayIds(especificacionesCompletas._columnas);
+        }
+        if (especificacionesCompletas._formatos) {
+            especificacionesCompletas._formatos = normalizarFormatosMap(especificacionesCompletas._formatos);
         }
         
         // Asegurar que existe la sección _producto

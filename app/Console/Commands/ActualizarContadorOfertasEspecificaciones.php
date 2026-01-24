@@ -55,6 +55,43 @@ class ActualizarContadorOfertasEspecificaciones extends Command
             if (!$especificaciones || !is_array($especificaciones) || empty($especificaciones)) {
                 continue;
             }
+
+            // Reparar metacampos que pudieron quedar corrompidos (por versiones anteriores del comando):
+            // - _formatos: { lineaId: {id: "texto", c: 0} } -> { lineaId: "texto" }
+            // - _orden/_columnas: [ {id: "x", c: 0}, ... ] -> [ "x", ... ]
+            if (isset($especificaciones['_formatos']) && is_array($especificaciones['_formatos'])) {
+                foreach ($especificaciones['_formatos'] as $k => $v) {
+                    if (is_array($v) && isset($v['id']) && is_string($v['id'])) {
+                        $especificaciones['_formatos'][$k] = $v['id'];
+                    } elseif (!is_string($v)) {
+                        // Si no es string ni objeto con id, limpiar para evitar errores en vistas
+                        unset($especificaciones['_formatos'][$k]);
+                    }
+                }
+            }
+
+            $normalizarListaIds = function ($arr) {
+                if (!is_array($arr)) {
+                    return [];
+                }
+                $out = [];
+                foreach ($arr as $v) {
+                    if (is_array($v) && isset($v['id'])) {
+                        $v = $v['id'];
+                    }
+                    if (is_string($v) || is_numeric($v)) {
+                        $out[] = (string) $v;
+                    }
+                }
+                return $out;
+            };
+
+            if (isset($especificaciones['_orden'])) {
+                $especificaciones['_orden'] = $normalizarListaIds($especificaciones['_orden']);
+            }
+            if (isset($especificaciones['_columnas'])) {
+                $especificaciones['_columnas'] = $normalizarListaIds($especificaciones['_columnas']);
+            }
             
             // Obtener ofertas activas del producto
             $ofertasActivas = OfertaProducto::where('producto_id', $producto->id)
@@ -71,13 +108,78 @@ class ActualizarContadorOfertasEspecificaciones extends Command
                           ->orWhere('fecha_final', '>=', $ahora);
                 })
                 ->get();
+
+            // Construir un mapa de conteos por línea/sublinea basado en especificaciones_internas de las ofertas.
+            // Importante: si una oferta NO tiene especificaciones_internas para una línea, no podemos concluir c=0,
+            // así que para esas líneas dejaremos el campo 'c' sin establecer (o lo eliminaremos si ya existía).
+            $conteosPorLineaSublinea = []; // [lineaIdStr => [sublineaIdStr => count]]
+            foreach ($ofertasActivas as $oferta) {
+                $especificacionesOferta = $oferta->especificaciones_internas;
+                if (!$especificacionesOferta || !is_array($especificacionesOferta)) {
+                    continue;
+                }
+
+                foreach ($especificacionesOferta as $lineaOfertaId => $ofertaLinea) {
+                    $lineaOfertaIdStr = is_string($lineaOfertaId) ? $lineaOfertaId : (string) $lineaOfertaId;
+                    if ($lineaOfertaIdStr !== '' && substr($lineaOfertaIdStr, 0, 1) === '_') {
+                        continue;
+                    }
+
+                    $ofertaSublineas = is_array($ofertaLinea) ? $ofertaLinea : [$ofertaLinea];
+                    $seen = [];
+                    foreach ($ofertaSublineas as $ofertaSublinea) {
+                        $ofertaSublineaId = null;
+                        if (is_array($ofertaSublinea) && isset($ofertaSublinea['id'])) {
+                            $ofertaSublineaId = $ofertaSublinea['id'];
+                        } elseif (is_string($ofertaSublinea) || is_numeric($ofertaSublinea)) {
+                            $ofertaSublineaId = $ofertaSublinea;
+                        }
+                        if ($ofertaSublineaId === null || $ofertaSublineaId === '') {
+                            continue;
+                        }
+                        $seen[(string) $ofertaSublineaId] = true;
+                    }
+
+                    foreach (array_keys($seen) as $sublineaIdStr) {
+                        if (!isset($conteosPorLineaSublinea[$lineaOfertaIdStr])) {
+                            $conteosPorLineaSublinea[$lineaOfertaIdStr] = [];
+                        }
+                        $conteosPorLineaSublinea[$lineaOfertaIdStr][$sublineaIdStr] = ($conteosPorLineaSublinea[$lineaOfertaIdStr][$sublineaIdStr] ?? 0) + 1;
+                    }
+                }
+            }
             
             // Inicializar contadores para cada sublínea
             $contadores = [];
             
             // Recorrer cada línea principal del producto
             foreach ($especificaciones as $lineaId => $sublineas) {
+                // Ignorar metacampos (_formatos, _orden, _columnas, _producto, etc.)
+                $lineaIdStr = is_string($lineaId) ? $lineaId : (string) $lineaId;
+                // Evitar str_starts_with() para compatibilidad con entornos antiguos (cron)
+                if ($lineaIdStr !== '' && substr($lineaIdStr, 0, 1) === '_') {
+                    continue;
+                }
+
                 if (!is_array($sublineas)) {
+                    continue;
+                }
+
+                // Solo procesar arrays numéricos (listas de sublíneas). Si es asociativo, saltar.
+                $keys = array_keys($sublineas);
+                $isNumericArray = ($keys === range(0, count($sublineas) - 1));
+                if (!$isNumericArray) {
+                    continue;
+                }
+
+                // Si ninguna oferta tiene especificaciones para esta línea, NO establecemos 'c' (y lo borramos si existía).
+                // Esto evita que los filtros de categorías se queden a 0 cuando las ofertas no están etiquetadas.
+                if (!isset($conteosPorLineaSublinea[$lineaIdStr])) {
+                    foreach ($sublineas as $idx => $sublinea) {
+                        if (is_array($sublinea) && array_key_exists('c', $sublinea)) {
+                            unset($especificaciones[$lineaId][$idx]['c']);
+                        }
+                    }
                     continue;
                 }
                 
@@ -101,44 +203,9 @@ class ActualizarContadorOfertasEspecificaciones extends Command
                         continue;
                     }
                     
-                    // Contar ofertas que coinciden con esta sublínea
-                    $count = 0;
-                    
-                    foreach ($ofertasActivas as $oferta) {
-                        $ofertaEspecificaciones = $oferta->especificaciones_internas;
-                        
-                        if (!$ofertaEspecificaciones || !is_array($ofertaEspecificaciones)) {
-                            continue;
-                        }
-                        
-                        // Verificar si la oferta tiene esta línea principal
-                        if (!isset($ofertaEspecificaciones[$lineaId])) {
-                            continue;
-                        }
-                        
-                        $ofertaSublineas = $ofertaEspecificaciones[$lineaId];
-                        
-                        // Manejar array de IDs o array de objetos
-                        if (!is_array($ofertaSublineas)) {
-                            $ofertaSublineas = [$ofertaSublineas];
-                        }
-                        
-                        // Verificar si alguna sublínea de la oferta coincide
-                        foreach ($ofertaSublineas as $ofertaSublinea) {
-                            $ofertaSublineaId = null;
-                            
-                            if (is_array($ofertaSublinea) && isset($ofertaSublinea['id'])) {
-                                $ofertaSublineaId = $ofertaSublinea['id'];
-                            } elseif (is_string($ofertaSublinea) || is_numeric($ofertaSublinea)) {
-                                $ofertaSublineaId = $ofertaSublinea;
-                            }
-                            
-                            if ($ofertaSublineaId && (string)$ofertaSublineaId === (string)$sublineaId) {
-                                $count++;
-                                break; // Solo contar una vez por oferta
-                            }
-                        }
-                    }
+                    // Contar ofertas que coinciden con esta sublínea (usando el mapa precomputado)
+                    $sublineaIdStr = (string) $sublineaId;
+                    $count = $conteosPorLineaSublinea[$lineaIdStr][$sublineaIdStr] ?? 0;
                     
                     // Actualizar el contador en la estructura
                     if (is_array($sublinea)) {

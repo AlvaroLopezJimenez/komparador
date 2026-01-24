@@ -7,6 +7,7 @@ use App\Models\Chollo;
 use Illuminate\Http\Request;
 use App\Models\Producto;
 use App\Models\OfertaProducto;
+use App\Models\Aviso;
 use App\Models\HistoricoPrecioOferta;
 use Carbon\Carbon;
 use Illuminate\Support\Arr;
@@ -18,6 +19,54 @@ use App\Services\CalcularPrecioUnidad;
 
 class OfertaProductoController extends Controller
 {
+    private function parsePrecioToFloat($value): ?float
+    {
+        if ($value === null) {
+            return null;
+        }
+        if (is_string($value)) {
+            $value = trim($value);
+            if ($value === '') {
+                return null;
+            }
+            $value = str_replace(',', '.', $value);
+        }
+        if (!is_numeric($value)) {
+            return null;
+        }
+        return (float) $value;
+    }
+
+    private function esPrecioCero($value): bool
+    {
+        $v = $this->parsePrecioToFloat($value);
+        return $v !== null && abs($v) < 0.0000001;
+    }
+
+    private function crearAvisoSinStockSiNoExiste(OfertaProducto $oferta): void
+    {
+        $fechaAviso = now()->addDays(4)->setTime(0, 1, 0);
+        $texto = 'Sin stock - 1a vez';
+
+        $existe = Aviso::where('avisoable_type', OfertaProducto::class)
+            ->where('avisoable_id', $oferta->id)
+            ->where('texto_aviso', $texto)
+            ->where('fecha_aviso', $fechaAviso)
+            ->exists();
+
+        if ($existe) {
+            return;
+        }
+
+        Aviso::create([
+            'texto_aviso' => $texto,
+            'fecha_aviso' => $fechaAviso,
+            'user_id' => auth()->id(),
+            'avisoable_type' => OfertaProducto::class,
+            'avisoable_id' => $oferta->id,
+            'oculto' => false,
+        ]);
+    }
     public function index(Producto $producto, Request $request)
     {
         $perPage = $request->input('perPage', 20);
@@ -140,6 +189,12 @@ class OfertaProductoController extends Controller
 
     public function update(Request $request, OfertaProducto $oferta)
     {
+        // Reemplazar comas por puntos en los campos numéricos antes de validar
+        $request->merge([
+            'precio_total' => str_replace(',', '.', $request->precio_total),
+            'precio_unidad' => str_replace(',', '.', $request->precio_unidad),
+        ]);
+
         $validated = $request->validate([
             'producto_id' => 'required|exists:productos,id',
             'tienda_id' => 'required|exists:tiendas,id',
@@ -326,6 +381,11 @@ class OfertaProductoController extends Controller
             'frecuencia_chollo_unidad',
         ]);
 
+        $precioCero = $this->esPrecioCero($request->input('precio_total')) || $this->esPrecioCero($request->input('precio_unidad'));
+        if ($precioCero) {
+            $datosBase['mostrar'] = 'no';
+        }
+
         $datosBase['chollo_id'] = $esOfertaChollo ? $request->input('chollo_id') : null;
         $datosBase['fecha_inicio'] = $esOfertaChollo ? $this->parseNullableDateTime($request->input('fecha_inicio')) : null;
         $datosBase['fecha_final'] = $esOfertaChollo ? $this->parseNullableDateTime($request->input('fecha_final')) : null;
@@ -355,6 +415,11 @@ class OfertaProductoController extends Controller
         if ($request->filled('fecha_actualizacion_manual')) {
             $oferta->updated_at = \Carbon\Carbon::parse($request->input('fecha_actualizacion_manual'));
             $oferta->save();
+        }
+
+        // Si el precio final es 0, crear aviso de "Sin stock - 1a vez" a 4 días (después de guardar)
+        if ($precioCero) {
+            $this->crearAvisoSinStockSiNoExiste($oferta);
         }
 
         // Rehabilitar timestamps automáticos
@@ -562,6 +627,12 @@ class OfertaProductoController extends Controller
             'frecuencia_chollo_unidad',
         ]);
 
+        // Si el precio final es 0, forzar no mostrar (antes de crear)
+        $precioCero = $this->esPrecioCero($request->input('precio_total')) || $this->esPrecioCero($request->input('precio_unidad'));
+        if ($precioCero) {
+            $datosBase['mostrar'] = 'no';
+        }
+
         $datosBase['chollo_id'] = $esOfertaChollo ? $request->input('chollo_id') : null;
         $datosBase['fecha_inicio'] = $esOfertaChollo ? $this->parseNullableDateTime($request->input('fecha_inicio')) : null;
         $datosBase['fecha_final'] = $esOfertaChollo ? $this->parseNullableDateTime($request->input('fecha_final')) : null;
@@ -587,6 +658,11 @@ class OfertaProductoController extends Controller
             $oferta->updated_at = \Carbon\Carbon::parse($request->input('fecha_actualizacion_manual'));
             $oferta->save();
             $oferta->timestamps = true;
+        }
+
+        // Si el precio final es 0, crear aviso de "Sin stock - 1a vez" a 4 días
+        if ($precioCero) {
+            $this->crearAvisoSinStockSiNoExiste($oferta);
         }
 
         return redirect()->route('admin.ofertas.todas')->with('success', 'Oferta añadida correctamente');

@@ -118,9 +118,9 @@
                             <div>
                                 <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">Precio total (€) *</label>
                                 <div class="flex gap-2">
-                                    <input type="number" name="precio_total" step="0.01" required
+                                    <input type="number" name="precio_total" step="0.001" max="9999.999" required
                                         value="{{ old('precio_total', $oferta->precio_total ?? '') }}"
-                                        class="flex-1 px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border">
+                                        class="flex-1 px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border focus:outline-none focus:ring-2 focus:ring-blue-500">
                                     <button type="button" id="btnObtenerPrecio" onclick="obtenerPrecioAutomatico()"
                                         class="px-3 py-2 bg-green-500 hover:bg-green-600 text-white rounded transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                                         title="Obtener Precio">
@@ -134,9 +134,9 @@
                             {{-- PRECIO POR UNIDAD --}}
                             <div>
                                 <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">Precio por unidad (€) *</label>
-                                <input type="number" name="precio_unidad" step="0.0001" required
+                                <input type="number" name="precio_unidad" step="0.001" max="9999.999" required
                                     value="{{ old('precio_unidad', $oferta->precio_unidad ?? '') }}"
-                                    class="w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border">
+                                    class="w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 @error('precio_unidad')
                                 <p class="text-sm text-red-500 mt-1">{{ $message }}</p>
                                 @enderror
@@ -733,6 +733,38 @@
                     <div class="flex justify-end mt-6">
                         <button type="button" onclick="cerrarModalVariante()" 
                             class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500">
+                            Cerrar
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Modal SOLO LECTURA para ver imágenes de una sublínea (especificaciones internas en ofertas) --}}
+            <div id="modal-imagenes-sublinea-oferta" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                <div class="bg-white dark:bg-gray-900 rounded-lg p-6 max-w-5xl w-full relative shadow-xl max-h-[90vh] flex flex-col">
+                    <button type="button" onclick="cerrarModalImagenesSublineaOferta()" class="absolute top-3 right-4 text-xl text-gray-800 dark:text-gray-100 hover:text-gray-600 dark:hover:text-gray-300 z-10">×</button>
+                    <div class="mb-4">
+                        <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200">Imágenes de la sublínea</h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Haz clic en una miniatura para verla en grande</p>
+                    </div>
+                    <div class="flex-1 overflow-y-auto">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div class="md:col-span-2">
+                                <div class="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 flex items-center justify-center" style="min-height: 400px;">
+                                    <img id="imagen-grande-sublinea-oferta" src="" alt="" class="max-w-full max-h-96 object-contain rounded">
+                                </div>
+                            </div>
+                            <div class="md:col-span-1">
+                                <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3">Miniaturas</h4>
+                                <div id="miniaturas-container-sublinea-oferta" class="space-y-2 max-h-96 overflow-y-auto">
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">No hay imágenes</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex justify-end gap-3 mt-4">
+                        <button type="button" onclick="cerrarModalImagenesSublineaOferta()"
+                            class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600">
                             Cerrar
                         </button>
                     </div>
@@ -1405,6 +1437,9 @@
              
              // Actualizar desplegable de como_scrapear según la tienda
              actualizarComoScrapearSegunTienda(tienda.id);
+
+             // Auto-sugerir "Actualizar cada" según la frecuencia más común de la tienda
+             aplicarFrecuenciaMasComunDeTienda(tienda.id);
              
              // Si el checkbox del chollo está marcado, verificar si existe otra oferta con chollo
              const cholloCheckbox = document.getElementById('es_chollo_checkbox');
@@ -1508,6 +1543,82 @@
                  opcionManual.disabled = false;
                  opcionAutomatico.style.opacity = '1';
                  opcionManual.style.opacity = '1';
+             }
+         }
+
+         // ===========================
+         // AUTO "ACTUALIZAR CADA" POR TIENDA (usa TiendaController@obtenerDesgloseTiempos)
+         // ===========================
+         let frecuenciaActualizarTouched = false;
+
+         function minutosAValorUnidad(minutos) {
+             const m = Number(minutos);
+             if (!Number.isFinite(m) || m <= 0) {
+                 return { valor: 1, unidad: 'dias' };
+             }
+             // Preferir días si es exacto, luego horas, si no minutos
+             if (Number.isInteger(m) && m % 1440 === 0) {
+                 return { valor: m / 1440, unidad: 'dias' };
+             }
+             if (Number.isInteger(m) && m % 60 === 0) {
+                 return { valor: m / 60, unidad: 'horas' };
+             }
+             return { valor: m, unidad: 'minutos' };
+         }
+
+         async function aplicarFrecuenciaMasComunDeTienda(tiendaId, opciones = {}) {
+             const inputValor = document.querySelector('[name="frecuencia_valor"]');
+             const selectUnidad = document.querySelector('[name="frecuencia_unidad"]');
+             if (!inputValor || !selectUnidad) return;
+
+             const ofertaId = {{ $oferta ? $oferta->id : 'null' }};
+             const esNuevaOferta = ofertaId === 'null' || ofertaId === null;
+             const force = !!opciones.force;
+
+             // En edición, no pisar si el usuario ya tocó el campo
+             if (!force && !esNuevaOferta && frecuenciaActualizarTouched) {
+                 return;
+             }
+
+             if (!tiendaId) return;
+
+             try {
+                 const response = await fetch(`/panel-privado/tiendas/${tiendaId}/desglose-tiempos`);
+                 const data = await response.json();
+                 const desglose = Array.isArray(data?.desglose) ? data.desglose : [];
+
+                 if (desglose.length === 0) {
+                     // Sin datos: dejar como está
+                     return;
+                 }
+
+                 // Elegir la moda (mayor cantidad). En empate, menor minutos.
+                 let mejor = null;
+                 for (const item of desglose) {
+                     const cantidad = Number(item?.cantidad ?? 0);
+                     const minutos = Number(item?.minutos ?? 0);
+                     if (!Number.isFinite(minutos) || minutos <= 0) continue;
+
+                     if (!mejor) {
+                         mejor = { cantidad, minutos };
+                         continue;
+                     }
+                     if (cantidad > mejor.cantidad) {
+                         mejor = { cantidad, minutos };
+                         continue;
+                     }
+                     if (cantidad === mejor.cantidad && minutos < mejor.minutos) {
+                         mejor = { cantidad, minutos };
+                     }
+                 }
+
+                 if (!mejor) return;
+
+                 const convertido = minutosAValorUnidad(mejor.minutos);
+                 inputValor.value = convertido.valor;
+                 selectUnidad.value = convertido.unidad;
+             } catch (e) {
+                 console.error('Error al obtener desglose de tiempos de tienda:', e);
              }
          }
 
@@ -2059,6 +2170,24 @@
                 actualizarComoScrapearSegunTienda(tiendaIdAlCargar);
             }
 
+            // Marcar como "tocado" si el usuario cambia manualmente el campo de frecuencia
+            const inputFrecuenciaValor = document.querySelector('[name="frecuencia_valor"]');
+            const selectFrecuenciaUnidad = document.querySelector('[name="frecuencia_unidad"]');
+            if (inputFrecuenciaValor) {
+                inputFrecuenciaValor.addEventListener('input', () => { frecuenciaActualizarTouched = true; });
+                inputFrecuenciaValor.addEventListener('change', () => { frecuenciaActualizarTouched = true; });
+            }
+            if (selectFrecuenciaUnidad) {
+                selectFrecuenciaUnidad.addEventListener('change', () => { frecuenciaActualizarTouched = true; });
+            }
+
+            // Si estamos creando oferta nueva y ya hay tienda seleccionada al cargar, sugerir frecuencia
+            const ofertaIdCarga = {{ $oferta ? $oferta->id : 'null' }};
+            const esNuevaOfertaCarga = ofertaIdCarga === 'null' || ofertaIdCarga === null;
+            if (esNuevaOfertaCarga && tiendaIdAlCargar) {
+                aplicarFrecuenciaMasComunDeTienda(tiendaIdAlCargar, { force: true });
+            }
+
             const actualizarEstadoChollo = (activo) => {
                 if (!cholloFields) {
                     return;
@@ -2400,6 +2529,12 @@
            
             const form = document.querySelector('form');
             form.addEventListener('submit', function(e) {
+        // Confirmación final: si el precio está en 0, forzar "no mostrar" y mostrar info
+        if (typeof _precioInputsEsCeroConfirmado === 'function' && _precioInputsEsCeroConfirmado()) {
+            _setMostrarNoPorPrecioCero();
+            _setAvisoInfoPrecioCero(true);
+        }
+
                 const productoId = document.getElementById('producto_id').value;
                 const urlInput = document.getElementById('url_input');
                 const urlValue = urlInput.value.trim();
@@ -2510,6 +2645,175 @@ let urlValidationInProgress = false;
 let urlIsValid = false;
 let urlDuplicateConfirmed = false;
 
+// =======================
+// VALIDACIÓN MAX PRECIO
+// =======================
+// Nota: el usuario escribe "9999,999" pero el input type="number" trabaja internamente con punto.
+window.MAX_PRECIO_OFERTA = 9999.999;
+window.MAX_DECIMALES_PRECIO_OFERTA = 3;
+window.PRECIO_CERO_DIAS_AVISO = 4;
+
+function normalizarNumeroOferta(valor) {
+    if (valor === null || valor === undefined) return NaN;
+    if (typeof valor === 'number') return valor;
+    const s = String(valor).trim();
+    if (!s) return NaN;
+    return parseFloat(s.replace(',', '.'));
+}
+
+function contarDecimalesOferta(valorRaw) {
+    if (valorRaw === null || valorRaw === undefined) return 0;
+    const s = String(valorRaw).trim();
+    if (!s) return 0;
+    // Soportar coma o punto como separador decimal. Si hay ambos, tomamos el último que aparezca.
+    const lastDot = s.lastIndexOf('.');
+    const lastComma = s.lastIndexOf(',');
+    const idx = Math.max(lastDot, lastComma);
+    if (idx === -1) return 0;
+    const dec = s.slice(idx + 1);
+    // Si el usuario escribe algo raro (ej: "12."), no contamos decimales
+    if (!dec) return 0;
+    // Si hay signos de notación científica, consideramos formato inválido para este caso
+    if (/e|E/.test(s)) return 999;
+    // Contar solo dígitos finales (si mete espacios o letras, lo consideramos inválido)
+    if (!/^\d+$/.test(dec)) return 999;
+    return dec.length;
+}
+
+window.validarPreciosMaximosEnFormulario = function validarPreciosMaximosEnFormulario() {
+    const inputTotal = document.querySelector('[name="precio_total"]');
+    const inputUnidad = document.querySelector('[name="precio_unidad"]');
+    if (!inputTotal || !inputUnidad) return true;
+
+    const max = window.MAX_PRECIO_OFERTA;
+    const maxDec = window.MAX_DECIMALES_PRECIO_OFERTA ?? 3;
+    const total = normalizarNumeroOferta(inputTotal.value);
+    const unidad = normalizarNumeroOferta(inputUnidad.value);
+
+    const totalDec = contarDecimalesOferta(inputTotal.value);
+    const unidadDec = contarDecimalesOferta(inputUnidad.value);
+
+    const totalExcede = Number.isFinite(total) && total > max;
+    const unidadExcede = Number.isFinite(unidad) && unidad > max;
+    const totalDecimalesInvalidos = inputTotal.value && totalDec > maxDec;
+    const unidadDecimalesInvalidos = inputUnidad.value && unidadDec > maxDec;
+
+    const marcar = (input, invalido) => {
+        // Borde + ring (y quitar el contorno azul de focus cuando hay error)
+        input.classList.toggle('border-red-500', invalido);
+        input.classList.toggle('ring-2', invalido);
+        input.classList.toggle('ring-red-500', invalido);
+        input.classList.toggle('focus:ring-red-500', invalido);
+        if (invalido) {
+            input.classList.remove('focus:ring-blue-500');
+        } else {
+            // Restaurar el focus azul normal si estaba presente en el input
+            input.classList.add('focus:ring-blue-500');
+            input.classList.remove('focus:ring-red-500');
+            input.classList.remove('ring-2', 'ring-red-500');
+            input.classList.remove('border-red-500');
+        }
+        input.setAttribute('aria-invalid', invalido ? 'true' : 'false');
+    };
+
+    const totalInvalido = totalExcede || totalDecimalesInvalidos;
+    const unidadInvalido = unidadExcede || unidadDecimalesInvalidos;
+
+    // Mensaje de validación nativo (por si se intenta enviar)
+    inputTotal.setCustomValidity(
+        totalExcede
+            ? `El precio total no puede superar ${String(max).replace('.', ',')}`
+            : (totalDecimalesInvalidos ? `Máximo ${maxDec} decimales` : '')
+    );
+    inputUnidad.setCustomValidity(
+        unidadExcede
+            ? `El precio por unidad no puede superar ${String(max).replace('.', ',')}`
+            : (unidadDecimalesInvalidos ? `Máximo ${maxDec} decimales` : '')
+    );
+
+    marcar(inputTotal, totalInvalido);
+    marcar(inputUnidad, unidadInvalido);
+
+    return !(totalInvalido || unidadInvalido);
+};
+
+// =======================
+// PRECIO 0 => NO MOSTRAR + INFO + AVISO SIN STOCK (+4 días)
+// (Se dispara solo al "confirmar" el 0: blur/change o submit; evita el caso 0,25 mientras escribes)
+// =======================
+let _precioCeroAutoAplicado = false;
+let _mostrarPrevioAntesDeCero = null;
+let _mostrarTouched = false;
+
+function _rawEsCeroConfirmado(raw) {
+    const s = String(raw ?? '').trim();
+    if (!s) return false;
+    // No considerar confirmados valores incompletos tipo "0," o "0."
+    if (s.endsWith(',') || s.endsWith('.')) return false;
+    return /^0+(?:[.,]0+)?$/.test(s);
+}
+
+function _precioInputsEsCeroConfirmado() {
+    const total = document.querySelector('[name="precio_total"]')?.value;
+    const unidad = document.querySelector('[name="precio_unidad"]')?.value;
+    return _rawEsCeroConfirmado(total) || _rawEsCeroConfirmado(unidad);
+}
+
+function _setMostrarNoPorPrecioCero() {
+    const radioNo = document.querySelector('input[name="mostrar"][value="no"]');
+    const radioSi = document.querySelector('input[name="mostrar"][value="si"]');
+    if (!radioNo || !radioSi) return;
+
+    if (!_precioCeroAutoAplicado) {
+        const actual = (radioNo.checked ? 'no' : (radioSi.checked ? 'si' : null));
+        _mostrarPrevioAntesDeCero = actual;
+    }
+
+    radioNo.checked = true;
+    _precioCeroAutoAplicado = true;
+}
+
+function _setAvisoInfoPrecioCero(visible) {
+    const listaAvisos = document.getElementById('lista-avisos');
+    if (!listaAvisos) return;
+
+    let box = document.getElementById('sin-stock-auto-msg');
+    if (!box) {
+        box = document.createElement('div');
+        box.id = 'sin-stock-auto-msg';
+        box.className = 'hidden mb-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700 rounded-xl p-4';
+        box.innerHTML = `
+            <div class="text-sm text-yellow-800 dark:text-yellow-200 font-semibold mb-1">
+                Precio 0 detectado
+            </div>
+            <div class="text-sm text-yellow-700 dark:text-yellow-300">
+                Al poner precio 0, la oferta se pone en <strong>no mostrar</strong> y al guardar se generará un aviso de <strong>“Sin stock - 1a vez”</strong> a <strong>${window.PRECIO_CERO_DIAS_AVISO} días</strong>.
+            </div>
+        `;
+        // Insertar justo encima del listado de avisos
+        listaAvisos.parentNode.insertBefore(box, listaAvisos);
+    }
+
+    if (visible) box.classList.remove('hidden');
+    else box.classList.add('hidden');
+}
+
+function _manejarPrecioCeroAuto() {
+    const esCero = _precioInputsEsCeroConfirmado();
+    if (esCero) {
+        _setMostrarNoPorPrecioCero();
+        _setAvisoInfoPrecioCero(true);
+    } else {
+        _setAvisoInfoPrecioCero(false);
+        // Opcional: si lo pusimos automáticamente y el usuario no tocó "mostrar", restaurar
+        if (_precioCeroAutoAplicado && !_mostrarTouched && _mostrarPrevioAntesDeCero === 'si') {
+            const radioSi = document.querySelector('input[name="mostrar"][value="si"]');
+            if (radioSi) radioSi.checked = true;
+        }
+        _precioCeroAutoAplicado = false;
+    }
+}
+
 // Función para guardar estado de validación en localStorage
 function guardarEstadoValidacion() {
     const estado = {
@@ -2567,6 +2871,23 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Obtener el ID de la oferta si estamos editando
     const ofertaId = {{ $oferta ? $oferta->id : 'null' }};
+
+    // Track si el usuario toca manualmente "mostrar"
+    document.querySelectorAll('input[name="mostrar"]').forEach(r => {
+        r.addEventListener('change', () => { _mostrarTouched = true; });
+    });
+
+    // Precio 0: disparar al confirmar (blur/change) para evitar el caso 0,25 mientras escribes
+    const precioTotalInput = document.querySelector('[name="precio_total"]');
+    const precioUnidadInput = document.querySelector('[name="precio_unidad"]');
+    if (precioTotalInput) {
+        precioTotalInput.addEventListener('blur', _manejarPrecioCeroAuto);
+        precioTotalInput.addEventListener('change', _manejarPrecioCeroAuto);
+    }
+    if (precioUnidadInput) {
+        precioUnidadInput.addEventListener('blur', _manejarPrecioCeroAuto);
+        precioUnidadInput.addEventListener('change', _manejarPrecioCeroAuto);
+    }
     
     // Función para validar URL
     async function validarUrl(url) {
@@ -2682,6 +3003,9 @@ document.addEventListener('DOMContentLoaded', function() {
             // Función para actualizar estado del botón
         function actualizarEstadoBoton() {
             const urlValue = urlInput.value.trim();
+        const preciosOk = typeof window.validarPreciosMaximosEnFormulario === 'function'
+            ? window.validarPreciosMaximosEnFormulario()
+            : true;
             
             if (urlValidationInProgress) {
                 btnGuardar.disabled = true;
@@ -2696,10 +3020,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 btnGuardar.disabled = false;
                 btnGuardar.textContent = 'Guardar oferta';
             }
+
+        // Si el precio supera el máximo, forzar deshabilitado (sin pisar el texto actual).
+        if (!preciosOk) {
+            btnGuardar.disabled = true;
+            btnGuardar.title = `El precio total y el precio por unidad no pueden superar ${window.MAX_PRECIO_OFERTA.toString().replace('.', ',')} €`;
+        } else if (btnGuardar.title && btnGuardar.title.includes('no pueden superar')) {
+            btnGuardar.title = '';
+        }
             
             // Guardar estado en localStorage
             guardarEstadoValidacion();
         }
+
+    // Exponer para que otros validadores (p.ej. precios) puedan recalcular el estado del botón
+    window.actualizarEstadoBotonUrl = actualizarEstadoBoton;
     
     // Función para limpiar URL de Amazon
     function limpiarUrlAmazon(url) {
@@ -2871,6 +3206,46 @@ document.addEventListener('DOMContentLoaded', function() {
     observer.observe(btnGuardarContainer);
 });
 
+// Validación reactiva de precios (rojo + bloqueo de submit)
+document.addEventListener('DOMContentLoaded', function() {
+    const inputTotal = document.querySelector('[name="precio_total"]');
+    const inputUnidad = document.querySelector('[name="precio_unidad"]');
+    const form = document.querySelector('form');
+    if (!inputTotal || !inputUnidad || !form) return;
+
+    const recalcularEstados = () => {
+        if (typeof window.validarPreciosMaximosEnFormulario === 'function') {
+            window.validarPreciosMaximosEnFormulario();
+        }
+        if (typeof window.actualizarEstadoBotonUrl === 'function') {
+            window.actualizarEstadoBotonUrl();
+        }
+        if (typeof window.actualizarEstadoBotonGuardar === 'function') {
+            window.actualizarEstadoBotonGuardar();
+        }
+    };
+
+    inputTotal.addEventListener('input', recalcularEstados);
+    inputUnidad.addEventListener('input', recalcularEstados);
+
+    // Estado inicial
+    recalcularEstados();
+
+    // Bloquear submit siempre que exceda el máximo (por si algún otro script re-habilita el botón)
+    form.addEventListener('submit', function(e) {
+        const ok = typeof window.validarPreciosMaximosEnFormulario === 'function'
+            ? window.validarPreciosMaximosEnFormulario()
+            : true;
+        if (!ok) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            alert(`El precio total y/o el precio por unidad no pueden superar ${window.MAX_PRECIO_OFERTA.toString().replace('.', ',')} €.`);
+            return false;
+        }
+    }, { capture: true, passive: false });
+});
+
 document.addEventListener('DOMContentLoaded', function() {
     const btnFechaFinalAhora = document.getElementById('chollo_fecha_final_ahora');
     const btnComprobadaAhora = document.getElementById('chollo_comprobada_ahora');
@@ -2904,6 +3279,35 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Variable global para almacenar información del producto actual
 let productoActualOferta = null;
+// Imágenes por sublínea (solo lectura) para el formulario de ofertas
+window.__ofertaImagenesSublinea = window.__ofertaImagenesSublinea || {};
+window.__ofertaImagenesSublineaActual = { key: null, imagenes: [] };
+
+function obtenerImagenesProductoOferta() {
+    const producto = productoActualOferta || null;
+    const out = [];
+    const add = (val) => {
+        if (!val) return;
+        if (Array.isArray(val)) {
+            val.forEach(add);
+            return;
+        }
+        if (typeof val === 'string') {
+            const v = val.trim();
+            if (v) out.push(v);
+        }
+    };
+
+    // Campos reales del modelo/API
+    add(producto?.imagen_grande);
+    add(producto?.imagen_pequena);
+
+    // Compatibilidad (por si en algún sitio se expone con otros nombres)
+    add(producto?.imagenes_grandes);
+    add(producto?.imagenes_pequenas);
+
+    return Array.from(new Set(out));
+}
 
 // ESPECIFICACIONES INTERNAS
 async function cargarEspecificacionesInternas(productoId) {
@@ -3013,7 +3417,7 @@ async function cargarEspecificacionesInternas(productoId) {
         const columnasProducto = esUnidadUnica && especificacionesElegidas._columnas ? especificacionesElegidas._columnas : [];
         
         // Mostrar los desplegables solo con las sublíneas marcadas como "Oferta"
-        mostrarDesplegablesEspecificaciones(filtrosFiltrados, especificacionesGuardadas, esUnidadUnica, columnasProducto);
+        mostrarDesplegablesEspecificaciones(filtrosFiltrados, especificacionesGuardadas, esUnidadUnica, columnasProducto, especificacionesElegidas);
         
     } catch (error) {
         console.error('Error al cargar especificaciones internas:', error);
@@ -3021,11 +3425,14 @@ async function cargarEspecificacionesInternas(productoId) {
     }
 }
 
-function mostrarDesplegablesEspecificaciones(filtros, especificacionesGuardadas = {}, esUnidadUnica = false, columnasProducto = []) {
+function mostrarDesplegablesEspecificaciones(filtros, especificacionesGuardadas = {}, esUnidadUnica = false, columnasProducto = [], especificacionesElegidas = {}) {
     const container = document.getElementById('especificaciones-internas-container');
     const inputHidden = document.getElementById('especificaciones_internas_input');
     
     if (!container) return;
+
+    // Reset del mapa de imágenes en cada render (para evitar datos desactualizados)
+    window.__ofertaImagenesSublinea = {};
     
     let html = '<p class="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-4">Marca las opciones deseadas en cada línea principal:</p>';
     html += '<div class="space-y-4">';
@@ -3077,11 +3484,75 @@ function mostrarDesplegablesEspecificaciones(filtros, especificacionesGuardadas 
                 String(selected) === String(idSublinea)
             );
             const esColumnaMarcada = columnaGuardada && String(columnaGuardada) === String(idSublinea);
+
+            // --- Imágenes de sublínea (solo ver) ---
+            const keyImg = `${String(idPrincipal)}::${String(idSublinea)}`;
+            const imagenesSublinea = [];
+            let usarImagenesProducto = false;
+            const addImgs = (val) => {
+                if (!val) return;
+                if (Array.isArray(val)) {
+                    val.forEach(addImgs);
+                    return;
+                }
+                if (typeof val === 'string') {
+                    const v = val.trim();
+                    if (v) imagenesSublinea.push(v);
+                }
+            };
+            // Soportar estructura en la propia sublínea
+            addImgs(sub.imagenes ?? sub.imagen);
+            // Soportar estructura en "especificacionesElegidas" (donde suele guardarse `img`)
+            try {
+                const elegidas = especificacionesElegidas ? especificacionesElegidas[idPrincipal] : null;
+                if (Array.isArray(elegidas)) {
+                    const item = elegidas.find(it => {
+                        if (typeof it === 'string' || typeof it === 'number') {
+                            return String(it) === String(idSublinea);
+                        }
+                        if (it && typeof it === 'object' && it.id) {
+                            return String(it.id) === String(idSublinea);
+                        }
+                        return false;
+                    });
+                    if (item && typeof item === 'object') {
+                        usarImagenesProducto = item.usarImagenesProducto === true;
+                        addImgs(item.img ?? item.imagenes ?? item.imagen);
+                    }
+                }
+            } catch (e) {
+                // Silenciar: no bloquea el render
+            }
+            let imagenesUnicas = Array.from(new Set(imagenesSublinea));
+
+            // Si la sublínea está marcada como "imag. producto", usar imágenes del producto asociado a la oferta
+            if (usarImagenesProducto) {
+                imagenesUnicas = obtenerImagenesProductoOferta();
+            }
+
+            if (imagenesUnicas.length > 0) {
+                window.__ofertaImagenesSublinea[keyImg] = imagenesUnicas;
+            }
             
             html += `<div class="flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-700 p-2 rounded">`;
             html += `<label class="flex items-center gap-2 cursor-pointer flex-1">`;
             html += `<input type="checkbox" class="especificacion-checkbox rounded border-gray-300 text-green-600 focus:ring-green-500" data-principal-id="${idPrincipal}" data-sublinea-id="${idSublinea}" data-sublinea-texto="${textoSublinea.replace(/"/g, '&quot;')}" ${isChecked ? 'checked' : ''}>`;
             html += `<span class="text-sm text-gray-700 dark:text-gray-300">${textoSublinea}</span>`;
+
+            // Botón para ver imágenes (justo a continuación del nombre de la sublínea)
+            // - Si hay imágenes: botón activo
+            // - Si está en "imag. producto" pero el producto no tiene imágenes: mostrar botón deshabilitado con "0 imágenes"
+            if (imagenesUnicas.length > 0 || usarImagenesProducto) {
+                const n = imagenesUnicas.length;
+                const deshabilitado = n === 0;
+                html += `<button type="button"
+                                class="btn-ver-imagenes-sublinea-oferta text-xs px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors ml-1 ${deshabilitado ? 'opacity-50 cursor-not-allowed' : ''}"
+                                data-key="${keyImg}"
+                                ${deshabilitado ? 'disabled' : ''}
+                                title="${deshabilitado ? 'El producto no tiene imágenes' : `Ver ${n} imagen${n !== 1 ? 'es' : ''}`}">
+                            ${n} imagen${n !== 1 ? 'es' : ''}
+                         </button>`;
+            }
             
             // Icono de ayuda "?" solo en la primera sublínea
             if (esPrimeraSublinea) {
@@ -3208,6 +3679,9 @@ function mostrarDesplegablesEspecificaciones(filtros, especificacionesGuardadas 
         
         // Configurar tooltips con click
         configurarTooltipsOfertas(container);
+
+        // Configurar botones de imágenes (solo lectura)
+        configurarBotonesImagenesSublineasOferta(container);
         
         // Validar todas las líneas principales que tienen checkbox de columna al cargar
         if (esUnidadUnica && columnasProducto.length > 0) {
@@ -3226,6 +3700,123 @@ function mostrarDesplegablesEspecificaciones(filtros, especificacionesGuardadas 
         actualizarChipsSeleccionados();
     });
 }
+
+// ============ IMÁGENES EN SUBLÍNEAS (OFERTAS, SOLO VER) ============
+function configurarBotonesImagenesSublineasOferta(contenedor) {
+    if (!contenedor) return;
+    contenedor.querySelectorAll('.btn-ver-imagenes-sublinea-oferta').forEach(btn => {
+        if (btn.dataset.listenerAdded === 'true') return;
+        btn.dataset.listenerAdded = 'true';
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation(); // evitar que el click en el botón dispare el toggle del checkbox (está dentro del label)
+            const key = this.dataset.key;
+            abrirModalImagenesSublineaOferta(key);
+        });
+    });
+}
+
+function resolverUrlImagenOferta(imgPath) {
+    const publicBase = @json(url('/'));
+    const imagesBase = @json(asset('images/')); // incluye "/" final
+
+    if (!imgPath) return '';
+    let p = String(imgPath).trim();
+    if (!p) return '';
+
+    // URL absoluta
+    if (/^https?:\/\//i.test(p)) return p;
+    if (/^\/\//.test(p)) return p;
+
+    // Normalizar: quitar slashes iniciales
+    p = p.replace(/^\/+/, '');
+
+    // Si ya viene con "images/..." (muy común), no lo dupliques.
+    if (/^images\//i.test(p)) {
+        return `${String(publicBase).replace(/\/+$/, '')}/${p}`;
+    }
+
+    // Asegurar exactamente una "/" entre base y ruta
+    return `${String(imagesBase).replace(/\/+$/, '')}/${p}`;
+}
+
+window.abrirModalImagenesSublineaOferta = function(key) {
+    const modal = document.getElementById('modal-imagenes-sublinea-oferta');
+    if (!modal) return;
+    const imagenes = (window.__ofertaImagenesSublinea && window.__ofertaImagenesSublinea[key]) ? window.__ofertaImagenesSublinea[key] : [];
+    window.__ofertaImagenesSublineaActual = { key, imagenes: Array.isArray(imagenes) ? imagenes : [] };
+    renderizarMiniaturasSublineaOferta();
+    modal.classList.remove('hidden');
+};
+
+window.cerrarModalImagenesSublineaOferta = function() {
+    const modal = document.getElementById('modal-imagenes-sublinea-oferta');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    window.__ofertaImagenesSublineaActual = { key: null, imagenes: [] };
+};
+
+function renderizarMiniaturasSublineaOferta() {
+    const container = document.getElementById('miniaturas-container-sublinea-oferta');
+    const imgGrande = document.getElementById('imagen-grande-sublinea-oferta');
+    if (!container || !imgGrande) return;
+
+    container.innerHTML = '';
+
+    const imagenes = (window.__ofertaImagenesSublineaActual && Array.isArray(window.__ofertaImagenesSublineaActual.imagenes))
+        ? window.__ofertaImagenesSublineaActual.imagenes
+        : [];
+
+    if (imagenes.length === 0) {
+        imgGrande.src = '';
+        imgGrande.alt = 'No hay imágenes';
+        container.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400">No hay imágenes</p>';
+        return;
+    }
+
+    // Mostrar primera imagen como grande
+    if (imagenes[0]) {
+        imgGrande.src = resolverUrlImagenOferta(imagenes[0]);
+        imgGrande.alt = 'Imagen 1';
+    }
+
+    // Miniaturas (solo click, sin reordenar)
+    imagenes.forEach((imgPath, index) => {
+        const div = document.createElement('div');
+        div.className = 'miniatura-sublinea-oferta cursor-pointer border-2 border-gray-300 dark:border-gray-600 rounded p-1 hover:border-blue-500 transition-colors';
+        if (index === 0) div.classList.add('border-blue-500');
+
+        const url = resolverUrlImagenOferta(imgPath);
+        div.innerHTML = `<img src="${url}" alt="Miniatura ${index + 1}" class="w-full h-20 object-cover rounded">`;
+
+        div.addEventListener('click', () => {
+            imgGrande.src = url;
+            imgGrande.alt = `Imagen ${index + 1}`;
+            container.querySelectorAll('.miniatura-sublinea-oferta').forEach(m => m.classList.remove('border-blue-500'));
+            div.classList.add('border-blue-500');
+        });
+
+        container.appendChild(div);
+    });
+}
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        if (!document.getElementById('modal-imagenes-sublinea-oferta')?.classList.contains('hidden')) {
+            window.cerrarModalImagenesSublineaOferta();
+        }
+    }
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('modal-imagenes-sublinea-oferta');
+    if (!modal) return;
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            window.cerrarModalImagenesSublineaOferta();
+        }
+    });
+});
 
 // Función para validar si una línea principal con checkbox de columna tiene al menos una opción marcada
 function validarColumnaOferta(contenedor, principalId) {
@@ -3304,6 +3895,15 @@ function actualizarEstadoBotonGuardar() {
         btnGuardar.title = 'Debes marcar una opción de columna en todas las líneas principales que tienen checkboxes de columna';
     } else {
         btnGuardar.title = '';
+    }
+
+    // Respetar también el límite máximo de precio
+    const preciosOk = typeof window.validarPreciosMaximosEnFormulario === 'function'
+        ? window.validarPreciosMaximosEnFormulario()
+        : true;
+    if (!preciosOk) {
+        btnGuardar.disabled = true;
+        btnGuardar.title = `El precio total y el precio por unidad no pueden superar ${window.MAX_PRECIO_OFERTA.toString().replace('.', ',')} €`;
     }
 }
 

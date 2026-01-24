@@ -1570,6 +1570,9 @@ public function generarContenido(Request $request)
             'id' => $producto->id,
             'nombre' => $producto->nombre,
             'unidadDeMedida' => $producto->unidadDeMedida,
+            // Imágenes del producto (para "usarImagenesProducto" en especificaciones internas, etc.)
+            'imagen_grande' => $producto->imagen_grande ?? [],
+            'imagen_pequena' => $producto->imagen_pequena ?? [],
             'categoria_id_especificaciones_internas' => $producto->categoria_id_especificaciones_internas,
             'categoria_especificaciones_internas_elegidas' => $producto->categoria_especificaciones_internas_elegidas,
             'grupos_de_ofertas' => $producto->grupos_de_ofertas
