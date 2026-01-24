@@ -1401,12 +1401,12 @@ class ClickController extends Controller
         $base = $oferta->url;
         $sep  = parse_url($base, PHP_URL_QUERY) ? '&' : '?'; // Detecta si ya tiene parámetros
         
-        if ($oferta->tienda_id == 11) {
+        if ($oferta->tienda_id == 2) {
             // Amazon - añade tag de afiliado
-            return $base . $sep . 'tag=chopan-21';
+            return $base . $sep . 'tag=kmpa2-21';
         
-        } elseif ($oferta->tienda_id == 3) {
-            // AliExpress - añade múltiples parámetros de afiliado
+        } elseif ($oferta->tienda_id == 9999) {
+            // Ejemplo Aliexpress para cuando tengamos afiliacion
             return $base . $sep . http_build_query([
                 'tt'             => 'CPS_NORMAL',
                 'aff_platform'   => 'portals-tool',
@@ -1418,20 +1418,8 @@ class ClickController extends Controller
                 'terminal_id'    => '8131d8ed9f8045ca855f504617e42023',
             ], '', '&', PHP_QUERY_RFC3986);
         
-        } elseif ($oferta->tienda_id == 12) {
-            // Okfarma 
-            return 'https://www.awin1.com/cread.php?awinmid=23841&awinaffid=1302515&ued=' . $base;
-        
-        } elseif ($oferta->tienda_id == 2) {
-            // Corte Inglés
-            return 'https://www.awin1.com/cread.php?awinmid=13075&awinaffid=1302515&ued=' . $base;
-        
-        } elseif ($oferta->tienda_id == 30) {
-            // Clarel
-            return 'https://www.awin1.com/cread.php?awinmid=84669&awinaffid=1302515&ued=' . $base;
-        
-        } elseif ($oferta->tienda_id == 5) {
-            // Carrefour
+        }  elseif ($oferta->tienda_id == 99999) {
+            // Ejemplo Awin para cuando tengamos
             return 'https://www.awin1.com/cread.php?awinmid=25399&awinaffid=1302515&ued=' . $base;
         
         } else {

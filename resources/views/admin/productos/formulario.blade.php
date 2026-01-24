@@ -6214,6 +6214,13 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!datos || datos.length === 0) {
             actualizarJSONProducto();
         }
+        
+        // Validar después de cargar datos
+        setTimeout(() => {
+            if (typeof validarEspecificacionesInternas === 'function') {
+                validarEspecificacionesInternas();
+            }
+        }, 300);
     }
     
     // Crear una línea principal del producto
@@ -6293,6 +6300,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 divPrincipal.dataset.slug = generarSlugProducto(this.value);
             }
             actualizarJSONProducto();
+            // Validar en tiempo real
+            if (typeof validarEspecificacionesInternas === 'function') {
+                validarEspecificacionesInternas();
+            }
+        });
+        
+        inputTexto.addEventListener('blur', function() {
+            // Validar al salir del campo
+            if (typeof validarEspecificacionesInternas === 'function') {
+                validarEspecificacionesInternas();
+            }
         });
         
         checkboxImportante.addEventListener('change', actualizarJSONProducto);
@@ -6325,12 +6343,22 @@ document.addEventListener('DOMContentLoaded', function() {
         btnEliminar.addEventListener('click', () => {
             divPrincipal.remove();
             actualizarJSONProducto();
+            // Validar después de eliminar
+            if (typeof validarEspecificacionesInternas === 'function') {
+                validarEspecificacionesInternas();
+            }
         });
         
         btnAñadir.addEventListener('click', () => {
             const nuevaLinea = crearLineaPrincipalProducto('', false, []);
             divPrincipal.insertAdjacentElement('afterend', nuevaLinea);
             actualizarJSONProducto();
+            // Validar después de añadir
+            if (typeof validarEspecificacionesInternas === 'function') {
+                setTimeout(() => {
+                    validarEspecificacionesInternas();
+                }, 100);
+            }
         });
         
         // Configurar drag and drop
@@ -6941,15 +6969,144 @@ document.addEventListener('DOMContentLoaded', function() {
     btnAñadir.addEventListener('click', () => {
         crearLineaPrincipalProducto('', false, []);
         actualizarJSONProducto();
+        // Validar después de añadir
+        setTimeout(() => {
+            if (typeof validarEspecificacionesInternas === 'function') {
+                validarEspecificacionesInternas();
+            }
+        }, 100);
     });
+    
+    // Función para validar que todas las líneas principales estén rellenadas
+    function validarEspecificacionesInternas() {
+        // Verificar si el checkbox "No añadir especificaciones internas" está marcado
+        const checkboxNoAñadir = document.getElementById('no_anadir_especificaciones');
+        if (checkboxNoAñadir && checkboxNoAñadir.checked) {
+            // Si está marcado, no validar y habilitar el botón
+            const btnGuardar = document.querySelector('button[type="submit"]');
+            if (btnGuardar) {
+                btnGuardar.disabled = false;
+                btnGuardar.classList.remove('opacity-50', 'cursor-not-allowed', 'bg-gray-400');
+                btnGuardar.classList.add('bg-pink-600', 'hover:bg-pink-700');
+            }
+            // Quitar resaltado rojo de todos los campos
+            const lineasPrincipales = container.querySelectorAll('.linea-principal-producto');
+            lineasPrincipales.forEach(lineaPrincipal => {
+                const inputTexto = lineaPrincipal.querySelector('.linea-principal-producto-texto');
+                if (inputTexto) {
+                    inputTexto.classList.remove('border-red-500', 'border-2');
+                    inputTexto.classList.add('border-gray-300', 'dark:border-gray-600');
+                }
+            });
+            return true;
+        }
+        
+        const lineasPrincipales = container.querySelectorAll('.linea-principal-producto');
+        let todasRellenadas = true;
+        const camposVacios = [];
+        
+        // Si no hay líneas principales, no hay nada que validar
+        if (lineasPrincipales.length === 0) {
+            const btnGuardar = document.querySelector('button[type="submit"]');
+            if (btnGuardar) {
+                btnGuardar.disabled = false;
+                btnGuardar.classList.remove('opacity-50', 'cursor-not-allowed', 'bg-gray-400');
+                btnGuardar.classList.add('bg-pink-600', 'hover:bg-pink-700');
+            }
+            return true;
+        }
+        
+        lineasPrincipales.forEach(lineaPrincipal => {
+            const inputTexto = lineaPrincipal.querySelector('.linea-principal-producto-texto');
+            if (inputTexto) {
+                const valor = inputTexto.value.trim();
+                if (!valor || valor === '') {
+                    todasRellenadas = false;
+                    camposVacios.push(inputTexto);
+                    // Resaltar en rojo
+                    inputTexto.classList.add('border-red-500', 'border-2');
+                    inputTexto.classList.remove('border-gray-300', 'dark:border-gray-600');
+                } else {
+                    // Quitar resaltado rojo si tiene valor
+                    inputTexto.classList.remove('border-red-500', 'border-2');
+                    inputTexto.classList.add('border-gray-300', 'dark:border-gray-600');
+                }
+            }
+        });
+        
+        // Actualizar estado del botón de guardar
+        const btnGuardar = document.querySelector('button[type="submit"]');
+        if (btnGuardar) {
+            if (!todasRellenadas) {
+                btnGuardar.disabled = true;
+                btnGuardar.classList.add('opacity-50', 'cursor-not-allowed', 'bg-gray-400');
+                btnGuardar.classList.remove('bg-pink-600', 'hover:bg-pink-700');
+            } else {
+                btnGuardar.disabled = false;
+                btnGuardar.classList.remove('opacity-50', 'cursor-not-allowed', 'bg-gray-400');
+                btnGuardar.classList.add('bg-pink-600', 'hover:bg-pink-700');
+            }
+        }
+        
+        return todasRellenadas;
+    }
     
     // Inicializar al cargar
     inicializarProducto();
+    
+    // Validar al cargar la página
+    setTimeout(() => {
+        validarEspecificacionesInternas();
+    }, 500);
+    
+    // Observar cambios en el contenedor para validar cuando se añadan/eliminen líneas
+    const observer = new MutationObserver(function(mutations) {
+        // Validar después de cambios en el DOM
+        setTimeout(() => {
+            validarEspecificacionesInternas();
+        }, 100);
+    });
+    
+    if (container) {
+        observer.observe(container, {
+            childList: true,
+            subtree: true
+        });
+    }
+    
+    // Validar cuando cambie el checkbox "No añadir especificaciones internas"
+    const checkboxNoAñadir = document.getElementById('no_anadir_especificaciones');
+    if (checkboxNoAñadir) {
+        checkboxNoAñadir.addEventListener('change', function() {
+            validarEspecificacionesInternas();
+        });
+    }
     
     // Actualizar JSON antes de enviar el formulario
     const form = document.querySelector('form');
     if (form) {
         form.addEventListener('submit', function(e) {
+            // Verificar si el checkbox "No añadir especificaciones internas" está marcado
+            const checkboxNoAñadir = document.getElementById('no_anadir_especificaciones');
+            if (!checkboxNoAñadir || !checkboxNoAñadir.checked) {
+                // Validar especificaciones internas antes de enviar solo si no está marcado el checkbox
+                if (!validarEspecificacionesInternas()) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    // Mostrar mensaje de error si no hay ninguno
+                    const campoVacio = container.querySelector('.linea-principal-producto-texto.border-red-500');
+                    if (campoVacio) {
+                        campoVacio.focus();
+                        campoVacio.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                    
+                    // Mostrar alerta
+                    alert('Por favor, rellena todas las líneas principales de ESPECIFICACIONES INTERNAS DEL PRODUCTO antes de guardar.');
+                    return false;
+                }
+            }
+            
             // Actualizar especificaciones internas del producto PRIMERO
             actualizarJSONProducto();
             // Actualizar especificaciones internas de la categoría (sublíneas)
