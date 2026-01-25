@@ -4,7 +4,7 @@
         $url = request()->fullUrl();
         
         // Verificar si la URL contiene palabras que debemos ignorar
-        $palabrasIgnorar = ['wordpress', 'wp-admin', 'pdata'];
+        $palabrasIgnorar = ['wordpress', 'wp-', 'pdata'];
         $urlLower = strtolower($url);
         $debeIgnorar = false;
         

@@ -430,6 +430,8 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
     //Historico de productos
     Route::get('productos/{producto}/estadisticas', [ProductoController::class, 'estadisticas'])->name('productos.estadisticas');
     Route::get('productos/{producto}/estadisticas/datos', [ProductoController::class, 'datosHistorico'])->name('productos.estadisticas.datos');
+    Route::get('productos/{producto}/estadisticas/info', [ProductoController::class, 'estadisticasInfo'])->name('productos.estadisticas.info');
+    Route::post('productos/{producto}/ocultar-precio-elevado', [ProductoController::class, 'ocultarOfertasPrecioElevado'])->name('productos.ocultar.precio.elevado');
 
     // ACTUALIZACIÓN DE CLICKS DE PRODUCTOS
     Route::get('productos/actualizar-clicks/ejecutar', [ProductoController::class, 'ejecucionActualizarClicks'])->name('productos.actualizar.clicks.ejecutar');

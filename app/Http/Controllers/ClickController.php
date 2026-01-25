@@ -774,7 +774,21 @@ class ClickController extends Controller
         $hasta = $request->input('hasta', now()->toDateString());
         $campana = $request->input('campana');
 
-        $palabrasClave = $producto->palabrasClave()->get();
+        // Obtener palabras clave únicas desde los clicks del producto
+        $palabrasClave = DB::table('clicks')
+            ->join('ofertas_producto', 'clicks.oferta_id', '=', 'ofertas_producto.id')
+            ->where('ofertas_producto.producto_id', $producto->id)
+            ->whereNotNull('clicks.campaña')
+            ->where('clicks.campaña', '!=', '')
+            ->distinct()
+            ->pluck('clicks.campaña')
+            ->map(function ($codigo) {
+                return (object) [
+                    'codigo' => $codigo,
+                    'palabra' => $codigo, // Usamos el código como palabra si no hay otra fuente
+                    'activa' => 'si'
+                ];
+            });
 
         $query = DB::table('clicks')
             ->join('ofertas_producto', 'clicks.oferta_id', '=', 'ofertas_producto.id')
@@ -811,7 +825,7 @@ class ClickController extends Controller
             ->orderByDesc('created_at')
             ->paginate(20);
 
-        return view('admin.productos.estadisticasClicks', compact(
+        return view('admin.productos.estadisticas', compact(
             'producto',
             'desde',
             'hasta',

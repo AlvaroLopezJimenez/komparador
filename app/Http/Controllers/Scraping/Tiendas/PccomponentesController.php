@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Scraping\Tiendas;
 
 use App\Http\Controllers\Scraping\Tiendas\PlantillaTiendaController;
+use Illuminate\Support\Facades\DB;
+use App\Models\OfertaProducto;
 
 class PccomponentesController extends PlantillaTiendaController
 {
@@ -21,6 +23,32 @@ class PccomponentesController extends PlantillaTiendaController
 
         $html = $resultado['html'];
 
+        // Verificar si es una página 404 (producto no encontrado)
+        if ($this->esPagina404($html)) {
+            // Si tenemos oferta, generar aviso y ocultar
+            if ($oferta && $oferta instanceof OfertaProducto) {
+                // Actualizar oferta para no mostrar
+                $oferta->update(['mostrar' => 'no']);
+                
+                // Crear aviso con fecha a una hora vista
+                DB::table('avisos')->insertGetId([
+                    'texto_aviso'     => 'PRODUCTO NO ENCONTRADO (404) - GENERADO AUTOMÁTICAMENTE',
+                    'fecha_aviso'     => now()->addHour(), // Una hora vista
+                    'user_id'         => 1,                 // usuario sistema
+                    'avisoable_type'  => \App\Models\OfertaProducto::class,
+                    'avisoable_id'    => $oferta->id,
+                    'oculto'          => 0,                 // visible
+                    'created_at'      => now(),
+                    'updated_at'      => now(),
+                ]);
+            }
+
+            return response()->json([
+                'success' => false,
+                'error'   => 'Producto no encontrado (página 404)'
+            ]);
+        }
+
         // Extraer precio (varios fallbacks, porque el HTML de PCC puede variar / tener spans anidados)
         $precio = $this->extraerPrecio($html);
         if ($precio !== null) {
@@ -31,6 +59,14 @@ class PccomponentesController extends PlantillaTiendaController
             'success' => false,
             'error'   => 'No se pudo encontrar el precio en la página de PC Componentes'
         ]);
+    }
+
+    /**
+     * Verifica si el HTML contiene el mensaje de error 404 de PC Componentes
+     */
+    private function esPagina404(string $html): bool
+    {
+        return strpos($html, '<div class="content-message">Nuestro equipo de expertos en tecnología no puede encontrar lo que buscas...') !== false;
     }
 
     /**

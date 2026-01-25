@@ -193,7 +193,7 @@ if (!function_exists('oCV6X')) {
         $esMasVendidos = in_array(strtolower(trim($q1X2 ?? '')), ['más vendidos', 'mas vendidos', 'más vendido', 'mas vendido']);
       @endphp
       @if($p4X7->count() > 0)
-        <div class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div class="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {{-- $p4X7 -> $productos, $p5X8 -> $producto o $item --}}
           @foreach($p4X7 as $p5X8)
             @php
@@ -242,73 +242,66 @@ if (!function_exists('oCV6X')) {
               
               // Formatear precio
               $precio = $precioOferta ?: $producto->precio;
-              $precioFormateado = $unidadMedida === 'unidadMilesima' 
-                ? number_format($precio, 3, ',', '.')
-                : number_format($precio, 2, ',', '.');
-              
-              // Sufijo unidad de medida
-              $sufijo = match($unidadMedida) {
-                'unidad' => '/Und.',
-                'kilos' => '/Kg.',
-                'litros' => '/L.',
-                'unidadMilesima' => '/Und.',
-                'unidadUnica' => '',
-                '800gramos' => '/800gr.',
-                '100ml' => '/100ml.',
-                default => ''
-              };
-              
-              // Construir nombre para variantes: marca + modelo + variante
-              $nombreMostrar = $producto->nombre;
-              if ($esVariante && $variante) {
-                $partesNombre = [];
-                if (!empty($producto->marca)) {
-                  $partesNombre[] = $producto->marca;
-                }
-                if (!empty($producto->modelo)) {
-                  $partesNombre[] = $producto->modelo;
-                }
-                if (!empty($variante)) {
-                  $partesNombre[] = $variante;
-                }
-                $nombreMostrar = !empty($partesNombre) ? implode(' ', $partesNombre) : $producto->nombre;
-              }
             @endphp
             {{-- aC4X -> añadirCam --}}
-            <a href="{{ aC4X($urlProducto) }}" class="relative bg-white rounded-lg shadow p-4 card-hover hover:shadow-md">
+            <a href="{{ aC4X($urlProducto) }}" 
+               class="group flex flex-col items-center bg-white rounded-xl shadow-md transition-all duration-300 transform hover:scale-105 hover:shadow-2xl cursor-pointer p-4 relative">
               {{-- Badge de descuento (solo para precios hot) --}}
               @if($esPreciosHot && $porcentajeDescuento > 0)
                 <div class="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-md shadow-md z-10">
                   -{{ $porcentajeDescuento }}%
                 </div>
               @endif
-              <div class="flex justify-center mb-3">
+              <div class="w-full flex justify-center mb-3">
                 @if(!empty($imagen))
                     <img loading="lazy" src="{{ asset('images/' . $imagen) }}" 
                          alt="{{ $producto->nombre }}" 
-                         class="w-24 h-24 object-contain">
+                         class="w-32 h-32 object-contain rounded-lg shadow-sm transition-all duration-300 group-hover:shadow-lg bg-gray-100">
                 @else
-                    <div class="w-24 h-24 flex items-center justify-center rounded-lg bg-gradient-to-br from-blue-100 to-blue-200">
+                    <div class="w-32 h-32 flex items-center justify-center rounded-lg bg-gradient-to-br from-blue-100 to-blue-200">
                         <svg class="w-12 h-12 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                         </svg>
                     </div>
                 @endif
               </div>
-              <div class="text-center">
-                <h3 class="font-semibold text-gray-800 mb-1">
-                  {{ Str::limit($nombreMostrar, 50) }}
-                </h3>
-                <p class="text-center mb-1">
-                  <span class="text-xs text-gray-500">Desde:</span>
-                  <span class="text-xl font-bold" style="color: #e97b11;">
-                    {{ $precioFormateado }}€
-                    @if($sufijo)
-                      <span class="text-xs text-gray-500">{{ $sufijo }}</span>
-                    @endif
-                  </span>
-                </p>
-              </div>
+              @php
+                // Construir nombre para variantes: marca + modelo + variante
+                $nombreMostrar = $producto->nombre;
+                if ($esVariante && $variante) {
+                  $partesNombre = [];
+                  if (!empty($producto->marca)) {
+                    $partesNombre[] = $producto->marca;
+                  }
+                  if (!empty($producto->modelo)) {
+                    $partesNombre[] = $producto->modelo;
+                  }
+                  if (!empty($variante)) {
+                    $partesNombre[] = $variante;
+                  }
+                  $nombreMostrar = !empty($partesNombre) ? implode(' ', $partesNombre) : $producto->nombre;
+                }
+              @endphp
+              <p class="font-semibold text-gray-700 text-center text-sm mb-1 line-clamp-2">{{ $nombreMostrar }}</p>
+              <p class="text-center mb-1 flex items-center justify-center gap-1">
+                <span class="text-[8px] text-gray-500">Desde:</span>
+                <span class="text-xl font-bold" style="color: #e97b11;">{{ $unidadMedida === 'unidadMilesima' ? number_format($precio, 3) : number_format($precio, 2) }}€</span>
+                @if($unidadMedida === 'unidad')
+                  <span class="text-[10px] text-gray-500">/Und.</span>
+                @elseif($unidadMedida === 'kilos')
+                  <span class="text-[10px] text-gray-500">/Kg.</span>
+                @elseif($unidadMedida === 'litros')
+                  <span class="text-[10px] text-gray-500">/L.</span>
+                @elseif($unidadMedida === 'unidadMilesima')
+                  <span class="text-[10px] text-gray-500">/Und.</span>
+                @elseif($unidadMedida === 'unidadUnica')
+                  {{-- No mostrar sufijo para UnidadUnica --}}
+                @elseif($unidadMedida === '800gramos')
+                  <span class="text-[10px] text-gray-500">/800gr.</span>
+                @elseif($unidadMedida === '100ml')
+                  <span class="text-[10px] text-gray-500">/100ml.</span>
+                @endif
+              </p>
             </a>
           @endforeach
         </div>
@@ -341,6 +334,14 @@ if (!function_exists('oCV6X')) {
   <x-footer />
 <x-cookie-consent />
 @stack('scripts')
+<style>
+    .line-clamp-2 {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+</style>
 </body>
 
 </html>

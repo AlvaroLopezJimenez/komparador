@@ -15,6 +15,8 @@ use App\Models\ProductoOfertaMasBarataPorProducto;
 use App\Services\SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\RateLimiter;
+use App\Models\Click;
+use App\Models\OfertaProducto;
 
 
 class ProductoController extends Controller
@@ -388,25 +390,262 @@ class ProductoController extends Controller
             ->get()
             ->keyBy('fecha');
 
+        // Obtener el rango de precios de las 5 ofertas más baratas del producto
+        $servicioOfertas = new SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos();
+        $ofertasProducto = $servicioOfertas->obtenerTodas($producto);
+        $primeras5Ofertas = $ofertasProducto->take(5);
+        
+        $rangoPrecio5Ofertas = [
+            'min' => null,
+            'max' => null,
+        ];
+        
+        if ($primeras5Ofertas->count() > 0) {
+            $precioPrimera = $primeras5Ofertas->first()->precio_unidad ?? null;
+            $precioQuinta = $primeras5Ofertas->last()->precio_unidad ?? null;
+            
+            $rangoPrecio5Ofertas = [
+                'min' => $precioPrimera !== null ? (float) $precioPrimera : null,
+                'max' => $precioQuinta !== null ? (float) $precioQuinta : null,
+            ];
+        }
+
         $labels = [];
         $valores = [];
 
         for ($i = 0; $i < $dias; $i++) {
             $fecha = Carbon::today()->subDays($dias - 1 - $i)->toDateString();
             $labels[] = Carbon::parse($fecha)->format('d/m');
-            $valores[] = isset($historico[$fecha]) ? (float) $historico[$fecha]->precio_minimo : 0;
+            $valores[] = isset($historico[$fecha]) ? (float) $historico[$fecha]->precio_minimo : null;
         }
 
         return response()->json([
             'labels' => $labels,
             'valores' => $valores,
+            'rango_5_ofertas' => $rangoPrecio5Ofertas,
+        ]);
+    }
+    
+    /**
+     * Obtener información adicional para las estadísticas de un producto
+     * - Rango de precio_unidad de las 5 ofertas más baratas del producto
+     * - Máximo y mínimo del historial de precios del producto en el rango de días
+     */
+    public function estadisticasInfo(Producto $producto, Request $request)
+    {
+        try {
+            $dias = (int) $request->query('dias', 90);
+            $desde = Carbon::today()->subDays($dias - 1);
+            
+            // Obtener todas las ofertas del producto usando el servicio
+            $servicioOfertas = new SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos();
+            $ofertasProducto = $servicioOfertas->obtenerTodas($producto);
+            
+            // Obtener las 5 primeras ofertas (las más baratas)
+            $primeras5Ofertas = $ofertasProducto->take(5);
+            
+            $rangoPrecioUnidad = [
+                'min' => null,
+                'max' => null,
+            ];
+            
+            if ($primeras5Ofertas->count() > 0) {
+                $precioPrimera = $primeras5Ofertas->first()->precio_unidad ?? null;
+                $precioQuinta = $primeras5Ofertas->last()->precio_unidad ?? null;
+                
+                $rangoPrecioUnidad = [
+                    'min' => $precioPrimera !== null ? (float) $precioPrimera : null,
+                    'max' => $precioQuinta !== null ? (float) $precioQuinta : null,
+                ];
+            }
+            
+            // Obtener máximo y mínimo del historial de precios del producto
+            $historicoProducto = HistoricoPrecioProducto::where('producto_id', $producto->id)
+                ->where('fecha', '>=', $desde)
+                ->get();
+            
+            $preciosHistoricos = $historicoProducto->pluck('precio_minimo')->filter()->toArray();
+            
+            $rangoHistorico = [
+                'min' => !empty($preciosHistoricos) ? (float) min($preciosHistoricos) : null,
+                'max' => !empty($preciosHistoricos) ? (float) max($preciosHistoricos) : null,
+            ];
+            
+            return response()->json([
+                'rango_precio_unidad' => $rangoPrecioUnidad,
+                'rango_historico' => $rangoHistorico,
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Error en estadisticasInfo producto: ' . $e->getMessage(), [
+                'producto_id' => $producto->id,
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'error' => 'Error al obtener información: ' . $e->getMessage(),
+                'rango_precio_unidad' => ['min' => null, 'max' => null],
+                'rango_historico' => ['min' => null, 'max' => null],
+            ], 500);
+        }
+    }
+    
+    /**
+     * Ocultar todas las ofertas de un producto y añadir anotación
+     */
+    public function ocultarOfertasPrecioElevado(Producto $producto)
+    {
+        $anotacionActual = $producto->anotaciones_internas ?? '';
+        
+        // Añadir salto de línea solo si ya hay contenido
+        if (!empty(trim($anotacionActual))) {
+            $nuevaAnotacion = $anotacionActual . "\nPRECIO MUY ELEVADO CONSTANTE EN EL TIEMPO";
+        } else {
+            $nuevaAnotacion = "PRECIO MUY ELEVADO CONSTANTE EN EL TIEMPO";
+        }
+        
+        // Ocultar todas las ofertas del producto
+        $ofertasActualizadas = OfertaProducto::where('producto_id', $producto->id)
+            ->update(['mostrar' => 'no']);
+        
+        // Actualizar anotaciones del producto
+        $producto->update([
+            'anotaciones_internas' => $nuevaAnotacion,
+        ]);
+        
+        return response()->json([
+            'success' => true,
+            'message' => "Se ocultaron {$ofertasActualizadas} oferta(s) y se añadió la anotación correctamente"
         ]);
     }
 
 
-    public function estadisticas(Producto $producto)
+    public function estadisticas(Request $request, Producto $producto)
     {
-        return view('admin.productos.estadisticas', compact('producto'));
+        // Manejar filtros rápidos
+        $filtroRapido = $request->input('filtro_rapido', '90dias');
+        $hoy = now();
+        
+        // Calcular fechas según filtro rápido
+        switch($filtroRapido) {
+            case 'hoy':
+                $desde = $hasta = $hoy->toDateString();
+                break;
+            case 'ayer':
+                $desde = $hasta = $hoy->copy()->subDay()->toDateString();
+                break;
+            case '7dias':
+                $desde = $hoy->copy()->subDays(7)->toDateString();
+                $hasta = $hoy->toDateString();
+                break;
+            case '30dias':
+                $desde = $hoy->copy()->subDays(30)->toDateString();
+                $hasta = $hoy->toDateString();
+                break;
+            case '90dias':
+                $desde = $hoy->copy()->subDays(90)->toDateString();
+                $hasta = $hoy->toDateString();
+                break;
+            case '180dias':
+                $desde = $hoy->copy()->subDays(180)->toDateString();
+                $hasta = $hoy->toDateString();
+                break;
+            case '1año':
+                $desde = $hoy->copy()->subYear()->toDateString();
+                $hasta = $hoy->toDateString();
+                break;
+            case 'siempre':
+                $desde = null;
+                $hasta = null;
+                break;
+            default:
+                // Si hay fechas manuales, usarlas
+                $desde = $request->input('desde', $hoy->copy()->subDays(90)->toDateString());
+                $hasta = $request->input('hasta', $hoy->toDateString());
+                break;
+        }
+        
+        // Si hay fechas manuales en el request, priorizarlas
+        if ($request->has('desde') && $request->has('hasta') && !$request->has('filtro_rapido')) {
+            $desde = $request->input('desde');
+            $hasta = $request->input('hasta');
+        }
+        
+        $campana = $request->input('campana');
+
+        // Obtener palabras clave únicas desde los clicks del producto
+        $palabrasClave = DB::table('clicks')
+            ->join('ofertas_producto', 'clicks.oferta_id', '=', 'ofertas_producto.id')
+            ->where('ofertas_producto.producto_id', $producto->id)
+            ->whereNotNull('clicks.campaña')
+            ->where('clicks.campaña', '!=', '')
+            ->distinct()
+            ->pluck('clicks.campaña')
+            ->map(function ($codigo) {
+                return (object) [
+                    'codigo' => $codigo,
+                    'palabra' => $codigo, // Usamos el código como palabra si no hay otra fuente
+                    'activa' => 'si'
+                ];
+            });
+
+        $query = DB::table('clicks')
+            ->join('ofertas_producto', 'clicks.oferta_id', '=', 'ofertas_producto.id')
+            ->join('tiendas', 'ofertas_producto.tienda_id', '=', 'tiendas.id')
+            ->where('ofertas_producto.producto_id', $producto->id);
+        
+        if ($desde && $hasta) {
+            $query->whereBetween('clicks.created_at', [$desde . ' 00:00:00', $hasta . ' 23:59:59']);
+        }
+
+        if ($campana) {
+            $query->where('clicks.campaña', $campana);
+        }
+
+        $agrupado = $query
+            ->selectRaw('tiendas.id, tiendas.nombre, tiendas.url_imagen, tiendas.opiniones, tiendas.puntuacion, COUNT(*) as total_clicks, MIN(clicks.precio_unidad) as min, MAX(clicks.precio_unidad) as max')
+            ->groupBy('tiendas.id', 'tiendas.nombre', 'tiendas.url_imagen', 'tiendas.opiniones', 'tiendas.puntuacion')
+            ->orderByDesc('total_clicks')
+            ->get()
+            ->keyBy('id');
+
+        $visibilidad = DB::table('ofertas_producto')
+            ->selectRaw('tienda_id, COUNT(*) as total, SUM(CASE WHEN mostrar = "no" THEN 1 ELSE 0 END) as ocultas')
+            ->where('producto_id', $producto->id)
+            ->groupBy('tienda_id')
+            ->get()
+            ->mapWithKeys(function ($item) {
+                return [$item->tienda_id => $item->ocultas >= $item->total];
+            });
+
+        $clicsPaginados = Click::with(['oferta.tienda'])
+            ->whereHas('oferta', function ($q) use ($producto) {
+                $q->where('producto_id', $producto->id);
+            })
+            ->when($campana, fn($q) => $q->where('campaña', $campana))
+            ->when($desde && $hasta, fn($q) => $q->whereBetween('created_at', [$desde . ' 00:00:00', $hasta . ' 23:59:59']))
+            ->orderByDesc('created_at')
+            ->paginate(20);
+        
+        // Calcular días para los gráficos de precios
+        $dias = 90; // Por defecto
+        if ($desde && $hasta) {
+            $fechaDesde = \Carbon\Carbon::parse($desde);
+            $fechaHasta = \Carbon\Carbon::parse($hasta);
+            $dias = $fechaDesde->diffInDays($fechaHasta) + 1;
+        }
+
+        return view('admin.productos.estadisticas', compact(
+            'producto',
+            'desde',
+            'hasta',
+            'campana',
+            'palabrasClave',
+            'agrupado',
+            'visibilidad',
+            'clicsPaginados',
+            'filtroRapido',
+            'dias',
+        ));
     }
 
     // Guardar el precio del dia en el historial de todos los productos
