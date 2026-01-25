@@ -204,12 +204,35 @@ if (!function_exists('oCV6X')) {
                 $precioOferta = $p5X8['precio_oferta'] ?? 0;
                 $unidadMedida = $p5X8['unidad_medida'] ?? $producto->unidadDeMedida;
                 $urlProducto = $p5X8['url_producto'] ?? ($producto->categoria ? $producto->categoria->construirUrlCategorias($producto->slug) : '#');
+                $variante = null;
+                $esVariante = false;
+              } elseif (isset($p5X8['producto']) && isset($p5X8['es_variante'])) {
+                // Es una variante de producto
+                $producto = $p5X8['producto'];
+                $variante = $p5X8['variante'] ?? null;
+                $precioVariante = $p5X8['precio_variante'] ?? null;
+                $porcentajeDescuento = null;
+                $precioOferta = $precioVariante;
+                $unidadMedida = $producto->unidadDeMedida;
+                $esVariante = true;
+                
+                // Construir URL con variante
+                if ($variante) {
+                  $varianteSlug = \Illuminate\Support\Str::slug($variante);
+                  $urlBase = $producto->categoria ? $producto->categoria->construirUrlCategorias($producto->slug) : '#';
+                  $urlProducto = $urlBase . '/' . $varianteSlug;
+                } else {
+                  $urlProducto = $producto->categoria ? $producto->categoria->construirUrlCategorias($producto->slug) : '#';
+                }
               } else {
+                // Producto normal
                 $producto = $p5X8;
                 $porcentajeDescuento = null;
                 $precioOferta = null;
                 $unidadMedida = $producto->unidadDeMedida;
                 $urlProducto = $producto->categoria ? $producto->categoria->construirUrlCategorias($producto->slug) : '#';
+                $variante = null;
+                $esVariante = false;
               }
               
               // Obtener imagen
@@ -234,6 +257,22 @@ if (!function_exists('oCV6X')) {
                 '100ml' => '/100ml.',
                 default => ''
               };
+              
+              // Construir nombre para variantes: marca + modelo + variante
+              $nombreMostrar = $producto->nombre;
+              if ($esVariante && $variante) {
+                $partesNombre = [];
+                if (!empty($producto->marca)) {
+                  $partesNombre[] = $producto->marca;
+                }
+                if (!empty($producto->modelo)) {
+                  $partesNombre[] = $producto->modelo;
+                }
+                if (!empty($variante)) {
+                  $partesNombre[] = $variante;
+                }
+                $nombreMostrar = !empty($partesNombre) ? implode(' ', $partesNombre) : $producto->nombre;
+              }
             @endphp
             {{-- aC4X -> añadirCam --}}
             <a href="{{ aC4X($urlProducto) }}" class="relative bg-white rounded-lg shadow p-4 card-hover hover:shadow-md">
@@ -258,7 +297,7 @@ if (!function_exists('oCV6X')) {
               </div>
               <div class="text-center">
                 <h3 class="font-semibold text-gray-800 mb-1">
-                  {{ Str::limit($producto->nombre, 50) }}
+                  {{ Str::limit($nombreMostrar, 50) }}
                 </h3>
                 <p class="text-center mb-1">
                   <span class="text-xs text-gray-500">Desde:</span>

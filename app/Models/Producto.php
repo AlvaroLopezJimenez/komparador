@@ -41,6 +41,8 @@ class Producto extends Model
         'categoria_id_especificaciones_internas',
         'categoria_especificaciones_internas_elegidas',
         'grupos_de_ofertas',
+        'especificaciones_busqueda',
+        'especificaciones_busqueda_texto',
     ];
 
     protected $casts = [
@@ -51,6 +53,7 @@ class Producto extends Model
         'keys_relacionados' => 'array',
         'categoria_especificaciones_internas_elegidas' => 'array',
         'grupos_de_ofertas' => 'array',
+        'especificaciones_busqueda' => 'array',
         'imagen_grande' => 'array',
         'imagen_pequena' => 'array',
         'aviso' => 'datetime',
@@ -69,6 +72,11 @@ class Producto extends Model
     public function categoria()
     {
         return $this->belongsTo(Categoria::class, 'categoria_id');
+    }
+
+    public function categoriaEspecificaciones()
+    {
+        return $this->belongsTo(Categoria::class, 'categoria_id_especificaciones_internas');
     }
 
     public function alertasPrecio()

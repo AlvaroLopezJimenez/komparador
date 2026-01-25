@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration {
     public function up(): void
@@ -34,6 +35,8 @@ return new class extends Migration {
             $table->foreignId('categoria_id')->nullable()->constrained('categorias')->onDelete('set null');
             $table->foreignId('categoria_id_especificaciones_internas')->nullable()->constrained('categorias')->onDelete('set null');
             $table->json('categoria_especificaciones_internas_elegidas')->nullable();
+            $table->json('especificaciones_busqueda')->nullable();
+            $table->text('especificaciones_busqueda_texto')->nullable();
             $table->json('grupos_de_ofertas')->nullable();
             $table->string('meta_titulo')->nullable();
             $table->text('meta_description')->nullable();
@@ -44,6 +47,9 @@ return new class extends Migration {
             $table->unsignedInteger('clicks')->default(0);
             $table->timestamps();
         });
+        
+        // Crear índice fulltext para búsquedas rápidas
+        DB::statement('ALTER TABLE productos ADD FULLTEXT INDEX idx_especificaciones_busqueda_texto (especificaciones_busqueda_texto)');
     }
 
     public function down(): void

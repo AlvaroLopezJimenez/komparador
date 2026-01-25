@@ -98,6 +98,41 @@
     </x-slot>
 
     <div class="py-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <!-- Banner de advertencia para productos con precio NULL -->
+        @if(($avisosProductoPrecioNullCount ?? 0) > 0)
+            <div class="mb-6 bg-red-900 border-l-4 border-red-500 text-red-100 p-4 rounded">
+                <div class="flex items-center">
+                    <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                    </svg>
+                    <div>
+                        <p class="font-bold">Advertencia: Hay {{ $avisosProductoPrecioNullCount }} aviso(s) de Producto con precio NULL</p>
+                        <p class="text-sm mt-1">Estos productos no tienen ofertas activas y su precio no se ha actualizado. Revisa estos productos para evitar errores en la vista.</p>
+                        @if($avisosProductoPrecioNull && $avisosProductoPrecioNull->count() > 0)
+                            <details class="mt-2">
+                                <summary class="cursor-pointer text-sm underline">Ver ejemplos ({{ $avisosProductoPrecioNull->count() }})</summary>
+                                <ul class="mt-2 ml-4 list-disc text-sm">
+                                    @foreach($avisosProductoPrecioNull->take(10) as $avisoNull)
+                                        <li>
+                                            Aviso #{{ $avisoNull->aviso_id }} - 
+                                            Producto #{{ $avisoNull->producto_id }} 
+                                            @if($avisoNull->producto_nombre)
+                                                ({{ $avisoNull->producto_nombre }})
+                                            @endif
+                                            - 
+                                            <a href="{{ route('admin.productos.edit', $avisoNull->producto_id) }}" target="_blank" class="underline hover:text-red-200">
+                                                Editar Producto
+                                            </a>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            </details>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        @endif
+
         <!-- Botones de acción -->
         <div class="mb-6 flex justify-between items-center">
             <div class="flex items-center space-x-3">
@@ -433,16 +468,25 @@
                                     </button>
                                     @if($aviso->avisoable_type === 'App\Models\Producto' && strpos($aviso->texto_aviso, 'Precio actualizado producto') !== false)
                                         @php
-                                            $precioActual = $aviso->avisoable ? $aviso->avisoable->precio : 0;
-                                            $alertasCount = \App\Models\CorreoAvisoPrecio::where('producto_id', $aviso->avisoable_id)
-                                                ->where('precio_limite', '>=', $precioActual)
-                                                ->where(function($query) {
-                                                    $query->whereNull('ultimo_envio_correo')
-                                                          ->orWhere('ultimo_envio_correo', '<', now()->subWeek());
-                                                })
-                                                ->count();
+                                            $precioActual = $aviso->avisoable?->precio;
+                                            $alertasCount = 0;
+                                            
+                                            // Solo contar alertas si el precio no es NULL
+                                            if ($aviso->avisoable_id && $precioActual !== null) {
+                                                $alertasCount = \App\Models\CorreoAvisoPrecio::where('producto_id', $aviso->avisoable_id)
+                                                    ->where('precio_limite', '>=', $precioActual)
+                                                    ->where(function($query) {
+                                                        $query->whereNull('ultimo_envio_correo')
+                                                              ->orWhere('ultimo_envio_correo', '<', now()->subWeek());
+                                                    })
+                                                    ->count();
+                                            }
                                         @endphp
-                                        @if($alertasCount > 0)
+                                        @if($precioActual === null)
+                                            <div class="px-3 py-1 text-xs bg-red-600 text-white rounded">
+                                                ERROR: Producto #{{ $aviso->avisoable_id }} con precio NULL
+                                            </div>
+                                        @elseif($alertasCount > 0)
                                             <button onclick="enviarAlertasProducto({{ $aviso->avisoable_id }}, {{ $precioActual }})" 
                                                 class="px-3 py-1 text-sm text-white rounded-md transition-all duration-300 bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 animate-pulse shadow-lg font-bold">
                                                 📧 Correos ({{ $alertasCount }})

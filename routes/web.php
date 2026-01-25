@@ -81,7 +81,7 @@ Route::middleware(['security.headers', 'block.public.deletes'])->group(function 
     //PARA REDIRIGIR AL USUARIO A LA TIENDA - AQUI CARGA LA PAGINA INTERMEDIA
     Route::get('/redirigir/{ofertaId}', [ClickController::class, 'redirigir'])->name('click.redirigir');
 
-    Route::middleware('throttle:10,1')->group(function () {
+    Route::middleware('throttle:30,1')->group(function () {
         // BÚSQUEDA PÚBLICA
         Route::get('/buscar', [BuscadorController::class, 'buscar'])->name('buscar');
         Route::get('/api/buscar-productos', [BuscadorController::class, 'productos'])->name('api.buscar.productos');
@@ -245,6 +245,9 @@ Route::prefix('admin')->group(function () {
     });
 
     // Calcular precios hot
+    // Calcula tambien precio producto
+    // Calcula tambien cada sublinea de cada producto marcada como mostrar, busca las ofertas que convan con cada sublinea
+    // y guarda en el campo especificaciones_busqueda el precio de la oferta más barata..
     Route::get('precios-hot/calcular', function (Request $request) {
         if ($request->get('token') !== env('TOKEN_ACTUALIZAR_PRECIOS')) {
             abort(403, 'Token inválido');
@@ -763,20 +766,62 @@ Route::middleware(['security.headers', 'block.public.deletes', 'throttle:10,1'])
 // RUTA DINÁMICA PARA PRODUCTOS CON MÚLTIPLES CATEGORÍAS (DEBE IR AL FINAL)
 // Esta ruta renderiza comparador.unidades.blade.php
 // NOTA: Esta ruta está dentro del grupo de rutas públicas con security.headers y block.public.deletes (línea 45)
-Route::get('/{categorias}/{slug}', function ($categorias, $slug) {
-    // Dividir las categorías en un array
-    $slugsRuta = explode('/', $categorias);
-    // Buscar el producto por slug
+// Acepta un segmento opcional de variante: /{categorias}/{slug}/{variante?}
+// Capturamos todo el path y parseamos manualmente
+Route::get('/{path}', function ($path) {
+    // Parsear el path completo manualmente
+    $pathSegments = array_filter(explode('/', $path));
+    
+    if (count($pathSegments) < 2) {
+        // Necesitamos al menos categoría + slug
+        abort(404);
+    }
+    
+    // El último segmento puede ser el slug o parte de la variante
+    // Necesitamos encontrar el slug del producto
+    // Intentar encontrar el producto probando desde el final hacia atrás
+    $slug = null;
+    $variante = null;
+    $categorias = [];
+    
+    // Intentar encontrar el producto empezando desde el final
+    for ($i = count($pathSegments) - 1; $i >= 1; $i--) {
+        $slugCandidato = $pathSegments[$i];
+        $producto = \App\Models\Producto::where('slug', $slugCandidato)->first();
+        
+        if ($producto) {
+            $slug = $slugCandidato;
+            // Todo antes del slug son categorías
+            $categorias = array_slice($pathSegments, 0, $i);
+            // Todo después del slug es la variante
+            if ($i < count($pathSegments) - 1) {
+                $variante = implode('/', array_slice($pathSegments, $i + 1));
+            }
+            break;
+        }
+    }
+    
+    if (!$slug) {
+        abort(404);
+    }
+    
+    // Buscar el producto por slug (ya lo tenemos de antes, pero lo recargamos con relaciones)
     $producto = \App\Models\Producto::with('categoria')->where('slug', $slug)->firstOrFail();
     
     // Obtener la jerarquía completa de categorías del producto
     $jerarquiaCompleta = $producto->categoria->obtenerJerarquiaCompleta();
     $slugsReales = collect($jerarquiaCompleta)->pluck('slug')->toArray();
+    
     // Verificar si la URL coincide con la jerarquía real
-    if ($slugsRuta !== $slugsReales) {
+    if ($categorias !== $slugsReales) {
         // Construir la URL correcta con todas las categorías
         $categoriasCorrectas = implode('/', $slugsReales);
-        return redirect("/{$categoriasCorrectas}/{$slug}", 301);
+        // Preservar el segmento de variante si existe
+        $urlRedireccion = "/{$categoriasCorrectas}/{$slug}";
+        if ($variante) {
+            $urlRedireccion .= "/{$variante}";
+        }
+        return redirect($urlRedireccion, 301);
     }
     // Obtener datos históricos de 3 meses por defecto
     $desde = Carbon::today()->subDays(89); // 90 días - 1 = 89
@@ -969,29 +1014,191 @@ for ($i = 0; $i < 90; $i++) {
                                      count($categoria->especificaciones_internas['filtros']) > 0;
     
     if ($tieneEspecificacionesInternas) {
-        // Obtener estructura de filtros actual
+        // Obtener estructura de filtros de categoría
         $estructuraFiltros = $categoria->especificaciones_internas['filtros'] ?? [];
+        
+        // También obtener filtros de producto si existen
+        $filtrosProducto = [];
+        $especificacionesElegidas = $producto->categoria_especificaciones_internas_elegidas;
+        if (isset($especificacionesElegidas['_producto']['filtros']) && 
+            is_array($especificacionesElegidas['_producto']['filtros'])) {
+            $filtrosProducto = $especificacionesElegidas['_producto']['filtros'];
+        }
+        
+        // Combinar filtros de categoría y producto
+        $filtrosCombinados = array_merge($estructuraFiltros, $filtrosProducto);
         
         // Crear mapa de slugs a IDs
         $mapaSlugs = [];
-        foreach ($estructuraFiltros as $filtro) {
+        foreach ($filtrosCombinados as $filtro) {
             $lineaId = $filtro['id'] ?? null;
             if (!$lineaId) continue;
             
             foreach ($filtro['subprincipales'] ?? [] as $sub) {
                 $sublineaId = $sub['id'] ?? null;
                 $slug = $sub['slug'] ?? null;
+                $texto = $sub['texto'] ?? null;
                 
-                // Si no tiene slug, generarlo desde el texto
-                if (!$slug && isset($sub['texto'])) {
-                    $slug = \Illuminate\Support\Str::slug($sub['texto']);
+                // IMPORTANTE: Siempre generar el slug desde el texto para asegurar consistencia
+                // "blanco blanco" → "blanco-blanco"
+                $slugDesdeTexto = $texto ? \Illuminate\Support\Str::slug($texto) : null;
+                
+                // Usar el slug generado desde el texto como principal
+                // Si hay un slug guardado, también añadirlo, pero el generado tiene prioridad
+                $slugPrincipal = $slugDesdeTexto ?: $slug;
+                
+                if ($slugPrincipal && $sublineaId) {
+                    $mapaSlugs[$slugPrincipal] = [
+                        'id' => $sublineaId,
+                        'linea_principal_id' => $lineaId,
+                        'texto' => $texto, // Guardar también el texto para búsqueda flexible
+                    ];
                 }
                 
-                if ($slug && $sublineaId) {
+                // También añadir el slug guardado si es diferente al generado
+                if ($slug && $slug !== $slugPrincipal && $sublineaId) {
                     $mapaSlugs[$slug] = [
                         'id' => $sublineaId,
                         'linea_principal_id' => $lineaId,
+                        'texto' => $texto,
                     ];
+                }
+            }
+        }
+        
+        // Procesar segmento de variante de la URL (ej: /256gb/amarillo)
+        if ($variante) {
+            // Dividir el segmento de variante por "/" para obtener múltiples variantes
+            $segmentosVariante = array_filter(explode('/', $variante));
+            
+            // Agrupar IDs por línea principal
+            $idsPorLinea = [];
+            
+            foreach ($segmentosVariante as $segmento) {
+                // Normalizar el segmento de la URL (por si tiene variaciones)
+                // La URL ya viene como slug (ej: "blanco-blanco"), pero normalizamos por si acaso
+                $segmentoNormalizado = \Illuminate\Support\Str::slug($segmento);
+                
+                // Buscar el slug en el mapa (búsqueda exacta primero)
+                $info = null;
+                if (isset($mapaSlugs[$segmento])) {
+                    $info = $mapaSlugs[$segmento];
+                } elseif (isset($mapaSlugs[$segmentoNormalizado])) {
+                    $info = $mapaSlugs[$segmentoNormalizado];
+                } else {
+                    // Buscar en todos los slugs del mapa (comparación flexible)
+                    foreach ($mapaSlugs as $slugMapa => $infoMapa) {
+                        // Normalizar el slug del mapa para comparar
+                        $slugMapaNormalizado = is_string($slugMapa) ? \Illuminate\Support\Str::slug($slugMapa) : strval($slugMapa);
+                        
+                        // Comparar normalizados
+                        if ($slugMapaNormalizado === $segmentoNormalizado) {
+                            $info = $infoMapa;
+                            break;
+                        }
+                        
+                        // También comparar con el texto si está disponible
+                        if (isset($infoMapa['texto']) && $infoMapa['texto']) {
+                            $textoNormalizado = \Illuminate\Support\Str::slug($infoMapa['texto']);
+                            if ($textoNormalizado === $segmentoNormalizado) {
+                                $info = $infoMapa;
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                if ($info) {
+                    $lineaId = $info['linea_principal_id'];
+                    $sublineaId = $info['id'];
+                    
+                    // Verificar que esta sublínea existe en las especificaciones elegidas del producto
+                    $especificacionesElegidas = $producto->categoria_especificaciones_internas_elegidas;
+                    if ($especificacionesElegidas && is_array($especificacionesElegidas)) {
+                        // Buscar primero en las especificaciones de categoría (estructura normal)
+                        $productoLinea = $especificacionesElegidas[$lineaId] ?? null;
+                        $existeEnProducto = false;
+                        
+                        if ($productoLinea) {
+                            $productoSublineas = is_array($productoLinea) ? $productoLinea : [$productoLinea];
+                            
+                            // Verificar si esta sublínea está en las especificaciones del producto
+                            foreach ($productoSublineas as $item) {
+                                $itemId = (is_array($item) && isset($item['id'])) ? strval($item['id']) : strval($item);
+                                if (strval($itemId) === strval($sublineaId)) {
+                                    $existeEnProducto = true;
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        // Si no se encontró en las especificaciones de categoría, buscar en las especificaciones del producto
+                        if (!$existeEnProducto && isset($especificacionesElegidas['_producto']['filtros'])) {
+                            foreach ($especificacionesElegidas['_producto']['filtros'] as $filtroProducto) {
+                                $filtroProductoId = $filtroProducto['id'] ?? null;
+                                if (strval($filtroProductoId) === strval($lineaId)) {
+                                    // Encontrar la sublínea en este filtro del producto
+                                    foreach ($filtroProducto['subprincipales'] ?? [] as $subProducto) {
+                                        $subProductoId = $subProducto['id'] ?? null;
+                                        if (strval($subProductoId) === strval($sublineaId)) {
+                                            $existeEnProducto = true;
+                                            break 2; // Salir de ambos bucles
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Solo añadir si existe en el producto
+                        if ($existeEnProducto) {
+                            if (!isset($idsPorLinea[$lineaId])) {
+                                $idsPorLinea[$lineaId] = [];
+                            }
+                            $idsPorLinea[$lineaId][] = $sublineaId;
+                        }
+                    }
+                }
+            }
+            
+            // Añadir los IDs encontrados a $filtrosAplicadosDesdeUrl
+            foreach ($idsPorLinea as $lineaId => $ids) {
+                // IMPORTANTE: Para variantes desde la URL, siempre aplicamos el filtro
+                // ya que el usuario está navegando directamente a esa variante específica
+                // No necesitamos verificar _columnas porque es una navegación directa
+                $debeAplicarFiltro = true;
+                
+                // Verificar si es una especificación interna del producto
+                $esEspecificacionProducto = false;
+                $especificacionesElegidas = $producto->categoria_especificaciones_internas_elegidas;
+                if ($especificacionesElegidas && is_array($especificacionesElegidas)) {
+                    // Verificar si está en las especificaciones del producto
+                    if (isset($especificacionesElegidas['_producto']['filtros'])) {
+                        foreach ($especificacionesElegidas['_producto']['filtros'] as $filtroProducto) {
+                            $filtroProductoId = $filtroProducto['id'] ?? null;
+                            if (strval($filtroProductoId) === strval($lineaId)) {
+                                $esEspecificacionProducto = true;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // Si NO es especificación del producto Y el producto tiene unidadDeMedida === 'unidadUnica'
+                    // entonces solo aplicar si está en _columnas
+                    if (!$esEspecificacionProducto && $producto->unidadDeMedida === 'unidadUnica') {
+                        if (isset($especificacionesElegidas['_columnas']) && 
+                            is_array($especificacionesElegidas['_columnas'])) {
+                            $columnas = array_map('strval', $especificacionesElegidas['_columnas']);
+                            $lineaIdStr = (string)$lineaId;
+                            
+                            if (!in_array($lineaIdStr, $columnas, true)) {
+                                $debeAplicarFiltro = false;
+                            }
+                        }
+                    }
+                }
+                
+                if ($debeAplicarFiltro && !empty($ids)) {
+                    $filtrosAplicadosDesdeUrl[$lineaId] = array_unique($ids);
                 }
             }
         }
@@ -1089,7 +1296,7 @@ for ($i = 0; $i < 90; $i++) {
     }
 
     return view('comparador.unidades', compact('producto', 'ofertas', 'breadcrumb', 'relacionados', 'productosPrecioMedio', 'productosPreciosHot', 'precios', 'filtrosAplicadosDesdeUrl'));
-})->where('categorias', '.*')->where('slug', '.*');
+})->where('path', '.*');
 
 // Cierre del grupo de rutas públicas con security.headers (iniciado en línea 44)
 });

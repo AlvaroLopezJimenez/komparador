@@ -82,7 +82,26 @@ class AvisoController extends Controller
             }
         }
 
-        return view('admin.avisos.index', compact('avisosVencidos', 'avisosPendientes', 'avisosOcultos', 'perPage', 'totalVencidos', 'totalPendientes', 'totalOcultos'));
+        // Detectar avisos de productos con precio NULL
+        $avisosProductoPrecioNullQuery = Aviso::query()
+            ->leftJoin('productos', 'productos.id', '=', 'avisos.avisoable_id')
+            ->where('avisos.avisoable_type', 'App\Models\Producto')
+            ->where('avisos.texto_aviso', 'like', '%Precio actualizado producto%')
+            ->whereNull('productos.precio')
+            ->visiblesPorUsuario($userId)
+            ->select([
+                'avisos.id as aviso_id',
+                'avisos.avisoable_id as producto_id',
+                'avisos.fecha_aviso as fecha_aviso',
+                'avisos.oculto as oculto',
+                'productos.nombre as producto_nombre',
+            ])
+            ->orderBy('avisos.fecha_aviso', 'desc');
+        
+        $avisosProductoPrecioNullCount = (clone $avisosProductoPrecioNullQuery)->count('avisos.id');
+        $avisosProductoPrecioNull = $avisosProductoPrecioNullQuery->limit(50)->get();
+
+        return view('admin.avisos.index', compact('avisosVencidos', 'avisosPendientes', 'avisosOcultos', 'perPage', 'totalVencidos', 'totalPendientes', 'totalOcultos', 'avisosProductoPrecioNullCount', 'avisosProductoPrecioNull'));
     }
 
     public function store(Request $request)
