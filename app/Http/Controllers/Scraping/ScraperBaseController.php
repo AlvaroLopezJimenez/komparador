@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use App\Services\CalcularPrecioUnidad;
 use App\Services\SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos;
+use App\Services\TiemposActualizacionOfertasDinamicos;
 
 abstract class ScraperBaseController extends Controller
 {
@@ -19,6 +20,10 @@ abstract class ScraperBaseController extends Controller
      */
     protected function procesarOfertaScraper(OfertaProducto $oferta)
     {
+        // Calcular nueva frecuencia basada en historial (antes de scrapear)
+        $serviceTiempos = new TiemposActualizacionOfertasDinamicos();
+        $serviceTiempos->calcularFrecuencia($oferta->id);
+        
         // Obtener las 1 ofertas más baratas del mismo producto (antes del scraping)
         $producto = Producto::find($oferta->producto_id);
         $servicioOfertas = new SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos();
@@ -171,6 +176,9 @@ if (is_numeric($precioAnterior) && $precioAnterior > 0) {
         
         // Forzar la actualización del updated_at
         $oferta->touch();
+        
+        // Registrar actualización exitosa en el historial de tiempos dinámicos
+        $serviceTiempos->registrarActualizacion($oferta->id, $precioNuevo, 'automatico');
 
         // Obtener las 1 ofertas más baratas del mismo producto (después del scraping)
         // Reutilizar el producto y servicio ya obtenidos al inicio del método

@@ -97,6 +97,11 @@ class PccomponentesController extends PlantillaTiendaController
      */
     private function precioDesdeAggregateOfferHighPrice(string $html): ?float
     {
+        // Primera opción: buscar ,"price":"valor",
+        if (preg_match('/,"price"\s*:\s*"(?<p>\d+(?:[.,]\d{1,2})?)",/i', $html, $m3)) {
+            return $this->toNumber($m3['p']);
+        }
+
         if (preg_match('/"@type"\s*:\s*"AggregateOffer"[\s\S]*?"highPrice"\s*:\s*"(?<p>\d+(?:[.,]\d{1,2})?)"/i', $html, $m)) {
             return $this->toNumber($m['p']);
         }

@@ -369,6 +369,12 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
 
     // Actualiza solo el campo mostrar de una oferta
     Route::put('ofertas/{oferta}/mostrar', [OfertaProductoController::class, 'actualizarMostrar'])->name('ofertas.mostrar');
+    
+    // Obtener historial de tiempos de actualización de precios
+    Route::get('ofertas/{oferta}/historial-tiempos-actualizacion', [OfertaProductoController::class, 'historialTiemposActualizacion'])->name('ofertas.historial.tiempos-actualizacion');
+    
+    // Historial global de tiempos de actualización de precios
+    Route::get('ofertas/historico-tiempos-actualizacion', [OfertaProductoController::class, 'historialTiemposActualizacionGlobal'])->name('ofertas.historico.tiempos-actualizacion');
 
     // BÚSQUEDA INTERACTIVA PARA FORMULARIOS (no eliminar)
 

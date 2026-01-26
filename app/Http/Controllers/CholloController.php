@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use App\Services\TiemposActualizacionOfertasDinamicos;
 
 class CholloController extends Controller
 {
@@ -1271,6 +1272,12 @@ class CholloController extends Controller
         }
 
         $oferta->update($datosActualizar);
+        
+        // Si es una oferta manual (sin chollo_id), registrar en historial de tiempos dinámicos
+        if (!$oferta->chollo_id) {
+            $serviceTiempos = new TiemposActualizacionOfertasDinamicos();
+            $serviceTiempos->registrarActualizacion($oferta->id, $precioTotal, 'manual');
+        }
 
         return response()->json([
             'success' => true,

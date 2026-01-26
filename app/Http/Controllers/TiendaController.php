@@ -61,7 +61,37 @@ class TiendaController extends Controller
             'mostrar_tienda' => 'required|in:si,no',
             'scrapear' => 'required|in:si,no',
             'como_scrapear' => 'required|in:automatico,manual,ambos',
+            'frecuencia_minima_valor' => 'required|numeric|min:0.1',
+            'frecuencia_minima_unidad' => 'required|in:minutos,horas,dias',
+            'frecuencia_maxima_valor' => 'required|numeric|min:0.1',
+            'frecuencia_maxima_unidad' => 'required|in:minutos,horas,dias',
         ]);
+        
+        // Convertir frecuencia mínima a minutos
+        $frecuenciaMinimaMinutos = $this->convertirAMinutos(
+            $request->input('frecuencia_minima_valor'),
+            $request->input('frecuencia_minima_unidad')
+        );
+        
+        // Convertir frecuencia máxima a minutos
+        $frecuenciaMaximaMinutos = $this->convertirAMinutos(
+            $request->input('frecuencia_maxima_valor'),
+            $request->input('frecuencia_maxima_unidad')
+        );
+        
+        // Validar que la frecuencia mínima sea menor o igual a la máxima
+        if ($frecuenciaMinimaMinutos > $frecuenciaMaximaMinutos) {
+            return redirect()->back()
+                ->withErrors(['frecuencia_minima_valor' => 'La frecuencia mínima no puede ser mayor que la frecuencia máxima'])
+                ->withInput();
+        }
+        
+        // Validar que la frecuencia mínima sea al menos 15 minutos
+        if ($frecuenciaMinimaMinutos < 15) {
+            return redirect()->back()
+                ->withErrors(['frecuencia_minima_valor' => 'La frecuencia mínima debe ser al menos 15 minutos'])
+                ->withInput();
+        }
 
         $avisoFecha = null;
         if ($request->filled('eliminar_aviso')) {
@@ -77,6 +107,8 @@ class TiendaController extends Controller
             'puntuacion' => $request->filled('puntuacion') ? $request->input('puntuacion') : 0,
             'anotaciones_internas' => $request->input('anotaciones_internas'),
             'aviso' => $avisoFecha,
+            'frecuencia_minima_minutos' => $frecuenciaMinimaMinutos,
+            'frecuencia_maxima_minutos' => $frecuenciaMaximaMinutos,
         ]);
 
 if ($request->has('comisiones')) {
@@ -157,7 +189,37 @@ public function edit(Tienda $tienda)
             'mostrar_tienda' => 'required|in:si,no',
             'scrapear' => 'required|in:si,no',
             'como_scrapear' => 'required|in:automatico,manual,ambos',
+            'frecuencia_minima_valor' => 'required|numeric|min:0.1',
+            'frecuencia_minima_unidad' => 'required|in:minutos,horas,dias',
+            'frecuencia_maxima_valor' => 'required|numeric|min:0.1',
+            'frecuencia_maxima_unidad' => 'required|in:minutos,horas,dias',
         ]);
+        
+        // Convertir frecuencia mínima a minutos
+        $frecuenciaMinimaMinutos = $this->convertirAMinutos(
+            $request->input('frecuencia_minima_valor'),
+            $request->input('frecuencia_minima_unidad')
+        );
+        
+        // Convertir frecuencia máxima a minutos
+        $frecuenciaMaximaMinutos = $this->convertirAMinutos(
+            $request->input('frecuencia_maxima_valor'),
+            $request->input('frecuencia_maxima_unidad')
+        );
+        
+        // Validar que la frecuencia mínima sea menor o igual a la máxima
+        if ($frecuenciaMinimaMinutos > $frecuenciaMaximaMinutos) {
+            return redirect()->back()
+                ->withErrors(['frecuencia_minima_valor' => 'La frecuencia mínima no puede ser mayor que la frecuencia máxima'])
+                ->withInput();
+        }
+        
+        // Validar que la frecuencia mínima sea al menos 15 minutos
+        if ($frecuenciaMinimaMinutos < 15) {
+            return redirect()->back()
+                ->withErrors(['frecuencia_minima_valor' => 'La frecuencia mínima debe ser al menos 15 minutos'])
+                ->withInput();
+        }
 
         $avisoFecha = $tienda->aviso;
 
@@ -186,6 +248,8 @@ public function edit(Tienda $tienda)
                 'como_scrapear',
             ]),
             'aviso' => $avisoFecha,
+            'frecuencia_minima_minutos' => $frecuenciaMinimaMinutos,
+            'frecuencia_maxima_minutos' => $frecuenciaMaximaMinutos,
         ]);
 
         
@@ -205,6 +269,24 @@ if ($request->has('comisiones')) {
 
 
         return redirect()->route('admin.tiendas.index')->with('success', 'Tienda actualizada correctamente.');
+    }
+
+    /**
+     * Convertir valor y unidad a minutos
+     */
+    private function convertirAMinutos($valor, $unidad)
+    {
+        $valor = (float) $valor;
+        
+        switch ($unidad) {
+            case 'dias':
+                return (int) round($valor * 1440);
+            case 'horas':
+                return (int) round($valor * 60);
+            case 'minutos':
+            default:
+                return (int) round($valor);
+        }
     }
 
     /**

@@ -21,6 +21,8 @@ class Tienda extends Model
         'mostrar_tienda',
         'scrapear',
         'como_scrapear',
+        'frecuencia_minima_minutos',
+        'frecuencia_maxima_minutos',
     ];
 
     public function ofertas()

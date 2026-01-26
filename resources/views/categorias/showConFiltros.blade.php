@@ -1418,7 +1418,7 @@
             
             if (!minSlider || !maxSlider || !minInput || !maxInput || !activeBar) return;
             
-            // Guardar valores originales y borrar al hacer focus, restaurar si está vacío al perder focus
+            {{-- Guardar valores originales y borrar al hacer focus, restaurar si está vacío al perder focus --}}
             let valorOriginalMin = '';
             let valorOriginalMax = '';
             
@@ -1444,7 +1444,7 @@
                 }
             });
             
-            // Evento para slider mínimo
+            {{-- Evento para slider mínimo --}}
             minSlider.addEventListener('input', function() {
                 const min = parseFloat(this.value);
                 const max = parseFloat(maxSlider.value);
@@ -1520,12 +1520,12 @@
         function _cbe1() {
             const checkboxes = document.querySelectorAll('aside .filtro-sublinea-checkbox');
             
-            // Event listener para checkboxes del sidebar
+            {{-- Event listener para checkboxes del sidebar --}}
             checkboxes.forEach(checkbox => {
                 checkbox.addEventListener('change', function() {
                     if (this.disabled) return;
                     
-                    // Sincronizar con el modal
+                    {{-- Sincronizar con el modal --}}
                     const lineaId = this.dataset.lineaId;
                     const sublineaId = this.dataset.sublineaId;
                     const checkboxModal = document.querySelector(`#mf1 .filtro-sublinea-checkbox[data-linea-id="${lineaId}"][data-sublinea-id="${sublineaId}"]`);
@@ -1574,12 +1574,12 @@
                     const lineaId = this.dataset.lineaId;
                     console.log('Linea ID:', lineaId);
                     
-                    // Buscar el contenedor más cercano (puede estar en sidebar o modal)
+                    {{-- Buscar el contenedor más cercano (puede estar en sidebar o modal) --}}
                     const lineaPrincipal = this.closest('.filtro-linea-principal');
                     let container = lineaPrincipal ? lineaPrincipal.querySelector(`.sublineas-container[data-linea-id="${lineaId}"]`) : null;
                     
                     if (!container) {
-                        // Si no se encuentra con closest, buscar en todo el documento
+                        {{-- Si no se encuentra con closest, buscar en todo el documento --}}
                         const estaEnModal = this.closest('#mf1');
                         if (estaEnModal) {
                             container = estaEnModal.querySelector(`.sublineas-container[data-linea-id="${lineaId}"]`);
@@ -1598,24 +1598,24 @@
                     console.log('Atributo data-tiene-mas-de-8 (getAttribute):', tieneMasDe8Attr);
                     console.log('Atributo data-tiene-mas-de-8 (dataset):', container.dataset.tieneMasDe8);
                     
-                    // Usar getAttribute porque dataset puede no funcionar con guiones múltiples
+                    {{-- Usar getAttribute porque dataset puede no funcionar con guiones múltiples --}}
                     const tieneMasDe8 = tieneMasDe8Attr === 'true';
                     const estaMostrandoTodas = this.classList.contains('mostrando-todas');
                     
                     console.log('tieneMasDe8:', tieneMasDe8, 'estaMostrandoTodas:', estaMostrandoTodas);
                     
                     if (estaMostrandoTodas) {
-                        // Ocultar: volver a mostrar solo las primeras 5
+                        {{-- Ocultar: volver a mostrar solo las primeras 5 --}}
                         if (tieneMasDe8) {
                             container.classList.remove('sublineas-scrollable');
-                            // Limpiar estilos inline relacionados con scroll usando removeProperty
+                            {{-- Limpiar estilos inline relacionados con scroll usando removeProperty --}}
                             container.style.removeProperty('max-height');
                             container.style.removeProperty('height');
                             container.style.removeProperty('overflow-y');
                             container.style.removeProperty('overflow-x');
                             container.style.removeProperty('-webkit-overflow-scrolling');
                             
-                            // Ocultar el indicador de scroll
+                            {{-- Ocultar el indicador de scroll --}}
                             const indicador = document.querySelector(`[data-indicador-linea="${lineaId}"]`);
                             if (indicador) {
                                 indicador.classList.add('hidden');
@@ -1630,30 +1630,30 @@
                         this.textContent = 'Mostrar más';
                         this.classList.remove('mostrando-todas');
                     } else {
-                        // Mostrar: mostrar todas las sublíneas
+                        {{-- Mostrar: mostrar todas las sublíneas --}}
                         const labels = container.querySelectorAll('.filtro-sublinea-label');
                         
                         if (tieneMasDe8) {
                             console.log('Entrando en bloque tieneMasDe8 = true');
-                            // Más de 8: mostrar todas pero con scroll (mantener espacio de 5)
+                            {{-- Más de 8: mostrar todas pero con scroll (mantener espacio de 5) --}}
                             labels.forEach(label => {
                                 label.classList.remove('hidden');
                             });
                             console.log('Labels mostrados:', labels.length);
                             
-                            // Activar scroll manteniendo el espacio de 5 sublíneas
+                            {{-- Activar scroll manteniendo el espacio de 5 sublíneas --}}
                             container.classList.add('sublineas-scrollable');
                             
-                            // Calcular altura exacta de 5 items + parte de la 6ª para indicar que hay más
+                            {{-- Calcular altura exacta de 5 items + parte de la 6ª para indicar que hay más --}}
                             const primerLabel = labels[0];
                             if (primerLabel) {
-                                // Esperar a que el DOM se actualice para obtener la altura real
+                                {{-- Esperar a que el DOM se actualice para obtener la altura real --}}
                                 requestAnimationFrame(() => {
                                     const labelHeight = primerLabel.offsetHeight;
-                                    const espacioEntreItems = 8; // space-y-2 = 0.5rem = 8px
-                                    // Mostrar 5 completas + 1/3 de la 6ª para indicar visualmente que hay más
+                                    const espacioEntreItems = 8; {{-- space-y-2 = 0.5rem = 8px --}}
+                                    {{-- Mostrar 5 completas + 1/3 de la 6ª para indicar visualmente que hay más --}}
                                     const altura5Items = (labelHeight * 5) + (espacioEntreItems * 4);
-                                    const alturaConIndicador = altura5Items + (labelHeight * 0.33); // Mostrar parte de la 6ª
+                                    const alturaConIndicador = altura5Items + (labelHeight * 0.33); {{-- Mostrar parte de la 6ª --}}
                                     
                                     console.log('Altura calculada:', {
                                         labelHeight: labelHeight,
@@ -1662,30 +1662,30 @@
                                         totalLabels: labels.length
                                     });
                                     
-                                    // Limpiar estilos previos primero
+                                    {{-- Limpiar estilos previos primero --}}
                                     container.style.removeProperty('max-height');
                                     container.style.removeProperty('height');
                                     container.style.removeProperty('overflow-y');
                                     container.style.removeProperty('overflow-x');
                                     
-                                    // Aplicar nuevos estilos con !important
+                                    {{-- Aplicar nuevos estilos con !important --}}
                                     container.style.setProperty('max-height', `${alturaConIndicador}px`, 'important');
                                     container.style.setProperty('height', `${alturaConIndicador}px`, 'important');
                                     container.style.setProperty('overflow-y', 'scroll', 'important');
                                     container.style.setProperty('overflow-x', 'hidden', 'important');
                                     
-                                    // Asegurar que la barra de scroll sea visible en móvil
+                                    {{-- Asegurar que la barra de scroll sea visible en móvil --}}
                                     container.style.setProperty('-webkit-overflow-scrolling', 'touch', 'important');
                                     
-                                    // Forzar el redibujado para asegurar que el scroll se active
+                                    {{-- Forzar el redibujado para asegurar que el scroll se active --}}
                                     void container.offsetHeight;
                                     
-                                    // Esperar a que el DOM se actualice completamente
+                                    {{-- Esperar a que el DOM se actualice completamente --}}
                                     requestAnimationFrame(() => {
                                         requestAnimationFrame(() => {
                                             container.scrollTop = 0;
                                             
-                                            // Verificar que el scroll funcione
+                                            {{-- Verificar que el scroll funcione --}}
                                             const tieneScroll = container.scrollHeight > container.clientHeight;
                                             const estaEnModal = container.closest('#mf1');
                                             
@@ -1701,31 +1701,31 @@
                                                 computedHeight: window.getComputedStyle(container).height
                                             });
                                             
-                                            // Si no hay scroll, forzar que se muestre ajustando la altura
+                                            {{-- Si no hay scroll, forzar que se muestre ajustando la altura --}}
                                             if (!tieneScroll && container.scrollHeight > 0) {
-                                                // Reducir un poco la altura para forzar el scroll
+                                                {{-- Reducir un poco la altura para forzar el scroll --}}
                                                 const nuevaAltura = Math.min(alturaConIndicador, container.scrollHeight - 1);
                                                 container.style.setProperty('max-height', `${nuevaAltura}px`, 'important');
                                                 container.style.setProperty('height', `${nuevaAltura}px`, 'important');
                                                 console.log('Ajustando altura para forzar scroll:', nuevaAltura);
                                                 
-                                                // Verificar de nuevo después del ajuste
+                                                {{-- Verificar de nuevo después del ajuste --}}
                                                 setTimeout(() => {
                                                     const tieneScrollAhora = container.scrollHeight > container.clientHeight;
                                                     console.log('Scroll después del ajuste:', tieneScrollAhora);
                                                 }, 50);
                                             }
                                             
-                                            // En móvil, asegurar que el scroll sea visible
+                                            {{-- En móvil, asegurar que el scroll sea visible --}}
                                             if (estaEnModal) {
-                                                // Calcular altura exacta para forzar scroll
+                                                {{-- Calcular altura exacta para forzar scroll --}}
                                                 const alturaNecesaria = container.scrollHeight;
                                                 const alturaMaxima = alturaConIndicador;
                                                 
-                                                // Si el contenido es mayor que la altura máxima, forzar scroll
+                                                {{-- Si el contenido es mayor que la altura máxima, forzar scroll --}}
                                                 if (alturaNecesaria > alturaMaxima) {
-                                                    // Reducir la altura para asegurar que haya scroll
-                                                    const alturaConScroll = alturaMaxima - 2; // Reducir 2px para asegurar scroll
+                                                    {{-- Reducir la altura para asegurar que haya scroll --}}
+                                                    const alturaConScroll = alturaMaxima - 2; {{-- Reducir 2px para asegurar scroll --}}
                                                     
                                                     container.style.setProperty('max-height', `${alturaConScroll}px`, 'important');
                                                     container.style.setProperty('height', `${alturaConScroll}px`, 'important');
@@ -1741,13 +1741,13 @@
                                                         tieneScroll: container.scrollHeight > container.clientHeight
                                                     });
                                                     
-                                                    // Forzar un reflow y verificar
+                                                    {{-- Forzar un reflow y verificar --}}
                                                     setTimeout(() => {
                                                         const tieneScrollFinal = container.scrollHeight > container.clientHeight;
                                                         console.log('Verificación final scroll móvil:', tieneScrollFinal);
                                                         
                                                         if (!tieneScrollFinal) {
-                                                            // Si aún no hay scroll, reducir más la altura
+                                                            {{-- Si aún no hay scroll, reducir más la altura --}}
                                                             const alturaAjustada = Math.max(alturaConScroll - 10, alturaMaxima * 0.8);
                                                             container.style.setProperty('max-height', `${alturaAjustada}px`, 'important');
                                                             container.style.setProperty('height', `${alturaAjustada}px`, 'important');
@@ -1761,7 +1761,7 @@
                                 });
                             } else {
                                 console.warn('No se encontró el primer label');
-                                // Fallback si no se puede calcular
+                                {{-- Fallback si no se puede calcular --}}
                                 container.style.setProperty('max-height', '15rem', 'important');
                                 container.style.setProperty('height', '15rem', 'important');
                                 container.style.setProperty('overflow-y', 'scroll', 'important');
@@ -1769,7 +1769,7 @@
                             }
                         } else {
                             console.log('Entrando en bloque tieneMasDe8 = false (menos de 8)');
-                            // Menos de 8: mostrar todas sin scroll
+                            {{-- Menos de 8: mostrar todas sin scroll --}}
                             labels.forEach(label => {
                                 label.classList.remove('hidden');
                             });
@@ -1790,7 +1790,7 @@
             const checkboxesSidebar = document.querySelectorAll('aside .filtro-sublinea-checkbox');
             const checkboxesModal = document.querySelectorAll('#mf1 .filtro-sublinea-checkbox');
             
-            // Sincronizar de sidebar a modal
+            {{-- Sincronizar de sidebar a modal --}}
             checkboxesSidebar.forEach(checkboxSidebar => {
                 const lineaId = checkboxSidebar.dataset.lineaId;
                 const sublineaId = checkboxSidebar.dataset.sublineaId;
@@ -1803,7 +1803,7 @@
                 }
             });
             
-            // Sincronizar de modal a sidebar
+            {{-- Sincronizar de modal a sidebar --}}
             checkboxesModal.forEach(checkboxModal => {
                 const lineaId = checkboxModal.dataset.lineaId;
                 const sublineaId = checkboxModal.dataset.sublineaId;
@@ -1832,7 +1832,7 @@
             titulosHeaders.forEach(tituloHeader => {
                 const lineaPrincipal = tituloHeader.closest('.filtro-linea-principal');
                 if (!lineaPrincipal || !lineaPrincipal.classList.contains('filtro-colapsado')) {
-                    return; // Solo configurar si es colapsable
+                    return; {{-- Solo configurar si es colapsable --}}
                 }
                 
                 tituloHeader.addEventListener('click', function(e) {
@@ -1863,7 +1863,7 @@
                     dropdown.classList.add('hidden');
                     svg.style.transform = 'rotate(0deg)';
                 } else {
-                    // Cerrar modal de filtros si está abierto
+                    {{-- Cerrar modal de filtros si está abierto --}}
                     const modalFiltros = document.getElementById('mf1');
                     if (modalFiltros && !modalFiltros.classList.contains('hidden')) {
                         modalFiltros.classList.add('hidden');
@@ -1901,7 +1901,7 @@
             
             if (btnVerFiltros && modalFiltros) {
                 btnVerFiltros.addEventListener('click', function() {
-                    // Cerrar dropdown de ordenación si está abierto
+                    {{-- Cerrar dropdown de ordenación si está abierto --}}
                     const dropdown = document.getElementById('dd1');
                     const svg = document.getElementById('svg-ordenar');
                     if (dropdown && !dropdown.classList.contains('hidden')) {
@@ -1911,7 +1911,7 @@
                         }
                     }
                     
-                    // Abrir modal primero para que los elementos estén en el DOM
+                    {{-- Abrir modal primero para que los elementos estén en el DOM --}}
                     modalFiltros.classList.remove('hidden');
                     document.body.style.overflow = 'hidden';
                     
@@ -1968,7 +1968,7 @@
                 checkbox.addEventListener('change', function() {
                     if (this.disabled) return;
                     
-                    // Sincronizar con el sidebar
+                    {{-- Sincronizar con el sidebar --}}
                     const lineaId = this.dataset.lineaId;
                     const sublineaId = this.dataset.sublineaId;
                     const checkboxSidebar = document.querySelector(`aside .filtro-sublinea-checkbox[data-linea-id="${lineaId}"][data-sublinea-id="${sublineaId}"]`);

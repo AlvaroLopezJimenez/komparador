@@ -638,6 +638,51 @@
             </div>
 
 
+            {{-- HISTORIAL DE TIEMPOS DE ACTUALIZACIÓN --}}
+            @if($oferta)
+            <details class="bg-white dark:bg-gray-800 shadow-sm rounded-xl border border-gray-200 dark:border-gray-700 mt-8">
+                <summary class="cursor-pointer px-6 py-4 text-lg font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors rounded-t-xl">
+                    <div class="flex items-center justify-between">
+                        <span>Historial de Actualizaciones de Precios</span>
+                        <svg class="w-5 h-5 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </div>
+                </summary>
+                
+                <div class="px-6 pb-6 space-y-4">
+                    {{-- Botones de filtro por días --}}
+                    <div class="flex gap-3 pt-4">
+                        <button type="button" 
+                                onclick="cargarHistorialTiemposActualizacion(30)" 
+                                id="btn-historial-30"
+                                class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition font-medium">
+                            30 días
+                        </button>
+                        <button type="button" 
+                                onclick="cargarHistorialTiemposActualizacion(90)" 
+                                id="btn-historial-90"
+                                class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-md transition font-medium">
+                            90 días
+                        </button>
+                        <button type="button" 
+                                onclick="cargarHistorialTiemposActualizacion(180)" 
+                                id="btn-historial-180"
+                                class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-md transition font-medium">
+                            180 días
+                        </button>
+                    </div>
+                    
+                    {{-- Contenedor para la tabla del historial --}}
+                    <div id="historial-tiempos-container" class="mt-4">
+                        <div class="text-center text-gray-500 dark:text-gray-400 py-8">
+                            <p>Selecciona un período para ver el historial</p>
+                        </div>
+                    </div>
+                </div>
+            </details>
+            @endif
+
             {{-- GUARDAR --}}
             <div class="sticky bottom-4 flex justify-end z-10 mt-8">
                 <button type="submit" id="btn_guardar"
@@ -1185,6 +1230,23 @@
         
         .group:hover #tooltipVariante {
             animation: tooltipFadeIn 0.3s ease-out;
+        }
+        
+        /* Estilos para el desplegable de historial */
+        details[open] summary svg {
+            transform: rotate(180deg);
+        }
+        
+        details summary {
+            list-style: none;
+        }
+        
+        details summary::-webkit-details-marker {
+            display: none;
+        }
+        
+        details summary::marker {
+            display: none;
         }
     </style>
 
@@ -3630,6 +3692,28 @@ function mostrarDesplegablesEspecificaciones(filtros, especificacionesGuardadas 
                     columnaCheckbox.disabled = !this.checked;
                     if (!this.checked) {
                         columnaCheckbox.checked = false;
+                    } else {
+                        // Si se marca el checkbox y es la primera sublínea marcada en esta línea principal, marcar también el checkbox de columna
+                        // Buscar en todo el documento, no solo en container
+                        const otrosCheckboxesMismaLinea = document.querySelectorAll(`.especificacion-checkbox[data-principal-id="${principalId}"]`);
+                        let hayOtraMarcada = false;
+                        otrosCheckboxesMismaLinea.forEach(cb => {
+                            if (cb !== this && cb.checked) {
+                                hayOtraMarcada = true;
+                            }
+                        });
+                        
+                        // Si no hay otra sublínea marcada, marcar automáticamente el checkbox de columna
+                        if (!hayOtraMarcada && columnaCheckbox && !columnaCheckbox.disabled) {
+                            columnaCheckbox.checked = true;
+                            // Desmarcar otros checkboxes de columna en la misma línea principal
+                            const otrosColumnaCheckboxes = document.querySelectorAll(`.columna-oferta-sublinea-checkbox[data-principal-id="${principalId}"]`);
+                            otrosColumnaCheckboxes.forEach(cb => {
+                                if (cb !== columnaCheckbox) {
+                                    cb.checked = false;
+                                }
+                            });
+                        }
                     }
                 }
                 
@@ -4862,5 +4946,156 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     }
 });
+
+    // ============ HISTORIAL DE TIEMPOS DE ACTUALIZACIÓN ============
+    let diasHistorialActual = 30;
+
+    function cargarHistorialTiemposActualizacion(dias) {
+        const ofertaId = {{ $oferta ? $oferta->id : 'null' }};
+        if (!ofertaId || ofertaId === 'null') {
+            return;
+        }
+
+        diasHistorialActual = dias;
+
+        // Actualizar botones activos
+        document.querySelectorAll('[id^="btn-historial-"]').forEach(btn => {
+            btn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+            btn.classList.add('bg-gray-600', 'hover:bg-gray-700');
+        });
+        document.getElementById(`btn-historial-${dias}`).classList.remove('bg-gray-600', 'hover:bg-gray-700');
+        document.getElementById(`btn-historial-${dias}`).classList.add('bg-blue-600', 'hover:bg-blue-700');
+
+        const container = document.getElementById('historial-tiempos-container');
+        container.innerHTML = '<div class="text-center text-gray-500 dark:text-gray-400 py-4"><p>Cargando...</p></div>';
+
+        fetch(`/panel-privado/ofertas/${ofertaId}/historial-tiempos-actualizacion?dias=${dias}`, {
+            method: 'GET',
+            headers: {
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                mostrarHistorialTiemposActualizacion(data.historial, data.total);
+            } else {
+                container.innerHTML = '<div class="text-center text-red-500 py-4"><p>Error al cargar el historial</p></div>';
+            }
+        })
+        .catch(error => {
+            console.error('Error al cargar historial:', error);
+            container.innerHTML = '<div class="text-center text-red-500 py-4"><p>Error al cargar el historial</p></div>';
+        });
+    }
+
+    function mostrarHistorialTiemposActualizacion(historial, total) {
+        const container = document.getElementById('historial-tiempos-container');
+        
+        if (total === 0) {
+            container.innerHTML = `
+                <div class="text-center text-gray-500 dark:text-gray-400 py-8">
+                    <p>No hay registros de actualización en este período</p>
+                </div>
+            `;
+            return;
+        }
+
+        let html = `
+            <div class="bg-gray-800 dark:bg-gray-800 shadow rounded-lg overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-700 dark:divide-gray-600">
+                    <thead class="bg-gray-700 dark:bg-gray-700">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 dark:text-gray-300 uppercase tracking-wider">Fecha</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 dark:text-gray-300 uppercase tracking-wider">Precio Total</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 dark:text-gray-300 uppercase tracking-wider">Tipo</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 dark:text-gray-300 uppercase tracking-wider">Frecuencia Aplicada</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 dark:text-gray-300 uppercase tracking-wider">Frecuencia Calculada</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-700 dark:divide-gray-600">
+        `;
+
+        historial.forEach(registro => {
+            const tipoClass = registro.tipo_actualizacion === 'automatico' 
+                ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' 
+                : 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200';
+            
+            const frecuenciaAplicada = registro.frecuencia_aplicada_minutos 
+                ? formatearFrecuencia(registro.frecuencia_aplicada_minutos) 
+                : '-';
+            
+            const frecuenciaCalculada = registro.frecuencia_calculada_minutos 
+                ? formatearFrecuencia(registro.frecuencia_calculada_minutos) 
+                : '-';
+
+            html += `
+                <tr class="hover:bg-gray-700 dark:hover:bg-gray-700">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-200 dark:text-gray-200">
+                        ${registro.created_at}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-200 dark:text-gray-200">
+                        ${registro.precio_total} €
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2 py-1 text-xs font-semibold rounded-full ${tipoClass}">
+                            ${registro.tipo_actualizacion === 'automatico' ? 'Automático' : 'Manual'}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-200 dark:text-gray-200">
+                        ${frecuenciaAplicada}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-200 dark:text-gray-200">
+                        ${frecuenciaCalculada}
+                    </td>
+                </tr>
+            `;
+        });
+
+        html += `
+                    </tbody>
+                </table>
+            </div>
+            <div class="mt-4 text-sm text-gray-400 dark:text-gray-500 text-center">
+                Total: ${total} registro${total !== 1 ? 's' : ''}
+            </div>
+        `;
+
+        container.innerHTML = html;
+    }
+
+    function formatearFrecuencia(minutos) {
+        if (!minutos) return '-';
+        
+        if (minutos % 1440 === 0) {
+            const dias = minutos / 1440;
+            return `${dias} día${dias !== 1 ? 's' : ''}`;
+        } else if (minutos % 60 === 0) {
+            const horas = minutos / 60;
+            return `${horas} hora${horas !== 1 ? 's' : ''}`;
+        } else {
+            return `${minutos} minuto${minutos !== 1 ? 's' : ''}`;
+        }
+    }
+
+    // Configurar el desplegable para cargar historial cuando se abra
+    document.addEventListener('DOMContentLoaded', function() {
+        const ofertaId = {{ $oferta ? $oferta->id : 'null' }};
+        if (ofertaId && ofertaId !== 'null') {
+            const detailsElement = document.querySelector('details');
+            if (detailsElement) {
+                // Detectar cuando se abre el desplegable
+                detailsElement.addEventListener('toggle', function() {
+                    if (this.open && diasHistorialActual === 30) {
+                        // Solo cargar si está cerrado y se abre por primera vez
+                        const container = document.getElementById('historial-tiempos-container');
+                        if (container && container.textContent.includes('Selecciona un período')) {
+                            cargarHistorialTiemposActualizacion(30);
+                        }
+                    }
+                });
+            }
+        }
+    });
 </script>
 </x-app-layout>

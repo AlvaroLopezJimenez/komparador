@@ -27,6 +27,13 @@ return new class extends Migration
             $table->enum('mostrar_tienda', ['si', 'no'])->default('si'); // Si la tienda debe mostrarse en el frontend
             $table->enum('como_scrapear', ['automatico', 'manual', 'ambos']);
             $table->enum('scrapear', ['si', 'no'])->default('si'); // Si la tienda debe ser scrapeada
+            $table->unsignedInteger('frecuencia_minima_minutos')->nullable()->default(15);
+            // Límite mínimo de frecuencia (en minutos) para todas las ofertas de esta tienda.
+            // Las ofertas de esta tienda nunca tendrán una frecuencia menor a este valor.
+            $table->unsignedInteger('frecuencia_maxima_minutos')->nullable()->default(10080);
+            // Límite máximo de frecuencia (en minutos) para todas las ofertas de esta tienda.
+            // Las ofertas de esta tienda nunca tendrán una frecuencia mayor a este valor.
+            // Valor por defecto: 10080 minutos = 7 días
             $table->timestamps();
         });
     }

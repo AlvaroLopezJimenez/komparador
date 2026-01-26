@@ -9,6 +9,7 @@ use App\Models\Producto;
 use App\Models\OfertaProducto;
 use App\Models\Aviso;
 use App\Models\HistoricoPrecioOferta;
+use App\Models\HistoricoTiempoActualizacionPrecioOferta;
 use Carbon\Carbon;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -392,6 +393,11 @@ class OfertaProductoController extends Controller
         $datosBase['comprobada'] = $esOfertaChollo ? $this->parseNullableDateTime($request->input('comprobada')) : null;
         $datosBase['frecuencia_comprobacion_chollos_min'] = $esOfertaChollo ? $frecuenciaCholloMin : null;
 
+        // Guardar precio anterior antes de actualizar
+        $precioAnterior = $oferta->precio_total;
+        $precioNuevo = (float) $validated['precio_total'];
+        $precioCambio = abs($precioAnterior - $precioNuevo) > 0.01; // Considerar cambio si diferencia > 1 céntimo
+
         // Deshabilitar timestamps automáticos temporalmente
         $oferta->timestamps = false;
 
@@ -417,6 +423,12 @@ class OfertaProductoController extends Controller
             $oferta->save();
         }
 
+        // Si el precio cambió y la oferta no tiene chollo_id, registrar o actualizar en el historial
+        if ($precioCambio && !$oferta->chollo_id) {
+            $serviceTiempos = new \App\Services\TiemposActualizacionOfertasDinamicos();
+            $serviceTiempos->registrarOActualizarActualizacion($oferta->id, $precioNuevo, 'manual');
+        }
+
         // Si el precio final es 0, crear aviso de "Sin stock - 1a vez" a 4 días (después de guardar)
         if ($precioCero) {
             $this->crearAvisoSinStockSiNoExiste($oferta);
@@ -439,6 +451,10 @@ class OfertaProductoController extends Controller
             'precio_total' => 'nullable|numeric|min:0',
             'precio_unidad' => 'nullable|numeric|min:0'
         ]);
+
+        // Guardar precio anterior antes de actualizar
+        $precioAnteriorOferta = $oferta->precio_total;
+        $precioNuevo = isset($validated['precio_total']) ? (float)$validated['precio_total'] : null;
 
         // Si se recibe precio_total pero no precio_unidad, calcularlo usando el servicio
         if (isset($validated['precio_total']) && !isset($validated['precio_unidad'])) {
@@ -464,9 +480,67 @@ class OfertaProductoController extends Controller
         // Recargar la oferta para obtener los valores actualizados
         $oferta->refresh();
 
+        // Si el precio total ha cambiado y la oferta no tiene chollo_id, registrar o actualizar en el historial
+        if ($precioNuevo !== null && abs($precioAnteriorOferta - $precioNuevo) > 0.01 && !$oferta->chollo_id) {
+            $serviceTiempos = new \App\Services\TiemposActualizacionOfertasDinamicos();
+            $serviceTiempos->registrarOActualizarActualizacion($oferta->id, $precioNuevo, 'manual');
+        }
+
         return response()->json([
             'success' => true,
             'precio_unidad' => $oferta->precio_unidad // Devolver el precio_unidad calculado
+        ]);
+    }
+
+    /**
+     * Obtener historial de tiempos de actualización de precios de una oferta
+     */
+    public function historialTiemposActualizacion(OfertaProducto $oferta, Request $request)
+    {
+        $dias = (int) $request->input('dias', 30);
+        
+        // Validar que los días sean válidos
+        if (!in_array($dias, [30, 90, 180])) {
+            $dias = 30;
+        }
+        
+        $fechaInicio = Carbon::now()->subDays($dias);
+        
+        $historial = HistoricoTiempoActualizacionPrecioOferta::where('oferta_id', $oferta->id)
+            ->where('created_at', '>=', $fechaInicio)
+            ->orderBy('created_at', 'desc')
+            ->get();
+        
+        return response()->json([
+            'success' => true,
+            'historial' => $historial->map(function ($registro) {
+                return [
+                    'id' => $registro->id,
+                    'precio_total' => number_format($registro->precio_total, 2, ',', '.'),
+                    'tipo_actualizacion' => $registro->tipo_actualizacion,
+                    'frecuencia_aplicada_minutos' => $registro->frecuencia_aplicada_minutos,
+                    'frecuencia_calculada_minutos' => $registro->frecuencia_calculada_minutos,
+                    'created_at' => $registro->created_at->format('d/m/Y H:i:s'),
+                    'created_at_timestamp' => $registro->created_at->timestamp,
+                ];
+            }),
+            'total' => $historial->count()
+        ]);
+    }
+
+    /**
+     * Mostrar historial global de tiempos de actualización de precios
+     */
+    public function historialTiemposActualizacionGlobal(Request $request)
+    {
+        $perPage = $request->input('per_page', 50);
+        
+        $historial = HistoricoTiempoActualizacionPrecioOferta::with(['oferta.producto.categoria'])
+            ->orderBy('created_at', 'desc')
+            ->paginate($perPage);
+        
+        return view('admin.ofertas.historico_tiempos_de_actualizacion_precios_ofertas', [
+            'historial' => $historial
         ]);
     }
 

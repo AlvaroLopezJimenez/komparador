@@ -194,6 +194,103 @@
                             <option value="ambos" {{ old('como_scrapear', $tienda->como_scrapear ?? 'automatico') == 'ambos' ? 'selected' : '' }}>Ambos</option>
                         </select>
                     </div>
+
+                    @php
+                        // Convertir frecuencia mínima a valor y unidad
+                        // Si hay valores old (después de error de validación), usar esos
+                        if (old('frecuencia_minima_valor') && old('frecuencia_minima_unidad')) {
+                            $frecuencia_minima_valor = old('frecuencia_minima_valor');
+                            $frecuencia_minima_unidad = old('frecuencia_minima_unidad');
+                        } else {
+                            // Si no, convertir desde minutos almacenados
+                            $frecuenciaMinima = $tienda->frecuencia_minima_minutos ?? 1440;
+                            if ($frecuenciaMinima % 1440 === 0) {
+                                $frecuencia_minima_valor = $frecuenciaMinima / 1440;
+                                $frecuencia_minima_unidad = 'dias';
+                            } elseif ($frecuenciaMinima % 60 === 0) {
+                                $frecuencia_minima_valor = $frecuenciaMinima / 60;
+                                $frecuencia_minima_unidad = 'horas';
+                            } else {
+                                $frecuencia_minima_valor = $frecuenciaMinima;
+                                $frecuencia_minima_unidad = 'minutos';
+                            }
+                        }
+                        
+                        // Convertir frecuencia máxima a valor y unidad
+                        // Si hay valores old (después de error de validación), usar esos
+                        if (old('frecuencia_maxima_valor') && old('frecuencia_maxima_unidad')) {
+                            $frecuencia_maxima_valor = old('frecuencia_maxima_valor');
+                            $frecuencia_maxima_unidad = old('frecuencia_maxima_unidad');
+                        } else {
+                            // Si no, convertir desde minutos almacenados
+                            $frecuenciaMaxima = $tienda->frecuencia_maxima_minutos ?? 2880;
+                            if ($frecuenciaMaxima % 1440 === 0) {
+                                $frecuencia_maxima_valor = $frecuenciaMaxima / 1440;
+                                $frecuencia_maxima_unidad = 'dias';
+                            } elseif ($frecuenciaMaxima % 60 === 0) {
+                                $frecuencia_maxima_valor = $frecuenciaMaxima / 60;
+                                $frecuencia_maxima_unidad = 'horas';
+                            } else {
+                                $frecuencia_maxima_valor = $frecuenciaMaxima;
+                                $frecuencia_maxima_unidad = 'minutos';
+                            }
+                        }
+                    @endphp
+                    <div class="col-span-1 md:col-span-2">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">
+                                    Frecuencia mínima
+                                    <span class="relative group">
+                                        <svg class="w-4 h-4 inline text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        <div class="absolute bottom-full left-0 mb-2 w-80 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
+                                            <p>Límite mínimo de frecuencia para todas las ofertas de esta tienda. Las ofertas nunca tendrán una frecuencia menor a este valor. Valor por defecto: 1 día.</p>
+                                        </div>
+                                    </span>
+                                </label>
+                                <div class="flex gap-2">
+                                    <input type="number" step="0.1" min="0.1" name="frecuencia_minima_valor" required
+                                        value="{{ old('frecuencia_minima_valor', $frecuencia_minima_valor ?? 1) }}"
+                                        class="w-20 px-2 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border text-center">
+                                    <select name="frecuencia_minima_unidad" required
+                                        class="px-3 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border">
+                                        <option value="minutos" {{ old('frecuencia_minima_unidad', $frecuencia_minima_unidad ?? '') == 'minutos' ? 'selected' : '' }}>Minutos</option>
+                                        <option value="horas" {{ old('frecuencia_minima_unidad', $frecuencia_minima_unidad ?? '') == 'horas' ? 'selected' : '' }}>Horas</option>
+                                        <option value="dias" {{ old('frecuencia_minima_unidad', $frecuencia_minima_unidad ?? '') == 'dias' ? 'selected' : '' }}>Días</option>
+                                    </select>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">Mínimo permitido: 15 minutos</p>
+                            </div>
+
+                            <div>
+                                <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">
+                                    Frecuencia máxima
+                                    <span class="relative group">
+                                        <svg class="w-4 h-4 inline text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        <div class="absolute bottom-full left-0 mb-2 w-80 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
+                                            <p>Límite máximo de frecuencia para todas las ofertas de esta tienda. Las ofertas nunca tendrán una frecuencia mayor a este valor. Valor por defecto: 2 días.</p>
+                                        </div>
+                                    </span>
+                                </label>
+                                <div class="flex gap-2">
+                                    <input type="number" step="0.1" min="0.1" name="frecuencia_maxima_valor" required
+                                        value="{{ old('frecuencia_maxima_valor', $frecuencia_maxima_valor ?? 2) }}"
+                                        class="w-20 px-2 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border text-center">
+                                    <select name="frecuencia_maxima_unidad" required
+                                        class="px-3 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border">
+                                        <option value="minutos" {{ old('frecuencia_maxima_unidad', $frecuencia_maxima_unidad ?? '') == 'minutos' ? 'selected' : '' }}>Minutos</option>
+                                        <option value="horas" {{ old('frecuencia_maxima_unidad', $frecuencia_maxima_unidad ?? '') == 'horas' ? 'selected' : '' }}>Horas</option>
+                                        <option value="dias" {{ old('frecuencia_maxima_unidad', $frecuencia_maxima_unidad ?? '') == 'dias' ? 'selected' : '' }}>Días</option>
+                                    </select>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">Valor por defecto: 2 días</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </fieldset>
 

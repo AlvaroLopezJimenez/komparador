@@ -135,7 +135,7 @@
     </script>
     @endif
   <style>
-    /* Line clamp para productos relacionados - máximo 2 líneas */
+    {{-- Line clamp para productos relacionados - máximo 2 líneas --}}
     .line-clamp-2 {
       display: -webkit-box;
       -webkit-line-clamp: 2;
@@ -1095,7 +1095,7 @@
     </div>
   </div>
   <script>
-    // Mejorar el comportamiento del desplegable
+    {{-- Mejorar el comportamiento del desplegable --}}
     document.addEventListener('DOMContentLoaded', function() {
       const btn = document.getElementById('admin-ofertas-btn');
       const menu = document.getElementById('admin-ofertas-menu');
@@ -1106,7 +1106,7 @@
       
       let hoverTimeout;
       
-      // Toggle en clic (móvil y desktop)
+      {{-- Toggle en clic (móvil y desktop) --}}
       btn.addEventListener('click', function(e) {
         e.stopPropagation();
         const isHidden = menu.classList.contains('hidden');
@@ -1118,7 +1118,7 @@
         }
       });
       
-      // Cerrar al hacer clic fuera
+      {{-- Cerrar al hacer clic fuera --}}
       document.addEventListener('click', function(e) {
         if (!btn.contains(e.target) && !menu.contains(e.target)) {
           menu.classList.add('hidden');
@@ -1126,7 +1126,7 @@
         }
       });
       
-      // Hover en desktop (solo en pantallas grandes)
+      {{-- Hover en desktop (solo en pantallas grandes) --}}
       dropdown.addEventListener('mouseenter', function() {
         if (window.innerWidth >= 1024) {
           clearTimeout(hoverTimeout);
@@ -3844,7 +3844,7 @@
             let mejoresOfertas = [];
             let mejorPrecio = Infinity;
             
-            // Considerar ofertas individuales y grupos unificados
+            {{-- Considerar ofertas individuales y grupos unificados --}}
             todasLasOfertas.forEach(o => {
               if (o.precio_unidad) {
                 const precio = parseFloat(String(o.precio_unidad).replace(',', '.'));
@@ -3853,7 +3853,7 @@
             });
             
             gruposUnificados.forEach(grupo => {
-              // El grupo tiene precioUnidad (camelCase), no precio_unidad
+              {{-- El grupo tiene precioUnidad (camelCase), no precio_unidad --}}
               if (grupo.precioUnidad) {
                 const precio = parseFloat(String(grupo.precioUnidad).replace(',', '.'));
                 if (!isNaN(precio) && precio < mejorPrecio) mejorPrecio = precio;
@@ -3867,7 +3867,7 @@
                 return !isNaN(precio) && precio === mejorPrecio;
               });
               gruposUnificados.forEach(grupo => {
-                // El grupo tiene precioUnidad (camelCase), no precio_unidad
+                {{-- El grupo tiene precioUnidad (camelCase), no precio_unidad --}}
                 if (grupo.precioUnidad) {
                   const precio = parseFloat(String(grupo.precioUnidad).replace(',', '.'));
                   if (!isNaN(precio) && precio === mejorPrecio) {
@@ -3877,7 +3877,7 @@
               });
             }
             
-            // Si ordenActual es null, respeta el orden original del backend
+            {{-- Si ordenActual es null, respeta el orden original del backend --}}
             {{-- x6: Contenedor del listado de ofertas --}}
             const cont = document.getElementById('x6');
             {{-- x7: Contenedor del botón mostrar más --}}
@@ -3896,11 +3896,11 @@
               return;
             }
             
-            // Determinar cuántas ofertas mostrar (considerando grupos como un solo item)
+            {{-- Determinar cuántas ofertas mostrar (considerando grupos como un solo item) --}}
             const itemsAMostrar = mostrarTodasLasOfertas ? totalItems : Math.min(totalItems, OFERTAS_INICIALES);
             const itemsRestantes = totalItems - itemsAMostrar;
             
-            // Mostrar/ocultar botón de "mostrar más"
+            {{-- Mostrar/ocultar botón de "mostrar más" --}}
             if (itemsRestantes > 0 && !mostrarTodasLasOfertas) {
               {{-- x9: Contador de ofertas restantes --}}
               document.getElementById('x9').textContent = itemsRestantes;
@@ -3909,24 +3909,24 @@
               botonMostrarMas.classList.add('hidden');
             }
             
-            // Crear grupos de ofertas
+            {{-- Crear grupos de ofertas --}}
             let html = '';
             let itemIndex = 0;
             let ofertasRenderizadas = [];
             
-            // Renderizar items unificados en orden (grupos y ofertas intercalados)
+            {{-- Renderizar items unificados en orden (grupos y ofertas intercalados) --}}
             for (let idxUnificado = 0; idxUnificado < itemsUnificados.length; idxUnificado++) {
               const itemOrdenado = itemsUnificados[idxUnificado];
               
               if (!mostrarTodasLasOfertas && itemIndex >= OFERTAS_INICIALES) break;
               
-              // Si es un grupo unificado
+              {{-- Si es un grupo unificado --}}
               if (itemOrdenado.tipo === 'grupo') {
                 const grupo = itemOrdenado.datos;
                 const primeraOferta = grupo.ofertas[0];
                 const esMejorOferta = mejoresOfertas.some(mejor => mejor.id === primeraOferta.id);
                 
-                // Crear contenedor para el grupo unificado
+                {{-- Crear contenedor para el grupo unificado --}}
                 const tieneDescuentosEnGrupo = grupo.ofertas.some(item => 
                   item.descuentos === 'cupon' || 
                   item.descuentos === '3x2' ||
@@ -3945,10 +3945,10 @@
                   html += '<div class="ofertas-grupo">';
                 }
                 
-                // Renderizar fila unificada del grupo
+                {{-- Renderizar fila unificada del grupo --}}
                 const item = primeraOferta;
                 
-                // Intercambiar estilos según filtro activo
+                {{-- Intercambiar estilos según filtro activo --}}
                 let precioTotalClass = 'text-sm text-gray-500';
                 let precioTotalLabelClass = 'font-semibold';
                 let precioUnidadClass = 'text-2xl font-extrabold';
@@ -3960,7 +3960,7 @@
                   precioUnidadLabelClass = 'text-xs font-semibold';
                 }
                 
-                // Determinar estructura de grid según unidadUnica
+                {{-- Determinar estructura de grid según unidadUnica --}}
                 let gridCols = 'sm:grid-cols-[100px_1fr_1fr_1fr_1fr_auto]';
                 let gridColsMovil = 'grid-cols-1';
                 let columnasDinamicas = '';
@@ -3970,7 +3970,7 @@
                 let esUnidadUnicaConColumnas = false;
                 let esUnidadUnicaSinColumnas = false;
                 
-                // Caso 1: Unidad única CON columnas marcadas
+                {{-- Caso 1: Unidad única CON columnas marcadas --}}
                 if (esUnidadUnica && columnasData && columnasData.length > 0) {
                   mostrarCantidad = false;
                   mostrarPrecioTotal = false;
@@ -3978,7 +3978,7 @@
                   columnasDinamicas = _rcgu1(grupo.ofertas);
                   esUnidadUnicaConColumnas = true;
                   
-                  // Para móvil/tablet: grid dinámico según número de columnas
+                  {{-- Para móvil/tablet: grid dinámico según número de columnas --}}
                   const numColumnas = columnasData.length;
                   if (numColumnas === 1) {
                     gridColsMovil = 'grid-cols-2';
@@ -3986,7 +3986,7 @@
                     gridColsMovil = 'grid-cols-3';
                   }
                   
-                  // Calcular grid según número de columnas dinámicas para desktop
+                  {{-- Calcular grid según número de columnas dinámicas para desktop --}}
                   if (numColumnas === 1) {
                     gridCols = 'sm:grid-cols-[100px_1fr_1fr_1fr_1fr_auto]';
                   } else if (numColumnas === 2) {
@@ -3995,7 +3995,7 @@
                     gridCols = 'sm:grid-cols-[100px_1fr_1fr_1fr_1fr_auto]';
                   }
                 }
-                // Caso 2: Unidad única SIN columnas marcadas
+                {{-- Caso 2: Unidad única SIN columnas marcadas --}}
                 else if (esUnidadUnica && (!columnasData || columnasData.length === 0)) {
                   mostrarCantidad = false;
                   mostrarPrecioTotal = true;
@@ -4006,13 +4006,13 @@
                   gridColsMovil = 'grid-cols-3';
                 }
                 
-                // En móvil (unidad única CON columnas): Primera fila (Logo order-1, Precio order-2), Segunda fila (Envío order-3, Columnas order-4+)
-                // En móvil (unidad única SIN columnas): Primera fila (Logo order-1, Envío order-2, Precio order-3), Segunda fila (Botón order-4)
+                {{-- En móvil (unidad única CON columnas): Primera fila (Logo order-1, Precio order-2), Segunda fila (Envío order-3, Columnas order-4+) --}}
+                {{-- En móvil (unidad única SIN columnas): Primera fila (Logo order-1, Envío order-2, Precio order-3), Segunda fila (Botón order-4) --}}
                 const ordenLogo = esUnidadUnicaConColumnas ? 'order-1 sm:!order-[0]' : (esUnidadUnicaSinColumnas ? 'order-1 sm:!order-[0]' : '');
                 const ordenEnvio = esUnidadUnicaConColumnas ? 'order-3 sm:!order-[0]' : (esUnidadUnicaSinColumnas ? 'order-2 sm:!order-[0]' : '');
                 const ordenPrecio = esUnidadUnicaConColumnas ? 'order-2 sm:!order-[0]' : (esUnidadUnicaSinColumnas ? 'order-3 sm:!order-[0]' : '');
                 
-                // Botón: después de las columnas dinámicas en móvil (con columnas) o en segunda fila (sin columnas)
+                {{-- Botón: después de las columnas dinámicas en móvil (con columnas) o en segunda fila (sin columnas) --}}
                 const numColumnas = esUnidadUnicaConColumnas ? columnasData.length : 0;
                 let colSpanBoton = '';
                 let ordenBoton = '';
@@ -4025,7 +4025,7 @@
                   ordenBoton = `order-4 sm:!order-[0] ${colSpanBoton} sm:!col-span-1`;
                 }
                 
-                // Usar la primera oferta del grupo para datos comunes (logo, envío, precio, descuentos)
+                {{-- Usar la primera oferta del grupo para datos comunes (logo, envío, precio, descuentos) --}}
                 const tieneDescuento = primeraOferta.descuentos && (
                   primeraOferta.descuentos === 'cupon' || 
                   primeraOferta.descuentos === '3x2' ||
@@ -4037,7 +4037,7 @@
                   ))
                 );
                 
-                // Generar botón con descuentos (usando la primera oferta)
+                {{-- Generar botón con descuentos (usando la primera oferta) --}}
                 let botonHtml = '';
                 if (primeraOferta.descuentos && typeof primeraOferta.descuentos === 'string' && primeraOferta.descuentos.startsWith('SoloAliexpress;')) {
                   botonHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
@@ -4132,7 +4132,7 @@
                   html += '</div></div></div>';
                 }
                 
-                // Registrar que este grupo fue renderizado
+                {{-- Registrar que este grupo fue renderizado --}}
                 ofertasRenderizadas.push({
                   tipo: 'grupo_unificado',
                   grupoId: grupo.grupoId,
@@ -4143,24 +4143,24 @@
                 
                 itemIndex++;
               }
-              // Si es una oferta individual
+              {{-- Si es una oferta individual --}}
               else if (itemOrdenado.tipo === 'oferta') {
                 const item = itemOrdenado.datos;
                 
                 const estaEnGrupo = ofertasEnGrupos.includes(item.id);
                 const esMejorOferta = mejoresOfertas.some(mejor => mejor.id === item.id);
                 
-                // Si está en un grupo unificado, saltarla (ya fue procesada como grupo)
+                {{-- Si está en un grupo unificado, saltarla (ya fue procesada como grupo) --}}
                 if (estaEnGrupo) {
                   continue;
                 }
                 
-                // Si es una mejor oferta, buscar si hay más consecutivas dentro de itemsUnificados
+                {{-- Si es una mejor oferta, buscar si hay más consecutivas dentro de itemsUnificados --}}
                 if (esMejorOferta) {
                   const grupoMejoresOfertas = [];
                   let j = idxUnificado;
                 
-                  // Agrupar todas las mejores ofertas consecutivas (solo ofertas individuales, no grupos)
+                  {{-- Agrupar todas las mejores ofertas consecutivas (solo ofertas individuales, no grupos) --}}
                   while (j < itemsUnificados.length && 
                          itemsUnificados[j].tipo === 'oferta' &&
                          !ofertasEnGrupos.includes(itemsUnificados[j].datos.id) &&
@@ -4169,9 +4169,9 @@
                     j++;
                   }
                   
-                  // Solo renderizar si hay ofertas en el grupo
+                  {{-- Solo renderizar si hay ofertas en el grupo --}}
                   if (grupoMejoresOfertas.length > 0) {
-                    // Crear contenedor para el grupo de mejores ofertas
+                    {{-- Crear contenedor para el grupo de mejores ofertas --}}
                     const tieneDescuentosEnGrupo = grupoMejoresOfertas.some(item => 
                       item.descuentos === 'cupon' || 
                       item.descuentos === '3x2' ||
@@ -4190,7 +4190,7 @@
                     html += '<div class="ofertas-grupo">';
                   
                     grupoMejoresOfertas.forEach(itemGrupo => {
-                  // Intercambiar estilos según filtro activo
+                  {{-- Intercambiar estilos según filtro activo --}}
                   let precioTotalClass = 'text-sm text-gray-500';
                   let precioTotalLabelClass = 'font-semibold';
                   let precioUnidadClass = 'text-2xl font-extrabold';
@@ -4202,7 +4202,7 @@
                     precioUnidadLabelClass = 'text-xs font-semibold';
                   }
                   
-                  // Determinar estructura de grid según unidadUnica
+                  {{-- Determinar estructura de grid según unidadUnica --}}
                   let gridCols = 'sm:grid-cols-[100px_1fr_1fr_1fr_1fr_auto]';
                   let gridColsMovil = 'grid-cols-1';
                   let columnasDinamicas = '';
@@ -4212,7 +4212,7 @@
                   let esUnidadUnicaConColumnas = false;
                   let esUnidadUnicaSinColumnas = false;
                   
-                  // Caso 1: Unidad única CON columnas marcadas
+                  {{-- Caso 1: Unidad única CON columnas marcadas --}}
                   if (esUnidadUnica && columnasData && columnasData.length > 0) {
                     mostrarCantidad = false;
                     mostrarPrecioTotal = false;
@@ -4220,19 +4220,19 @@
                     columnasDinamicas = _rcuu1(itemGrupo);
                     esUnidadUnicaConColumnas = true;
                     
-                    // Para móvil/tablet: grid dinámico según número de columnas
-                    // Primera fila: logo 50% + precio 50% (2 columnas)
-                    // Segunda fila: envío + columnas dinámicas
+                    {{-- Para móvil/tablet: grid dinámico según número de columnas --}}
+                    {{-- Primera fila: logo 50% + precio 50% (2 columnas) --}}
+                    {{-- Segunda fila: envío + columnas dinámicas --}}
                     const numColumnas = columnasData.length;
                     if (numColumnas === 1) {
-                      // 1 columna: envío 50% + columna 50% (2 columnas en segunda fila)
+                      {{-- 1 columna: envío 50% + columna 50% (2 columnas en segunda fila) --}}
                       gridColsMovil = 'grid-cols-2';
                     } else {
-                      // 2, 3 o 4 columnas: envío 33% + cada columna 33% (3 columnas en segunda fila)
+                      {{-- 2, 3 o 4 columnas: envío 33% + cada columna 33% (3 columnas en segunda fila) --}}
                       gridColsMovil = 'grid-cols-3';
                     }
                     
-                    // Calcular grid según número de columnas dinámicas para desktop
+                    {{-- Calcular grid según número de columnas dinámicas para desktop --}}
                     if (numColumnas === 1) {
                       gridCols = 'sm:grid-cols-[100px_1fr_1fr_1fr_1fr_auto]';
                     } else if (numColumnas === 2) {
@@ -4241,41 +4241,41 @@
                       gridCols = 'sm:grid-cols-[100px_1fr_1fr_1fr_1fr_auto]';
                     }
                   }
-                  // Caso 2: Unidad única SIN columnas marcadas
+                  {{-- Caso 2: Unidad única SIN columnas marcadas --}}
                   else if (esUnidadUnica && (!columnasData || columnasData.length === 0)) {
                     mostrarCantidad = false;
-                    mostrarPrecioTotal = true; // Mostrar precio total
+                    mostrarPrecioTotal = true; {{-- Mostrar precio total --}}
                     mostrarPrecioUnidad = false;
                     esUnidadUnicaSinColumnas = true;
                     
-                    // El label "Precio total" no debe estar en negrita para unidad única sin columnas
+                    {{-- El label "Precio total" no debe estar en negrita para unidad única sin columnas --}}
                     precioTotalLabelClass = 'text-sm text-gray-500';
                     
-                    // PC: Logo, Envío, Precio total, Botón (4 columnas)
+                    {{-- PC: Logo, Envío, Precio total, Botón (4 columnas) --}}
                     gridCols = 'sm:grid-cols-[100px_1fr_1fr_auto]';
                     
-                    // Móvil: Primera fila (Logo, Envío, Precio total), Segunda fila (Botón)
+                    {{-- Móvil: Primera fila (Logo, Envío, Precio total), Segunda fila (Botón) --}}
                     gridColsMovil = 'grid-cols-3';
                   }
                   
-                  // En móvil (unidad única CON columnas): Primera fila (Logo order-1, Precio order-2), Segunda fila (Envío order-3, Columnas order-4+)
-                  // En móvil (unidad única SIN columnas): Primera fila (Logo order-1, Envío order-2, Precio order-3), Segunda fila (Botón order-4)
-                  // En desktop: sin order (orden natural)
+                  {{-- En móvil (unidad única CON columnas): Primera fila (Logo order-1, Precio order-2), Segunda fila (Envío order-3, Columnas order-4+) --}}
+                  {{-- En móvil (unidad única SIN columnas): Primera fila (Logo order-1, Envío order-2, Precio order-3), Segunda fila (Botón order-4) --}}
+                  {{-- En desktop: sin order (orden natural) --}}
                   const ordenLogo = esUnidadUnicaConColumnas ? 'order-1 sm:!order-[0]' : (esUnidadUnicaSinColumnas ? 'order-1 sm:!order-[0]' : '');
                   const ordenEnvio = esUnidadUnicaConColumnas ? 'order-3 sm:!order-[0]' : (esUnidadUnicaSinColumnas ? 'order-2 sm:!order-[0]' : '');
                   const ordenPrecio = esUnidadUnicaConColumnas ? 'order-2 sm:!order-[0]' : (esUnidadUnicaSinColumnas ? 'order-3 sm:!order-[0]' : '');
                   
-                  // Botón: después de las columnas dinámicas en móvil (con columnas) o en segunda fila (sin columnas)
+                  {{-- Botón: después de las columnas dinámicas en móvil (con columnas) o en segunda fila (sin columnas) --}}
                   const numColumnas = esUnidadUnicaConColumnas ? columnasData.length : 0;
                   let colSpanBoton = '';
                   let ordenBoton = '';
                   
                   if (esUnidadUnicaConColumnas) {
-                    // Botón: col-span según número de columnas del grid móvil
+                    {{-- Botón: col-span según número de columnas del grid móvil --}}
                     colSpanBoton = numColumnas === 1 ? 'col-span-2' : 'col-span-3';
                     ordenBoton = numColumnas === 1 ? `order-5 sm:!order-[0] ${colSpanBoton} sm:!col-span-1` : `order-6 sm:!order-[0] ${colSpanBoton} sm:!col-span-1`;
                   } else if (esUnidadUnicaSinColumnas) {
-                    // Botón: ocupa toda la segunda fila en móvil
+                    {{-- Botón: ocupa toda la segunda fila en móvil --}}
                     colSpanBoton = 'col-span-3';
                     ordenBoton = `order-4 sm:!order-[0] ${colSpanBoton} sm:!col-span-1`;
                   }
@@ -4333,14 +4333,14 @@
                         const cuponInfo = _pc1(itemGrupo.descuentos);
                         const valorCupon = cuponInfo ? cuponInfo.valor : (itemGrupo.descuentos.split(';')[1] || '');
                         const codigoCupon = cuponInfo ? cuponInfo.codigo : null;
-                        // Escapar valores para evitar problemas con comillas y caracteres especiales
+                        {{-- Escapar valores para evitar problemas con comillas y caracteres especiales --}}
                         const codigoCuponEscapado = codigoCupon ? codigoCupon.replace(/"/g, '&quot;').replace(/'/g, '&#39;') : '';
                         const valorCuponEscapado = String(valorCupon).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
                         const dataAttrs = codigoCupon 
                           ? `data-cupon="true" data-codigo-cupon="${codigoCuponEscapado}" data-valor-cupon="${valorCuponEscapado}"` 
                           : `data-cupon="true" data-valor-cupon="${valorCuponEscapado}"`;
-                        // Si es mejor oferta (primera del grupo), badge dentro (top: 0px), sino medio fuera (sin especificar top)
-                        const badgeTop = 'top: 0px;'; // Para mejor oferta, dentro del botón
+                        {{-- Si es mejor oferta (primera del grupo), badge dentro (top: 0px), sino medio fuera (sin especificar top) --}}
+                        const badgeTop = 'top: 0px;'; {{-- Para mejor oferta, dentro del botón --}}
                         return '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); ' + badgeTop + ' right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold;">CUPÓN</span>' +
                                '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" ' + dataAttrs + ' target="_blank">Ir a la tienda</span>';
                       } catch (e) {
@@ -4374,20 +4374,20 @@
                   
                     html += '</div></div></div>';
                   
-                    // Avanzar el índice de ofertas procesadas
+                    {{-- Avanzar el índice de ofertas procesadas --}}
                     itemIndex += grupoMejoresOfertas.length;
                   
-                    // IMPORTANTE: Saltar todas las ofertas que ya fueron procesadas en el grupo
-                    // j apunta a la primera oferta DESPUÉS del grupo
-                    idxUnificado = j - 1; // -1 porque el for incrementará al final
+                    {{-- IMPORTANTE: Saltar todas las ofertas que ya fueron procesadas en el grupo --}}
+                    {{-- j apunta a la primera oferta DESPUÉS del grupo --}}
+                    idxUnificado = j - 1; {{-- -1 porque el for incrementará al final --}}
                     continue;
                   }
                 }
                 
-                // Si no es mejor oferta, renderizar como oferta individual normal
+                {{-- Si no es mejor oferta, renderizar como oferta individual normal --}}
                 if (!esMejorOferta) {
-                  // Renderizar oferta individual normal (sin borde de mejor oferta)
-                  // Usar el mismo código que se usaba en el forEach eliminado
+                  {{-- Renderizar oferta individual normal (sin borde de mejor oferta) --}}
+                  {{-- Usar el mismo código que se usaba en el forEach eliminado --}}
                   let precioTotalClass = 'text-sm text-gray-500';
                 let precioTotalLabelClass = 'font-semibold';
                 let precioUnidadClass = 'text-2xl font-extrabold';
@@ -4455,7 +4455,7 @@
                   ordenBoton = `order-4 sm:!order-[0] ${colSpanBoton} sm:!col-span-1`;
                 }
                 
-                // Generar botón
+                {{-- Generar botón --}}
                 let botonHtml = '';
                 if (item.descuentos && typeof item.descuentos === 'string' && item.descuentos.startsWith('SoloAliexpress;')) {
                   botonHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
@@ -4562,13 +4562,13 @@
             
             cont.innerHTML = html;
             
-            // Añadir event listeners para cupones después de renderizar
-            // Usar setTimeout para asegurar que el DOM se haya actualizado
+            {{-- Añadir event listeners para cupones después de renderizar --}}
+            {{-- Usar setTimeout para asegurar que el DOM se haya actualizado --}}
             setTimeout(() => {
               _scel1();
             }, 100);
             
-            // Actualizar mejor oferta en móvil
+            {{-- Actualizar mejor oferta en móvil --}}
             _amom1(filtradas);
             } catch (error) {
               {{-- x6: Contenedor del listado de ofertas --}}
@@ -4582,9 +4582,9 @@
           {{-- _mi1: marcarInteraccion - Marca que el usuario ha interactuado con los filtros --}}
           function _mi1() {
             filtroInteractuado = true;
-            mostrarTodasLasOfertas = false; // Resetear para mostrar solo las primeras 15
+            mostrarTodasLasOfertas = false; {{-- Resetear para mostrar solo las primeras 15 --}}
             _ro1();
-            // Actualizar oferta en el modal si está abierto
+            {{-- Actualizar oferta en el modal si está abierto --}}
             if (typeof _rod1 === 'function') {
               {{-- x18: Modal de imágenes --}}
               const modal = document.getElementById('x18');
@@ -4601,24 +4601,24 @@
             {{-- x5: Botón ordenar por precio total --}}
             const btnPrecio = document.getElementById('x5');
             
-            // Solo ejecutar si los botones existen
+            {{-- Solo ejecutar si los botones existen --}}
             if (!btnUnidades || !btnPrecio) return;
             
             [btnUnidades, btnPrecio].forEach(btn => {
               if (btn) {
                 btn.classList.remove('bg-gray-700', 'text-white', 'bg-white', 'text-blue-500');
-                btn.classList.add('bg-white'); // Estado base inactivo
-                btn.style.color = '#d16a0f'; // Color naranja para texto inactivo
+                btn.classList.add('bg-white'); {{-- Estado base inactivo --}}
+                btn.style.color = '#d16a0f'; {{-- Color naranja para texto inactivo --}}
               }
             });
             if (ordenActual === 'unidades' || ordenActual === null) {
-              btnUnidades.classList.add('bg-gray-700', 'text-white'); // Activo
+              btnUnidades.classList.add('bg-gray-700', 'text-white'); {{-- Activo --}}
               btnUnidades.classList.remove('bg-white');
-              btnUnidades.style.color = ''; // Resetear color para que use text-white
+              btnUnidades.style.color = ''; {{-- Resetear color para que use text-white --}}
             } else if (ordenActual === 'precio_total') {
-              btnPrecio.classList.add('bg-gray-700', 'text-white'); // Activo
+              btnPrecio.classList.add('bg-gray-700', 'text-white'); {{-- Activo --}}
               btnPrecio.classList.remove('bg-white');
-              btnPrecio.style.color = ''; // Resetear color para que use text-white
+              btnPrecio.style.color = ''; {{-- Resetear color para que use text-white --}}
             }
           }
 
@@ -4632,7 +4632,7 @@
           {{-- Función para configurar event listeners de cupones (debe estar antes de usarse) --}}
           {{-- _scel1: setupCuponEventListeners - Configura todos los event listeners para los botones de cupones y descuentos --}}
           function _scel1() {
-            // Buscar todos los botones con cupón (tanto split-button como normales)
+            {{-- Buscar todos los botones con cupón (tanto split-button como normales) --}}
             const cuponButtons = document.querySelectorAll('[data-cupon="true"]');
             const cuponAliExpressButtons = document.querySelectorAll('[data-cupon-aliexpress="true"]');
             const cuponCholloTiendaButtons = document.querySelectorAll('[data-cupon-chollo-tienda="true"]');
@@ -4643,46 +4643,46 @@
             const botones2aAl50 = document.querySelectorAll('[data-2a-al-50="true"]');
             const botones2aAl70 = document.querySelectorAll('[data-2a-al-70="true"]');
             
-            // Buscar todas las tarjetas de ofertas para añadir event listeners
+            {{-- Buscar todas las tarjetas de ofertas para añadir event listeners --}}
             const productCards = document.querySelectorAll('.product-card');
             
-            // Buscar botones de las mejores ofertas en móvil
+            {{-- Buscar botones de las mejores ofertas en móvil --}}
             const mejorOfertaBoton1 = document.getElementById('mejor-oferta-boton-movil-1');
             const mejorOfertaBoton2 = document.getElementById('mejor-oferta-boton-movil-2');
             
             
             cuponButtons.forEach((button, index) => {
-              // Remover event listeners anteriores para evitar duplicados
+              {{-- Remover event listeners anteriores para evitar duplicados --}}
               button.removeEventListener('click', _hcc1);
               button.addEventListener('click', _hcc1);
             });
             
             cuponAliExpressButtons.forEach((button, index) => {
-              // Remover event listeners anteriores para evitar duplicados
+              {{-- Remover event listeners anteriores para evitar duplicados --}}
               button.removeEventListener('click', _hcac1);
               button.addEventListener('click', _hcac1);
             });
             
             cuponCholloTiendaButtons.forEach((button, index) => {
-              // Remover event listeners anteriores para evitar duplicados
+              {{-- Remover event listeners anteriores para evitar duplicados --}}
               button.removeEventListener('click', _hctc1);
               button.addEventListener('click', _hctc1);
             });
             
             cuponCholloTiendaSoloButtons.forEach((button, index) => {
-              // Remover event listeners anteriores para evitar duplicados
+              {{-- Remover event listeners anteriores para evitar duplicados --}}
               button.removeEventListener('click', _hctc1);
               button.addEventListener('click', _hctc1);
             });
             
             botones3x2.forEach(button => {
-              // Remover event listeners anteriores para evitar duplicados
+              {{-- Remover event listeners anteriores para evitar duplicados --}}
               button.removeEventListener('click', _h3x21);
               button.addEventListener('click', _h3x21);
             });
             
             botones2x1.forEach(button => {
-              // Remover event listeners anteriores para evitar duplicados
+              {{-- Remover event listeners anteriores para evitar duplicados --}}
               button.removeEventListener('click', _h2x11);
               button.addEventListener('click', _h2x11);
             });
@@ -4693,25 +4693,25 @@
             });
             
             botones2aAl50.forEach(button => {
-              // Remover event listeners anteriores para evitar duplicados
+              {{-- Remover event listeners anteriores para evitar duplicados --}}
               button.removeEventListener('click', _h2a501);
               button.addEventListener('click', _h2a501);
             });
             
             botones2aAl70.forEach(button => {
-              // Remover event listeners anteriores para evitar duplicados
+              {{-- Remover event listeners anteriores para evitar duplicados --}}
               button.removeEventListener('click', _h2a701);
               button.addEventListener('click', _h2a701);
             });
             
-            // Configurar event listeners para tarjetas de ofertas
+            {{-- Configurar event listeners para tarjetas de ofertas --}}
             productCards.forEach(card => {
-              // Remover event listeners anteriores para evitar duplicados
+              {{-- Remover event listeners anteriores para evitar duplicados --}}
               card.removeEventListener('click', _hpcc1);
               card.addEventListener('click', _hpcc1);
             });
             
-            // Configurar event listeners para los contenedores de las mejores ofertas en móvil
+            {{-- Configurar event listeners para los contenedores de las mejores ofertas en móvil --}}
             const mejorOfertaContenedor1 = document.getElementById('mejor-oferta-contenedor-movil-1');
             const mejorOfertaContenedor2 = document.getElementById('mejor-oferta-contenedor-movil-2');
             const mejorOfertaContenedor3 = document.getElementById('mejor-oferta-contenedor-movil-3');
@@ -4719,42 +4719,42 @@
             
             [mejorOfertaContenedor1, mejorOfertaContenedor2, mejorOfertaContenedor3, mejorOfertaContenedor4].forEach((contenedor, index) => {
               if (contenedor) {
-                // Buscar el botón dentro del contenedor usando el ID específico (puede ser <a> o <span>)
+                {{-- Buscar el botón dentro del contenedor usando el ID específico (puede ser <a> o <span>) --}}
                 const botonContainer = document.getElementById(`mejor-oferta-boton-movil-${index + 1}`);
                 
                 if (botonContainer) {
-                  // Buscar tanto <a> como <span> (los botones con descuento son <span>)
+                  {{-- Buscar tanto <a> como <span> (los botones con descuento son <span>) --}}
                   const botonElement = botonContainer.querySelector('a, span[data-cupon], span[data-cupon-aliexpress], span[data-cupon-chollo-tienda], span[data-3x2], span[data-2x1], span[data-2a-al-50-cheque], span[data-2a-al-50], span[data-2a-al-70]');
                   
                   if (botonElement) {
-                    // Remover event listeners anteriores para evitar duplicados
+                    {{-- Remover event listeners anteriores para evitar duplicados --}}
                     botonElement.removeEventListener('click', _hmomc1);
-                    // Usar capture: true para que se ejecute antes que el handler del contenedor
+                    {{-- Usar capture: true para que se ejecute antes que el handler del contenedor --}}
                     botonElement.addEventListener('click', _hmomc1, true);
                   }
                 }
                 
-                // También agregar event listener al enlace padre del contenedor para que abra el modal si tiene descuento
+                {{-- También agregar event listener al enlace padre del contenedor para que abra el modal si tiene descuento --}}
                 const contenedorLink = contenedor.querySelector('a');
                 if (contenedorLink) {
-                  // Remover event listeners anteriores
+                  {{-- Remover event listeners anteriores --}}
                   const handlerAnterior = contenedorLink._handleMejorOfertaContenedor;
                   if (handlerAnterior) {
                     contenedorLink.removeEventListener('click', handlerAnterior);
                   }
                   
-                  // Crear handler específico para el contenedor que busca el botón dentro
+                  {{-- Crear handler específico para el contenedor que busca el botón dentro --}}
                   const handlerContenedor = function(e) {
-                    // Si el clic fue directamente en el botón, no hacer nada (ya se maneja)
+                    {{-- Si el clic fue directamente en el botón, no hacer nada (ya se maneja) --}}
                     if (e.target.closest('#mejor-oferta-boton-movil-' + (index + 1))) {
                       return;
                     }
                     
-                    // Buscar el botón dentro del contenedor (puede ser <a> o <span>)
+                    {{-- Buscar el botón dentro del contenedor (puede ser <a> o <span>) --}}
                     const botonContainer = document.getElementById(`mejor-oferta-boton-movil-${index + 1}`);
                     
                     if (botonContainer) {
-                      // Buscar tanto <a> como <span> con atributos de descuento
+                      {{-- Buscar tanto <a> como <span> con atributos de descuento --}}
                       const botonElement = botonContainer.querySelector('a, span[data-cupon], span[data-cupon-aliexpress], span[data-cupon-chollo-tienda], span[data-3x2], span[data-2x1], span[data-2a-al-50-cheque], span[data-2a-al-50], span[data-2a-al-70]');
                       
                       if (botonElement) {
@@ -4768,10 +4768,10 @@
                                                 botonElement.hasAttribute('data-2a-al-70');
                         
                         if (tieneDescuento) {
-                          // Si tiene descuento, prevenir navegación y abrir modal
+                          {{-- Si tiene descuento, prevenir navegación y abrir modal --}}
                           e.preventDefault();
                           e.stopPropagation();
-                          // Llamar directamente a handleMejorOfertaMovilClick con el botonElement como target
+                          {{-- Llamar directamente a handleMejorOfertaMovilClick con el botonElement como target --}}
                           const fakeEvent = {
                             target: botonElement,
                             preventDefault: () => {},
@@ -4780,26 +4780,26 @@
                           _hmomc1(fakeEvent);
                         }
                       }
-                      // Si no tiene descuento, dejar que el enlace padre navegue normalmente
+                      {{-- Si no tiene descuento, dejar que el enlace padre navegue normalmente --}}
                     }
                   };
                   
-                  // Guardar referencia del handler para poder removerlo después
+                  {{-- Guardar referencia del handler para poder removerlo después --}}
                   contenedorLink._handleMejorOfertaContenedor = handlerContenedor;
-                  // Usar capture: true para que se ejecute antes que otros handlers y poder prevenir la navegación
+                  {{-- Usar capture: true para que se ejecute antes que otros handlers y poder prevenir la navegación --}}
                   contenedorLink.addEventListener('click', handlerContenedor, true);
                 }
               }
             });
           }
           
-          // Event listener para el botón "mostrar más"
+          {{-- Event listener para el botón "mostrar más" --}}
           {{-- x8: Botón mostrar más ofertas --}}
           document.getElementById('x8').addEventListener('click', function() {
             mostrarTodasLasOfertas = true;
             _ro1();
           });
-          // Solo añadir event listeners de ordenar si los botones existen (no es unidadUnica)
+          {{-- Solo añadir event listeners de ordenar si los botones existen (no es unidadUnica) --}}
           {{-- x4: Botón ordenar por unidades --}}
           const btnOrdenUnidades2 = document.getElementById('x4');
           {{-- x5: Botón ordenar por precio total --}}
@@ -4807,12 +4807,12 @@
           
           if (btnOrdenUnidades2) {
             btnOrdenUnidades2.addEventListener('click', function() {
-              ordenActual = 'unidades'; // Ahora 'unidades' significa precio_unidad
+              ordenActual = 'unidades'; {{-- Ahora 'unidades' significa precio_unidad --}}
               _sob1();
               filtroInteractuado = true;
-              mostrarTodasLasOfertas = false; // Resetear para mostrar solo las primeras 15
+              mostrarTodasLasOfertas = false; {{-- Resetear para mostrar solo las primeras 15 --}}
               _ro1();
-              // Actualizar oferta en el modal si está abierto
+              {{-- Actualizar oferta en el modal si está abierto --}}
               if (typeof _rod1 === 'function') {
                 {{-- x18: Modal de imágenes --}}
               const modal = document.getElementById('x18');
@@ -4828,9 +4828,9 @@
               ordenActual = 'precio_total';
               _sob1();
               filtroInteractuado = true;
-              mostrarTodasLasOfertas = false; // Resetear para mostrar solo las primeras 15
+              mostrarTodasLasOfertas = false; {{-- Resetear para mostrar solo las primeras 15 --}}
               _ro1();
-              // Actualizar oferta en el modal si está abierto
+              {{-- Actualizar oferta en el modal si está abierto --}}
               if (typeof _rod1 === 'function') {
                 {{-- x18: Modal de imágenes --}}
               const modal = document.getElementById('x18');
@@ -4842,7 +4842,7 @@
           }
 
           document.addEventListener('DOMContentLoaded', function() {
-            // Solo llamar a setOrdenBotones si los botones existen (no es unidadUnica)
+            {{-- Solo llamar a setOrdenBotones si los botones existen (no es unidadUnica) --}}
             {{-- x4: Botón ordenar por unidades --}}
             const btnOrdenUnidades3 = document.getElementById('x4');
             {{-- x5: Botón ordenar por precio total --}}
@@ -4850,7 +4850,7 @@
             if (btnOrdenUnidades3 && btnOrdenPrecio3) {
               _sob1();
             }
-            // Filtrado inicial por parámetro v si existe
+            {{-- Filtrado inicial por parámetro v si existe --}}
             const vParam = _gpv1();
             if (vParam) {
               {{-- x3: Filtro de cantidad --}}
@@ -4858,7 +4858,7 @@
             }
             _ro1();
             
-            // Funcionalidad para "Leer más" y "Leer menos" - MÓVIL
+            {{-- Funcionalidad para "Leer más" y "Leer menos" - MÓVIL --}}
             {{-- x10: Descripción corta (móvil) --}}
             const descripcionCorta = document.getElementById('x10');
             {{-- x12: Descripción completa (móvil) --}}
@@ -4880,7 +4880,7 @@
               });
             }
             
-            // Funcionalidad para "Leer más" y "Leer menos" - DESKTOP
+            {{-- Funcionalidad para "Leer más" y "Leer menos" - DESKTOP --}}
             {{-- x14: Descripción corta (desktop) --}}
             const descripcionCortaDesktop = document.getElementById('x14');
             {{-- x16: Descripción completa (desktop) --}}
@@ -5107,7 +5107,7 @@
 
 
   <script>
-    // Variables globales para los gráficos
+    {{-- Variables globales para los gráficos --}}
     {{-- v7: chart - Instancia del gráfico de precios desktop --}}
     let v7 = null;
     {{-- v8: chartMovil - Instancia del gráfico de precios móvil --}}
@@ -5119,24 +5119,24 @@
     {{-- v11: tokenSeguridad - Token de seguridad para las peticiones API --}}
     const v11 = '{{ hash('md5', $producto->id . env('APP_KEY', 'default_key')) }}';
     
-    // Función para detectar el mejor período inicial
+    {{-- Función para detectar el mejor período inicial --}}
     {{-- _dmp1: detectarMejorPeriodo - Detecta el mejor período inicial para mostrar en el gráfico de precios --}}
     function _dmp1(precios) {
       const datosConPrecio = precios.filter(p => p.precio > 0).length;
       const totalDatos = precios.length;
       const densidad = (datosConPrecio / totalDatos) * 100;
       
-      // Si no hay datos, mostrar mensaje
+      {{-- Si no hay datos, mostrar mensaje --}}
       if (datosConPrecio === 0) {
         _mmsd1();
-        return '3m'; // Cambiar por defecto a 3 meses
+        return '3m'; {{-- Cambiar por defecto a 3 meses --}}
       }
       
-      // Siempre empezar con 3 meses por defecto
+      {{-- Siempre empezar con 3 meses por defecto --}}
       return '3m';
     }
     
-    // Función para mostrar mensaje cuando no hay datos
+    {{-- Función para mostrar mensaje cuando no hay datos --}}
     {{-- _mmsd1: mostrarMensajeSinDatos - Muestra un mensaje cuando no hay datos históricos disponibles --}}
     function _mmsd1() {
       const contenedores = [
@@ -5149,7 +5149,7 @@
         if (canvas) {
           canvas.style.display = 'none';
           
-          // Crear mensaje informativo
+          {{-- Crear mensaje informativo --}}
           const mensaje = document.createElement('div');
           mensaje.className = 'flex items-center justify-center h-full text-gray-500 text-center p-4';
           mensaje.innerHTML = `
@@ -5172,7 +5172,7 @@
       const labels = precios.map(p => p.fecha);
       const datos = precios.map(p => p.precio);
 
-      // Función para crear/actualizar gráfico
+      {{-- Función para crear/actualizar gráfico --}}
       {{-- _cg1: crearGrafico - Crea o actualiza un gráfico de precios históricos --}}
       function _cg1(ctx, labels, datos, isMovil = false) {
         const config = {
@@ -5186,8 +5186,8 @@
               borderColor: 'rgb(125, 210, 170)',
               backgroundColor: 'rgba(125, 210, 170, 0.25)',
               tension: 0.3,
-              pointRadius: 0, // Quitar los puntos
-              pointHoverRadius: 4, // Solo mostrar punto al hacer hover
+              pointRadius: 0, {{-- Quitar los puntos --}}
+              pointHoverRadius: 4, {{-- Solo mostrar punto al hacer hover --}}
               pointHoverBackgroundColor: 'rgb(125, 210, 170)',
               pointHoverBorderColor: '#fff',
               pointHoverBorderWidth: 2
@@ -5215,10 +5215,10 @@
             scales: {
               x: {
                 ticks: {
-                  maxTicksLimit: 6, // Reducir a 6 fechas máximo
+                  maxTicksLimit: 6, {{-- Reducir a 6 fechas máximo --}}
                   maxRotation: 0,
                   autoSkip: true,
-                  autoSkipPadding: 20 // Espacio entre etiquetas
+                  autoSkipPadding: 20 {{-- Espacio entre etiquetas --}}
                 },
                 grid: {
                   display: false
@@ -5255,10 +5255,10 @@
         }
       }
 
-      // Función para actualizar gráficos con nuevos datos
+      {{-- Función para actualizar gráficos con nuevos datos --}}
       {{-- _ag1: actualizarGraficos - Actualiza los gráficos de precios con nuevos datos --}}
       function _ag1(labels, datos) {
-        // Añadir efecto de fade out
+        {{-- Añadir efecto de fade out --}}
         const contenedores = [
           document.getElementById('graficoPrecios').parentElement,
           document.getElementById('graficoPreciosMovil')?.parentElement
@@ -5269,7 +5269,7 @@
           contenedor.style.transition = 'opacity 0.2s ease-in-out';
         });
         
-        // Crear nuevos gráficos
+        {{-- Crear nuevos gráficos --}}
         const ctx = document.getElementById('graficoPrecios').getContext('2d');
         _cg1(ctx, labels, datos, false);
 
@@ -5279,7 +5279,7 @@
           _cg1(ctxMovil, labels, datos, true);
         }
         
-        // Forzar redibujado después de un pequeño delay
+        {{-- Forzar redibujado después de un pequeño delay --}}
         setTimeout(() => {
           if (v7) {
             v7.resize();
@@ -5291,7 +5291,7 @@
           }
         }, 100);
         
-        // Restaurar opacidad
+        {{-- Restaurar opacidad --}}
         setTimeout(() => {
           contenedores.forEach(contenedor => {
             contenedor.style.opacity = '1';
@@ -5299,13 +5299,13 @@
         }, 200);
       }
 
-      // Función para cambiar período
+      {{-- Función para cambiar período --}}
       {{-- _cp1: cambiarPeriodo - Cambia el período del gráfico de precios (1m, 3m, 6m, 1a) --}}
       async function _cp1(periodo) {
         if (periodo === v9) return;
         
         try {
-          // Deshabilitar botones durante la carga
+          {{-- Deshabilitar botones durante la carga --}}
           const botones = document.querySelectorAll('[data-periodo]');
           botones.forEach(btn => {
             btn.disabled = true;
@@ -5321,17 +5321,17 @@
           
           const data = await response.json();
           
-          // Actualizar gráficos
+          {{-- Actualizar gráficos --}}
           const labels = data.precios.map(p => p.fecha);
           const datos = data.precios.map(p => p.precio);
           _ag1(labels, datos);
           
-          // Actualizar estado de botones
+          {{-- Actualizar estado de botones --}}
           v9 = periodo;
           _ab1(periodo);
           
         } catch (error) {
-          // Mostrar mensaje de error más específico
+          {{-- Mostrar mensaje de error más específico --}}
           let mensaje = 'Error al cargar los datos del gráfico';
           if (error.message.includes('429')) {
             mensaje = 'Demasiadas solicitudes. Inténtalo de nuevo en un momento.';
@@ -5341,9 +5341,9 @@
             mensaje = 'No se encontraron datos para este período.';
           }
           
-          // Mostrar mensaje de error en consola
+          {{-- Mostrar mensaje de error en consola --}}
         } finally {
-          // Habilitar botones
+          {{-- Habilitar botones --}}
           const botones = document.querySelectorAll('[data-periodo]');
           botones.forEach(btn => {
             btn.disabled = false;
@@ -5353,7 +5353,7 @@
         }
       }
 
-      // Función para actualizar estado de botones
+      {{-- Función para actualizar estado de botones --}}
       {{-- _ab1: actualizarBotones - Actualiza el estado visual de los botones de período del gráfico --}}
       function _ab1(periodoActivo) {
         const botones = document.querySelectorAll('[data-periodo]');
@@ -5375,7 +5375,7 @@
         });
       }
 
-      // Crear gráficos iniciales con los datos de 3 meses que vienen del servidor
+      {{-- Crear gráficos iniciales con los datos de 3 meses que vienen del servidor --}}
       _cg1(ctx, labels, datos, false);
 
       const canvasMovil = document.getElementById('graficoPreciosMovil');
@@ -5384,10 +5384,10 @@
         _cg1(ctxMovil, labels, datos, true);
       }
       
-      // Actualizar estado de botones para mostrar 3M como activo
+      {{-- Actualizar estado de botones para mostrar 3M como activo --}}
       _ab1('3m');
 
-      // Event listeners para botones de período
+      {{-- Event listeners para botones de período --}}
       document.querySelectorAll('[data-periodo]').forEach(btn => {
         btn.addEventListener('click', function() {
           const periodo = this.getAttribute('data-periodo');
@@ -5395,7 +5395,7 @@
         });
       });
 
-      // Resize observers
+      {{-- Resize observers --}}
       const container = document.getElementById('graficoPrecios').parentElement;
       const resizeObserver = new ResizeObserver(() => {
         if (v7) {
@@ -5425,29 +5425,29 @@
 
   {{-- JS PARA LOS FORMULARIOS DE ALERTA DE PRECIO --}}
 <script>
-// Función para scroll suave al formulario de alerta
+{{-- Función para scroll suave al formulario de alerta --}}
 {{-- _sa1: scrollToAlerta - Realiza scroll suave hasta el formulario de alerta de precio --}}
 function _sa1() {
   const formularioAlerta = document.querySelector('aside');
   if (formularioAlerta) {
-    // Añadir efecto visual al botón
+    {{-- Añadir efecto visual al botón --}}
     const boton = document.querySelector('#boton-flotante-alerta button');
     if (boton) {
       boton.classList.add('scale-95');
       setTimeout(() => boton.classList.remove('scale-95'), 200);
     }
     
-    // Calcular la posición del formulario
+    {{-- Calcular la posición del formulario --}}
     const rect = formularioAlerta.getBoundingClientRect();
     const windowHeight = window.innerHeight;
     
-    // Scroll para que el formulario esté completamente visible con offset
+    {{-- Scroll para que el formulario esté completamente visible con offset --}}
     formularioAlerta.scrollIntoView({ 
       behavior: 'smooth', 
       block: 'start' 
     });
     
-    // Añadir un offset adicional para que el formulario aparezca más abajo
+    {{-- Añadir un offset adicional para que el formulario aparezca más abajo --}}
     setTimeout(() => {
       window.scrollBy({
         top: -50,
@@ -5455,12 +5455,12 @@ function _sa1() {
       });
     }, 300);
     
-    // Añadir un pequeño delay y hacer focus en el primer input
+    {{-- Añadir un pequeño delay y hacer focus en el primer input --}}
     setTimeout(() => {
       const primerInput = document.getElementById('correo_alerta2');
       if (primerInput) {
         primerInput.focus();
-        // Añadir un efecto de highlight sutil
+        {{-- Añadir un efecto de highlight sutil --}}
         primerInput.classList.add('ring-4', 'ring-blue-300');
         setTimeout(() => {
           primerInput.classList.remove('ring-4', 'ring-blue-300');
@@ -5470,7 +5470,7 @@ function _sa1() {
   }
 }
 
-// Ocultar botón flotante cuando el usuario está cerca del formulario
+{{-- Ocultar botón flotante cuando el usuario está cerca del formulario --}}
 {{-- _tbf1: toggleBotonFlotante - Muestra/oculta el botón flotante de alerta según la posición del scroll --}}
 function _tbf1() {
   {{-- x19: Botón flotante de alerta (móvil) --}}
@@ -5481,7 +5481,7 @@ function _tbf1() {
     const rect = formularioAlerta.getBoundingClientRect();
     const windowHeight = window.innerHeight;
     
-    // El formulario está visible si está en la pantalla y no está muy arriba
+    {{-- El formulario está visible si está en la pantalla y no está muy arriba --}}
     const isVisible = rect.top < windowHeight * 0.8 && rect.bottom > windowHeight * 0.2;
     
     if (isVisible) {
@@ -5495,7 +5495,7 @@ function _tbf1() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Función para manejar formularios de alerta
+    {{-- Función para manejar formularios de alerta --}}
     {{-- _sfa1: setupFormularioAlerta - Configura los event listeners del formulario de alerta de precio --}}
     function _sfa1(formId, mensajeId) {
         const formAlerta = document.getElementById(formId);
@@ -5505,7 +5505,7 @@ document.addEventListener('DOMContentLoaded', function() {
             formAlerta.addEventListener('submit', function(e) {
                 e.preventDefault();
                 
-                // Obtener los datos del formulario
+                {{-- Obtener los datos del formulario --}}
                 const formData = new FormData(formAlerta);
                 const data = {
                     correo: formData.get('correo'),
@@ -5514,19 +5514,19 @@ document.addEventListener('DOMContentLoaded', function() {
                     acepto_politicas: formData.get('acepto_politicas') === 'on'
                 };
                 
-                // Validación básica del lado del cliente
+                {{-- Validación básica del lado del cliente --}}
                 if (!data.correo || !data.precio_limite || !data.acepto_politicas) {
                     _mm1(mensajeAlerta, 'Por favor, completa todos los campos y acepta las políticas de privacidad.', 'error');
                     return;
                 }
                 
-                // Deshabilitar el botón durante el envío
+                {{-- Deshabilitar el botón durante el envío --}}
                 const submitBtn = formAlerta.querySelector('button[type="submit"]');
                 const originalText = submitBtn.textContent;
                 submitBtn.disabled = true;
                 submitBtn.textContent = 'Guardando...';
                 
-                // Enviar la petición
+                {{-- Enviar la petición --}}
                 fetch('{{ route("alertas.guardar") }}', {
                     method: 'POST',
                     headers: {
@@ -5540,7 +5540,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (result.success) {
                         _mm1(mensajeAlerta, result.message, 'success');
                         formAlerta.reset();
-                        // Restaurar el precio por defecto
+                        {{-- Restaurar el precio por defecto --}}
                         const precioInput = formAlerta.querySelector('input[name="precio_limite"]');
                         if (precioInput) {
                             precioInput.value = '{{ number_format($producto->precio, 2, ".", "") }}';
@@ -5558,7 +5558,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     _mm1(mensajeAlerta, 'Error de conexión. Inténtalo de nuevo.', 'error');
                 })
                 .finally(() => {
-                    // Restaurar el botón
+                    {{-- Restaurar el botón --}}
                     submitBtn.disabled = false;
                     submitBtn.textContent = originalText;
                 });
@@ -5572,7 +5572,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         mensajeElement.textContent = mensaje;
         
-        // Estilos según el tipo de mensaje
+        {{-- Estilos según el tipo de mensaje --}}
         if (tipo === 'success') {
             mensajeElement.className = 'mt-3 text-sm p-3 rounded-md bg-green-100 text-green-800 border border-green-200';
         } else {
@@ -5581,31 +5581,31 @@ document.addEventListener('DOMContentLoaded', function() {
         
         mensajeElement.classList.remove('hidden');
         
-        // Ocultar el mensaje después de 5 segundos
+        {{-- Ocultar el mensaje después de 5 segundos --}}
         setTimeout(() => {
             mensajeElement.classList.add('hidden');
         }, 5000);
     }
     
-    // Configurar el formulario de alerta
+    {{-- Configurar el formulario de alerta --}}
     _sfa1('formAlertaPrecio2', 'mensajeAlerta2');
     
-    // Configurar el comportamiento del botón flotante
+    {{-- Configurar el comportamiento del botón flotante --}}
     window.addEventListener('scroll', _tbf1);
     
-    // Ocultar botón flotante inicialmente si el formulario ya es visible
+    {{-- Ocultar botón flotante inicialmente si el formulario ya es visible --}}
     setTimeout(_tbf1, 100);
     
-    // Configurar funcionalidad de cupones
+    {{-- Configurar funcionalidad de cupones --}}
     _scm2();
 });
 
 {{-- _scel1 ya está definida en el script anterior --}}
 
-// Función para manejar clic en tarjeta de oferta
+{{-- Función para manejar clic en tarjeta de oferta --}}
 {{-- _hpcc1: handleProductCardClick - Maneja el evento de clic en las tarjetas de producto --}}
 function _hpcc1(e) {
-  // Si el clic fue en un botón específico, no hacer nada (ya se maneja por separado)
+  {{-- Si el clic fue en un botón específico, no hacer nada (ya se maneja por separado) --}}
   if (e.target.closest('[data-cupon], [data-cupon-aliexpress], [data-cupon-chollo-tienda], [data-cupon-chollo-tienda-solo], [data-3x2], [data-2x1], [data-2a-al-50-cheque], [data-2a-al-50], [data-2a-al-70]')) {
     return;
   }
@@ -5613,7 +5613,7 @@ function _hpcc1(e) {
   const card = e.currentTarget;
   const url = card.href;
   
-  // Buscar qué tipo de descuento tiene esta oferta
+  {{-- Buscar qué tipo de descuento tiene esta oferta --}}
   const cuponButton = card.querySelector('[data-cupon="true"]');
   const cuponAliExpressButton = card.querySelector('[data-cupon-aliexpress="true"]');
   const cuponCholloTiendaButton = card.querySelector('[data-cupon-chollo-tienda="true"]');
@@ -5666,17 +5666,17 @@ function _hpcc1(e) {
   }
 }
 
-// Función para manejar clic en botón con cupón
+{{-- Función para manejar clic en botón con cupón --}}
 {{-- _hcc1: handleCuponClick - Maneja el clic en botones con cupones normales --}}
 function _hcc1(e) {
   e.preventDefault();
   e.stopPropagation();
   
   const button = e.target.closest('[data-cupon="true"]') || e.target;
-  // Buscar el enlace padre que contiene la URL (la tarjeta de producto)
+  {{-- Buscar el enlace padre que contiene la URL (la tarjeta de producto) --}}
   const card = button.closest('.product-card');
   let url = card ? card.href : null;
-  // Si no hay card, buscar data-url en el botón
+  {{-- Si no hay card, buscar data-url en el botón --}}
   if (!url) {
     url = button.getAttribute('data-url');
   }
@@ -5687,30 +5687,30 @@ function _hcc1(e) {
     return;
   }
   
-  // Mostrar modal de cupón
+  {{-- Mostrar modal de cupón --}}
   _scm1(url, valorCupon, codigoCupon);
 }
 
-// Función para manejar clic en botón con cupón de AliExpress
+{{-- Función para manejar clic en botón con cupón de AliExpress --}}
 {{-- _hcac1: handleCuponAliExpressClick - Maneja el clic en botones con cupones de AliExpress --}}
 function _hcac1(e) {
   e.preventDefault();
   e.stopPropagation();
   
   const button = e.target.closest('[data-cupon-aliexpress="true"]') || e.target;
-  // Para AliExpress, necesitamos obtener la URL del contexto de la oferta
+  {{-- Para AliExpress, necesitamos obtener la URL del contexto de la oferta --}}
   const ofertaElement = button.closest('.oferta-item, .oferta-grupo');
   let url = '#';
   
   if (ofertaElement) {
-    // Buscar el enlace de la oferta
+    {{-- Buscar el enlace de la oferta --}}
     const linkElement = ofertaElement.querySelector('a[href]');
     if (linkElement) {
       url = linkElement.href;
     }
   }
   
-  // También intentar obtener la URL desde el atributo data-url
+  {{-- También intentar obtener la URL desde el atributo data-url --}}
   const urlFromData = button.getAttribute('data-url');
   if (urlFromData) {
     url = urlFromData;
@@ -5719,30 +5719,30 @@ function _hcac1(e) {
   const descuentos = button.getAttribute('data-descuentos');
   const ofertaId = button.getAttribute('data-oferta-id');
   
-  // Mostrar modal de cupón AliExpress
+  {{-- Mostrar modal de cupón AliExpress --}}
   showCuponAliExpressModal(url, descuentos, ofertaId);
 }
 
-// Función para manejar clic en botón con cupón de CholloTienda
+{{-- Función para manejar clic en botón con cupón de CholloTienda --}}
 {{-- _hctc1: handleCuponCholloTiendaClick - Maneja el clic en botones con cupones de CholloTienda --}}
 function _hctc1(e) {
   e.preventDefault();
   e.stopPropagation();
   
   const button = e.target.closest('[data-cupon-chollo-tienda="true"], [data-cupon-chollo-tienda-solo="true"]') || e.target;
-  // Para CholloTienda, necesitamos obtener la URL del contexto de la oferta
+  {{-- Para CholloTienda, necesitamos obtener la URL del contexto de la oferta --}}
   const ofertaElement = button.closest('.oferta-item, .oferta-grupo');
   let url = '#';
   
   if (ofertaElement) {
-    // Buscar el enlace de la oferta
+    {{-- Buscar el enlace de la oferta --}}
     const linkElement = ofertaElement.querySelector('a[href]');
     if (linkElement) {
       url = linkElement.href;
     }
   }
   
-  // También intentar obtener la URL desde el atributo data-url
+  {{-- También intentar obtener la URL desde el atributo data-url --}}
   const urlFromData = button.getAttribute('data-url');
   if (urlFromData) {
     url = urlFromData;
@@ -5751,11 +5751,11 @@ function _hctc1(e) {
   const descuentos = button.getAttribute('data-descuentos');
   const ofertaId = button.getAttribute('data-oferta-id');
   
-  // Mostrar modal de cupón CholloTienda
+  {{-- Mostrar modal de cupón CholloTienda --}}
   _scctm1(url, descuentos, ofertaId);
 }
 
-// Función para manejar clic en botón 3x2
+{{-- Función para manejar clic en botón 3x2 --}}
 {{-- _h3x21: handle3x2Click - Maneja el clic en botones con oferta 3x2 --}}
 function _h3x21(e) {
   e.preventDefault();
@@ -5764,7 +5764,7 @@ function _h3x21(e) {
   const button = e.target.closest('[data-3x2="true"]') || e.target;
   const link = button.closest('a');
   let url = link ? link.href : null;
-  // Si no hay link, buscar data-url en el botón
+  {{-- Si no hay link, buscar data-url en el botón --}}
   if (!url) {
     url = button.getAttribute('data-url');
   }
@@ -5773,11 +5773,11 @@ function _h3x21(e) {
     return;
   }
   
-  // Mostrar modal de 3x2
+  {{-- Mostrar modal de 3x2 --}}
   _s3x2m1(url);
 }
 
-// Función para manejar clic en botón 2x1
+{{-- Función para manejar clic en botón 2x1 --}}
 {{-- _h2x11: handle2x1Click - Maneja el clic en botones con oferta 2x1 --}}
 function _h2x11(e) {
   e.preventDefault();
@@ -5786,7 +5786,7 @@ function _h2x11(e) {
   const button = e.target.closest('[data-2x1="true"]') || e.target;
   const link = button.closest('a');
   let url = link ? link.href : null;
-  // Si no hay link, buscar data-url en el botón
+  {{-- Si no hay link, buscar data-url en el botón --}}
   if (!url) {
     url = button.getAttribute('data-url');
   }
@@ -5795,11 +5795,11 @@ function _h2x11(e) {
     return;
   }
   
-  // Mostrar modal de 2x1
+  {{-- Mostrar modal de 2x1 --}}
   _s2x1m1(url);
 }
 
-// Función para manejar clic en botón 2a al 50 con cheque
+{{-- Función para manejar clic en botón 2a al 50 con cheque --}}
 {{-- _h2a50c1: handle2aAl50ChequeClick - Maneja el clic en botones con oferta 2ª al 50% con cheque --}}
 function _h2a50c1(e) {
   e.preventDefault();
@@ -5815,7 +5815,7 @@ function _h2a50c1(e) {
   _s2a50cm1(url);
 }
 
-// Función para manejar clic en botón 2a al 50
+{{-- Función para manejar clic en botón 2a al 50 --}}
 {{-- _h2a501: handle2aAl50Click - Maneja el clic en botones con oferta 2ª al 50% --}}
 function _h2a501(e) {
   e.preventDefault();
@@ -5824,7 +5824,7 @@ function _h2a501(e) {
   const button = e.target.closest('[data-2a-al-50="true"]') || e.target;
   const link = button.closest('a');
   let url = link ? link.href : null;
-  // Si no hay link, buscar data-url en el botón
+  {{-- Si no hay link, buscar data-url en el botón --}}
   if (!url) {
     url = button.getAttribute('data-url');
   }
@@ -5833,11 +5833,11 @@ function _h2a501(e) {
     return;
   }
   
-  // Mostrar modal de 2a al 50
+  {{-- Mostrar modal de 2a al 50 --}}
   _s2a50m1(url);
 }
 
-// Función para manejar clic en botón 2a al 70
+{{-- Función para manejar clic en botón 2a al 70 --}}
 {{-- _h2a701: handle2aAl70Click - Maneja el clic en botones con oferta 2ª al 70% --}}
 function _h2a701(e) {
   e.preventDefault();
@@ -5846,7 +5846,7 @@ function _h2a701(e) {
   const button = e.target.closest('[data-2a-al-70="true"]') || e.target;
   const link = button.closest('a');
   let url = link ? link.href : null;
-  // Si no hay link, buscar data-url en el botón
+  {{-- Si no hay link, buscar data-url en el botón --}}
   if (!url) {
     url = button.getAttribute('data-url');
   }
@@ -5855,28 +5855,28 @@ function _h2a701(e) {
     return;
   }
   
-  // Mostrar modal de 2a al 70
+  {{-- Mostrar modal de 2a al 70 --}}
   _s2a70m1(url);
 }
 
-// Función para manejar clic en botón de la mejor oferta en móvil
+{{-- Función para manejar clic en botón de la mejor oferta en móvil --}}
 {{-- _hmomc1: handleMejorOfertaMovilClick - Maneja el clic en las mejores ofertas móviles --}}
 function _hmomc1(e) {
-  // Si e.preventDefault existe, prevenir comportamiento por defecto
+  {{-- Si e.preventDefault existe, prevenir comportamiento por defecto --}}
   if (e.preventDefault) {
     e.preventDefault();
     e.stopPropagation();
   }
   
-  // Buscar el elemento del botón (puede ser <a> o <span>)
+  {{-- Buscar el elemento del botón (puede ser <a> o <span>) --}}
   let link = e.target;
   
-  // Si el target es el badge o algo dentro, buscar el elemento del botón
+  {{-- Si el target es el badge o algo dentro, buscar el elemento del botón --}}
   if (link.tagName === 'SPAN' && link.classList.contains('cupon-badge')) {
     link = link.parentElement.querySelector('a, span[data-cupon], span[data-cupon-aliexpress], span[data-cupon-chollo-tienda], span[data-cupon-chollo-tienda-solo], span[data-3x2], span[data-2x1], span[data-2a-al-50], span[data-2a-al-70]');
   }
   
-  // Si no es el botón, buscar el botón más cercano
+  {{-- Si no es el botón, buscar el botón más cercano --}}
   if (!link || (!link.hasAttribute('data-cupon') && !link.hasAttribute('data-cupon-aliexpress') && !link.hasAttribute('data-cupon-chollo-tienda') && !link.hasAttribute('data-cupon-chollo-tienda-solo') && !link.hasAttribute('data-3x2') && !link.hasAttribute('data-2x1') && !link.hasAttribute('data-2a-al-50-cheque') && !link.hasAttribute('data-2a-al-50') && !link.hasAttribute('data-2a-al-70'))) {
     const botonContainer = e.target.closest('[id^="mejor-oferta-boton-movil-"]');
     if (botonContainer) {
@@ -5888,10 +5888,10 @@ function _hmomc1(e) {
     return;
   }
   
-  // Obtener la URL del href o del atributo data-url
+  {{-- Obtener la URL del href o del atributo data-url --}}
   const url = link.href || link.getAttribute('data-url');
   
-  // Verificar qué tipo de descuento tiene
+  {{-- Verificar qué tipo de descuento tiene --}}
   if (link.hasAttribute('data-cupon-aliexpress')) {
     const descuentos = link.getAttribute('data-descuentos');
     const ofertaId = link.getAttribute('data-oferta-id');
@@ -5903,11 +5903,11 @@ function _hmomc1(e) {
   } else if (link.hasAttribute('data-cupon')) {
     const valorCupon = link.getAttribute('data-valor-cupon');
     const codigoCupon = link.getAttribute('data-codigo-cupon');
-    // Si hay código de cupón, mostrar modal; si no, ir directamente a la tienda
+    {{-- Si hay código de cupón, mostrar modal; si no, ir directamente a la tienda --}}
     if (codigoCupon) {
       _scm1(url, valorCupon, codigoCupon);
     } else {
-      // Si no hay código, ir directamente a la tienda
+      {{-- Si no hay código, ir directamente a la tienda --}}
       window.open(url, '_blank', 'noopener,noreferrer');
     }
   } else if (link.hasAttribute('data-3x2')) {
@@ -5921,12 +5921,12 @@ function _hmomc1(e) {
   } else if (link.hasAttribute('data-2a-al-70')) {
     _s2a70m1(url);
   } else {
-    // Oferta normal, ir directamente
+    {{-- Oferta normal, ir directamente --}}
     window.open(url, '_blank', 'noopener,noreferrer');
   }
 }
 
-// Función para mostrar modal de cupón
+{{-- Función para mostrar modal de cupón --}}
 {{-- _scm1: showCuponModal - Muestra el modal con información del cupón --}}
 function _scm1(url, valorCupon = null, codigoCupon = null) {
   _cm1();
@@ -5954,7 +5954,7 @@ function _scm1(url, valorCupon = null, codigoCupon = null) {
   title.textContent = '¡Aplicar cupón!';
   text.textContent = 'Para conseguir este precio, hay que aplicar este cupón.';
   
-  // Generar HTML para el cupón
+  {{-- Generar HTML para el cupón --}}
   let cuponesHtml = '';
   if (codigoCupon && valorCupon) {
     cuponesHtml = _ghc1({
@@ -5981,11 +5981,11 @@ function _scm1(url, valorCupon = null, codigoCupon = null) {
   
   cuponesList.innerHTML = cuponesHtml;
   
-  // Configurar botones de copiar
+  {{-- Configurar botones de copiar --}}
   if (codigoCupon) {
     _cbc1(cuponesList, url, true);
   } else {
-    // Si no hay código, solo configurar el botón de ir a la tienda
+    {{-- Si no hay código, solo configurar el botón de ir a la tienda --}}
     cuponesList.querySelectorAll('.copiar-cupon-btn').forEach(btn => {
       btn.onclick = function(e) {
         e.preventDefault();
@@ -6001,19 +6001,19 @@ function _scm1(url, valorCupon = null, codigoCupon = null) {
 
 
 
-// Función para parsear cupones de CholloTienda
+{{-- Función para parsear cupones de CholloTienda --}}
 {{-- _pcct1: parsearCuponesCholloTienda - Parsea los cupones de CholloTienda --}}
 function _pcct1(descuentos) {
   if (!descuentos) {
     return [];
   }
   
-  // Verificar si es el formato nuevo "1 Solo cupón"
+  {{-- Verificar si es el formato nuevo "1 Solo cupón" --}}
   if (descuentos.startsWith('CholloTienda1SoloCuponQueAplicaDescuento;')) {
     const partes = descuentos.split(';');
     const cupon = {};
     
-    // Buscar los valores en el string
+    {{-- Buscar los valores en el string --}}
     for (let i = 0; i < partes.length; i++) {
       if (partes[i] === 'descuento' && i + 1 < partes.length) {
         cupon.descuento = parseFloat(partes[i + 1]);
@@ -6026,7 +6026,7 @@ function _pcct1(descuentos) {
       }
     }
     
-    // Si se encontró el cupón, devolverlo en un array
+    {{-- Si se encontró el cupón, devolverlo en un array --}}
     if (cupon.descuento !== undefined && cupon.cupon) {
       return [cupon];
     }
@@ -6034,7 +6034,7 @@ function _pcct1(descuentos) {
     return [];
   }
   
-  // Formato original CholloTienda;
+  {{-- Formato original CholloTienda; --}}
   if (!descuentos.startsWith('CholloTienda;')) {
     return [];
   }
@@ -6042,8 +6042,8 @@ function _pcct1(descuentos) {
   const partes = descuentos.split(';');
   const cupones = [];
   
-  // Buscar patrones de cupones: descuento;X;sobrePrecioTotal;Y;cupon;Z
-  // El formato es: CholloTienda;tienda_id;{id};descuento;{valor};sobrePrecioTotal;{minimo};cupon;{codigo};...
+  {{-- Buscar patrones de cupones: descuento;X;sobrePrecioTotal;Y;cupon;Z --}}
+  {{-- El formato es: CholloTienda;tienda_id;{id};descuento;{valor};sobrePrecioTotal;{minimo};cupon;{codigo};... --}}
   for (let i = 0; i < partes.length; i++) {
     if (partes[i] === 'descuento' && i + 4 < partes.length) {
       if (partes[i + 2] === 'sobrePrecioTotal' && partes[i + 4] === 'cupon') {
@@ -6059,7 +6059,7 @@ function _pcct1(descuentos) {
   return cupones;
 }
 
-// Función para mostrar modal de cupón CholloTienda
+{{-- Función para mostrar modal de cupón CholloTienda --}}
 {{-- _scctm1: showCuponCholloTiendaModal - Muestra el modal de cupones de CholloTienda --}}
 function _scctm1(url, descuentos, ofertaId) {
   _cm1();
@@ -6093,7 +6093,7 @@ function _scctm1(url, descuentos, ofertaId) {
     ? 'Para conseguir este precio, hay que aplicar este cupón.<br>'
     : 'Los cupones son validos para la gran mayoría de productos, pero no para todos. Puedes comprobarlo en la tienda<br>';
   
-  // Generar HTML para la lista de cupones
+  {{-- Generar HTML para la lista de cupones --}}
   let cuponesHtml = '';
   cuponesInfo.forEach(cupon => {
     const descuentoTexto = (esSoloCupon && cupon.tipo_descuento === 'porcentaje') 
@@ -6116,7 +6116,7 @@ function _scctm1(url, descuentos, ofertaId) {
   document.body.style.overflow = 'hidden';
 }
 
-// Función para copiar al portapapeles
+{{-- Función para copiar al portapapeles --}}
 {{-- _cap1: copiarAlPortapapeles - Copia texto al portapapeles --}}
 function _cap1(texto) {
   if (navigator.clipboard && window.isSecureContext) {
@@ -6148,9 +6148,9 @@ function _fctc1(texto) {
   document.body.removeChild(textArea);
 }
 
-// ==================== FUNCIONES GENÉRICAS PARA MODALES ====================
+{{-- ==================== FUNCIONES GENÉRICAS PARA MODALES ==================== --}}
 
-// Configuración de modales simples
+{{-- Configuración de modales simples --}}
 {{-- v12: modalConfigs - Configuración de los modales de ofertas especiales (3x2, 2x1, etc.) --}}
 const v12 = {
   '3x2': {
@@ -6175,7 +6175,7 @@ const v12 = {
   }
 };
 
-// Función genérica para modales simples
+{{-- Función genérica para modales simples --}}
 {{-- _ssm1: showSimpleModal - Muestra un modal simple con configuración personalizada --}}
 function _ssm1(url, config) {
   _cm1();
@@ -6192,7 +6192,7 @@ function _ssm1(url, config) {
   
   if (!modal || !continueBtn || !title || !text) return;
   
-  // Ocultar lista de cupones si existe
+  {{-- Ocultar lista de cupones si existe --}}
   if (cuponesList) cuponesList.innerHTML = '';
   
   continueBtn.href = url;
@@ -6210,7 +6210,7 @@ function _ssm1(url, config) {
   document.body.style.overflow = 'hidden';
 }
 
-// Función para generar HTML de un cupón
+{{-- Función para generar HTML de un cupón --}}
 {{-- _ghc1: generarHTMLCupon - Genera el HTML para mostrar un cupón en el modal --}}
 function _ghc1(cuponData) {
   const { descuentoTexto, codigoCupon, mostrarSobrePrecio, sobrePrecioTotal, urlRedireccion } = cuponData;
@@ -6242,7 +6242,7 @@ function _ghc1(cuponData) {
   `;
 }
 
-// Función para configurar botones de copiar cupones
+{{-- Función para configurar botones de copiar cupones --}}
 {{-- _cbc1: configurarBotonesCopiar - Configura los event listeners de los botones copiar cupón --}}
 function _cbc1(cuponesList, urlDefault, cerrarModal = false) {
   cuponesList.querySelectorAll('.copiar-cupon-btn').forEach(btn => {
@@ -6277,7 +6277,7 @@ function _cbc1(cuponesList, urlDefault, cerrarModal = false) {
   });
 }
 
-// Funciones de modal simplificadas
+{{-- Funciones de modal simplificadas --}}
 {{-- _s3x2m1: show3x2Modal - Muestra el modal de oferta 3x2 --}}
 function _s3x2m1(url) {
   _ssm1(url, v12['3x2']);
@@ -6303,7 +6303,7 @@ function _s2a70m1(url) {
   _ssm1(url, v12['2a-al-70']);
 }
 
-// Función para ocultar modal de cupón
+{{-- Función para ocultar modal de cupón --}}
 {{-- _hcm1: hideCuponModal - Oculta el modal de cupones --}}
 function _hcm1() {
   {{-- x20: Modal overlay de cupones --}}
@@ -6312,13 +6312,13 @@ function _hcm1() {
   if (modal) {
     modal.classList.remove('show');
     
-    // Restaurar scroll del body
+    {{-- Restaurar scroll del body --}}
     document.body.style.overflow = '';
   }
 }
 
 
-// Función para configurar el modal de cupón
+{{-- Función para configurar el modal de cupón --}}
 {{-- _scm2: setupCuponModal - Configura el modal de cupones (event listeners) --}}
 function _scm2() {
   {{-- x20: Modal overlay de cupones --}}
@@ -6331,24 +6331,24 @@ function _scm2() {
   const closeBtn = document.getElementById('x21');
   
   if (modal && cancelBtn) {
-    // Cerrar modal al hacer clic en cancelar
+    {{-- Cerrar modal al hacer clic en cancelar --}}
     cancelBtn.addEventListener('click', _hcm1);
   }
   
   if (closeBtn) {
-    // Cerrar modal al hacer clic en el botón X
+    {{-- Cerrar modal al hacer clic en el botón X --}}
     closeBtn.addEventListener('click', _hcm1);
   }
   
   if (modal) {
-    // Cerrar modal al hacer clic en el overlay (fuera del modal)
+    {{-- Cerrar modal al hacer clic en el overlay (fuera del modal) --}}
     modal.addEventListener('click', function(e) {
       if (e.target === modal) {
         _hcm1();
       }
     });
     
-    // Cerrar modal con tecla Escape
+    {{-- Cerrar modal con tecla Escape --}}
     document.addEventListener('keydown', function(e) {
       if (e.key === 'Escape' && modal.classList.contains('show')) {
         _hcm1();
@@ -6357,14 +6357,14 @@ function _scm2() {
   }
   
   if (continueBtn) {
-    // Cerrar modal al hacer clic en continuar
+    {{-- Cerrar modal al hacer clic en continuar --}}
     continueBtn.addEventListener('click', function() {
       _hcm1();
     });
   }
 }
 
-// ==================== MODAL DE IMÁGENES ====================
+{{-- ==================== MODAL DE IMÁGENES ==================== --}}
 {{-- v6: imagesBaseUrl - URL base para las imágenes --}}
 const v6 = '{{ asset('images/') }}';
 const vanIconUrlModal = '{{ asset('images/van.png') }}';
@@ -6387,9 +6387,9 @@ let v5 = false;
 function _am1() {
   if (v1.length === 0) return;
   
-  // Usar el índice de la imagen principal actual
+  {{-- Usar el índice de la imagen principal actual --}}
   v17 = v4 || 0;
-  // Inicializar el carrusel móvil
+  {{-- Inicializar el carrusel móvil --}}
   const maxVisible = 7;
   v18 = 0;
   if (v18 + maxVisible > v1.length) {
@@ -6399,16 +6399,16 @@ function _am1() {
   {{-- x18: Modal de imágenes --}}
   const modal = document.getElementById('x18');
   if (modal) {
-    // Mostrar el modal inmediatamente
+    {{-- Mostrar el modal inmediatamente --}}
     modal.classList.remove('hidden');
     document.body.style.overflow = 'hidden';
     
-    // Actualizar el modal inmediatamente (mostrará spinner mientras carga la imagen principal)
+    {{-- Actualizar el modal inmediatamente (mostrará spinner mientras carga la imagen principal) --}}
     _am2();
   }
 }
 
-// Variables para almacenar imágenes originales y actuales
+{{-- Variables para almacenar imágenes originales y actuales --}}
 {{-- v14: imagenesOriginalesGrandes - Backup de las imágenes grandes originales --}}
 let v14 = [];
 {{-- v15: imagenesOriginalesPequenas - Backup de las imágenes pequeñas originales --}}
@@ -6416,7 +6416,7 @@ let v15 = [];
 {{-- v16: imagenesOriginalesProducto - Backup de todas las imágenes originales --}}
 let v16 = [];
 
-// Inicializar imágenes del producto
+{{-- Inicializar imágenes del producto --}}
 document.addEventListener('DOMContentLoaded', function() {
   const imagenGrandeArray = @json($producto->imagen_grande ?? []);
   const imagenPequenaArray = @json($producto->imagen_pequena ?? []);
@@ -6424,31 +6424,31 @@ document.addEventListener('DOMContentLoaded', function() {
   v2 = Array.isArray(imagenGrandeArray) ? imagenGrandeArray : [];
   v3 = Array.isArray(imagenPequenaArray) ? imagenPequenaArray : [];
   
-  // Guardar imágenes originales
+  {{-- Guardar imágenes originales --}}
   v14 = [...v2];
   v15 = [...v3];
   
-  // Usar imágenes pequeñas si no hay grandes, y viceversa
+  {{-- Usar imágenes pequeñas si no hay grandes, y viceversa --}}
   v1 = v2.length > 0 ? v2 : v3;
   v16 = [...v1];
   
-  // Inicializar índice de imagen principal
+  {{-- Inicializar índice de imagen principal --}}
   v4 = 0;
   
-  // Renderizar carruseles de miniaturas
+  {{-- Renderizar carruseles de miniaturas --}}
   _rmp1();
   
-  // Configurar eventos para cambiar imagen
+  {{-- Configurar eventos para cambiar imagen --}}
   _ceip1();
   
-  // Si hay filtros iniciales desde la URL, buscar si alguno tiene imágenes y cambiar la imagen del producto
-  // Esto debe ejecutarse después de que se inicialicen las imágenes del producto
+  {{-- Si hay filtros iniciales desde la URL, buscar si alguno tiene imágenes y cambiar la imagen del producto --}}
+  {{-- Esto debe ejecutarse después de que se inicialicen las imágenes del producto --}}
   if (typeof window.v13 !== 'undefined' && window.v13 && Object.keys(window.v13).length > 0) {
-    // Buscar la última sublínea seleccionada con imágenes
+    {{-- Buscar la última sublínea seleccionada con imágenes --}}
     let ultimaSublineaConImagenes = null;
     const botones = document.querySelectorAll('.filtro-sublinea-btn');
     
-    // Recorrer en orden inverso para encontrar la última seleccionada
+    {{-- Recorrer en orden inverso para encontrar la última seleccionada --}}
     const botonesArray = Array.from(botones).reverse();
     
     botonesArray.forEach(boton => {
@@ -6456,37 +6456,37 @@ document.addEventListener('DOMContentLoaded', function() {
       const sublineaId = boton.dataset.sublineaId;
       const imagenesSublinea = boton.dataset.imagenes ? JSON.parse(boton.dataset.imagenes) : null;
       
-      // Verificar si esta sublínea está seleccionada y tiene imágenes
+      {{-- Verificar si esta sublínea está seleccionada y tiene imágenes --}}
       if (imagenesSublinea && imagenesSublinea.length > 0 && 
           window.v13[lineaId] && 
           window.v13[lineaId].includes(String(sublineaId))) {
-        // Si encontramos una, usarla (como estamos en orden inverso, será la última)
+        {{-- Si encontramos una, usarla (como estamos en orden inverso, será la última) --}}
         if (!ultimaSublineaConImagenes) {
           ultimaSublineaConImagenes = imagenesSublinea;
         }
       }
     });
     
-    // Si hay una sublínea con imágenes seleccionada, cambiar a sus imágenes
+    {{-- Si hay una sublínea con imágenes seleccionada, cambiar a sus imágenes --}}
     if (ultimaSublineaConImagenes && typeof cambiarImagenesProducto === 'function') {
       _cip1(ultimaSublineaConImagenes);
     }
   }
   
-  // Cerrar modal al hacer clic fuera
+  {{-- Cerrar modal al hacer clic fuera --}}
   {{-- x18: Modal de imágenes --}}
   const modal = document.getElementById('x18');
   if (modal) {
     modal.addEventListener('click', function(e) {
-      // Cerrar si el click fue directamente en el modal o en el div intermedio
-      // (pero no en el contenedor blanco del modal)
+      {{-- Cerrar si el click fue directamente en el modal o en el div intermedio --}}
+      {{-- (pero no en el contenedor blanco del modal) --}}
       const modalContent = modal.querySelector('.bg-white.rounded-lg.shadow-2xl');
       if (!modalContent || !modalContent.contains(e.target)) {
         _cm1();
       }
     });
     
-    // Cerrar con tecla Escape
+    {{-- Cerrar con tecla Escape --}}
     document.addEventListener('keydown', function(e) {
       if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
         _cm1();
@@ -6495,24 +6495,24 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 
-// ==================== CARRUSEL DE MINIATURAS EN LA PÁGINA ====================
+{{-- ==================== CARRUSEL DE MINIATURAS EN LA PÁGINA ==================== --}}
 
-// Función para renderizar miniaturas en la página (no en el modal)
+{{-- Función para renderizar miniaturas en la página (no en el modal) --}}
 {{-- _rmp1: renderizarMiniaturasPagina - Renderiza todas las miniaturas del producto en la página --}}
 function _rmp1() {
   if (v1.length === 0) return;
   
-  // Renderizar miniaturas desktop
+  {{-- Renderizar miniaturas desktop --}}
   _rmd1();
   
-  // Renderizar miniaturas móvil
+  {{-- Renderizar miniaturas móvil --}}
   _rmm1();
   
-  // Actualizar imagen principal
+  {{-- Actualizar imagen principal --}}
   _aip1();
 }
 
-// Renderizar miniaturas desktop (hasta 3 + botón + = 4 cuadrados)
+{{-- Renderizar miniaturas desktop (hasta 3 + botón + = 4 cuadrados) --}}
 {{-- _rmd1: renderizarMiniaturasDesktop - Renderiza las miniaturas en la vista desktop --}}
 function _rmd1() {
   const container = document.getElementById('carrusel-miniaturas-desktop');
@@ -6524,7 +6524,7 @@ function _rmd1() {
   const numMiniaturas = Math.min(v1.length, maxMiniaturas);
   const hayMasImagenes = v1.length > maxMiniaturas;
   
-  // Renderizar miniaturas
+  {{-- Renderizar miniaturas --}}
   for (let i = 0; i < numMiniaturas; i++) {
     const imgPath = v3[i] || v2[i] || '';
     const isActive = i === v4;
@@ -6537,7 +6537,7 @@ function _rmd1() {
     container.appendChild(miniatura);
   }
   
-  // Añadir botón + como 4º cuadrado (siempre visible)
+  {{-- Añadir botón + como 4º cuadrado (siempre visible) --}}
   const botonMas = document.createElement('div');
   botonMas.className = 'miniatura-pagina-desktop boton-mas';
   botonMas.style.width = '60px';
@@ -6553,7 +6553,7 @@ function _rmd1() {
   container.appendChild(botonMas);
 }
 
-// Renderizar miniaturas móvil (3 a la izquierda, 2-3 a la derecha)
+{{-- Renderizar miniaturas móvil (3 a la izquierda, 2-3 a la derecha) --}}
 {{-- _rmm1: renderizarMiniaturasMovil - Renderiza los puntos indicadores en la vista móvil --}}
 function _rmm1() {
   const containerPuntos = document.getElementById('puntos-indicadores-movil');
@@ -6563,7 +6563,7 @@ function _rmm1() {
   
   if (v1.length === 0) return;
   
-  // Crear un punto por cada imagen
+  {{-- Crear un punto por cada imagen --}}
   for (let i = 0; i < v1.length; i++) {
     const punto = document.createElement('button');
     punto.type = 'button';
@@ -6580,39 +6580,39 @@ function _rmm1() {
   }
 }
 
-// Función para cambiar las imágenes del producto por las de una sublínea
+{{-- Función para cambiar las imágenes del producto por las de una sublínea --}}
 {{-- _cip1: cambiarImagenesProducto - Cambia las imágenes del producto por las de una sublínea --}}
 function _cip1(imagenesSublinea) {
   if (!imagenesSublinea || imagenesSublinea.length === 0) return;
   
-  // Las imágenes de la sublínea son las imágenes grandes
-  // Intentar usar thumbnails para las pequeñas si existen
+  {{-- Las imágenes de la sublínea son las imágenes grandes --}}
+  {{-- Intentar usar thumbnails para las pequeñas si existen --}}
   const nuevasImagenesGrandes = [];
   const nuevasImagenesPequenas = [];
   
   imagenesSublinea.forEach(imagen => {
-    // Las imágenes de la sublínea se usan como grandes
+    {{-- Las imágenes de la sublínea se usan como grandes --}}
     nuevasImagenesGrandes.push(imagen);
     
-    // Intentar encontrar thumbnail para la versión pequeña
+    {{-- Intentar encontrar thumbnail para la versión pequeña --}}
     const thumbnail = imagen.replace(/\.(jpg|jpeg|png|gif|webp)$/i, '-thumbnail.webp');
-    // Usar thumbnail si existe, sino usar la imagen original
+    {{-- Usar thumbnail si existe, sino usar la imagen original --}}
     nuevasImagenesPequenas.push(thumbnail);
   });
   
-  // Actualizar arrays de imágenes
+  {{-- Actualizar arrays de imágenes --}}
   v2 = nuevasImagenesGrandes;
   v3 = nuevasImagenesPequenas;
   v1 = v2.length > 0 ? v2 : v3;
   
-  // Resetear índice a 0
+  {{-- Resetear índice a 0 --}}
   v4 = 0;
   
-  // Actualizar imagen principal y miniaturas
+  {{-- Actualizar imagen principal y miniaturas --}}
   _aip1();
   _rmp1();
   
-  // Si el modal está abierto, actualizarlo también
+  {{-- Si el modal está abierto, actualizarlo también --}}
   {{-- x18: Modal de imágenes --}}
   const modalAbierto = document.getElementById('x18');
   if (modalAbierto && !modalAbierto.classList.contains('hidden')) {
@@ -6620,14 +6620,14 @@ function _cip1(imagenesSublinea) {
   }
 }
 
-// Función para restaurar las imágenes originales del producto o cambiar a otra sublínea seleccionada
+{{-- Función para restaurar las imágenes originales del producto o cambiar a otra sublínea seleccionada --}}
 {{-- _rio1: restaurarImagenesOriginales - Restaura las imágenes originales del producto --}}
 function _rio1() {
-  // Buscar la última sublínea seleccionada con imágenes (para priorizar la más reciente)
+  {{-- Buscar la última sublínea seleccionada con imágenes (para priorizar la más reciente) --}}
   let ultimaSublineaConImagenes = null;
   const botones = document.querySelectorAll('.filtro-sublinea-btn');
   
-  // Recorrer en orden inverso para encontrar la última seleccionada
+  {{-- Recorrer en orden inverso para encontrar la última seleccionada --}}
   const botonesArray = Array.from(botones).reverse();
   
   botonesArray.forEach(boton => {
@@ -6635,46 +6635,46 @@ function _rio1() {
     const sublineaId = boton.dataset.sublineaId;
     const imagenesSublinea = boton.dataset.imagenes ? JSON.parse(boton.dataset.imagenes) : null;
     
-    // Verificar si esta sublínea está seleccionada y tiene imágenes
+    {{-- Verificar si esta sublínea está seleccionada y tiene imágenes --}}
     if (imagenesSublinea && imagenesSublinea.length > 0 && 
         window.v13 && window.v13[lineaId] && 
         window.v13[lineaId].includes(String(sublineaId))) {
-      // Si encontramos una, usarla (como estamos en orden inverso, será la última)
+      {{-- Si encontramos una, usarla (como estamos en orden inverso, será la última) --}}
       if (!ultimaSublineaConImagenes) {
         ultimaSublineaConImagenes = imagenesSublinea;
       }
     }
   });
   
-  // Si hay una sublínea con imágenes seleccionada, cambiar a sus imágenes
+  {{-- Si hay una sublínea con imágenes seleccionada, cambiar a sus imágenes --}}
   if (ultimaSublineaConImagenes) {
     _cip1(ultimaSublineaConImagenes);
   } else {
-    // Si no hay ninguna sublínea con imágenes seleccionada, restaurar originales
+    {{-- Si no hay ninguna sublínea con imágenes seleccionada, restaurar originales --}}
     v2 = [...v14];
     v3 = [...v15];
     v1 = [...v16];
     
-    // Resetear índice a 0
+    {{-- Resetear índice a 0 --}}
     v4 = 0;
     
-    // Actualizar imagen principal y miniaturas
+    {{-- Actualizar imagen principal y miniaturas --}}
     _aip1();
     _rmp1();
   }
 }
 
-// Cambiar imagen principal
+{{-- Cambiar imagen principal --}}
 {{-- _cip2: cambiarImagenPrincipal - Cambia la imagen principal del producto --}}
 function _cip2(index) {
   if (index < 0 || index >= v1.length) return;
   
   v4 = index;
   _aip1();
-  _rmp1(); // Re-renderizar para actualizar bordes
+  _rmp1(); {{-- Re-renderizar para actualizar bordes --}}
 }
 
-// Actualizar imagen principal
+{{-- Actualizar imagen principal --}}
 {{-- _aip1: actualizarImagenPrincipal - Actualiza la imagen principal en desktop y móvil --}}
 function _aip1() {
   const imgDesktop = document.getElementById('imagen-producto-desktop');
@@ -6687,23 +6687,23 @@ function _aip1() {
   
   if (imgDesktop && imgUrl) {
     imgDesktop.src = imgUrl;
-    // Asegurar que se mantengan las clases CSS originales para desktop (max-h-60 object-contain)
+    {{-- Asegurar que se mantengan las clases CSS originales para desktop (max-h-60 object-contain) --}}
     if (!imgDesktop.classList.contains('max-h-60')) {
       imgDesktop.classList.add('max-h-60');
     }
     if (!imgDesktop.classList.contains('object-contain')) {
       imgDesktop.classList.add('object-contain');
     }
-    // Asegurar que no tenga restricciones de ancho/alto fijas que limiten el tamaño
+    {{-- Asegurar que no tenga restricciones de ancho/alto fijas que limiten el tamaño --}}
     imgDesktop.classList.remove('w-28', 'h-28');
-    // Asegurar que no haya estilos inline que limiten el tamaño
+    {{-- Asegurar que no haya estilos inline que limiten el tamaño --}}
     imgDesktop.style.width = '';
     imgDesktop.style.height = '';
     imgDesktop.style.maxWidth = '';
   }
   if (imgMovil && imgUrl) {
     imgMovil.src = imgUrl;
-    // Asegurar que se mantengan las clases CSS originales para móvil (w-48 h-48 object-contain)
+    {{-- Asegurar que se mantengan las clases CSS originales para móvil (w-48 h-48 object-contain) --}}
     if (!imgMovil.classList.contains('w-48')) {
       imgMovil.classList.add('w-48');
     }
@@ -6713,13 +6713,13 @@ function _aip1() {
     if (!imgMovil.classList.contains('object-contain')) {
       imgMovil.classList.add('object-contain');
     }
-    // Asegurar que no haya estilos inline que limiten el tamaño
+    {{-- Asegurar que no haya estilos inline que limiten el tamaño --}}
     imgMovil.style.width = '';
     imgMovil.style.height = '';
     imgMovil.style.maxWidth = '';
   }
   
-  // Actualizar puntos indicadores móvil
+  {{-- Actualizar puntos indicadores móvil --}}
   const containerPuntos = document.getElementById('puntos-indicadores-movil');
   if (containerPuntos) {
     const puntos = containerPuntos.querySelectorAll('button');
@@ -6730,20 +6730,20 @@ function _aip1() {
   }
 }
 
-// Configurar eventos para imagen principal
+{{-- Configurar eventos para imagen principal --}}
 {{-- _ceip1: configurarEventosImagenPrincipal - Configura los eventos de la imagen principal --}}
 function _ceip1() {
   const imgMovil = document.getElementById('imagen-producto-movil');
   const imgDesktop = document.getElementById('imagen-producto-desktop');
   
-  // Configurar click para abrir modal
+  {{-- Configurar click para abrir modal --}}
   if (imgMovil) {
     imgMovil.onclick = function() {
       if (typeof _am1 === 'function') {
         _am1();
       }
     };
-    // Configurar swipe para móvil
+    {{-- Configurar swipe para móvil --}}
     _csip1(imgMovil);
   }
   
@@ -6756,7 +6756,7 @@ function _ceip1() {
   }
 }
 
-// Configurar swipe para imagen principal móvil
+{{-- Configurar swipe para imagen principal móvil --}}
 {{-- _csip1: configurarSwipeImagenPrincipal - Configura el gesto swipe para la imagen principal móvil --}}
 function _csip1(elemento) {
   let touchStartX = 0;
@@ -6771,11 +6771,11 @@ function _csip1(elemento) {
     touchEndX = e.changedTouches[0].clientX;
     const swipeDistance = touchEndX - touchStartX;
     
-    // Swipe hacia la izquierda (siguiente imagen)
+    {{-- Swipe hacia la izquierda (siguiente imagen) --}}
     if (swipeDistance < -minSwipeDistance && v4 < v1.length - 1) {
       _cip2(v4 + 1);
     }
-    // Swipe hacia la derecha (imagen anterior)
+    {{-- Swipe hacia la derecha (imagen anterior) --}}
     else if (swipeDistance > minSwipeDistance && v4 > 0) {
       _cip2(v4 - 1);
     }
@@ -6790,7 +6790,7 @@ function _cm1() {
     modal.classList.add('hidden');
     document.body.style.overflow = '';
     
-    // Si el modal se abrió desde long press, restaurar imágenes originales
+    {{-- Si el modal se abrió desde long press, restaurar imágenes originales --}}
     if (v5) {
       _rio1();
       v5 = false;
@@ -6813,7 +6813,7 @@ function _ci1(direccion) {
 function _si1(index) {
   v17 = index;
   
-  // Si estamos en móvil, ajustar el carrusel para centrar la imagen seleccionada
+  {{-- Si estamos en móvil, ajustar el carrusel para centrar la imagen seleccionada --}}
   const maxVisible = 7;
   let newStartIndex = Math.max(0, v17 - 3);
   if (newStartIndex + maxVisible > v1.length) {
@@ -6836,55 +6836,55 @@ function _am2() {
   const contenedorImagen = modal ? modal.querySelector('.flex-1.flex.items-center.justify-center.bg-gray-50') : null;
   
   if (imagenGrande) {
-    // Mostrar spinner de carga
+    {{-- Mostrar spinner de carga --}}
     const spinner = contenedorImagen ? contenedorImagen.querySelector('.imagen-loading-spinner') : null;
     if (spinner) spinner.classList.remove('hidden');
     imagenGrande.classList.add('opacity-0');
     
-    // Usar imagen_grande para la imagen grande del modal
+    {{-- Usar imagen_grande para la imagen grande del modal --}}
     const imagenActual = v2[v17] || v3[v17] || '';
     
     if (imagenActual) {
       const img = new Image();
       
       img.onload = function() {
-        // Ocultar spinner y mostrar imagen
+        {{-- Ocultar spinner y mostrar imagen --}}
         if (spinner) spinner.classList.add('hidden');
         imagenGrande.src = `${v6}/${imagenActual}`;
         imagenGrande.alt = 'Imagen ' + (v17 + 1) + ' del producto';
         imagenGrande.classList.remove('opacity-0');
         
-        // Después de cargar la imagen principal, pre-cargar las demás
+        {{-- Después de cargar la imagen principal, pre-cargar las demás --}}
         _cpi1();
       };
       
       img.onerror = function() {
-        // Si falla la carga, ocultar spinner
+        {{-- Si falla la carga, ocultar spinner --}}
         if (spinner) spinner.classList.add('hidden');
         imagenGrande.classList.remove('opacity-0');
       };
       
-      // Cargar la imagen
+      {{-- Cargar la imagen --}}
       img.src = `${v6}/${imagenActual}`;
       
-      // Si la imagen ya está en caché, se ejecutará onload inmediatamente
+      {{-- Si la imagen ya está en caché, se ejecutará onload inmediatamente --}}
       if (img.complete) {
         img.onload();
       }
     } else {
-      // Si no hay imagen, ocultar spinner
+      {{-- Si no hay imagen, ocultar spinner --}}
       if (spinner) spinner.classList.add('hidden');
       imagenGrande.classList.remove('opacity-0');
     }
     
-    // Configurar swipe para móvil (solo una vez)
+    {{-- Configurar swipe para móvil (solo una vez) --}}
     if (!imagenGrande.hasAttribute('data-swipe-configured')) {
       _csm1(imagenGrande);
       imagenGrande.setAttribute('data-swipe-configured', 'true');
     }
   }
   
-  // Actualizar estado de flechas
+  {{-- Actualizar estado de flechas --}}
   if (btnFlechaIzq) {
     btnFlechaIzq.disabled = v17 === 0;
     btnFlechaIzq.style.opacity = v17 === 0 ? '0.3' : '0.5';
@@ -6894,19 +6894,19 @@ function _am2() {
     btnFlechaDer.style.opacity = v17 === v1.length - 1 ? '0.3' : '0.5';
   }
   
-  // Renderizar miniaturas
+  {{-- Renderizar miniaturas --}}
   _rm1();
   
-  // Renderizar oferta en desktop
+  {{-- Renderizar oferta en desktop --}}
   _rod1();
 }
 
-// Función para pre-cargar las demás imágenes grandes de forma diferida
+{{-- Función para pre-cargar las demás imágenes grandes de forma diferida --}}
 {{-- _cpi1: cargarPreImagenes - Pre-carga las imágenes grandes restantes de forma diferida --}}
 function _cpi1() {
-  // Esperar un poco después de que se cargue la imagen principal
+  {{-- Esperar un poco después de que se cargue la imagen principal --}}
   setTimeout(function() {
-    // Pre-cargar todas las imágenes grandes excepto la actual
+    {{-- Pre-cargar todas las imágenes grandes excepto la actual --}}
     for (let i = 0; i < v1.length; i++) {
       if (i !== v17) {
         const imgPath = v2[i] || v3[i] || '';
@@ -6916,15 +6916,15 @@ function _cpi1() {
         }
       }
     }
-  }, 500); // Esperar 500ms después de abrir el modal
+  }, 500); {{-- Esperar 500ms después de abrir el modal --}}
 }
 
-// Función para configurar swipe en móvil
+{{-- Función para configurar swipe en móvil --}}
 {{-- _csm1: configurarSwipeMovil - Configura el gesto swipe para el modal móvil --}}
 function _csm1(elemento) {
   let touchStartX = 0;
   let touchEndX = 0;
-  const minSwipeDistance = 50; // Distancia mínima en píxeles para considerar un swipe
+  const minSwipeDistance = 50; {{-- Distancia mínima en píxeles para considerar un swipe --}}
   
   elemento.addEventListener('touchstart', function(e) {
     touchStartX = e.changedTouches[0].screenX;
@@ -6938,24 +6938,24 @@ function _csm1(elemento) {
   function handleSwipe() {
     const swipeDistance = touchEndX - touchStartX;
     
-    // Swipe hacia la izquierda (siguiente imagen)
+    {{-- Swipe hacia la izquierda (siguiente imagen) --}}
     if (swipeDistance < -minSwipeDistance && v17 < v1.length - 1) {
       _ci1(1);
     }
-    // Swipe hacia la derecha (imagen anterior)
+    {{-- Swipe hacia la derecha (imagen anterior) --}}
     else if (swipeDistance > minSwipeDistance && v17 > 0) {
       _ci1(-1);
     }
   }
 }
 
-// Función para configurar swipe en el carrusel móvil
+{{-- Función para configurar swipe en el carrusel móvil --}}
 {{-- _cscm1: configurarSwipeCarruselMovil - Configura el gesto swipe para el carrusel móvil --}}
 function _cscm1(elemento) {
   let touchStartX = 0;
   let touchStartY = 0;
   let isScrolling = false;
-  const minSwipeDistance = 30; // Distancia mínima en píxeles para considerar un swipe
+  const minSwipeDistance = 30; {{-- Distancia mínima en píxeles para considerar un swipe --}}
   
   elemento.addEventListener('touchstart', function(e) {
     touchStartX = e.touches[0].clientX;
@@ -6967,19 +6967,19 @@ function _cscm1(elemento) {
     if (!isScrolling) {
       const deltaX = Math.abs(e.touches[0].clientX - touchStartX);
       const deltaY = Math.abs(e.touches[0].clientY - touchStartY);
-      // Si el movimiento horizontal es mayor que el vertical, es un swipe horizontal
+      {{-- Si el movimiento horizontal es mayor que el vertical, es un swipe horizontal --}}
       if (deltaX > deltaY) {
         isScrolling = true;
       }
     }
     
     if (isScrolling) {
-      // Permitir el scroll nativo del contenedor
+      {{-- Permitir el scroll nativo del contenedor --}}
       const currentScrollLeft = elemento.scrollLeft;
       const touchX = e.touches[0].clientX;
       const deltaX = touchX - touchStartX;
       
-      // Actualizar el scroll del contenedor
+      {{-- Actualizar el scroll del contenedor --}}
       elemento.scrollLeft = currentScrollLeft - deltaX;
       touchStartX = touchX;
     }
@@ -6997,17 +6997,17 @@ function _rm1() {
   const miniaturasDesktop = document.getElementById('miniaturas-container-desktop');
   const miniaturasMovil = document.getElementById('miniaturas-container-movil');
   
-  // Limpiar contenedores
+  {{-- Limpiar contenedores --}}
   if (miniaturasDesktop) miniaturasDesktop.innerHTML = '';
   if (miniaturasMovil) miniaturasMovil.innerHTML = '';
   
-  // Configurar swipe para el carrusel móvil (solo una vez)
+  {{-- Configurar swipe para el carrusel móvil (solo una vez) --}}
   if (miniaturasMovil && !miniaturasMovil.hasAttribute('data-swipe-configured')) {
     _cscm1(miniaturasMovil);
     miniaturasMovil.setAttribute('data-swipe-configured', 'true');
   }
   
-  // Renderizar miniaturas desktop (vertical - todas las imágenes)
+  {{-- Renderizar miniaturas desktop (vertical - todas las imágenes) --}}
   if (miniaturasDesktop) {
     for (let i = 0; i < v1.length; i++) {
       const imgPath = v3[i] || v2[i] || '';
@@ -7017,13 +7017,13 @@ function _rm1() {
       miniatura.style.width = '96px';
       miniatura.style.height = '96px';
       miniatura.onclick = () => _si1(i);
-      // Las miniaturas se cargan normalmente (sin lazy)
+      {{-- Las miniaturas se cargan normalmente (sin lazy) --}}
       miniatura.innerHTML = `<img src="${v6}/${imgPath}" alt="Miniatura ${i + 1}">`;
       miniaturasDesktop.appendChild(miniatura);
     }
   }
   
-  // Renderizar miniaturas móvil (horizontal, solo las visibles usando carruselMovilStartIndex)
+  {{-- Renderizar miniaturas móvil (horizontal, solo las visibles usando carruselMovilStartIndex) --}}
   if (miniaturasMovil) {
     const maxVisible = 7;
     let movilStartIndex = v18;
@@ -7040,23 +7040,23 @@ function _rm1() {
       miniatura.style.width = '64px';
       miniatura.style.height = '64px';
       miniatura.onclick = () => _si1(i);
-      // Las miniaturas se cargan normalmente (sin lazy)
+      {{-- Las miniaturas se cargan normalmente (sin lazy) --}}
       miniatura.innerHTML = `<img src="${v6}/${imgPath}" alt="Miniatura ${i + 1}">`;
       miniaturasMovil.appendChild(miniatura);
     }
     
-    // Actualizar botones del carrusel móvil
+    {{-- Actualizar botones del carrusel móvil --}}
     _abcm1(movilStartIndex, movilEndIndex);
   }
 }
 
 {{-- _cms1: centrarMiniaturaSeleccionada - Centra la miniatura seleccionada en el carrusel --}}
 function _cms1() {
-  // Solo para móvil, centrar la miniatura seleccionada
+  {{-- Solo para móvil, centrar la miniatura seleccionada --}}
   const containerMovil = document.getElementById('miniaturas-container-movil');
   if (!containerMovil) return;
   
-  // Scroll suave hacia la miniatura activa después de un pequeño delay para que se renderice
+  {{-- Scroll suave hacia la miniatura activa después de un pequeño delay para que se renderice --}}
   setTimeout(() => {
     const miniaturaActiva = containerMovil.querySelector('.activa');
     if (miniaturaActiva) {
@@ -7078,7 +7078,7 @@ function _mcm1(direccion) {
     v18 = Math.max(0, v1.length - maxVisible);
   }
   
-  // Re-renderizar solo las miniaturas
+  {{-- Re-renderizar solo las miniaturas --}}
   _rm1();
 }
 
@@ -7097,7 +7097,7 @@ function _abcm1(startIndex, endIndex) {
 
 {{-- _rod1: renderizarOfertaDesktop - Renderiza la información de la oferta en el modal desktop --}}
 function _rod1() {
-  // Solo renderizar en desktop
+  {{-- Solo renderizar en desktop --}}
   const container = document.getElementById('modal-oferta-container');
   if (!container) return;
   
@@ -7106,15 +7106,15 @@ function _rod1() {
     return;
   }
   
-  // Obtener las ofertas filtradas actuales (igual que en renderOfertas)
+  {{-- Obtener las ofertas filtradas actuales (igual que en renderOfertas) --}}
   let filtradas = ofertas.slice();
   
-  // Aplicar filtro de especificaciones internas primero
+  {{-- Aplicar filtro de especificaciones internas primero --}}
   if (typeof _fpe1 === 'function') {
     filtradas = _fpe1(filtradas);
   }
   
-  // Aplicar otros filtros (igual que en renderOfertas)
+  {{-- Aplicar otros filtros (igual que en renderOfertas) --}}
   {{-- x1: Filtro de tienda --}}
   const tienda = document.getElementById('x1')?.value;
   {{-- x2: Filtro de envío gratis --}}
@@ -7126,26 +7126,26 @@ function _rod1() {
   if (envioGratis) filtradas = filtradas.filter(o => (o.envio_gratis && o.envio_gratis.toLowerCase().includes('gratis')));
   if (cantidad) filtradas = filtradas.filter(o => String(o.unidades) === cantidad);
   
-  // Aplicar el mismo orden que en renderOfertas
+  {{-- Aplicar el mismo orden que en renderOfertas --}}
   if (ordenActual === 'precio_total') {
     filtradas.sort((a, b) => parseFloat(a.precio_total.replace(',', '.')) - parseFloat(b.precio_total.replace(',', '.')));
   } else if (ordenActual === 'unidades') {
     filtradas.sort((a, b) => parseFloat(a.precio_unidad.replace(',', '.')) - parseFloat(b.precio_unidad.replace(',', '.')));
   }
   
-  // Si no hay ofertas filtradas, mostrar mensaje
+  {{-- Si no hay ofertas filtradas, mostrar mensaje --}}
   if (filtradas.length === 0) {
     container.innerHTML = '<p class="text-gray-500 text-center">No hay ofertas disponibles con los filtros seleccionados</p>';
     return;
   }
   
-  // Obtener la primera oferta de las filtradas (la más barata según el orden actual)
+  {{-- Obtener la primera oferta de las filtradas (la más barata según el orden actual) --}}
   const primeraOferta = filtradas[0];
   const unidadMedida = '{{ $producto->unidadDeMedida }}';
   const esUnidadUnica = unidadMedida === 'unidadUnica';
   const columnasDataModal = @json($columnasData ?? null);
   
-  // Función auxiliar para obtener texto de sublínea (usa columnasDataModal local)
+  {{-- Función auxiliar para obtener texto de sublínea (usa columnasDataModal local) --}}
   {{-- _otsm1: obtenerTextoSublineaModal - Obtiene el texto de una sublínea para el modal --}}
   function _otsm1(lineaId, sublineaId) {
     if (!columnasDataModal || !Array.isArray(columnasDataModal)) return '-';
@@ -7155,7 +7155,7 @@ function _rod1() {
     return sublinea ? sublinea.texto : '-';
   }
   
-  // Función para renderizar columnas dinámicas (adaptada para modal)
+  {{-- Función para renderizar columnas dinámicas (adaptada para modal) --}}
   {{-- _rcuum1: renderizarColumnasUnidadUnicaModal - Renderiza columnas dinámicas para oferta única en el modal --}}
   function _rcuum1(oferta) {
     if (!esUnidadUnica || !columnasDataModal || !Array.isArray(columnasDataModal) || columnasDataModal.length === 0) {
@@ -7164,15 +7164,15 @@ function _rod1() {
     
     const numColumnas = columnasDataModal.length;
     const especificacionesOferta = oferta.especificaciones_internas || {};
-    const columnasOferta = especificacionesOferta._c || {}; // _c = ofuscado de _columnas
+    const columnasOferta = especificacionesOferta._c || {}; {{-- _c = ofuscado de _columnas --}}
     
     let html = '';
     
-    // Para el modal, cada columna se muestra como independiente, centrada y con separador
+    {{-- Para el modal, cada columna se muestra como independiente, centrada y con separador --}}
     columnasDataModal.forEach((linea, index) => {
       const sublineaId = columnasOferta[linea.id];
       const textoSublinea = sublineaId ? _otsm1(linea.id, sublineaId) : '-';
-      // Añadir separador (border-b) excepto en la última columna
+      {{-- Añadir separador (border-b) excepto en la última columna --}}
       const separatorClass = index < numColumnas - 1 ? 'pb-4 mb-4 border-b border-gray-200' : '';
       html += `<div class="text-center ${separatorClass}">
         <div class="text-xs text-gray-500 mb-1">${linea.texto}</div>
@@ -7183,12 +7183,12 @@ function _rod1() {
     return html;
   }
   
-  // Renderizar columnas dinámicas usando la misma función que el listado
+  {{-- Renderizar columnas dinámicas usando la misma función que el listado --}}
   const columnasDinamicasHtml = esUnidadUnica && columnasDataModal && Array.isArray(columnasDataModal) && columnasDataModal.length > 0 
     ? _rcuum1(primeraOferta) 
     : '';
   
-  // Determinar qué mostrar (igual que en renderOfertas)
+  {{-- Determinar qué mostrar (igual que en renderOfertas) --}}
   let mostrarCantidad = !esUnidadUnica;
   let mostrarPrecioTotal = false;
   let mostrarPrecioUnidad = false;
@@ -7222,7 +7222,7 @@ function _rod1() {
             </div>
   `;
   
-  // Envío (igual que en el listado)
+  {{-- Envío (igual que en el listado) --}}
   html += `
       <div class="text-center mb-4 pb-4 border-b border-gray-200">
         <div class="envio text-gray-700">
@@ -7232,7 +7232,7 @@ function _rod1() {
       </div>
   `;
   
-  // Cantidad (solo si no es unidad única, usando la función correcta)
+  {{-- Cantidad (solo si no es unidad única, usando la función correcta) --}}
   if (mostrarCantidad) {
     html += `
       <div class="text-center mb-4 pb-4 border-b border-gray-200">
@@ -7244,14 +7244,14 @@ function _rod1() {
     `;
   }
   
-  // Columnas dinámicas (si es unidad única con columnas)
+  {{-- Columnas dinámicas (si es unidad única con columnas) --}}
   if (columnasDinamicasHtml) {
     html += `<div class="mb-4">${columnasDinamicasHtml}</div>`;
   }
   
-  // Precio (igual que en el listado)
+  {{-- Precio (igual que en el listado) --}}
   if (!mostrarPrecioTotal && !mostrarPrecioUnidad && primeraOferta.precio_total) {
-    // Unidad única con columnas: mostrar precio total grande
+    {{-- Unidad única con columnas: mostrar precio total grande --}}
     html += `
       <div class="text-center mb-4 pb-4 border-b border-gray-200">
         <div class="precio-total text-gray-700">
@@ -7261,7 +7261,7 @@ function _rod1() {
       </div>
     `;
   } else if (mostrarPrecioTotal && primeraOferta.precio_total) {
-    // Unidad única sin columnas u otros casos: mostrar precio total normal
+    {{-- Unidad única sin columnas u otros casos: mostrar precio total normal --}}
     const precioTotalClass = esUnidadUnicaSinColumnas ? 'text-xl font-bold text-gray-700' : 'text-xl font-bold text-gray-700';
     const precioTotalLabelClass = esUnidadUnicaSinColumnas ? 'text-sm text-gray-500' : 'text-sm text-gray-500';
     html += `
@@ -7274,7 +7274,7 @@ function _rod1() {
     `;
   }
   
-  // Precio por unidad (solo si se debe mostrar)
+  {{-- Precio por unidad (solo si se debe mostrar) --}}
   if (mostrarPrecioUnidad) {
     html += `
       <div class="text-center mb-4 pb-4 border-b border-gray-200">
@@ -7288,7 +7288,7 @@ function _rod1() {
     `;
   }
   
-  // Generar botón con descuentos (misma lógica que en el listado)
+  {{-- Generar botón con descuentos (misma lógica que en el listado) --}}
   let botonHtml = '';
   if (primeraOferta.descuentos && typeof primeraOferta.descuentos === 'string' && primeraOferta.descuentos.startsWith('SoloAliexpress;')) {
     botonHtml = '<div class="relative">' +
@@ -7367,13 +7367,13 @@ function _rod1() {
   
   container.innerHTML = html;
   
-  // Configurar event listeners para descuentos después de renderizar
+  {{-- Configurar event listeners para descuentos después de renderizar --}}
   setTimeout(() => {
     _scel1();
   }, 100);
 }
 
-// Inicializar carruseles de sublíneas
+{{-- Inicializar carruseles de sublíneas --}}
 {{-- _ics1: inicializarCarruselesSublineas - Inicializa los carruseles de sublíneas --}}
 function _ics1() {
   const containers = document.querySelectorAll('.sublineas-carrusel-container');
@@ -7386,13 +7386,13 @@ function _ics1() {
     
     if (!carrusel) return;
     
-    // Verificar si estamos en desktop (ancho >= 640px)
+    {{-- Verificar si estamos en desktop (ancho >= 640px) --}}
     const esDesktop = () => window.innerWidth >= 640;
     
-    // Función para actualizar visibilidad de botones (solo en desktop)
+    {{-- Función para actualizar visibilidad de botones (solo en desktop) --}}
     const actualizarBotones = () => {
       if (!esDesktop() || !btnLeft || !btnRight) {
-        // En móvil, asegurar que los botones estén ocultos
+        {{-- En móvil, asegurar que los botones estén ocultos --}}
         if (btnLeft) {
           btnLeft.style.opacity = '0';
           btnLeft.style.pointerEvents = 'none';
@@ -7408,7 +7408,7 @@ function _ics1() {
       const scrollWidth = carrusel.scrollWidth;
       const clientWidth = carrusel.clientWidth;
       
-      // Mostrar/ocultar botón izquierdo
+      {{-- Mostrar/ocultar botón izquierdo --}}
       if (scrollLeft > 5) {
         btnLeft.style.opacity = '1';
         btnLeft.style.pointerEvents = 'auto';
@@ -7417,7 +7417,7 @@ function _ics1() {
         btnLeft.style.pointerEvents = 'none';
       }
       
-      // Mostrar/ocultar botón derecho
+      {{-- Mostrar/ocultar botón derecho --}}
       if (scrollLeft < scrollWidth - clientWidth - 5) {
         btnRight.style.opacity = '1';
         btnRight.style.pointerEvents = 'auto';
@@ -7427,13 +7427,13 @@ function _ics1() {
       }
     };
     
-    // Event listener para el scroll
+    {{-- Event listener para el scroll --}}
     carrusel.addEventListener('scroll', actualizarBotones);
     
-    // Event listener para resize
+    {{-- Event listener para resize --}}
     window.addEventListener('resize', actualizarBotones);
     
-    // Botones solo funcionan en desktop
+    {{-- Botones solo funcionan en desktop --}}
     if (btnLeft) {
       btnLeft.addEventListener('click', (e) => {
         if (esDesktop()) {
@@ -7452,19 +7452,19 @@ function _ics1() {
       });
     }
     
-    // Mostrar botones al hacer hover sobre el contenedor (solo desktop)
+    {{-- Mostrar botones al hacer hover sobre el contenedor (solo desktop) --}}
     if (esDesktop()) {
       container.addEventListener('mouseenter', () => {
         actualizarBotones();
       });
     }
     
-    // Inicializar visibilidad de botones
+    {{-- Inicializar visibilidad de botones --}}
     actualizarBotones();
   });
 }
 
-// Inicializar carruseles cuando el DOM esté listo
+{{-- Inicializar carruseles cuando el DOM esté listo --}}
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', _ics1);
 } else {
