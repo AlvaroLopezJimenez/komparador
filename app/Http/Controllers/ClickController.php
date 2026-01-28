@@ -14,9 +14,16 @@ use App\Jobs\GuardarClickJob;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
+use App\Services\SignedUrlService;
 
 class ClickController extends Controller
 {
+    protected $signedUrlService;
+
+    public function __construct(SignedUrlService $signedUrlService)
+    {
+        $this->signedUrlService = $signedUrlService;
+    }
 
     //LISTAR TODOS LOS CLICKS
     public function index(Request $request)
@@ -897,12 +904,77 @@ class ClickController extends Controller
         // ===== RECOPILACIÓN DE DATOS BÁSICOS =====
         // Obtenemos los datos necesarios para procesar el click
         $cam = $request->query('cam');                    // Parámetro de campaña (opcional)
-        $oferta = OfertaProducto::with('producto')->findOrFail($ofertaId); // Buscamos la oferta
+        $oferta = OfertaProducto::with('producto.categoria')->findOrFail($ofertaId); // Buscamos la oferta
         $ip = $request->ip();                            // IP del usuario para evitar duplicados
 
-        // ===== EXCLUSIÓN DE USUARIOS AUTENTICADOS =====
-        // Si el usuario está autenticado, saltarse todos los bloqueos
+        // ===== VALIDACIÓN DE URL FIRMADA (para usuarios no autenticados) =====
         $usuarioAutenticado = auth()->check();
+        $tokenFirmado = $request->query('t');
+        
+        // Si el usuario NO está autenticado, validar token firmado
+        if (!$usuarioAutenticado && $tokenFirmado) {
+            // Validar que el token corresponda a esta oferta
+            if (!$this->signedUrlService->validarUrlFirmada($tokenFirmado, $ofertaId)) {
+                // Token inválido o expirado - bloquear acceso
+                Log::warning('Intento de acceso con URL firmada inválida o expirada', [
+                    'oferta_id' => $ofertaId,
+                    'ip' => $ip,
+                    'user_agent' => $request->userAgent(),
+                ]);
+                
+                // Construir URL del producto usando el mismo método que en unidades.blade.php
+                $urlProducto = null;
+                if ($oferta->producto && $oferta->producto->categoria) {
+                    $urlProducto = $oferta->producto->categoria->construirUrlCategorias($oferta->producto->slug);
+                    // Asegurar que sea una URL completa
+                    if (!str_starts_with($urlProducto, 'http')) {
+                        $urlProducto = url($urlProducto);
+                    }
+                }
+                
+                return response()
+                    ->view('redireccion', [
+                        'requiereCaptcha' => false,
+                        'bloqueadoMensual' => false,
+                        'url' => null,
+                        'ofertaId' => $ofertaId,
+                        'cam' => $cam,
+                        'error' => 'URL inválida o expirada. Por favor, vuelve a la página del producto.',
+                        'urlProducto' => $urlProducto,
+                    ])
+                    ->header('X-Robots-Tag', 'noindex, nofollow');
+            }
+        } elseif (!$usuarioAutenticado && !$tokenFirmado) {
+            // Usuario no autenticado sin token - bloquear acceso directo
+            Log::warning('Intento de acceso directo a URL de redirección sin token', [
+                'oferta_id' => $ofertaId,
+                'ip' => $ip,
+                'user_agent' => $request->userAgent(),
+            ]);
+            
+            // Construir URL del producto usando el mismo método que en unidades.blade.php
+            $urlProducto = null;
+            if ($oferta->producto && $oferta->producto->categoria) {
+                $urlProducto = $oferta->producto->categoria->construirUrlCategorias($oferta->producto->slug);
+                // Asegurar que sea una URL completa
+                if (!str_starts_with($urlProducto, 'http')) {
+                    $urlProducto = url($urlProducto);
+                }
+            }
+            
+            return response()
+                ->view('redireccion', [
+                    'requiereCaptcha' => false,
+                    'bloqueadoMensual' => false,
+                    'url' => null,
+                    'ofertaId' => $ofertaId,
+                    'cam' => $cam,
+                    'error' => 'Acceso no autorizado. Por favor, vuelve a la página del producto.',
+                    'urlProducto' => $urlProducto,
+                ])
+                ->header('X-Robots-Tag', 'noindex, nofollow');
+        }
+        
         $captchaResuelto = false; // Flag para indicar si el CAPTCHA fue resuelto
         
         // ===== BLOQUEO INMEDIATO DE BOTS DE IA =====

@@ -547,6 +547,12 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
     Route::post('ofertas/{oferta}/historial-guardar', [OfertaProductoController::class, 'historialGuardar'])->name('ofertas.historial.guardar');
 
     //Listo de avisos
+    // Rutas para Anti-Scraping
+    Route::prefix('anti-scraping')->name('anti-scraping.')->group(function () {
+        Route::get('fingerprints', [App\Http\Controllers\Admin\AntiScrapingController::class, 'fingerprintsProblematicos'])->name('fingerprints');
+        Route::get('fingerprints/{fingerprint}', [App\Http\Controllers\Admin\AntiScrapingController::class, 'fingerprintDetalle'])->name('fingerprints.detalle');
+    });
+
     Route::prefix('avisos')->name('avisos.')->group(function () {
         Route::get('/', [AvisoController::class, 'index'])->name('index');
         Route::post('/', [AvisoController::class, 'store'])->name('store');

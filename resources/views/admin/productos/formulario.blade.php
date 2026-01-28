@@ -6345,8 +6345,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         inputTexto.addEventListener('input', function() {
-            if (!divPrincipal.dataset.slug || divPrincipal.dataset.slug === '') {
-                divPrincipal.dataset.slug = generarSlugProducto(this.value);
+            // Actualizar slug cuando cambia el texto (siempre regenerar para asegurar que esté correcto)
+            const textoActual = this.value.trim();
+            if (textoActual) {
+                divPrincipal.dataset.slug = generarSlugProducto(textoActual);
             }
             actualizarJSONProducto();
             // Validar en tiempo real
@@ -6544,8 +6546,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         inputTexto.addEventListener('input', function() {
-            if (!divIntermedia.dataset.slug || divIntermedia.dataset.slug === '') {
-                divIntermedia.dataset.slug = generarSlugProducto(this.value);
+            // Actualizar slug cuando cambia el texto (siempre regenerar para asegurar que esté correcto)
+            const textoActual = this.value.trim();
+            if (textoActual) {
+                divIntermedia.dataset.slug = generarSlugProducto(textoActual);
             }
             actualizarJSONProducto();
         });
@@ -6897,13 +6901,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const texto = lineaPrincipal.querySelector('.linea-principal-producto-texto').value.trim();
             const importante = lineaPrincipal.querySelector('.linea-principal-producto-importante').checked;
             const idUnicoPrincipal = lineaPrincipal.dataset.idUnico;
-            const slugPrincipal = lineaPrincipal.dataset.slug || generarSlugProducto(texto);
+            // SIEMPRE regenerar el slug desde el texto para asegurar que esté correcto
+            const slugPrincipal = texto ? generarSlugProducto(texto) : '';
+            lineaPrincipal.dataset.slug = slugPrincipal;
             const columnaCheckbox = lineaPrincipal.querySelector('.columna-oferta-producto-checkbox');
             const esColumna = columnaCheckbox && columnaCheckbox.checked;
-            
-            if (texto && !lineaPrincipal.dataset.slug) {
-                lineaPrincipal.dataset.slug = slugPrincipal;
-            }
             
             const containerSubprincipales = lineaPrincipal.querySelector('.subprincipales-producto-container');
             const lineasIntermedias = containerSubprincipales ? containerSubprincipales.querySelectorAll('.linea-intermedia-producto') : [];
@@ -6914,7 +6916,9 @@ document.addEventListener('DOMContentLoaded', function() {
             lineasIntermedias.forEach(lineaIntermedia => {
                 const textoIntermedia = lineaIntermedia.querySelector('.linea-intermedia-producto-texto').value.trim();
                 const idUnicoIntermedia = lineaIntermedia.dataset.idUnico;
-                const slugIntermedia = lineaIntermedia.dataset.slug || generarSlugProducto(textoIntermedia);
+                // SIEMPRE regenerar el slug desde el texto para asegurar que esté correcto
+                const slugIntermedia = textoIntermedia ? generarSlugProducto(textoIntermedia) : '';
+                lineaIntermedia.dataset.slug = slugIntermedia;
                 const checkboxPrincipal = lineaIntermedia.querySelector('.especificacion-producto-checkbox');
                 // Usar selectores más específicos con data attributes, igual que en categorías
                 // IMPORTANTE: usar idUnicoPrincipal (no principalId) que es el ID único de la línea principal
@@ -6922,10 +6926,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 const ofertaCheckbox = document.querySelector(`.especificacion-producto-oferta-checkbox[data-principal-id="${idUnicoPrincipal}"][data-sublinea-id="${idUnicoIntermedia}"]`);
                 const usarImagenesCheckbox = document.querySelector(`.especificacion-producto-usar-imagenes-producto-checkbox[data-principal-id="${idUnicoPrincipal}"][data-sublinea-id="${idUnicoIntermedia}"]`);
                 const textoAlternativoInput = document.querySelector(`.texto-alternativo-sublinea-producto-input[data-principal-id="${idUnicoPrincipal}"][data-sublinea-id="${idUnicoIntermedia}"]`);
-                
-                if (textoIntermedia && !lineaIntermedia.dataset.slug) {
-                    lineaIntermedia.dataset.slug = slugIntermedia;
-                }
                 
                 // Añadir a subprincipales siempre (para la estructura)
                 subprincipales.push({

@@ -1892,30 +1892,43 @@ public function generarContenido(Request $request)
 
     /**
      * Obtener precios históricos de un producto según el rango de tiempo
+     * 
+     * Compatible con ambos sistemas:
+     * - Sistema antiguo: requiere token MD5 en query param
+     * - Sistema nuevo: usa token JWT en header X-Auth-Token (manejado por middleware)
      */
     public function obtenerPreciosHistoricos(Request $request, $productoId)
     {
-        // Validación y protección contra ataques
+        // Validación del período
         $request->validate([
             'periodo' => 'required|in:3m,6m,9m,12m,1y',
-            'token' => 'required|string|size:32'
         ]);
 
-        // Verificar token de seguridad (prevenir ataques)
-        $expectedToken = hash('md5', $productoId . env('APP_KEY', 'default_key'));
-        if ($request->token !== $expectedToken) {
-            return response()->json(['error' => 'Token inválido'], 403);
-        }
-
-        // Rate limiting: máximo 10 requests por minuto por IP
-        $key = 'precios_historicos_' . $request->ip();
-        $maxAttempts = 10;
-        $decayMinutes = 1;
+        // Verificar si usa el sistema antiguo (token en query) o nuevo (token en header)
+        $tokenHeader = $request->header('X-Auth-Token');
+        $tokenQuery = $request->query('token');
         
-        if (RateLimiter::tooManyAttempts($key, $maxAttempts)) {
-            return response()->json(['error' => 'Demasiadas solicitudes'], 429);
+        if ($tokenQuery) {
+            // Sistema antiguo: validar token MD5
+            $expectedToken = hash('md5', $productoId . env('APP_KEY', 'default_key'));
+            if ($tokenQuery !== $expectedToken) {
+                return response()->json(['error' => 'Token inválido'], 403);
+            }
+            
+            // Rate limiting antiguo (más restrictivo)
+            $key = 'precios_historicos_' . $request->ip();
+            $maxAttempts = 10;
+            $decayMinutes = 1;
+            
+            if (RateLimiter::tooManyAttempts($key, $maxAttempts)) {
+                return response()->json(['error' => 'Demasiadas solicitudes'], 429);
+            }
+            RateLimiter::hit($key, $decayMinutes * 60);
+        } else if (!$tokenHeader) {
+            // Si no tiene ningún token, rechazar
+            return response()->json(['error' => 'Token requerido'], 401);
         }
-        RateLimiter::hit($key, $decayMinutes * 60);
+        // Si tiene token en header, el middleware anti-scraping ya lo validó
 
         // Verificar que el producto existe
         $producto = Producto::find($productoId);

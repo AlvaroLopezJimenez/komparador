@@ -69,5 +69,6 @@ class Kernel extends HttpKernel
         'verificar.imagenes' => \App\Http\Middleware\VerificarPermisosImagenes::class,
         'security.headers' => \App\Http\Middleware\SecurityHeaders::class,
         'block.public.deletes' => \App\Http\Middleware\BlockPublicDeletes::class,
+        'anti-scraping' => \App\Http\Middleware\AntiScrapingMiddleware::class,
     ];
 }

@@ -8,6 +8,7 @@ use App\Models\Categoria;
 use App\Models\Producto;
 use App\Models\OfertaProducto;
 use App\Models\HistoricoPrecioProducto;
+use App\Models\ProductoOfertaMasBarataPorProducto;
 use Illuminate\Console\Command;
 use Carbon\Carbon;
 
@@ -49,6 +50,13 @@ class CalcularPreciosHot extends Command
         ]);
 
         try {
+            // PASO 1: Actualizar precios de productos antes de calcular precios hot
+            $this->info('💰 Paso 1/2: Actualizando precios de productos...');
+            $preciosActualizados = $this->actualizarPreciosProductos();
+            $this->info("✅ Precios actualizados: {$preciosActualizados} productos");
+            
+            // PASO 2: Calcular precios hot
+            $this->info('🔥 Paso 2/2: Calculando precios hot...');
             $this->procesarPreciosHot($ejecucion);
             
             $ejecucion->update([
@@ -69,6 +77,66 @@ class CalcularPreciosHot extends Command
         }
 
         return 0;
+    }
+
+    /**
+     * Actualiza el precio de todos los productos usando la tabla producto_oferta_mas_barata_por_producto
+     * Este método replica la lógica de ejecutarPrecioBajoSegundoPlano
+     * 
+     * @return int Número de precios actualizados
+     */
+    private function actualizarPreciosProductos()
+    {
+        $productos = Producto::all();
+        $totalProductos = $productos->count();
+        $preciosActualizados = 0;
+
+        $this->line("📋 Procesando {$totalProductos} productos...");
+
+        foreach ($productos as $producto) {
+            try {
+                // Consultar la tabla producto_oferta_mas_barata_por_producto para obtener el precio_unidad
+                $ofertaMasBarata = ProductoOfertaMasBarataPorProducto::where('producto_id', $producto->id)->first();
+
+                // IMPORTANTE: Solo actualizar el precio si hay una oferta válida
+                // Si no hay oferta, mantener el precio actual (no poner NULL)
+                if ($ofertaMasBarata && $ofertaMasBarata->precio_unidad !== null) {
+                    // El precio_unidad ya está almacenado en la tabla (con descuentos y chollos aplicados)
+                    $precioRealMasBajo = $ofertaMasBarata->precio_unidad;
+                    
+                    // Validar que el precio es válido (mayor que 0)
+                    if ($precioRealMasBajo <= 0) {
+                        continue; // Saltar este producto, mantener precio actual
+                    }
+                    
+                    // Si el producto tiene unidadDeMedida = unidadMilesima, redondear a 3 decimales
+                    if ($producto->unidadDeMedida === 'unidadMilesima') {
+                        $precioNuevo = round($precioRealMasBajo, 3);
+                    } else {
+                        $precioNuevo = $precioRealMasBajo;
+                    }
+                    
+                    // Validar que el precio nuevo no es NULL ni negativo
+                    if ($precioNuevo === null || $precioNuevo <= 0) {
+                        continue; // Saltar este producto, mantener precio actual
+                    }
+                    
+                    // Comparar si el precio es diferente
+                    if ($producto->precio != $precioNuevo) {
+                        // Actualizar el precio del producto
+                        $producto->precio = $precioNuevo;
+                        $producto->save();
+                        $preciosActualizados++;
+                    }
+                }
+                // Si no hay oferta, NO actualizar el precio (mantener el precio actual)
+            } catch (\Exception $e) {
+                // Continuar con el siguiente producto si hay error
+                \Log::warning("Error al actualizar precio del producto {$producto->id}: " . $e->getMessage());
+            }
+        }
+
+        return $preciosActualizados;
     }
 
     private function procesarPreciosHot($ejecucion)

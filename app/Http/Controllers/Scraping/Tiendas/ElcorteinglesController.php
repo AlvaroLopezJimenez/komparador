@@ -61,30 +61,50 @@ class ElcorteinglesController extends PlantillaTiendaController
         // ---- 1) NUEVO: "price":{"original":"60.75","final":"42.39"} ----
         $precio = $this->extraerPrecioDeOriginalFinal($html);
         if ($precio !== null) {
+            // Detectar ofertas especiales (solo detectar, no modificar precios)
+            if ($oferta) {
+                $this->detectarYGuardarDescuentos($html, $oferta);
+            }
             return response()->json(['success' => true, 'precio' => $precio]);
         }
 
         // ---- 2) dataLayer / JSON embebido: "price":{"final":"31.55"} o "price":{"final":31.55} ----
         $precio = $this->extraerPrecioDePriceFinal($html);
         if ($precio !== null) {
+            // Detectar ofertas especiales (solo detectar, no modificar precios)
+            if ($oferta) {
+                $this->detectarYGuardarDescuentos($html, $oferta);
+            }
             return response()->json(['success' => true, 'precio' => $precio]);
         }
 
         // ---- 3) JSON-LD <script type="application/ld+json"> ... {"@type":"Offer","price":"31.55"} ... ----
         $precio = $this->extraerPrecioDeJsonLd($html);
         if ($precio !== null) {
+            // Detectar ofertas especiales (solo detectar, no modificar precios)
+            if ($oferta) {
+                $this->detectarYGuardarDescuentos($html, $oferta);
+            }
             return response()->json(['success' => true, 'precio' => $precio]);
         }
 
         // ---- 4) Fallback visible en HTML (supermercado) ----
         $precio = $this->extraerPrecioDeHtmlVisible($html);
         if ($precio !== null) {
+            // Detectar ofertas especiales (solo detectar, no modificar precios)
+            if ($oferta) {
+                $this->detectarYGuardarDescuentos($html, $oferta);
+            }
             return response()->json(['success' => true, 'precio' => $precio]);
         }
 
         // ---- 5) Microdatos (schema.org) en HTML: itemprop="lowPrice" o "price" ----
         $precio = $this->extraerPrecioDeMicrodata($html);
         if ($precio !== null) {
+            // Detectar ofertas especiales (solo detectar, no modificar precios)
+            if ($oferta) {
+                $this->detectarYGuardarDescuentos($html, $oferta);
+            }
             return response()->json(['success' => true, 'precio' => $precio]);
         }
 
@@ -391,6 +411,88 @@ private function extraerPrecioDeMicrodata(string $html): ?float
                 'aviso_id' => $avisoId,
                 'oferta_id' => $oferta->id
             ]);
+        }
+    }
+
+    /* ===================== Detección de Descuentos ===================== */
+
+    /**
+     * Detecta ofertas "2ª unidad al 70%" en el HTML.
+     * Busca el texto "Comprando 2, la 2ª unidad sale a" en el HTML.
+     */
+    private function detectarOferta2aUnidad70(string $html): bool
+    {
+        // Buscar "Comprando 2, la 2ª unidad sale a" en cualquier parte del HTML
+        return (bool) preg_match('/Comprando\s+2[,\s]+la\s+2[ªa]\s+unidad\s+sale\s+a/i', $html);
+    }
+
+    /**
+     * Detecta y guarda los descuentos en la oferta sin modificar precios.
+     */
+    private function detectarYGuardarDescuentos(string $html, $oferta): void
+    {
+        if (!$oferta || !($oferta instanceof OfertaProducto)) {
+            return;
+        }
+
+        $tieneOferta2a70 = $this->detectarOferta2aUnidad70($html);
+        $descuentoAnterior = $oferta->descuentos;
+        $descuentoNuevo = null;
+
+        // Determinar qué descuento aplicar
+        if ($tieneOferta2a70) {
+            $descuentoNuevo = '2a al 70';
+        }
+
+        // Si hay descuento nuevo
+        if ($descuentoNuevo !== null) {
+            Log::info('ElcorteinglesController - DESCUENTO DETECTADO:', [
+                'oferta_id' => $oferta->id,
+                'descuento_nuevo' => $descuentoNuevo,
+                'descuento_anterior' => $descuentoAnterior
+            ]);
+
+            // Actualizar el campo descuentos de la oferta
+            $oferta->update(['descuentos' => $descuentoNuevo]);
+
+            // Solo crear aviso si el descuento es nuevo o ha cambiado
+            if ($descuentoAnterior !== $descuentoNuevo) {
+                $textoAviso = match($descuentoNuevo) {
+                    '2a al 70' => 'DETECTADO DESCUENTO 2ª UNIDAD AL 70% - GENERADO AUTOMÁTICAMENTE',
+                    default => 'DETECTADO DESCUENTO - GENERADO AUTOMÁTICAMENTE'
+                };
+
+                $avisoId = DB::table('avisos')->insertGetId([
+                    'texto_aviso'     => $textoAviso,
+                    'fecha_aviso'     => now(),
+                    'user_id'         => 1,
+                    'avisoable_type'  => \App\Models\OfertaProducto::class,
+                    'avisoable_id'    => $oferta->id,
+                    'oculto'          => 0,
+                    'created_at'      => now(),
+                    'updated_at'      => now(),
+                ]);
+
+                Log::info('ElcorteinglesController - Aviso descuento creado:', [
+                    'aviso_id' => $avisoId,
+                    'oferta_id' => $oferta->id,
+                    'descuento' => $descuentoNuevo
+                ]);
+            }
+        } else {
+            // Si no hay descuentos pero la oferta tenía descuentos de El Corte Inglés, limpiar el campo
+            if ($descuentoAnterior === '2a al 70') {
+                Log::info('ElcorteinglesController - Descuentos ya no disponibles, limpiando campo descuentos:', [
+                    'oferta_id' => $oferta->id,
+                    'descuentos_anterior' => $descuentoAnterior
+                ]);
+
+                $oferta->update(['descuentos' => null]);
+
+                Log::info('ElcorteinglesController - Campo descuentos limpiado:', [
+                    'oferta_id' => $oferta->id
+                ]);
+            }
         }
     }
 

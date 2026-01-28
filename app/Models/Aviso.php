@@ -27,12 +27,13 @@ class Aviso extends Model
     }
     
     /**
-     * Sobrescribir getAttribute para interceptar accesos a 'avisoable' cuando el tipo es 'Interno'
+     * Sobrescribir getAttribute para interceptar accesos a 'avisoable' cuando el tipo es 'Interno' o 'AntiScraping'
      */
     public function getAttribute($key)
     {
-        // Si se intenta acceder a 'avisoable' y el tipo es 'Interno', retornar null sin intentar cargar
-        if ($key === 'avisoable' && ($this->attributes['avisoable_type'] ?? null) === 'Interno') {
+        // Si se intenta acceder a 'avisoable' y el tipo es 'Interno' o 'AntiScraping', retornar null sin intentar cargar
+        $tipo = $this->attributes['avisoable_type'] ?? null;
+        if ($key === 'avisoable' && in_array($tipo, ['Interno', 'AntiScraping'])) {
             return null;
         }
         

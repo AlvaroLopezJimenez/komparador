@@ -28,6 +28,48 @@ class RouteServiceProvider extends ServiceProvider
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
         });
 
+        // Rate limiters para sistema anti-scraping
+        RateLimiter::for('anti-scraping-token', function (Request $request) {
+            $ip = $request->ip();
+            $fingerprint = $request->header('X-Fingerprint');
+            
+            $limits = config('anti-scraping.limits.token');
+            
+            return [
+                Limit::perMinute($limits['per_minute_ip'])->by('ip:' . $ip),
+                Limit::perMinute($limits['per_minute_fingerprint'])->by('fp:' . $fingerprint),
+                Limit::perHour($limits['per_hour_ip'])->by('ip:' . $ip),
+                Limit::perDay($limits['per_day_ip'])->by('ip:' . $ip),
+            ];
+        });
+
+        RateLimiter::for('anti-scraping-ofertas', function (Request $request) {
+            $ip = $request->ip();
+            $token = $request->header('X-Auth-Token');
+            $fingerprint = $request->header('X-Fingerprint');
+            
+            $limits = config('anti-scraping.limits.ofertas');
+            
+            return [
+                Limit::perMinute($limits['per_minute_token'])->by('token:' . $token),
+                Limit::perMinute($limits['per_minute_ip'])->by('ip:' . $ip),
+                Limit::perHour($limits['per_hour_ip'])->by('ip:' . $ip),
+                Limit::perDay($limits['per_day_ip'])->by('ip:' . $ip),
+            ];
+        });
+
+        RateLimiter::for('anti-scraping-historicos', function (Request $request) {
+            $ip = $request->ip();
+            
+            $limits = config('anti-scraping.limits.historicos');
+            
+            return [
+                Limit::perMinute($limits['per_minute_ip'])->by('ip:' . $ip),
+                Limit::perHour($limits['per_hour_ip'])->by('ip:' . $ip),
+                Limit::perDay($limits['per_day_ip'])->by('ip:' . $ip),
+            ];
+        });
+
         $this->routes(function () {
             Route::middleware('api')
                 ->prefix('api')

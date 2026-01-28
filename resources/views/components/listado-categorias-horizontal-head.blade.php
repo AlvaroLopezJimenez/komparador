@@ -24,8 +24,8 @@ if (!function_exists('_f1')) {
 @endphp
 
 {{-- BARRA DE CATEGORÍAS --}}
-<div class="sticky top-0 z-40 bg-gray-50/95 backdrop-blur-sm border-b border-gray-200/50">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 sm:py-3">
+<div class="bg-gray-50/95 backdrop-blur-sm border-b border-gray-200/50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-1.5 sm:py-2">
         <div class="flex items-center justify-between">
             <div class="flex items-center space-x-2 sm:space-x-5 overflow-x-auto pb-1 scrollbar-hide" style="-webkit-overflow-scrolling: touch;">
                 {{-- btnCategoriasBarra -> bcb1 --}}

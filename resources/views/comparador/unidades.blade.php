@@ -56,7 +56,7 @@
 <meta name="csrf-token" content="{{ csrf_token() }}">
 {{-- Icono --}}
     <link rel="icon" type="image/png" href="{{ asset('images/icono.webp') }}">
-  @vite(['resources/css/app.css', 'resources/js/app.js'])
+  @vite(['resources/css/app.css', 'resources/js/app.js', 'resources/js/fingerprint.js', 'resources/js/carga-datos-dinamica.js'])
 
   {{-- SCRIPT PARA GOOGLE ANALYTICS--}}
     @if (env('GA_MEASUREMENT_ID'))
@@ -2265,6 +2265,13 @@
               }
             }
             
+            // Generar URL firmada (solo para usuarios no autenticados)
+            // Los usuarios autenticados pueden usar URLs directas
+            $signedUrlService = app(\App\Services\SignedUrlService::class);
+            $urlRedireccion = auth()->check() 
+                ? route('click.redirigir', ['ofertaId' => $item->id])
+                : $signedUrlService->generarUrlFirmada($item->id);
+            
             return [
               "id" => $item->id,
               "nombre" => $item->tienda->nombre ?? 'N/A',
@@ -2277,7 +2284,7 @@
               "precio_total" => number_format($item->precio_total ?? 0, 2, ',', ''),
               "precio_unidad" => number_format($item->precio_unidad ?? 0, $decimalesPrecioUnidad, ',', ''),
               "descuentos" => $item->descuentos ?? '',
-              "url" => añadirCam(route('click.redirigir', ['ofertaId' => $item->id])),
+              "url" => añadirCam($urlRedireccion),
               "especificaciones_internas" => $especificacionesOfuscadas,
             ];
           } catch (\Exception $e) {
@@ -2371,23 +2378,56 @@
             _aeb1();
             {{-- Actualizar contadores de sublíneas al cargar --}}
             _acs1();
-            {{-- Actualizar filtros dinámicamente al cargar (basándose en todas las ofertas) --}}
-            _afd1(ofertas);
-            _ro1();
+            {{-- NO llamar _afd1 y _ro1 aquí porque las ofertas aún no están cargadas --}}
+            {{-- Se llamarán cuando llegue el evento 'ofertas-cargadas' --}}
           });
-          {{-- Cargar ofertas con manejo de errores --}}
+          {{-- Cargar ofertas dinámicamente vía API --}}
           let ofertas = [];
-          try {
-            const ofertasJson = @json($ofertasArray);
-            ofertas = Array.isArray(ofertasJson) ? ofertasJson : [];
-            
-          } catch (e) {
-            ofertas = [];
-          }
           const unidadMedida = '{{ $producto->unidadDeMedida }}';
           const esUnidadUnica = unidadMedida === 'unidadUnica';
-          const columnasData = @json($columnasData ?? null);
-          const gruposDeOfertas = @json($producto->grupos_de_ofertas ?? null);
+          let columnasData = @json($columnasData ?? null);
+          let gruposDeOfertas = @json($producto->grupos_de_ofertas ?? null);
+          
+          {{-- Hacer productoId disponible globalmente ANTES de que se carguen los scripts --}}
+          window.productoId = {{ $producto->id }};
+          
+          {{-- Indicar si el usuario está autenticado (para bypass del sistema anti-scraping) --}}
+          window.usuarioAutenticado = {{ auth()->check() ? 'true' : 'false' }};
+          
+          {{-- Configurar listeners ANTES de que se ejecute carga-datos-dinamica.js --}}
+          (function() {
+          {{-- Escuchar evento de ofertas cargadas --}}
+          window.addEventListener('ofertas-cargadas', function(event) {
+            ofertas = event.detail.ofertas || [];
+            
+            {{-- Esperar a que las funciones estén definidas --}}
+            const intentarRenderizar = () => {
+              if (typeof _afd1 === 'function' && typeof _ro1 === 'function' && typeof _acs1 === 'function' && typeof _cos1 === 'function' && typeof _aeb1 === 'function' && typeof _tod1 === 'function') {
+                {{-- Actualizar filtros dinámicos con todas las ofertas --}}
+                _afd1(ofertas);
+                {{-- Actualizar estado de botones (habilitar/deshabilitar según ofertas disponibles) --}}
+                _aeb1();
+                {{-- Actualizar contadores de sublíneas (esto cuenta las ofertas por especificación) --}}
+                _acs1();
+                {{-- Renderizar ofertas --}}
+                _ro1();
+              } else {
+                setTimeout(intentarRenderizar, 50);
+              }
+            };
+            
+            intentarRenderizar();
+          });
+            
+            {{-- Escuchar evento de especificaciones cargadas --}}
+            window.addEventListener('especificaciones-cargadas', function(event) {
+              gruposDeOfertas = event.detail.grupos_de_ofertas || null;
+              {{-- Actualizar columnasData desde columnas_data (procesado en el backend) --}}
+              if (event.detail.columnas_data) {
+                columnasData = event.detail.columnas_data;
+              }
+            });
+          })();
 
           let ordenActual = null; {{-- En la primera carga, respeta el orden del backend --}}
           let filtroInteractuado = false;
@@ -3000,6 +3040,11 @@
           {{-- Función para verificar si una sublínea tiene ofertas disponibles --}}
           {{-- _tod1: tieneOfertasDisponibles - Verifica si una sublínea específica tiene ofertas disponibles --}}
           function _tod1(lineaId, sublineaId) {
+            {{-- Verificar que haya ofertas disponibles --}}
+            if (!ofertas || ofertas.length === 0) {
+              return false;
+            }
+            
             {{-- Obtener ofertas filtradas por todas las selecciones actuales (excepto esta línea) --}}
             const ofertasFiltradas = _oof1(lineaId);
             
@@ -4972,39 +5017,175 @@
           {{-- Snippets para mejorar el SEO --}}
           {{-- Para indexar en GOOGLE la ficha de producto --}}
           @php
-          // Generar array de ofertas para cada versión (por unidades)
-          $offersJsonLd = $cantidadesUnicas->map(function($cantidad) use ($producto, $ofertas) {
-              $oferta = $ofertas->where('unidades', $cantidad)->sortBy('precio_total')->first();
-              if (!$oferta) return null;
-              return [
-                  "@type" => "Offer",
-                  "url" => $producto->categoria->construirUrlCategorias($producto->slug) . '?v=' . $cantidad,
-                  "price" => number_format($oferta->precio_total, 2, '.', ''),
-                  "priceCurrency" => "EUR",
-                  "itemCondition" => "https://schema.org/NewCondition",
-                  "availability" => "https://schema.org/InStock",
-                  "seller" => [
-                      "@type" => "Organization",
-                      "name" => $oferta->tienda->nombre
-                  ],
-                  "sku" => $oferta->id,
-                  "description" => $producto->descripcion_corta . ' - ' . $cantidad . ' unidades',
-              ];
-          })->filter()->values();
+          // Generar array de ofertas combinando variantes (v) y especificaciones internas
+          $offersJsonLd = collect();
 
-          $productJsonLd = [
-              "@context" => "https://schema.org",
-              "@type" => "Product",
-              "name" => $producto->titulo,
-              "image" => [ asset('images/' . ($producto->imagen_pequena[0] ?? '')) ],
-              "description" => $producto->descripcion_corta,
-              "brand" => [
-                  "@type" => "Brand",
-                  "name" => $producto->marca,
-                  "url" => url('buscar?q=' . Str::slug($producto->marca))
-              ],
-              "offers" => $offersJsonLd
-          ];
+          // 1. Ofertas por variantes (v) - cantidad/unidades (si existen)
+          if ($cantidadesUnicas->isNotEmpty()) {
+              foreach ($cantidadesUnicas as $cantidad) {
+                  $oferta = $ofertas->where('unidades', $cantidad)->sortBy('precio_total')->first();
+                  if (!$oferta) continue;
+                  
+                  // Construir URL absoluta para el schema
+                  $urlBase = $producto->categoria->construirUrlCategorias($producto->slug);
+                  $urlCompleta = 'https://komparador.com' . $urlBase . '?v=' . $cantidad;
+                  
+                  // Formatear la cantidad según el tipo de unidad
+                  $textoCantidad = '';
+                  if ($producto->unidadDeMedida === 'kilos') {
+                      $textoCantidad = ($cantidad == intval($cantidad)) ? 
+                          number_format($cantidad, 0, ',', '.') : 
+                          number_format($cantidad, 2, ',', '.') . ' Kilos';
+                  } elseif ($producto->unidadDeMedida === 'litros') {
+                      $textoCantidad = ($cantidad == intval($cantidad)) ? 
+                          number_format($cantidad, 0, ',', '.') : 
+                          number_format($cantidad, 2, ',', '.') . ' Litros';
+                  } else {
+                      $textoCantidad = ($cantidad == intval($cantidad)) ? 
+                          number_format($cantidad, 0, ',', '.') : 
+                          number_format($cantidad, 2, ',', '.') . ' Unidades';
+                  }
+                  
+                  $offersJsonLd->push([
+                      "@type" => "Offer",
+                      "url" => $urlCompleta,
+                      "price" => number_format($oferta->precio_total, 2, '.', ''),
+                      "priceCurrency" => "EUR",
+                      "itemCondition" => "https://schema.org/NewCondition",
+                      "availability" => "https://schema.org/InStock",
+                      "seller" => [
+                          "@type" => "Organization",
+                          "name" => $oferta->tienda->nombre
+                      ],
+                      "sku" => $oferta->id,
+                      "name" => $producto->titulo . ' - ' . $textoCantidad,
+                      "description" => $producto->descripcion_corta,
+                  ]);
+              }
+          }
+
+          // 2. Ofertas por especificaciones internas (si existen)
+          if ($producto->categoria_id_especificaciones_internas && $producto->categoria_especificaciones_internas_elegidas) {
+              $categoriaEspecificaciones = \App\Models\Categoria::find($producto->categoria_id_especificaciones_internas);
+              $especificacionesElegidas = $producto->categoria_especificaciones_internas_elegidas;
+              
+              if ($categoriaEspecificaciones && $categoriaEspecificaciones->especificaciones_internas && 
+                  isset($categoriaEspecificaciones->especificaciones_internas['filtros'])) {
+                  
+                  // Combinar filtros de categoría y producto
+                  $filtrosCombinados = [];
+                  if (isset($categoriaEspecificaciones->especificaciones_internas['filtros'])) {
+                      $filtrosCombinados = array_merge($filtrosCombinados, $categoriaEspecificaciones->especificaciones_internas['filtros']);
+                  }
+                  if (isset($especificacionesElegidas['_producto']['filtros']) && 
+                      is_array($especificacionesElegidas['_producto']['filtros'])) {
+                      $filtrosCombinados = array_merge($filtrosCombinados, $especificacionesElegidas['_producto']['filtros']);
+                  }
+                  
+                  // Procesar cada filtro (línea principal)
+                  foreach ($filtrosCombinados as $filtro) {
+                      $sublineasElegidas = $especificacionesElegidas[$filtro['id']] ?? [];
+                      if (empty($sublineasElegidas) || !isset($filtro['subprincipales'])) continue;
+                      
+                      // Procesar cada sublínea (valor de la especificación)
+                      foreach ($filtro['subprincipales'] as $sub) {
+                          // Buscar los datos de la sublínea en las elegidas
+                          $sublineaData = collect($sublineasElegidas)->first(function($item) use ($sub) {
+                              if (!is_array($item) || !isset($item['id'])) return false;
+                              return (string)$item['id'] === (string)$sub['id'];
+                          });
+                          
+                          // Verificar si está marcada como "Mostrar"
+                          $estaMarcadaComoMostrar = $sublineaData && 
+                              (is_array($sublineaData) && ((isset($sublineaData['m']) && $sublineaData['m'] === 1) || 
+                               (isset($sublineaData['mostrar']) && $sublineaData['mostrar'] === true)));
+                          
+                          if (!$estaMarcadaComoMostrar) continue;
+                          
+                          // Obtener el texto de la sublínea
+                          $textoSublinea = $sub['texto'] ?? '';
+                          if (empty($textoSublinea) && is_array($sublineaData)) {
+                              // Intentar obtener texto alternativo si es columna oferta
+                              $esColumnaOferta = isset($especificacionesElegidas['_columnas']) && 
+                                                is_array($especificacionesElegidas['_columnas']) && 
+                                                in_array($filtro['id'], $especificacionesElegidas['_columnas']);
+                              if ($esColumnaOferta && isset($sublineaData['textoAlternativo']) && !empty($sublineaData['textoAlternativo'])) {
+                                  $textoSublinea = $sublineaData['textoAlternativo'];
+                              } elseif (isset($sublineaData['texto'])) {
+                                  $textoSublinea = $sublineaData['texto'];
+                              }
+                          }
+                          
+                          if (empty($textoSublinea)) continue;
+                          
+                          // Buscar ofertas que tengan esta especificación
+                          $ofertasConEspecificacion = $ofertas->filter(function($oferta) use ($filtro, $sub) {
+                              if (!$oferta->especificaciones_internas || !is_array($oferta->especificaciones_internas)) {
+                                  return false;
+                              }
+                              $ofertaLinea = $oferta->especificaciones_internas[$filtro['id']] ?? null;
+                              if ($ofertaLinea === null) return false;
+                              
+                              $ofertaLineaArray = is_array($ofertaLinea) ? $ofertaLinea : [$ofertaLinea];
+                              $sublineaIdStr = (string)$sub['id'];
+                              
+                              return collect($ofertaLineaArray)->contains(function($id) use ($sublineaIdStr) {
+                                  return (string)$id === $sublineaIdStr;
+                              });
+                          });
+                          
+                          if ($ofertasConEspecificacion->isEmpty()) continue;
+                          
+                          // Obtener la mejor oferta para esta especificación
+                          $mejorOferta = $ofertasConEspecificacion->sortBy('precio_total')->first();
+                          
+                          // Construir URL usando el slug guardado en las especificaciones internas
+                          $urlBase = $producto->categoria->construirUrlCategorias($producto->slug);
+                          // Usar el slug guardado en la especificación (ya viene sin acentos y formateado)
+                          $slugEspecificacion = $sub['slug'] ?? '';
+                          // Si no hay slug guardado, generar uno como fallback
+                          if (empty($slugEspecificacion)) {
+                              $slugEspecificacion = \Illuminate\Support\Str::slug($textoSublinea);
+                          }
+                          $urlCompleta = 'https://komparador.com' . $urlBase . '/' . $slugEspecificacion;
+                          
+                          $offersJsonLd->push([
+                              "@type" => "Offer",
+                              "url" => $urlCompleta,
+                              "price" => number_format($mejorOferta->precio_total, 2, '.', ''),
+                              "priceCurrency" => "EUR",
+                              "itemCondition" => "https://schema.org/NewCondition",
+                              "availability" => "https://schema.org/InStock",
+                              "seller" => [
+                                  "@type" => "Organization",
+                                  "name" => $mejorOferta->tienda->nombre
+                              ],
+                              "sku" => $mejorOferta->id,
+                              "name" => $producto->titulo . ' - ' . $textoSublinea,
+                              "description" => $producto->descripcion_corta,
+                          ]);
+                      }
+                  }
+              }
+          }
+
+          // Solo generar el schema Product si hay ofertas
+          $productJsonLd = null;
+          if ($offersJsonLd->isNotEmpty()) {
+              $productJsonLd = [
+                  "@context" => "https://schema.org",
+                  "@type" => "Product",
+                  "name" => $producto->titulo,
+                  "image" => [ asset('images/' . ($producto->imagen_pequena[0] ?? '')) ],
+                  "description" => $producto->descripcion_corta,
+                  "brand" => [
+                      "@type" => "Brand",
+                      "name" => $producto->marca,
+                      "url" => url('buscar?q=' . Str::slug($producto->marca))
+                  ],
+                  "offers" => $offersJsonLd->values()
+              ];
+          }
           @endphp
           {{-- Para indexar las preguntas frecuentes --}}
           @php
@@ -5026,9 +5207,11 @@
             {!! json_encode($faqJsonLd, JSON_HEX_QUOT | JSON_HEX_APOS | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT) !!}
             </script>
 
+            @if($productJsonLd)
             <script type="application/ld+json">
             {!! json_encode($productJsonLd, JSON_HEX_QUOT | JSON_HEX_APOS | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT) !!}
           </script>
+          @endif
           {{-- Para indexar el buscador --}}
           <script type="application/ld+json">
             {

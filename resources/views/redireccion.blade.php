@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>@if(isset($bloqueadoMensual) && $bloqueadoMensual) Acceso bloqueado @elseif(isset($requiereCaptcha) && $requiereCaptcha) Verificación de seguridad @else Redirigiendo... @endif</title>
-    @if(isset($requiereCaptcha) && $requiereCaptcha || isset($bloqueadoMensual) && $bloqueadoMensual)
+    <title>@if(isset($bloqueadoMensual) && $bloqueadoMensual) Acceso bloqueado @elseif(isset($requiereCaptcha) && $requiereCaptcha) Verificación de seguridad @elseif(isset($error) && $error) Enlace caducado @else Redirigiendo... @endif</title>
+    @if(isset($requiereCaptcha) && $requiereCaptcha || isset($bloqueadoMensual) && $bloqueadoMensual || isset($error) && $error)
     <script src="https://www.google.com/recaptcha/api.js" async defer></script>
     <script src="https://cdn.tailwindcss.com"></script>
     @endif
@@ -133,6 +133,46 @@
                 document.getElementById('btn-continuar').disabled = false;
             }
         </script>
+    
+    @elseif(isset($error) && $error)
+        {{-- ERROR: TOKEN CADUCADO O URL INVÁLIDA --}}
+        <div class="min-h-screen flex items-center justify-center px-4 bg-gray-50">
+            <div class="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
+                <div class="text-center mb-6">
+                    <svg class="mx-auto h-12 w-12 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <h1 class="text-2xl font-bold text-gray-900 mt-4">⏰ Enlace caducado</h1>
+                    <p class="text-gray-600 mt-4 text-lg">
+                        El enlace ha caducado. Por favor, recarga la página del producto en komparador.com para poder ir a la tienda.
+                    </p>
+                    <div class="bg-blue-50 border-l-4 border-blue-400 p-4 mt-6 rounded">
+                        <p class="text-sm text-gray-700 font-medium">
+                            Los enlaces de redirección tienen un tiempo de validez limitado por seguridad.
+                        </p>
+                    </div>
+                    <div class="mt-6">
+                        @if(isset($urlProducto) && $urlProducto)
+                            <a href="{{ $urlProducto }}" 
+                               style="background-color: #e97b11;"
+                               class="inline-block text-white font-semibold py-3 px-6 rounded-lg transition-colors"
+                               onmouseover="this.style.backgroundColor='#d16a0f'"
+                               onmouseout="this.style.backgroundColor='#e97b11'">
+                                Volver al producto
+                            </a>
+                        @else
+                            <a href="https://komparador.com" 
+                               style="background-color: #e97b11;"
+                               class="inline-block text-white font-semibold py-3 px-6 rounded-lg transition-colors"
+                               onmouseover="this.style.backgroundColor='#d16a0f'"
+                               onmouseout="this.style.backgroundColor='#e97b11'">
+                                Ir a komparador.com
+                            </a>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </div>
     
     @else
         {{-- REDIRECCIÓN NORMAL --}}
