@@ -738,18 +738,18 @@
                             </svg>
                         </a>
                         
-                        <button onclick="ejecutarComprobacion('comisiones')"
+                        <a href="{{ route('admin.users.index') }}"
                             class="w-full flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors group">
                             <div class="flex items-center">
-                                <svg class="w-4 h-4 text-gray-400 group-hover:text-orange-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                <svg class="w-4 h-4 text-gray-400 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                                 </svg>
-                                <span class="ml-3 text-sm font-medium text-gray-700 dark:text-gray-300">Comprobar comisiones</span>
+                                <span class="ml-3 text-sm font-medium text-gray-700 dark:text-gray-300">Users</span>
                             </div>
-                            <svg class="w-4 h-4 text-gray-400 group-hover:text-orange-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="w-4 h-4 text-gray-400 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                             </svg>
-                        </button>
+                        </a>
                         
                         <button onclick="ejecutarComprobacion('productos-sin-ofertas')"
                             class="w-full flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors group">
@@ -878,9 +878,6 @@ function ejecutarComprobacion(tipo) {
     
     let url;
     switch(tipo) {
-        case 'comisiones':
-            url = '{{ route("admin.avisos.ejecutar.comprobacion.comisiones") }}';
-            break;
         case 'productos-sin-ofertas':
             url = '{{ route("admin.avisos.ejecutar.comprobacion.productos-sin-ofertas") }}';
             break;

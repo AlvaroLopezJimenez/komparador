@@ -32,6 +32,19 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
+        // Registrar actividad de login
+        try {
+            $user = Auth::user();
+            if ($user) {
+                \App\Models\UserActivity::create([
+                    'user_id' => $user->id,
+                    'action_type' => \App\Models\UserActivity::ACTION_LOGIN,
+                ]);
+            }
+        } catch (\Exception $e) {
+            \Log::error('Error al registrar actividad de login: ' . $e->getMessage());
+        }
+
         return redirect()->intended(RouteServiceProvider::HOME);
     }
 

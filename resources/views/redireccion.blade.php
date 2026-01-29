@@ -146,11 +146,6 @@
                     <p class="text-gray-600 mt-4 text-lg">
                         El enlace ha caducado. Por favor, recarga la página del producto en komparador.com para poder ir a la tienda.
                     </p>
-                    <div class="bg-blue-50 border-l-4 border-blue-400 p-4 mt-6 rounded">
-                        <p class="text-sm text-gray-700 font-medium">
-                            Los enlaces de redirección tienen un tiempo de validez limitado por seguridad.
-                        </p>
-                    </div>
                     <div class="mt-6">
                         @if(isset($urlProducto) && $urlProducto)
                             <a href="{{ $urlProducto }}" 

@@ -2466,6 +2466,7 @@
               }
               
               const partes = descuentos.split(';');
+              
               if (partes.length >= 3) {
                 {{-- Formato nuevo: cupon;codigo;cantidad (puede tener más partes si el código contiene ;) --}}
                 {{-- Tomar todo entre el primer y último ; como código, y el último como valor --}}
@@ -2836,7 +2837,7 @@
               } else if (descuentosStr && typeof descuentosStr === 'string' && descuentosStr.startsWith('cupon;')) {
                 try {
                   tieneDescuento = true;
-                  const cuponInfo = _pc1(oferta.descuentos);
+                  const cuponInfo = window._pc1(oferta.descuentos);
                   const valorCupon = cuponInfo ? cuponInfo.valor : (oferta.descuentos.split(';')[1] || '');
                   const codigoCupon = cuponInfo ? cuponInfo.codigo : null;
                   {{-- Escapar valores para evitar problemas con comillas y caracteres especiales --}}
@@ -4085,47 +4086,48 @@
                 {{-- Generar botón con descuentos (usando la primera oferta) --}}
                 let botonHtml = '';
                 if (primeraOferta.descuentos && typeof primeraOferta.descuentos === 'string' && primeraOferta.descuentos.startsWith('SoloAliexpress;')) {
-                  botonHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon-aliexpress="true" data-descuentos="' + primeraOferta.descuentos.replace(/"/g, '&quot;') + '" data-oferta-id="' + primeraOferta.id + '" data-url="' + primeraOferta.url + '">Ir a la tienda</span>';
+                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
+                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon-aliexpress="true" data-descuentos="' + primeraOferta.descuentos.replace(/"/g, '&quot;') + '" data-oferta-id="' + primeraOferta.id + '" data-url="' + primeraOferta.url + '">Ir a la tienda</span></div>';
                 } else if (primeraOferta.descuentos && typeof primeraOferta.descuentos === 'string' && primeraOferta.descuentos.startsWith('CholloTienda1SoloCuponQueAplicaDescuento;')) {
-                  botonHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon-chollo-tienda-solo="true" data-descuentos="' + primeraOferta.descuentos.replace(/"/g, '&quot;') + '" data-oferta-id="' + primeraOferta.id + '" data-url="' + primeraOferta.url + '">Ir a la tienda</span>';
+                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
+                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon-chollo-tienda-solo="true" data-descuentos="' + primeraOferta.descuentos.replace(/"/g, '&quot;') + '" data-oferta-id="' + primeraOferta.id + '" data-url="' + primeraOferta.url + '">Ir a la tienda</span></div>';
                 } else if (primeraOferta.descuentos && typeof primeraOferta.descuentos === 'string' && primeraOferta.descuentos.startsWith('CholloTienda;')) {
-                  botonHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon-chollo-tienda="true" data-descuentos="' + primeraOferta.descuentos.replace(/"/g, '&quot;') + '" data-oferta-id="' + primeraOferta.id + '" data-url="' + primeraOferta.url + '">Ir a la tienda</span>';
+                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
+                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon-chollo-tienda="true" data-descuentos="' + primeraOferta.descuentos.replace(/"/g, '&quot;') + '" data-oferta-id="' + primeraOferta.id + '" data-url="' + primeraOferta.url + '">Ir a la tienda</span></div>';
                 } else if (primeraOferta.descuentos && typeof primeraOferta.descuentos === 'string' && primeraOferta.descuentos.startsWith('cupon;')) {
                   try {
-                    const cuponInfo = _pc1(primeraOferta.descuentos);
+                    const cuponInfo = window._pc1(primeraOferta.descuentos);
                     const valorCupon = cuponInfo ? cuponInfo.valor : (primeraOferta.descuentos.split(';')[1] || '');
                     const codigoCupon = cuponInfo ? cuponInfo.codigo : null;
                     const codigoCuponEscapado = codigoCupon ? codigoCupon.replace(/"/g, '&quot;').replace(/'/g, '&#39;') : '';
                     const valorCuponEscapado = String(valorCupon).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    const urlEscapada = primeraOferta.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
                     const dataAttrs = codigoCupon 
-                      ? `data-cupon="true" data-codigo-cupon="${codigoCuponEscapado}" data-valor-cupon="${valorCuponEscapado}"` 
-                      : `data-cupon="true" data-valor-cupon="${valorCuponEscapado}"`;
-                    botonHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold;">CUPÓN</span>' +
-                               '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" ' + dataAttrs + ' target="_blank">Ir a la tienda</span>';
+                      ? `data-cupon="true" data-codigo-cupon="${codigoCuponEscapado}" data-valor-cupon="${valorCuponEscapado}" data-url="${urlEscapada}"` 
+                      : `data-cupon="true" data-valor-cupon="${valorCuponEscapado}" data-url="${urlEscapada}"`;
+                    botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold;">CUPÓN</span>' +
+                               '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" ' + dataAttrs + ' target="_blank">Ir a la tienda</span></div>';
                   } catch (e) {
                     botonHtml = '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'">Ir a la tienda</span>';
                   }
                 } else if (primeraOferta.descuentos === 'cupon') {
-                  botonHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon="true" target="_blank">Ir a la tienda</span>';
+                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
+                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon="true" target="_blank">Ir a la tienda</span></div>';
                 } else if (primeraOferta.descuentos === '3x2') {
-                  botonHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #8b5cf6, #a855f7); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">3x2</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-3x2="true" target="_blank">Ir a la tienda</span>';
+                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #8b5cf6, #a855f7); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">3x2</span>' +
+                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-3x2="true" target="_blank">Ir a la tienda</span></div>';
                 } else if (primeraOferta.descuentos === '2x1 - SoloCarrefour') {
-                  botonHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #10b981, #059669); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">2x1</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2x1="true" target="_blank">Ir a la tienda</span>';
+                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #10b981, #059669); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">2x1</span>' +
+                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2x1="true" target="_blank">Ir a la tienda</span></div>';
                 } else if (primeraOferta.descuentos === '2a al 50 - cheque - SoloCarrefour') {
-                  botonHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">2a al 50%</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2a-al-50-cheque="true" target="_blank">Ir a la tienda</span>';
+                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">2a al 50%</span>' +
+                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2a-al-50-cheque="true" target="_blank">Ir a la tienda</span></div>';
                 } else if (primeraOferta.descuentos === '2a al 70') {
-                  botonHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">2a AL 70%</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2a-al-70="true" target="_blank">Ir a la tienda</span>';
+                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">2a AL 70%</span>' +
+                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2a-al-70="true" target="_blank">Ir a la tienda</span></div>';
                 } else if (primeraOferta.descuentos === '2a al 50') {
-                  botonHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">2a al 50%</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2a-al-50="true" target="_blank">Ir a la tienda</span>';
+                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">2a al 50%</span>' +
+                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2a-al-50="true" target="_blank">Ir a la tienda</span></div>';
                 } else {
                   botonHtml = '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded">Ir a la tienda</span>';
                 }
@@ -4364,52 +4366,53 @@
                       ` : ''}
                       <div class="boton text-center min-w-0 relative overflow-visible ${ordenBoton}">
                   ${itemGrupo.descuentos && typeof itemGrupo.descuentos === 'string' && itemGrupo.descuentos.startsWith('SoloAliexpress;') ? 
-                    '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon-aliexpress="true" data-descuentos="' + itemGrupo.descuentos.replace(/"/g, '&quot;') + '" data-oferta-id="' + itemGrupo.id + '" data-url="' + itemGrupo.url + '">Ir a la tienda</span>' :
+                    '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
+                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon-aliexpress="true" data-descuentos="' + itemGrupo.descuentos.replace(/"/g, '&quot;') + '" data-oferta-id="' + itemGrupo.id + '" data-url="' + itemGrupo.url + '">Ir a la tienda</span></div>' :
                     (itemGrupo.descuentos && typeof itemGrupo.descuentos === 'string' && itemGrupo.descuentos.startsWith('CholloTienda1SoloCuponQueAplicaDescuento;')) ?
-                    '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon-chollo-tienda-solo="true" data-descuentos="' + itemGrupo.descuentos.replace(/"/g, '&quot;') + '" data-oferta-id="' + itemGrupo.id + '" data-url="' + itemGrupo.url + '">Ir a la tienda</span>' :
+                    '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
+                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon-chollo-tienda-solo="true" data-descuentos="' + itemGrupo.descuentos.replace(/"/g, '&quot;') + '" data-oferta-id="' + itemGrupo.id + '" data-url="' + itemGrupo.url + '">Ir a la tienda</span></div>' :
                     itemGrupo.descuentos && typeof itemGrupo.descuentos === 'string' && itemGrupo.descuentos.startsWith('CholloTienda;') ?
-                    '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon-chollo-tienda="true" data-descuentos="' + itemGrupo.descuentos.replace(/"/g, '&quot;') + '" data-oferta-id="' + itemGrupo.id + '" data-url="' + itemGrupo.url + '">Ir a la tienda</span>' :
+                    '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
+                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon-chollo-tienda="true" data-descuentos="' + itemGrupo.descuentos.replace(/"/g, '&quot;') + '" data-oferta-id="' + itemGrupo.id + '" data-url="' + itemGrupo.url + '">Ir a la tienda</span></div>' :
                     itemGrupo.descuentos && typeof itemGrupo.descuentos === 'string' && itemGrupo.descuentos.startsWith('cupon;') ? 
                     (() => {
                       try {
-                        const cuponInfo = _pc1(itemGrupo.descuentos);
+                        const cuponInfo = window._pc1(itemGrupo.descuentos);
                         const valorCupon = cuponInfo ? cuponInfo.valor : (itemGrupo.descuentos.split(';')[1] || '');
                         const codigoCupon = cuponInfo ? cuponInfo.codigo : null;
                         {{-- Escapar valores para evitar problemas con comillas y caracteres especiales --}}
                         const codigoCuponEscapado = codigoCupon ? codigoCupon.replace(/"/g, '&quot;').replace(/'/g, '&#39;') : '';
                         const valorCuponEscapado = String(valorCupon).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                        const urlEscapada = itemGrupo.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
                         const dataAttrs = codigoCupon 
-                          ? `data-cupon="true" data-codigo-cupon="${codigoCuponEscapado}" data-valor-cupon="${valorCuponEscapado}"` 
-                          : `data-cupon="true" data-valor-cupon="${valorCuponEscapado}"`;
+                          ? `data-cupon="true" data-codigo-cupon="${codigoCuponEscapado}" data-valor-cupon="${valorCuponEscapado}" data-url="${urlEscapada}"` 
+                          : `data-cupon="true" data-valor-cupon="${valorCuponEscapado}" data-url="${urlEscapada}"`;
                         {{-- Si es mejor oferta (primera del grupo), badge dentro (top: 0px), sino medio fuera (sin especificar top) --}}
                         const badgeTop = 'top: 0px;'; {{-- Para mejor oferta, dentro del botón --}}
-                        return '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); ' + badgeTop + ' right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold;">CUPÓN</span>' +
-                               '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" ' + dataAttrs + ' target="_blank">Ir a la tienda</span>';
+                        return '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); ' + badgeTop + ' right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold;">CUPÓN</span>' +
+                               '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" ' + dataAttrs + ' target="_blank">Ir a la tienda</span></div>';
                       } catch (e) {
                         return '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'">Ir a la tienda</span>';
                       }
                     })() : 
                     itemGrupo.descuentos === 'cupon' ? 
-                    '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon="true" target="_blank">Ir a la tienda</span>' : 
+                    '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
+                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon="true" target="_blank">Ir a la tienda</span></div>' : 
                     itemGrupo.descuentos === '3x2' ?
-                    '<span class="cupon-badge" style="background: linear-gradient(135deg, #8b5cf6, #a855f7); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">3x2</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-3x2="true" target="_blank">Ir a la tienda</span>' :
+                    '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #8b5cf6, #a855f7); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">3x2</span>' +
+                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-3x2="true" target="_blank">Ir a la tienda</span></div>' :
                     itemGrupo.descuentos === '2x1 - SoloCarrefour' ?
-                    '<span class="cupon-badge" style="background: linear-gradient(135deg, #10b981, #059669); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">2x1</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2x1="true" target="_blank">Ir a la tienda</span>' :
+                    '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #10b981, #059669); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">2x1</span>' +
+                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2x1="true" target="_blank">Ir a la tienda</span></div>' :
                     itemGrupo.descuentos === '2a al 50 - cheque - SoloCarrefour' ?
-                    '<span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">2a al 50%</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2a-al-50-cheque="true" target="_blank">Ir a la tienda</span>' :
+                    '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">2a al 50%</span>' +
+                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2a-al-50-cheque="true" target="_blank">Ir a la tienda</span></div>' :
                     itemGrupo.descuentos === '2a al 70' ?
-                    '<span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">2a AL 70%</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2a-al-70="true" target="_blank">Ir a la tienda</span>' :
+                    '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">2a AL 70%</span>' +
+                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2a-al-70="true" target="_blank">Ir a la tienda</span></div>' :
                     itemGrupo.descuentos === '2a al 50' ?
-                    '<span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">2a al 50%</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2a-al-50="true" target="_blank">Ir a la tienda</span>' :
+                    '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">2a al 50%</span>' +
+                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2a-al-50="true" target="_blank">Ir a la tienda</span></div>' :
                     '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'">Ir a la tienda</span>'
                   }
                       </div>
@@ -4503,17 +4506,17 @@
                 {{-- Generar botón --}}
                 let botonHtml = '';
                 if (item.descuentos && typeof item.descuentos === 'string' && item.descuentos.startsWith('SoloAliexpress;')) {
-                  botonHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon-aliexpress="true" data-descuentos="' + item.descuentos.replace(/"/g, '&quot;') + '" data-oferta-id="' + item.id + '" data-url="' + item.url + '">Ir a la tienda</span>';
+                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
+                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon-aliexpress="true" data-descuentos="' + item.descuentos.replace(/"/g, '&quot;') + '" data-oferta-id="' + item.id + '" data-url="' + item.url + '">Ir a la tienda</span></div>';
                 } else if (item.descuentos && typeof item.descuentos === 'string' && item.descuentos.startsWith('CholloTienda1SoloCuponQueAplicaDescuento;')) {
-                  botonHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon-chollo-tienda-solo="true" data-descuentos="' + item.descuentos.replace(/"/g, '&quot;') + '" data-oferta-id="' + item.id + '" data-url="' + item.url + '">Ir a la tienda</span>';
+                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
+                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon-chollo-tienda-solo="true" data-descuentos="' + item.descuentos.replace(/"/g, '&quot;') + '" data-oferta-id="' + item.id + '" data-url="' + item.url + '">Ir a la tienda</span></div>';
                 } else if (item.descuentos && typeof item.descuentos === 'string' && item.descuentos.startsWith('CholloTienda;')) {
-                  botonHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon-chollo-tienda="true" data-descuentos="' + item.descuentos.replace(/"/g, '&quot;') + '" data-oferta-id="' + item.id + '" data-url="' + item.url + '">Ir a la tienda</span>';
+                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
+                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon-chollo-tienda="true" data-descuentos="' + item.descuentos.replace(/"/g, '&quot;') + '" data-oferta-id="' + item.id + '" data-url="' + item.url + '">Ir a la tienda</span></div>';
                 } else if (item.descuentos && typeof item.descuentos === 'string' && item.descuentos.startsWith('cupon;')) {
                   try {
-                    const cuponInfo = _pc1(item.descuentos);
+                    const cuponInfo = window._pc1(item.descuentos);
                     const valorCupon = cuponInfo ? cuponInfo.valor : (item.descuentos.split(';')[1] || '');
                     const codigoCupon = cuponInfo ? cuponInfo.codigo : null;
                     const codigoCuponEscapado = codigoCupon ? codigoCupon.replace(/"/g, '&quot;').replace(/'/g, '&#39;') : '';
@@ -4522,30 +4525,30 @@
                     const dataAttrs = codigoCupon 
                       ? `data-cupon="true" data-codigo-cupon="${codigoCuponEscapado}" data-valor-cupon="${valorCuponEscapado}" data-url="${urlEscapada}"` 
                       : `data-cupon="true" data-valor-cupon="${valorCuponEscapado}" data-url="${urlEscapada}"`;
-                    botonHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
-                               '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" ' + dataAttrs + '>Ir a la tienda</span>';
-                                  } catch (e) {
-                    botonHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
-                               '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon="true" data-url="' + item.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;') + '">Ir a la tienda</span>';
+                    botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
+                               '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" ' + dataAttrs + '>Ir a la tienda</span></div>';
+                  } catch (e) {
+                    botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
+                               '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon="true" data-url="' + item.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;') + '">Ir a la tienda</span></div>';
                   }
                 } else if (item.descuentos === 'cupon') {
-                  botonHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon="true" data-url="' + item.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;') + '">Ir a la tienda</span>';
+                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
+                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon="true" data-url="' + item.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;') + '">Ir a la tienda</span></div>';
                 } else if (item.descuentos === '3x2') {
-                  botonHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #8b5cf6, #a855f7); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">3x2</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-3x2="true" data-url="' + item.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;') + '">Ir a la tienda</span>';
+                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #8b5cf6, #a855f7); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">3x2</span>' +
+                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-3x2="true" data-url="' + item.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;') + '">Ir a la tienda</span></div>';
                 } else if (item.descuentos === '2x1 - SoloCarrefour') {
-                  botonHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #10b981, #059669); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">2x1</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2x1="true" data-url="' + item.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;') + '">Ir a la tienda</span>';
+                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #10b981, #059669); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">2x1</span>' +
+                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2x1="true" data-url="' + item.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;') + '">Ir a la tienda</span></div>';
                 } else if (item.descuentos === '2a al 50 - cheque - SoloCarrefour') {
-                  botonHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">2a al 50%</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2a-al-50-cheque="true" data-url="' + item.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;') + '">Ir a la tienda</span>';
+                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">2a al 50%</span>' +
+                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2a-al-50-cheque="true" data-url="' + item.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;') + '">Ir a la tienda</span></div>';
                 } else if (item.descuentos === '2a al 70') {
-                  botonHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">2a AL 70%</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2a-al-70="true" data-url="' + item.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;') + '">Ir a la tienda</span>';
+                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">2a AL 70%</span>' +
+                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2a-al-70="true" data-url="' + item.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;') + '">Ir a la tienda</span></div>';
                 } else if (item.descuentos === '2a al 50') {
-                  botonHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">2a al 50%</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2a-al-50="true" data-url="' + item.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;') + '">Ir a la tienda</span>';
+                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">2a al 50%</span>' +
+                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2a-al-50="true" data-url="' + item.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;') + '">Ir a la tienda</span></div>';
                 } else {
                   botonHtml = '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'">Ir a la tienda</span>';
                 }
@@ -5855,7 +5858,22 @@ function _hcc1(e) {
   e.preventDefault();
   e.stopPropagation();
   
-  const button = e.target.closest('[data-cupon="true"]') || e.target;
+  {{-- Buscar el botón con data-cupon, primero en el target, luego en el contenedor padre --}}
+  let button = e.target.closest('[data-cupon="true"]');
+  
+  {{-- Si no se encuentra, buscar en el contenedor padre (el div con relative) --}}
+  if (!button) {
+    const container = e.target.closest('.relative');
+    if (container) {
+      button = container.querySelector('[data-cupon="true"]');
+    }
+  }
+  
+  {{-- Si aún no se encuentra, usar el target directamente --}}
+  if (!button) {
+    button = e.target;
+  }
+  
   {{-- Buscar el enlace padre que contiene la URL (la tarjeta de producto) --}}
   const card = button.closest('.product-card');
   let url = card ? card.href : null;
@@ -7490,7 +7508,7 @@ function _rod1() {
       '</div>';
   } else if (primeraOferta.descuentos && typeof primeraOferta.descuentos === 'string' && primeraOferta.descuentos.startsWith('cupon;')) {
     try {
-      const cuponInfo = _pc1(primeraOferta.descuentos);
+      const cuponInfo = window._pc1(primeraOferta.descuentos);
       const valorCupon = cuponInfo ? cuponInfo.valor : (primeraOferta.descuentos.split(';')[1] || '');
       const codigoCupon = cuponInfo ? cuponInfo.codigo : null;
       const codigoCuponEscapado = codigoCupon ? codigoCupon.replace(/"/g, '&quot;').replace(/'/g, '&#39;') : '';

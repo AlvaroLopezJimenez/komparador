@@ -195,8 +195,13 @@ if (is_numeric($precioAnterior) && $precioAnterior > 0) {
         $precioRealAntes = $ofertaAntes ? $this->calcularPrecioRealPorUnidad($ofertaAntes) : null;
         $precioRealDespues = $ofertaDespues ? $this->calcularPrecioRealPorUnidad($ofertaDespues) : null;
 
+        // Normalizar ambos precios a 3 decimales SOLO para la comparación (no afecta el guardado ni el aviso)
+        // Esto evita falsos positivos cuando 0.250 y 0.25 son el mismo precio
+        $precioRealAntesNormalizado = $precioRealAntes !== null ? round((float)$precioRealAntes, 3) : null;
+        $precioRealDespuesNormalizado = $precioRealDespues !== null ? round((float)$precioRealDespues, 3) : null;
+
         if (($ofertaAntes ? $ofertaAntes->id : null) !== ($ofertaDespues ? $ofertaDespues->id : null) ||
-            $precioRealAntes !== $precioRealDespues) {
+            $precioRealAntesNormalizado !== $precioRealDespuesNormalizado) {
             
             $cambiosDetectados = true;
             
@@ -214,8 +219,8 @@ if (is_numeric($precioAnterior) && $precioAnterior > 0) {
                 $producto->update(['precio' => $precioMasBajo]);
                     
                     //Además guardamos un aviso para comprobación manual
-                    // Guardar aviso
-                    $textoAviso = 'Precio actualizado producto '.$producto->nombre.'precio antiguo: '. $precioAntiguoProducto.', precio Nuevo: '.$precioUnidadNuevo;
+                    // Guardar aviso usando los precios REALES (sin normalizar)
+                    $textoAviso = 'Precio actualizado producto '.$producto->nombre.' precio antiguo: '. $precioAntiguoProducto.', precio Nuevo: '.$precioRealDespues;
                     DB::table('avisos')->insert([
                         'texto_aviso'     => $textoAviso,
                         'fecha_aviso'     => now(),                         // momento de detección

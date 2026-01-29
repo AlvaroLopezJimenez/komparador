@@ -437,6 +437,15 @@ class OfertaProductoController extends Controller
         // Rehabilitar timestamps automáticos
         $oferta->timestamps = true;
 
+        // Registrar actividad de usuario
+        if (auth()->check()) {
+            \App\Models\UserActivity::create([
+                'user_id' => auth()->id(),
+                'action_type' => \App\Models\UserActivity::ACTION_OFERTA_MODIFICADA,
+                'oferta_id' => $oferta->id,
+            ]);
+        }
+
         return redirect()->route('admin.ofertas.todas')->with('success', 'Oferta actualizada');
     }
 
@@ -737,6 +746,15 @@ class OfertaProductoController extends Controller
         // Si el precio final es 0, crear aviso de "Sin stock - 1a vez" a 4 días
         if ($precioCero) {
             $this->crearAvisoSinStockSiNoExiste($oferta);
+        }
+
+        // Registrar actividad de usuario
+        if (auth()->check()) {
+            \App\Models\UserActivity::create([
+                'user_id' => auth()->id(),
+                'action_type' => \App\Models\UserActivity::ACTION_OFERTA_CREADA,
+                'oferta_id' => $oferta->id,
+            ]);
         }
 
         return redirect()->route('admin.ofertas.todas')->with('success', 'Oferta añadida correctamente');

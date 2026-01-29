@@ -76,8 +76,14 @@ class BuscadorController extends Controller
     {
         $query = $request->get('q', '');
         
-        if (empty($query)) {
-            return redirect()->route('welcome');
+        // Si la query está vacía o solo tiene espacios, redirigir a precios hot
+        if (empty(trim($query))) {
+            $params = ['q' => 'precios hot'];
+            // Preservar el parámetro 'cam' si existe
+            if ($request->has('cam')) {
+                $params['cam'] = $request->get('cam');
+            }
+            return redirect()->route('buscar', $params);
         }
 
         // Normalizar la consulta: convertir a minúsculas y dividir en palabras

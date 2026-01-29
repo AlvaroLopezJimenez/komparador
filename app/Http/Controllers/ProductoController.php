@@ -179,6 +179,15 @@ class ProductoController extends Controller
             'aviso' => $avisoFecha,
         ]);
 
+        // Registrar actividad de usuario
+        if (auth()->check()) {
+            \App\Models\UserActivity::create([
+                'user_id' => auth()->id(),
+                'action_type' => \App\Models\UserActivity::ACTION_PRODUCTO_CREADO,
+                'producto_id' => $producto->id,
+            ]);
+        }
+
         return redirect()->route('admin.productos.index')->with('success', 'Producto guardado correctamente.');
     }
 
@@ -358,6 +367,15 @@ class ProductoController extends Controller
 
         // Refrescar el modelo para asegurar que se carguen los datos actualizados
         $producto->refresh();
+        
+        // Registrar actividad de usuario
+        if (auth()->check()) {
+            \App\Models\UserActivity::create([
+                'user_id' => auth()->id(),
+                'action_type' => \App\Models\UserActivity::ACTION_PRODUCTO_MODIFICADO,
+                'producto_id' => $producto->id,
+            ]);
+        }
         
         // Debug: verificar que se guardó correctamente
         \Log::info('Producto actualizado', [

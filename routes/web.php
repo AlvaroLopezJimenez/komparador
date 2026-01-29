@@ -565,9 +565,13 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
         Route::get('/oferta-mas-barata', [AvisoController::class, 'obtenerOfertaMasBarata'])->name('oferta-mas-barata');
         
         // Ejecuciones de comprobaciones
-        Route::post('/ejecutar/comprobacion/comisiones', [AvisoController::class, 'ejecutarComprobacionComisiones'])->name('ejecutar.comprobacion.comisiones');
         Route::post('/ejecutar/comprobacion/productos-sin-ofertas', [AvisoController::class, 'ejecutarComprobacionProductosSinOfertas'])->name('ejecutar.comprobacion.productos-sin-ofertas');
         Route::post('/ejecutar/comprobacion/ofertas-vencidas', [AvisoController::class, 'ejecutarComprobacionOfertasVencidas'])->name('ejecutar.comprobacion.ofertas-vencidas');
+    });
+
+    // Rutas para Users
+    Route::prefix('users')->name('users.')->group(function () {
+        Route::get('/', [App\Http\Controllers\UsersController::class, 'index'])->name('index');
     });
 
     // RUTAS PARA SCRAPER DE OFERTAS
