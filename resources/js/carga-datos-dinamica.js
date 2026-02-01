@@ -39,7 +39,12 @@
             cargarDatos();
         }).catch(error => {
             console.error('Error inicializando carga dinámica:', error);
-            mostrarError('Error al inicializar. Por favor, recarga la página.');
+            // Si el error es relacionado con token, mostrar modal
+            if (error.message && (error.message.includes('token') || error.message.includes('Token'))) {
+                mostrarModalTokenExpirado();
+            } else {
+                mostrarError('Error al inicializar. Por favor, recarga la página.');
+            }
         });
     }
     
@@ -169,43 +174,11 @@
                     throw new Error(errorData.error || 'Error al cargar ofertas');
                 }
                 
-                // Si el token expiró, intentar obtener uno nuevo (solo una vez)
+                // Si el token expiró o es inválido, mostrar modal directamente sin intentar renovar
                 if (response.status === 401 && (errorData.code === 'TOKEN_EXPIRED' || errorData.code === 'INVALID_TOKEN')) {
-                    console.log('Token inválido, obteniendo nuevo token...');
-                    tokenCache = null;
-                    tokenExpiration = null;
-                    
-                    // Solo reintentar si no hemos excedido el límite
-                    if (reintentosToken < MAX_REINTENTOS_TOKEN) {
-                        const nuevoToken = await obtenerToken();
-                        // Reintentar con el nuevo token (solo una vez)
-                        const reintentoHeaders = {
-                            'Accept': 'application/json',
-                            'X-Auth-Token': nuevoToken,
-                            'X-Fingerprint': fingerprint
-                        };
-                        const reintentoResponse = await fetch(`/api/ofertas/${productoId}`, {
-                            method: 'GET',
-                            headers: reintentoHeaders,
-                            credentials: 'same-origin'
-                        });
-                        
-                        if (!reintentoResponse.ok) {
-                            const reintentoError = await reintentoResponse.json().catch(() => ({}));
-                            throw new Error(reintentoError.error || 'Error al cargar ofertas después de renovar token');
-                        }
-                        
-                        const reintentoData = await reintentoResponse.json();
-                        // Devolver ofertas junto con especificaciones
-                        return {
-                            ofertas: reintentoData.ofertas || [],
-                            especificaciones: reintentoData.especificaciones || null,
-                            grupos_de_ofertas: reintentoData.grupos_de_ofertas || null,
-                            columnas_data: reintentoData.columnas_data || null
-                        };
-                    } else {
-                        throw new Error('No se pudo obtener un token válido después de varios intentos');
-                    }
+                    console.log('Token inválido o expirado, mostrando modal...');
+                    mostrarModalTokenExpirado();
+                    throw new Error('Token inválido o expirado');
                 }
                 
                 throw new Error(errorData.error || 'Error al cargar ofertas');
@@ -245,36 +218,11 @@
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
                 
+                // Si el token expiró o es inválido, mostrar modal directamente sin intentar renovar
                 if (response.status === 401 && (errorData.code === 'TOKEN_EXPIRED' || errorData.code === 'INVALID_TOKEN')) {
-                    if (reintentosToken < MAX_REINTENTOS_TOKEN) {
-                        tokenCache = null;
-                        tokenExpiration = null;
-                        const nuevoToken = await obtenerToken();
-                        // Reintentar una vez
-                        const reintentoResponse = await fetch(`/api/especificaciones/${productoId}`, {
-                            method: 'GET',
-                            headers: {
-                                'X-Auth-Token': nuevoToken,
-                                'X-Fingerprint': fingerprint,
-                                'Accept': 'application/json'
-                            },
-                            credentials: 'same-origin'
-                        });
-                        
-                        if (!reintentoResponse.ok) {
-                            const reintentoError = await reintentoResponse.json().catch(() => ({}));
-                            throw new Error(reintentoError.error || 'Error al cargar especificaciones');
-                        }
-                        
-                        const reintentoData = await reintentoResponse.json();
-                        return {
-                            especificaciones: reintentoData.especificaciones,
-                            grupos_de_ofertas: reintentoData.grupos_de_ofertas,
-                            columnas_data: reintentoData.columnas_data // Incluir columnas_data
-                        };
-                    } else {
-                        throw new Error('No se pudo obtener un token válido');
-                    }
+                    console.log('Token inválido o expirado, mostrando modal...');
+                    mostrarModalTokenExpirado();
+                    throw new Error('Token inválido o expirado');
                 }
                 
                 throw new Error(errorData.error || 'Error al cargar especificaciones');
@@ -318,10 +266,11 @@
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
                 
+                // Si el token expiró o es inválido, mostrar modal directamente sin intentar renovar
                 if (response.status === 401 && (errorData.code === 'TOKEN_EXPIRED' || errorData.code === 'INVALID_TOKEN')) {
-                    tokenCache = null;
-                    tokenExpiration = null;
-                    return cargarHistoricos(productoId, periodo);
+                    console.log('Token inválido o expirado, mostrando modal...');
+                    mostrarModalTokenExpirado();
+                    throw new Error('Token inválido o expirado');
                 }
                 
                 throw new Error(errorData.error || 'Error al cargar históricos');
@@ -397,7 +346,11 @@
             
         } catch (error) {
             console.error('Error cargando datos:', error);
-            mostrarError('Error al cargar datos. Por favor, recarga la página.');
+            // Si el error es relacionado con token, el modal ya se habrá mostrado
+            // Si no, mostrar error genérico
+            if (!error.message.includes('token') && !error.message.includes('Token')) {
+                mostrarError('Error al cargar datos. Por favor, recarga la página.');
+            }
         }
     }
     
@@ -412,13 +365,25 @@
         }
     }
     
+    /**
+     * Muestra el modal de token expirado/inválido
+     */
+    function mostrarModalTokenExpirado() {
+        const modal = document.getElementById('x27');
+        if (modal) {
+            modal.style.display = 'block';
+            modal.classList.add('show');
+        }
+    }
+    
     // Exportar funciones globales
     window.cargarDatosDinamicos = {
         init: init,
         cargarOfertas: cargarOfertas,
         cargarEspecificaciones: cargarEspecificaciones,
         cargarHistoricos: cargarHistoricos,
-        obtenerToken: obtenerToken
+        obtenerToken: obtenerToken,
+        mostrarModalTokenExpirado: mostrarModalTokenExpirado
     };
     
     // Auto-inicializar cuando el DOM esté listo

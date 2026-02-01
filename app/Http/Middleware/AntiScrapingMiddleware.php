@@ -29,9 +29,9 @@ class AntiScrapingMiddleware
      *
      * ORDEN OPTIMIZADO:
      * 0. Usuarios autenticados (bypass completo, más rápido)
-     * 1. Token válido (rápido, rechazo inmediato)
-     * 2. TTL correcto (rápido)
-     * 3. Bots legítimos (bypass antes de rate limits)
+     * 1. Bots legítimos (bypass antes de validar token - importante para SEO)
+     * 2. Token válido (rápido, rechazo inmediato)
+     * 3. TTL correcto (rápido)
      * 4. Rate limit (rápido, cache)
      * 5. Heurísticas (solo si pasa todo lo anterior)
      */
@@ -80,7 +80,15 @@ class AntiScrapingMiddleware
             return $next($request);
         }
 
-        // ✅ ORDEN 1: Validación rápida de token (rechazo inmediato)
+        // ✅ ORDEN 1: Bypass para bots legítimos (ANTES de validar token)
+        // Los bots legítimos (Googlebot, Bingbot, etc.) no pueden obtener tokens dinámicos
+        // como los usuarios reales, así que los permitimos antes de validar el token
+        // Esto es importante para SEO ya que Googlebot ejecuta JavaScript y necesita acceder a la API
+        if ($this->esBotLegitimo($request)) {
+            return $next($request);
+        }
+
+        // ✅ ORDEN 2: Validación rápida de token (rechazo inmediato)
         // Solo validar token si NO hay usuario autenticado (doble verificación)
         $token = $request->header('X-Auth-Token');
         if (!$token || !$this->validarToken($token)) {
@@ -101,7 +109,7 @@ class AntiScrapingMiddleware
             // Si el usuario está autenticado pero no hay token, continuar (bypass)
         }
 
-        // ✅ ORDEN 2: Validar TTL del token (rápido)
+        // ✅ ORDEN 3: Validar TTL del token (rápido)
         // Solo validar expiración si hay token y el usuario NO está autenticado
         if ($token && !$isAuthenticated && $this->tokenExpirado($token)) {
             $this->avisoService->crearAvisoBloqueo(
@@ -117,13 +125,8 @@ class AntiScrapingMiddleware
             ], 401);
         }
 
-        // ✅ ORDEN 3: Bypass para bots legítimos (antes de rate limits)
-        if ($this->esBotLegitimo($request)) {
-            // Los bots legítimos también deben usar token, pero sin restricciones
-            return $next($request);
-        }
-
         // ✅ ORDEN 4: Rate limiting (cache, rápido)
+        // Solo se aplica si no es usuario autenticado ni bot legítimo
         $limits = config("anti-scraping.limits.{$type}");
         if (!$this->pasaRateLimit($request, $limits, $type)) {
             $retryAfter = $this->getRetryAfter($request, $type);

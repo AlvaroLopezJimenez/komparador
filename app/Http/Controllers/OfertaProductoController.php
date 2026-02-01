@@ -17,6 +17,8 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
 use App\Services\CalcularPrecioUnidad;
+use App\Services\SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos;
+use App\Models\ProductoOfertaMasBarataPorProducto;
 
 class OfertaProductoController extends Controller
 {
@@ -437,6 +439,62 @@ class OfertaProductoController extends Controller
         // Rehabilitar timestamps automáticos
         $oferta->timestamps = true;
 
+        // Recalcular la oferta más barata del producto y actualizar precio del producto
+        try {
+            $producto = Producto::find($oferta->producto_id);
+            
+            if ($producto) {
+                $servicioOfertas = new SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos();
+                $ofertaMasBarata = $servicioOfertas->obtener($producto);
+
+                if ($ofertaMasBarata) {
+                    // Obtener la oferta original de la base de datos para guardar los datos originales
+                    $ofertaOriginal = OfertaProducto::find($ofertaMasBarata->id);
+
+                    if ($ofertaOriginal) {
+                        // Actualizar o crear el registro en la tabla producto_oferta_mas_barata_por_producto
+                        ProductoOfertaMasBarataPorProducto::updateOrCreate(
+                            ['producto_id' => $producto->id],
+                            [
+                                'oferta_id' => $ofertaOriginal->id,
+                                'tienda_id' => $ofertaOriginal->tienda_id,
+                                'precio_total' => $ofertaMasBarata->precio_total, // Precio con descuentos aplicados
+                                'precio_unidad' => $ofertaMasBarata->precio_unidad, // Precio con descuentos aplicados
+                                'unidades' => $ofertaOriginal->unidades,
+                                'url' => $ofertaOriginal->url,
+                            ]
+                        );
+
+                        // Actualizar el precio del producto con el precio_unidad de la oferta más barata
+                        $precioRealMasBajo = $ofertaMasBarata->precio_unidad;
+                        
+                        // Validar que el precio es válido (mayor que 0)
+                        if ($precioRealMasBajo > 0) {
+                            // Si el producto tiene unidadDeMedida = unidadMilesima, redondear a 3 decimales
+                            if ($producto->unidadDeMedida === 'unidadMilesima') {
+                                $precioNuevo = round($precioRealMasBajo, 3);
+                            } else {
+                                $precioNuevo = $precioRealMasBajo;
+                            }
+                            
+                            // Actualizar el precio del producto solo si es diferente
+                            if ($producto->precio != $precioNuevo) {
+                                $producto->precio = $precioNuevo;
+                                $producto->save();
+                            }
+                        }
+                    }
+                } else {
+                    // Si no hay oferta más barata, eliminar el registro si existe
+                    ProductoOfertaMasBarataPorProducto::where('producto_id', $producto->id)->delete();
+                    // No actualizar el precio del producto (mantener el precio actual)
+                }
+            }
+        } catch (\Exception $e) {
+            // Log del error pero no interrumpir el flujo
+            \Log::error('Error al recalcular oferta más barata después de actualizar oferta: ' . $e->getMessage());
+        }
+
         // Registrar actividad de usuario
         if (auth()->check()) {
             \App\Models\UserActivity::create([
@@ -493,6 +551,62 @@ class OfertaProductoController extends Controller
         if ($precioNuevo !== null && abs($precioAnteriorOferta - $precioNuevo) > 0.01 && !$oferta->chollo_id) {
             $serviceTiempos = new \App\Services\TiemposActualizacionOfertasDinamicos();
             $serviceTiempos->registrarOActualizarActualizacion($oferta->id, $precioNuevo, 'manual');
+        }
+
+        // Recalcular la oferta más barata del producto y actualizar precio del producto
+        try {
+            $producto = Producto::find($oferta->producto_id);
+            
+            if ($producto) {
+                $servicioOfertas = new SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos();
+                $ofertaMasBarata = $servicioOfertas->obtener($producto);
+
+                if ($ofertaMasBarata) {
+                    // Obtener la oferta original de la base de datos para guardar los datos originales
+                    $ofertaOriginal = OfertaProducto::find($ofertaMasBarata->id);
+
+                    if ($ofertaOriginal) {
+                        // Actualizar o crear el registro en la tabla producto_oferta_mas_barata_por_producto
+                        ProductoOfertaMasBarataPorProducto::updateOrCreate(
+                            ['producto_id' => $producto->id],
+                            [
+                                'oferta_id' => $ofertaOriginal->id,
+                                'tienda_id' => $ofertaOriginal->tienda_id,
+                                'precio_total' => $ofertaMasBarata->precio_total, // Precio con descuentos aplicados
+                                'precio_unidad' => $ofertaMasBarata->precio_unidad, // Precio con descuentos aplicados
+                                'unidades' => $ofertaOriginal->unidades,
+                                'url' => $ofertaOriginal->url,
+                            ]
+                        );
+
+                        // Actualizar el precio del producto con el precio_unidad de la oferta más barata
+                        $precioRealMasBajo = $ofertaMasBarata->precio_unidad;
+                        
+                        // Validar que el precio es válido (mayor que 0)
+                        if ($precioRealMasBajo > 0) {
+                            // Si el producto tiene unidadDeMedida = unidadMilesima, redondear a 3 decimales
+                            if ($producto->unidadDeMedida === 'unidadMilesima') {
+                                $precioNuevo = round($precioRealMasBajo, 3);
+                            } else {
+                                $precioNuevo = $precioRealMasBajo;
+                            }
+                            
+                            // Actualizar el precio del producto solo si es diferente
+                            if ($producto->precio != $precioNuevo) {
+                                $producto->precio = $precioNuevo;
+                                $producto->save();
+                            }
+                        }
+                    }
+                } else {
+                    // Si no hay oferta más barata, eliminar el registro si existe
+                    ProductoOfertaMasBarataPorProducto::where('producto_id', $producto->id)->delete();
+                    // No actualizar el precio del producto (mantener el precio actual)
+                }
+            }
+        } catch (\Exception $e) {
+            // Log del error pero no interrumpir el flujo
+            \Log::error('Error al recalcular oferta más barata después de actualizar mostrar: ' . $e->getMessage());
         }
 
         return response()->json([
@@ -746,6 +860,62 @@ class OfertaProductoController extends Controller
         // Si el precio final es 0, crear aviso de "Sin stock - 1a vez" a 4 días
         if ($precioCero) {
             $this->crearAvisoSinStockSiNoExiste($oferta);
+        }
+
+        // Recalcular la oferta más barata del producto y actualizar precio del producto
+        try {
+            $producto = Producto::find($oferta->producto_id);
+            
+            if ($producto) {
+                $servicioOfertas = new SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos();
+                $ofertaMasBarata = $servicioOfertas->obtener($producto);
+
+                if ($ofertaMasBarata) {
+                    // Obtener la oferta original de la base de datos para guardar los datos originales
+                    $ofertaOriginal = OfertaProducto::find($ofertaMasBarata->id);
+
+                    if ($ofertaOriginal) {
+                        // Actualizar o crear el registro en la tabla producto_oferta_mas_barata_por_producto
+                        ProductoOfertaMasBarataPorProducto::updateOrCreate(
+                            ['producto_id' => $producto->id],
+                            [
+                                'oferta_id' => $ofertaOriginal->id,
+                                'tienda_id' => $ofertaOriginal->tienda_id,
+                                'precio_total' => $ofertaMasBarata->precio_total, // Precio con descuentos aplicados
+                                'precio_unidad' => $ofertaMasBarata->precio_unidad, // Precio con descuentos aplicados
+                                'unidades' => $ofertaOriginal->unidades,
+                                'url' => $ofertaOriginal->url,
+                            ]
+                        );
+
+                        // Actualizar el precio del producto con el precio_unidad de la oferta más barata
+                        $precioRealMasBajo = $ofertaMasBarata->precio_unidad;
+                        
+                        // Validar que el precio es válido (mayor que 0)
+                        if ($precioRealMasBajo > 0) {
+                            // Si el producto tiene unidadDeMedida = unidadMilesima, redondear a 3 decimales
+                            if ($producto->unidadDeMedida === 'unidadMilesima') {
+                                $precioNuevo = round($precioRealMasBajo, 3);
+                            } else {
+                                $precioNuevo = $precioRealMasBajo;
+                            }
+                            
+                            // Actualizar el precio del producto solo si es diferente
+                            if ($producto->precio != $precioNuevo) {
+                                $producto->precio = $precioNuevo;
+                                $producto->save();
+                            }
+                        }
+                    }
+                } else {
+                    // Si no hay oferta más barata, eliminar el registro si existe
+                    ProductoOfertaMasBarataPorProducto::where('producto_id', $producto->id)->delete();
+                    // No actualizar el precio del producto (mantener el precio actual)
+                }
+            }
+        } catch (\Exception $e) {
+            // Log del error pero no interrumpir el flujo
+            \Log::error('Error al recalcular oferta más barata después de crear oferta: ' . $e->getMessage());
         }
 
         // Registrar actividad de usuario

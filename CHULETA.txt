@@ -5,6 +5,10 @@ php artisan db:seed
 
 docker-compose exec app php artisan migrate:fresh --seed
 
+//Levantar docker
+
+docker compose up -d --build
+
 ////////Ver variable que entra
 
 @dd($ofertas)

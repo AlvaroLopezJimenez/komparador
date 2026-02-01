@@ -263,24 +263,38 @@ public function todasCategorias()
         }
 
         // Aplicar ordenación
-        if ($o1 === 'precio') {
+        // Si ordenamos por precio y hay filtros, NO ordenar por precio aquí (se ordenará después de recalcular precios)
+        if ($o1 === 'precio' && empty($fa1)) {
+            // Si no hay filtros, ordenar por precio en la query (precio base)
             $query->orderBy('precio', 'asc');
+            $query->orderBy('nombre', 'asc');
         } elseif ($o1 === 'rebajado') {
             // Ordenar por rebajado de mayor a menor, considerando NULL como 0
             $query->orderByRaw('COALESCE(rebajado, 0) DESC');
+            // Aplicar orden natural por nombre como secundario
+            $query->orderByRaw("
+                CASE
+                    WHEN SUBSTRING_INDEX(nombre, ' ', -1) REGEXP '^[0-9]+' 
+                        THEN CAST(SUBSTRING_INDEX(nombre, ' ', -1) AS UNSIGNED)
+                    ELSE 999999
+                END ASC
+            ")
+            ->orderBy('nombre', 'asc');
         } else {
-            $query->orderBy('clicks', 'desc');
+            // Ordenar por relevancia (clicks) o por nombre si hay filtros y orden es precio
+            if ($o1 !== 'precio') {
+                $query->orderBy('clicks', 'desc');
+            }
+            // Aplicar orden natural por nombre como secundario
+            $query->orderByRaw("
+                CASE
+                    WHEN SUBSTRING_INDEX(nombre, ' ', -1) REGEXP '^[0-9]+' 
+                        THEN CAST(SUBSTRING_INDEX(nombre, ' ', -1) AS UNSIGNED)
+                    ELSE 999999
+                END ASC
+            ")
+            ->orderBy('nombre', 'asc');
         }
-
-        // Aplicar orden natural por nombre
-        $query->orderByRaw("
-            CASE
-                WHEN SUBSTRING_INDEX(nombre, ' ', -1) REGEXP '^[0-9]+' 
-                    THEN CAST(SUBSTRING_INDEX(nombre, ' ', -1) AS UNSIGNED)
-                ELSE 999999
-            END ASC
-        ")
-        ->orderBy('nombre', 'asc');
 
         // Paginación (36 productos por página)
         // $productos -> $pr1 (se mantiene localmente pero se pasa como pr1 a la vista)
@@ -289,6 +303,15 @@ public function todasCategorias()
         // Recalcular precios de productos basándose en ofertas que coinciden con los filtros
         if (!empty($fa1)) {
             $pr1 = $this->recalcularPreciosConFiltros($pr1, $fa1);
+            
+            // Si el orden es por precio y hay filtros, ordenar después de recalcular precios
+            if ($o1 === 'precio') {
+                $productosCollection = $pr1->getCollection();
+                $productosOrdenados = $productosCollection->sortBy(function($producto) {
+                    return (float)($producto->precio ?? 999999);
+                })->values();
+                $pr1->setCollection($productosOrdenados);
+            }
         }
 
         // Obtener todos los productos de la categoría (para calcular contadores y rango de precios)

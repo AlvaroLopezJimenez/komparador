@@ -1052,6 +1052,13 @@
         Modificar producto
       </a>
 
+      {{-- Botón Ofertas --}}
+      <a href="{{ route('admin.ofertas.index', $producto) }}" 
+         target="_blank"
+         class="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded transition-colors">
+        Ofertas
+      </a>
+
       {{-- Desplegable de ofertas --}}
       <div class="relative" id="admin-ofertas-dropdown">
         <button id="admin-ofertas-btn" 
@@ -5291,6 +5298,28 @@
     </div>
   </div>
 
+  {{-- Modal para token expirado/inválido --}}
+  <div id="x27" class="cupon-modal-overlay" style="display: none;">
+    <div class="cupon-modal">
+      <div class="cupon-modal-header">
+        <div class="cupon-modal-icon" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+          </svg>
+        </div>
+        <h3 id="x28" class="cupon-modal-title">Sesión expirada</h3>
+        <p id="x29" class="cupon-modal-text">
+          Tu sesión ha expirado. Por favor, actualiza la página para poder ver la lista de ofertas y tiendas disponibles.
+        </p>
+      </div>
+      <div class="cupon-modal-buttons">
+        {{-- x30: Botón actualizar página --}}
+        <button id="x30" class="cupon-btn cupon-btn-primary" onclick="window.location.reload();">
+          Actualizar página
+        </button>
+      </div>
+    </div>
+  </div>
 
   <script>
     {{-- Variables globales para los gráficos --}}

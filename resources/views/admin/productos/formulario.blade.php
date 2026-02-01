@@ -1285,23 +1285,47 @@
                 .trim().replace(/\s+/g, '-').toLowerCase();
         });
 
-        // Copiar nombre al slug después de 1 segundo de inactividad
-        let nombreTimeout = null;
+        // Copiar nombre al slug en tiempo real (solo para productos nuevos)
         const nombreInput = document.querySelector('input[name="nombre"]');
         const slugInput = document.getElementById('slug');
-        
-        if (nombreInput && slugInput) {
-            nombreInput.addEventListener('input', function() {
-                // Limpiar timeout anterior
-                if (nombreTimeout) {
-                    clearTimeout(nombreTimeout);
+        let slugModificadoManualmente = false;
+        let slugValorOriginal = slugInput ? slugInput.value.trim() : '';
+
+        // Verificar si estamos editando (el slug está readonly)
+        const esEdicion = slugInput && slugInput.hasAttribute('readonly');
+
+        if (nombreInput && slugInput && !esEdicion) {
+            // Detectar si el usuario modifica manualmente el slug
+            slugInput.addEventListener('input', function() {
+                const slugActual = slugInput.value.trim();
+                // Si el slug actual es diferente al que se generaría automáticamente del nombre actual
+                const nombreActual = nombreInput.value.trim();
+                if (nombreActual) {
+                    const slugGenerado = nombreActual
+                        .normalize("NFD").replace(/[\u0300-\u036f]/g, '')
+                        .replace(/[^a-zA-Z0-9\s-]/g, '')
+                        .trim().replace(/\s+/g, '-').toLowerCase();
+                    
+                    // Si el slug no coincide con el generado, significa que fue modificado manualmente
+                    if (slugActual !== slugGenerado) {
+                        slugModificadoManualmente = true;
+                    }
                 }
-                
-                // Crear nuevo timeout de 1 segundo
-                nombreTimeout = setTimeout(() => {
+            });
+            
+            // Detectar si el usuario borra texto del slug manualmente
+            slugInput.addEventListener('keydown', function(e) {
+                // Si presiona backspace o delete y hay texto en el slug
+                if ((e.key === 'Backspace' || e.key === 'Delete') && slugInput.value.length > 0) {
+                    slugModificadoManualmente = true;
+                }
+            });
+            
+            // Copiar nombre al slug cada vez que se escribe (solo si no fue modificado manualmente)
+            nombreInput.addEventListener('input', function() {
+                if (!slugModificadoManualmente) {
                     const nombre = nombreInput.value.trim();
                     
-                    // Solo copiar si hay contenido y el slug está vacío o coincide con el nombre anterior
                     if (nombre) {
                         // Normalizar el nombre igual que se hace con el slug
                         const slugNormalizado = nombre
@@ -1309,15 +1333,14 @@
                             .replace(/[^a-zA-Z0-9\s-]/g, '')
                             .trim().replace(/\s+/g, '-').toLowerCase();
                         
-                        // Solo actualizar si el slug está vacío o si el usuario no lo ha modificado manualmente
-                        const slugActual = slugInput.value.trim();
-                        if (!slugActual || slugActual === '') {
-                            slugInput.value = slugNormalizado;
-                            // Disparar evento input para activar la validación del slug
-                            slugInput.dispatchEvent(new Event('input'));
-                        }
+                        slugInput.value = slugNormalizado;
+                        // Disparar evento input para activar la validación del slug
+                        slugInput.dispatchEvent(new Event('input'));
+                    } else {
+                        // Si el nombre está vacío, limpiar el slug también
+                        slugInput.value = '';
                     }
-                }, 1000);
+                }
             });
         }
 

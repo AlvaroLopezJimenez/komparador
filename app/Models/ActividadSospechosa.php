@@ -29,3 +29,7 @@ class ActividadSospechosa extends Model
     ];
 }
 
+
+
+
+

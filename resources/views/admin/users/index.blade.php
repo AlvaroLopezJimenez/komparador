@@ -22,7 +22,7 @@
             </div>
             
             <div id="contenidoFiltros" class="hidden px-6 pb-6">
-                <form method="GET" action="{{ route('admin.users.index') }}" class="space-y-4">
+                <form method="GET" action="{{ route('admin.users.index') }}" id="formFiltros" class="space-y-4">
                     <input type="hidden" name="filtro_rapido" id="filtro_rapido" value="{{ request('filtro_rapido', $filtroRapido ?? '30dias') }}">
                     <input type="hidden" name="periodo" value="{{ request('periodo', $periodo ?? 'dia') }}">
                     
@@ -301,7 +301,7 @@
         
         function aplicarFiltroRapido(filtro) {
             document.getElementById('filtro_rapido').value = filtro;
-            document.querySelector('form').submit();
+            document.getElementById('formFiltros').submit();
         }
         
         document.addEventListener('DOMContentLoaded', function() {

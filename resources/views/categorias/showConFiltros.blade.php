@@ -589,7 +589,7 @@
 
                 {{-- CONTENEDOR DE PRODUCTOS --}}
                 @if($pr1->count() > 0)
-                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-6 mb-6">
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-4 sm:gap-6 mb-6">
                     @foreach($pr1 as $pr2)
                         @php
                             // $unidad -> $u2
@@ -688,7 +688,6 @@
                             </div>
                             <p class="font-semibold text-gray-700 text-center text-sm mb-1 line-clamp-2">{{ $pr2->nombre }}</p>
                             <p class="text-center mb-1">
-                                <span class="text-xs text-gray-500">Desde:</span>
                                 <span class="text-xl font-bold" style="color: #e97b11;">{{ $pf1 }}€
                                     @if($s1)
                                         <span class="text-xs text-gray-500">{{ $s1 }}</span>
