@@ -2485,13 +2485,14 @@ class OfertaProductoController extends Controller
      */
     public function obtenerTiendasDisponibles()
     {
-        $tiendas = \App\Models\Tienda::select('id', 'nombre')
+        $tiendas = \App\Models\Tienda::select('id', 'nombre', 'url')
             ->orderBy('nombre', 'asc')
             ->get()
             ->map(function ($tienda) {
                 return [
                     'id' => $tienda->id,
-                    'nombre' => $tienda->nombre
+                    'nombre' => $tienda->nombre,
+                    'url' => $tienda->url
                 ];
             });
         

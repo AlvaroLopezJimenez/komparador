@@ -2706,6 +2706,7 @@ let urlValidationTimeout = null;
 let urlValidationInProgress = false;
 let urlIsValid = false;
 let urlDuplicateConfirmed = false;
+let urlTiendaDetectionTimeout = null;
 
 // =======================
 // VALIDACIÓN MAX PRECIO
@@ -3131,8 +3132,120 @@ document.addEventListener('DOMContentLoaded', function() {
             return url; // En caso de error, devolver URL original
         }
     }
+
+    // Función para extraer y normalizar el dominio de una URL
+    function extraerDominioNormalizado(url) {
+        try {
+            if (!url || !url.trim()) {
+                return null;
+            }
+
+            // Añadir protocolo si no tiene
+            let urlCompleta = url.trim();
+            if (!/^https?:\/\//i.test(urlCompleta)) {
+                urlCompleta = 'https://' + urlCompleta;
+            }
+
+            // Intentar parsear la URL
+            let hostname;
+            try {
+                const urlObj = new URL(urlCompleta);
+                hostname = urlObj.hostname;
+            } catch (e) {
+                // Si falla el parser, intentar extraer manualmente
+                const match = urlCompleta.match(/^(?:https?:\/\/)?(?:www\.)?([^\/\s]+)/i);
+                if (match && match[1]) {
+                    hostname = match[1];
+                } else {
+                    return null;
+                }
+            }
+
+            if (!hostname) {
+                return null;
+            }
+
+            // Normalizar: quitar www. y convertir a minúsculas
+            hostname = hostname.toLowerCase();
+            hostname = hostname.replace(/^www\./, '');
+
+            return hostname;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    // Función para normalizar la URL de una tienda (igual que extraerDominioNormalizado)
+    function normalizarUrlTienda(urlTienda) {
+        if (!urlTienda || !urlTienda.trim()) {
+            return null;
+        }
+
+        // Normalizar: quitar www., https://, http:// y convertir a minúsculas
+        let normalizada = urlTienda.trim().toLowerCase();
+        normalizada = normalizada.replace(/^https?:\/\//, '');
+        normalizada = normalizada.replace(/^www\./, '');
+        normalizada = normalizada.replace(/\/.*$/, ''); // Quitar cualquier path después del dominio
+        normalizada = normalizada.replace(/\/$/, ''); // Quitar barra final si existe
+
+        return normalizada;
+    }
+
+    // Función para detectar y seleccionar automáticamente la tienda basándose en la URL
+    async function detectarTiendaPorUrl(url) {
+        if (!url || !url.trim()) {
+            return;
+        }
+
+        // Solo intentar detectar si no hay tienda seleccionada
+        const tiendaIdActual = document.getElementById('tienda_id')?.value;
+        if (tiendaIdActual && tiendaIdActual.trim() !== '') {
+            return; // Ya hay una tienda seleccionada, no hacer nada
+        }
+
+        const dominioUrl = extraerDominioNormalizado(url);
+        if (!dominioUrl) {
+            return;
+        }
+
+        try {
+            // Obtener todas las tiendas disponibles
+            const response = await fetch('{{ route("admin.ofertas.tiendas.disponibles") }}');
+            if (!response.ok) {
+                return;
+            }
+            
+            const todasLasTiendas = await response.json();
+
+            if (!Array.isArray(todasLasTiendas) || todasLasTiendas.length === 0) {
+                return;
+            }
+
+            // Buscar tienda que coincida con el dominio
+            const tiendaEncontrada = todasLasTiendas.find(tienda => {
+                if (!tienda || !tienda.url || !tienda.url.trim()) {
+                    return false;
+                }
+
+                const dominioTienda = normalizarUrlTienda(tienda.url);
+                if (!dominioTienda) {
+                    return false;
+                }
+
+                // Comparar dominios normalizados (case-insensitive)
+                return dominioTienda.toLowerCase() === dominioUrl.toLowerCase();
+            });
+
+            // Si encontramos una tienda, seleccionarla automáticamente
+            if (tiendaEncontrada) {
+                seleccionarTienda(tiendaEncontrada);
+            }
+        } catch (error) {
+            // Silenciar errores
+        }
+    }
     
-    // Event listener para pegar URL (limpiar automáticamente URLs de Amazon)
+    // Event listener para pegar URL (limpiar automáticamente URLs de Amazon y detectar tienda)
     urlInput.addEventListener('paste', function(e) {
         // Usar setTimeout para acceder al valor después de que se pegue
         setTimeout(() => {
@@ -3144,8 +3257,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Disparar evento input para que se ejecute la validación
                     urlInput.dispatchEvent(new Event('input', { bubbles: true }));
                 }
+                
+                // Detectar tienda automáticamente después de limpiar la URL
+                // Usar un pequeño delay adicional para asegurar que el valor esté disponible
+                setTimeout(() => {
+                    detectarTiendaPorUrl(urlLimpia || urlPegada);
+                }, 50);
             }
-        }, 10);
+        }, 50);
     });
     
     // Event listener para cambios en el campo URL
@@ -3164,9 +3283,12 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
-        // Limpiar timeout anterior
+        // Limpiar timeouts anteriores
         if (urlValidationTimeout) {
             clearTimeout(urlValidationTimeout);
+        }
+        if (urlTiendaDetectionTimeout) {
+            clearTimeout(urlTiendaDetectionTimeout);
         }
         
         // Si la URL está vacía, ocultar mensaje y habilitar botón
@@ -3186,6 +3308,19 @@ document.addEventListener('DOMContentLoaded', function() {
         urlValidationTimeout = setTimeout(() => {
             validarUrl(url);
         }, 1000);
+        
+        // Detectar tienda automáticamente después de limpiar la URL y un pequeño delay
+        // Solo si no hay tienda seleccionada
+        const tiendaIdActual = document.getElementById('tienda_id')?.value;
+        if (!tiendaIdActual || tiendaIdActual.trim() === '') {
+            // Primero limpiar la URL (por si es Amazon u otra tienda con limpieza especial)
+            const urlLimpia = limpiarUrlAmazon(url);
+            urlTiendaDetectionTimeout = setTimeout(() => {
+                // Asegurarse de usar la URL actual del input por si cambió
+                const urlActual = urlInput.value.trim();
+                detectarTiendaPorUrl(urlLimpia || urlActual);
+            }, 500); // Delay para evitar demasiadas peticiones mientras se escribe
+        }
     });
     
     // Event listener para el checkbox de confirmación
