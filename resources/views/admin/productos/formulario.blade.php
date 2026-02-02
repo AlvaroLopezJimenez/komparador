@@ -66,60 +66,6 @@
                 </div>
             </fieldset>
 
-            {{-- ASOCIAR CATEGORÍA PARA ESPECIFICACIONES INTERNAS --}}
-            <fieldset class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 space-y-6 border border-gray-200 dark:border-gray-700">
-                <legend class="text-lg font-semibold text-gray-700 dark:text-gray-200">CATEGORIA - especificaciones internas</legend>
-
-                {{-- Buscador de categoría para especificaciones internas --}}
-                <div class="mb-6">
-                    <label class="block mb-2 font-medium text-gray-700 dark:text-gray-200">Categoría para especificaciones internas</label>
-                    <div class="relative">
-                        <input type="hidden" name="categoria_id_especificaciones_internas" id="categoria_especificaciones_id" value="{{ old('categoria_id_especificaciones_internas', $producto->categoria_id_especificaciones_internas ?? '') }}">
-                        <input type="text" id="categoria_especificaciones_nombre"
-                            value="{{ old('categoria_especificaciones_nombre', $categoriaEspecificacionesNombre ?? '') }}"
-                            class="w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="Escribe para buscar categorías..."
-                            autocomplete="off">
-                        <div id="categoria_especificaciones_sugerencias" class="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg hidden max-h-60 overflow-y-auto"></div>
-                    </div>
-                    <p class="text-sm text-gray-500 mt-1">Selecciona una categoría para asociar las especificaciones internas. Por defecto se muestra la última categoría de la jerarquía del producto.</p>
-                    @error('categoria_id_especificaciones_internas')
-                        <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
-                    @enderror
-                </div>
-
-                {{-- Checkbox para no añadir especificaciones internas --}}
-                <div class="mb-4">
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" name="no_anadir_especificaciones" id="no_anadir_especificaciones" value="1" class="rounded border-gray-300 text-red-600 focus:ring-red-500">
-                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">No añadir especificaciones internas</span>
-                    </label>
-                </div>
-
-                {{-- Contenedor para mostrar las especificaciones internas de la categoría seleccionada --}}
-                <div id="especificaciones-internas-seleccion" class="mt-4 hidden">
-                    <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600 space-y-4">
-                        <div id="especificaciones-internas-contenido"></div>
-                    </div>
-                </div>
-                
-                <input type="hidden" name="categoria_especificaciones_internas_elegidas" id="categoria_especificaciones_internas_elegidas_input" value="{{ old('categoria_especificaciones_internas_elegidas', $producto && $producto->categoria_especificaciones_internas_elegidas ? json_encode($producto->categoria_especificaciones_internas_elegidas, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : '') }}">
-            </fieldset>
-
-            {{-- ESPECIFICACIONES INTERNAS DEL PRODUCTO --}}
-            <fieldset class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 space-y-6 border border-gray-200 dark:border-gray-700">
-                <legend class="text-lg font-semibold text-gray-700 dark:text-gray-200">ESPECIFICACIONES INTERNAS DEL PRODUCTO</legend>
-                <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Puedes añadir líneas principales y sublíneas específicas de este producto. Estas se guardarán junto con las especificaciones de la categoría.</p>
-                
-                <div id="especificaciones-producto-container" class="space-y-4">
-                    <!-- Las líneas principales específicas del producto se generarán dinámicamente aquí -->
-                </div>
-                
-                <button type="button" id="btn-añadir-linea-producto" class="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded shadow">
-                    + Añadir línea principal
-                </button>
-            </fieldset>
-
             {{-- DATOS PRINCIPALES --}}
             <fieldset class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 space-y-6 border border-gray-200 dark:border-gray-700">
                 <legend class="text-lg font-semibold text-gray-700 dark:text-gray-200">Información general</legend>
@@ -232,6 +178,60 @@
                     </div>
 
                 </div>
+            </fieldset>
+
+            {{-- ASOCIAR CATEGORÍA PARA ESPECIFICACIONES INTERNAS --}}
+            <fieldset class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 space-y-6 border border-gray-200 dark:border-gray-700">
+                <legend class="text-lg font-semibold text-gray-700 dark:text-gray-200">CATEGORIA - especificaciones internas</legend>
+
+                {{-- Buscador de categoría para especificaciones internas --}}
+                <div class="mb-6">
+                    <label class="block mb-2 font-medium text-gray-700 dark:text-gray-200">Categoría para especificaciones internas</label>
+                    <div class="relative">
+                        <input type="hidden" name="categoria_id_especificaciones_internas" id="categoria_especificaciones_id" value="{{ old('categoria_id_especificaciones_internas', $producto->categoria_id_especificaciones_internas ?? '') }}">
+                        <input type="text" id="categoria_especificaciones_nombre"
+                            value="{{ old('categoria_especificaciones_nombre', $categoriaEspecificacionesNombre ?? '') }}"
+                            class="w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="Escribe para buscar categorías..."
+                            autocomplete="off">
+                        <div id="categoria_especificaciones_sugerencias" class="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg hidden max-h-60 overflow-y-auto"></div>
+                    </div>
+                    <p class="text-sm text-gray-500 mt-1">Selecciona una categoría para asociar las especificaciones internas. Por defecto se muestra la última categoría de la jerarquía del producto.</p>
+                    @error('categoria_id_especificaciones_internas')
+                        <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                {{-- Checkbox para no añadir especificaciones internas --}}
+                <div class="mb-4">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" name="no_anadir_especificaciones" id="no_anadir_especificaciones" value="1" class="rounded border-gray-300 text-red-600 focus:ring-red-500">
+                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">No añadir especificaciones internas</span>
+                    </label>
+                </div>
+
+                {{-- Contenedor para mostrar las especificaciones internas de la categoría seleccionada --}}
+                <div id="especificaciones-internas-seleccion" class="mt-4 hidden">
+                    <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600 space-y-4">
+                        <div id="especificaciones-internas-contenido"></div>
+                    </div>
+                </div>
+                
+                <input type="hidden" name="categoria_especificaciones_internas_elegidas" id="categoria_especificaciones_internas_elegidas_input" value="{{ old('categoria_especificaciones_internas_elegidas', $producto && $producto->categoria_especificaciones_internas_elegidas ? json_encode($producto->categoria_especificaciones_internas_elegidas, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : '') }}">
+            </fieldset>
+
+            {{-- ESPECIFICACIONES INTERNAS DEL PRODUCTO --}}
+            <fieldset class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 space-y-6 border border-gray-200 dark:border-gray-700">
+                <legend class="text-lg font-semibold text-gray-700 dark:text-gray-200">ESPECIFICACIONES INTERNAS DEL PRODUCTO</legend>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Puedes añadir líneas principales y sublíneas específicas de este producto. Estas se guardarán junto con las especificaciones de la categoría.</p>
+                
+                <div id="especificaciones-producto-container" class="space-y-4">
+                    <!-- Las líneas principales específicas del producto se generarán dinámicamente aquí -->
+                </div>
+                
+                <button type="button" id="btn-añadir-linea-producto" class="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded shadow">
+                    + Añadir línea principal
+                </button>
             </fieldset>
 
             {{-- IMÁGENES --}}

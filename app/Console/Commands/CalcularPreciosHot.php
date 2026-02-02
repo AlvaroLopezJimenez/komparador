@@ -8,7 +8,7 @@ use App\Models\Categoria;
 use App\Models\Producto;
 use App\Models\OfertaProducto;
 use App\Models\HistoricoPrecioProducto;
-use App\Models\ProductoOfertaMasBarataPorProducto;
+use App\Services\SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos;
 use Illuminate\Console\Command;
 use Carbon\Carbon;
 
@@ -80,8 +80,7 @@ class CalcularPreciosHot extends Command
     }
 
     /**
-     * Actualiza el precio de todos los productos usando la tabla producto_oferta_mas_barata_por_producto
-     * Este método replica la lógica de ejecutarPrecioBajoSegundoPlano
+     * Actualiza el precio de todos los productos usando el servicio para obtener ofertas con descuentos y chollos
      * 
      * @return int Número de precios actualizados
      */
@@ -90,19 +89,20 @@ class CalcularPreciosHot extends Command
         $productos = Producto::all();
         $totalProductos = $productos->count();
         $preciosActualizados = 0;
+        $servicioOfertas = new SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos();
 
         $this->line("📋 Procesando {$totalProductos} productos...");
 
         foreach ($productos as $producto) {
             try {
-                // Consultar la tabla producto_oferta_mas_barata_por_producto para obtener el precio_unidad
-                $ofertaMasBarata = ProductoOfertaMasBarataPorProducto::where('producto_id', $producto->id)->first();
+                // Usar el servicio para obtener la oferta más barata con descuentos y chollos aplicados
+                $mejorOferta = $servicioOfertas->obtener($producto);
 
                 // IMPORTANTE: Solo actualizar el precio si hay una oferta válida
                 // Si no hay oferta, mantener el precio actual (no poner NULL)
-                if ($ofertaMasBarata && $ofertaMasBarata->precio_unidad !== null) {
-                    // El precio_unidad ya está almacenado en la tabla (con descuentos y chollos aplicados)
-                    $precioRealMasBajo = $ofertaMasBarata->precio_unidad;
+                if ($mejorOferta && $mejorOferta->precio_unidad !== null) {
+                    // El precio_unidad ya viene con descuentos y chollos aplicados del servicio
+                    $precioRealMasBajo = $mejorOferta->precio_unidad;
                     
                     // Validar que el precio es válido (mayor que 0)
                     if ($precioRealMasBajo <= 0) {
@@ -242,55 +242,72 @@ class CalcularPreciosHot extends Command
     {
         $productosHot = [];
         $haceUnMes = Carbon::now()->subMonth();
+        $servicioOfertas = new SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos();
 
         foreach ($productos as $producto) {
-            // Calcular precio medio del último mes
+            // Calcular precio medio del último mes, excluyendo valores 0 y NULL
             $precioMedio = HistoricoPrecioProducto::where('producto_id', $producto->id)
                 ->where('fecha', '>=', $haceUnMes)
+                ->where('precio_minimo', '>', 0)
+                ->whereNotNull('precio_minimo')
                 ->avg('precio_minimo');
 
-            if (!$precioMedio) {
-                continue; // Saltar productos sin historial de precios
-            }
-
-            // Buscar la oferta con precio más bajo y cargar la relación con tienda
-            $mejorOferta = OfertaProducto::with('tienda')
-                ->where('producto_id', $producto->id)
-                ->where('mostrar', 'si')
-                ->whereHas('tienda', function($query) {
-                    $query->where('mostrar_tienda', 'si');
-                })
-                ->orderBy('precio_unidad', 'asc')
-                ->first();
-
-            if (!$mejorOferta) {
-                continue; // Saltar productos sin ofertas
-            }
-
-            // Usar el precio del producto en lugar del precio_unidad de la oferta
-            $precioProducto = $producto->precio;
-            
-            // Verificar que el precio del producto sea válido y mayor que 0
-            if (!$precioProducto || $precioProducto <= 0) {
-                continue; // Saltar productos sin precio válido
+            // Validar que el precio medio sea válido (mayor que 0)
+            if (!$precioMedio || $precioMedio <= 0) {
+                // Limpiar rebajado si no hay precio medio válido
+                Producto::where('id', $producto->id)->update(['rebajado' => null]);
+                continue;
             }
             
-            // Calcular porcentaje de diferencia usando el precio del producto
-            $diferencia = (($precioMedio - $precioProducto) / $precioMedio) * 100;
+            // Usar el servicio para obtener la oferta más barata con descuentos y chollos aplicados
+            $mejorOferta = $servicioOfertas->obtener($producto);
+            
+            if (!$mejorOferta || $mejorOferta->precio_unidad <= 0) {
+                // Limpiar rebajado si no hay oferta válida
+                Producto::where('id', $producto->id)->update(['rebajado' => null]);
+                continue;
+            }
 
-            // Solo incluir si el precio del producto es menor que la media
-            if ($diferencia > 0) {
+            // Usar el precio_unidad de la oferta procesada (con descuentos y chollos aplicados)
+            $precioOferta = $mejorOferta->precio_unidad;
+            
+            // Validar que el precio de la oferta no sea mayor que el precio medio (evitar descuentos negativos)
+            if ($precioOferta > $precioMedio) {
+                // Limpiar rebajado si el precio actual es mayor que la media (no es descuento)
+                Producto::where('id', $producto->id)->update(['rebajado' => null]);
+                continue;
+            }
+            
+            // Calcular porcentaje de diferencia usando el precio de la oferta más barata
+            $diferencia = (($precioMedio - $precioOferta) / $precioMedio) * 100;
+
+            // Solo incluir si el precio de la oferta es menor que la media y la diferencia es del 5% o más
+            if ($diferencia >= 5) {
+                // Actualizar campo rebajado del producto SOLO si entra en precios hot
+                // Si la diferencia es >= 5%, guardar el porcentaje redondeado a entero
+                $porcentajeRebajado = (int) round($diferencia);
+                Producto::where('id', $producto->id)->update(['rebajado' => $porcentajeRebajado]);
+                
+                // Verificar que la tienda existe y tiene los datos necesarios
+                $tienda = $mejorOferta->tienda;
+                if (!$tienda) {
+                    continue; // Saltar si no hay tienda
+                }
+                
                 $productosHot[] = [
                     'producto_id' => $producto->id,
                     'oferta_id' => $mejorOferta->id,
                     'tienda_id' => $mejorOferta->tienda_id,
-                    'precio_oferta' => $precioProducto,
+                    'precio_oferta' => $precioOferta,
                     'porcentaje_diferencia' => round($diferencia, 2),
                     'url_oferta' => $mejorOferta->url,
                     'url_producto' => $this->generarUrlProducto($producto),
                     'producto_nombre' => $producto->nombre,
                     'tienda_nombre' => $mejorOferta->tienda ? $mejorOferta->tienda->nombre : 'Tienda desconocida'
                 ];
+            } else {
+                // Si la diferencia es menor al 5%, limpiar rebajado (poner a null)
+                Producto::where('id', $producto->id)->update(['rebajado' => null]);
             }
         }
 

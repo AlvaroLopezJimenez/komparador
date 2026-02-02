@@ -43,12 +43,16 @@ class PrecioHotController extends Controller
                 'fin' => now()
             ]);
 
+            // Recargar la ejecución para obtener los logs actualizados
+            $ejecucion->refresh();
+
             return response()->json([
                 'status' => 'ok',
                 'message' => 'Proceso completado',
                 'total_categorias' => $ejecucion->total,
                 'total_inserciones' => $ejecucion->total_guardado,
-                'total_errores' => $ejecucion->total_errores
+                'total_errores' => $ejecucion->total_errores,
+                'log' => $ejecucion->log // Añadir los logs a la respuesta
             ]);
         } catch (\Exception $e) {
             $ejecucion->update([
@@ -120,7 +124,7 @@ class PrecioHotController extends Controller
             foreach ($categorias as $categoria) {
                 try {
                     $log[] = "🔄 Procesando categoría: {$categoria->nombre}";
-                    $productosHot = $this->obtenerProductosHotPorCategoria($categoria, 20);
+                    $productosHot = $this->obtenerProductosHotPorCategoria($categoria, 20, $log);
                     
                     if (!empty($productosHot)) {
                         // Guardar o actualizar en la tabla precios_hot
@@ -143,7 +147,7 @@ class PrecioHotController extends Controller
             // Procesar categoría global "Precios Hot"
             try {
                 $log[] = "🔄 Procesando categoría global: Precios Hot";
-                $productosHotGlobal = $this->obtenerProductosHotGlobal(60);
+                $productosHotGlobal = $this->obtenerProductosHotGlobal(60, $log);
                 
                 if (!empty($productosHotGlobal)) {
                     PrecioHot::updateOrCreate(
@@ -177,7 +181,7 @@ class PrecioHotController extends Controller
         ]);
     }
 
-    private function obtenerProductosHotPorCategoria($categoria, $limite = 20)
+    private function obtenerProductosHotPorCategoria($categoria, $limite = 20, &$log = [])
     {
         // Obtener todas las categorías hijas (incluyendo la actual)
         $categoriaIds = $this->obtenerCategoriaIdsIncluyendoHijas($categoria->id);
@@ -191,10 +195,10 @@ class PrecioHotController extends Controller
             ->where('precio', '>', 0)
             ->get();
         
-        return $this->calcularProductosHot($productos, $limite);
+        return $this->calcularProductosHot($productos, $limite, $log);
     }
 
-    private function obtenerProductosHotGlobal($limite = 60)
+    private function obtenerProductosHotGlobal($limite = 60, &$log = [])
     {
         // Obtener todos los productos con sus relaciones
         $productos = Producto::with('categoria')
@@ -203,69 +207,55 @@ class PrecioHotController extends Controller
             ->where('precio', '>', 0)
             ->get();
         
-        return $this->calcularProductosHot($productos, $limite);
+        return $this->calcularProductosHot($productos, $limite, $log);
     }
 
-    private function calcularProductosHot($productos, $limite)
+    private function calcularProductosHot($productos, $limite, &$log = [])
     {
         $productosHot = [];
         $haceUnMes = Carbon::now()->subMonth();
-        $descuentosController = new \App\Http\Controllers\DescuentosController();
+        $servicioOfertas = new SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos();
 
         foreach ($productos as $producto) {
-            // Calcular precio medio del último mes
+            // Calcular precio medio del último mes, excluyendo valores 0 y NULL
             $precioMedio = HistoricoPrecioProducto::where('producto_id', $producto->id)
                 ->where('fecha', '>=', $haceUnMes)
+                ->where('precio_minimo', '>', 0)
+                ->whereNotNull('precio_minimo')
                 ->avg('precio_minimo');
 
-            if (!$precioMedio) {
-                continue; // Saltar productos sin historial de precios
+            // Validar que el precio medio sea válido (mayor que 0)
+            if (!$precioMedio || $precioMedio <= 0) {
+                // Limpiar rebajado si no hay precio medio válido
+                Producto::where('id', $producto->id)->update(['rebajado' => null]);
+                continue;
             }
             
-            // Obtener todas las ofertas válidas del producto
-            $ofertasValidas = OfertaProducto::with(['tienda' => function($query) {
-                    $query->select('id', 'nombre', 'url_imagen');
-                }])
-                ->where('producto_id', $producto->id)
-                ->where('mostrar', 'si')
-                ->whereHas('tienda', function($query) {
-                    $query->where('mostrar_tienda', 'si');
-                })
-                ->get();
-
-            if ($ofertasValidas->isEmpty()) {
-                continue; // Saltar productos sin ofertas válidas
-            }
-
-            // Procesar ofertas con descuentos
-            $ofertasProcesadas = collect();
-            foreach ($ofertasValidas as $oferta) {
-                if (!empty($oferta->descuentos)) {
-                    // Si tiene descuentos, procesarla con DescuentosController
-                    $ofertaProcesada = $descuentosController->aplicarDescuento($oferta);
-                    $ofertasProcesadas->push($ofertaProcesada);
-                } else {
-                    // Si no tiene descuentos, usar la oferta tal como está
-                    $ofertasProcesadas->push($oferta);
-                }
-            }
-
-            // Ordenar por precio_unidad (menor a mayor) y tomar la más barata
-            $mejorOferta = $ofertasProcesadas->sortBy('precio_unidad')->first();
+            // Usar el servicio para obtener la oferta más barata con descuentos y chollos aplicados
+            $mejorOferta = $servicioOfertas->obtener($producto);
             
             if (!$mejorOferta || $mejorOferta->precio_unidad <= 0) {
-                continue; // Saltar si no hay precio válido
+                // Limpiar rebajado si no hay oferta válida
+                Producto::where('id', $producto->id)->update(['rebajado' => null]);
+                continue;
             }
 
-            // Usar el precio_unidad más bajo de todas las ofertas procesadas
+            // Usar el precio_unidad de la oferta procesada (con descuentos y chollos aplicados)
             $precioOferta = $mejorOferta->precio_unidad;
+            
+            // Validar que el precio de la oferta no sea mayor que el precio medio (evitar descuentos negativos)
+            if ($precioOferta > $precioMedio) {
+                // Limpiar rebajado si el precio actual es mayor que la media (no es descuento)
+                Producto::where('id', $producto->id)->update(['rebajado' => null]);
+                continue;
+            }
             
             // Calcular porcentaje de diferencia usando el precio de la oferta más barata
             $diferencia = (($precioMedio - $precioOferta) / $precioMedio) * 100;
 
             // Solo incluir si el precio de la oferta es menor que la media y la diferencia es del 5% o más
             if ($diferencia >= 5) {
-                // Actualizar campo rebajado del producto (funcionalidad adicional)
+                // Actualizar campo rebajado del producto SOLO si entra en precios hot
                 // Si la diferencia es >= 5%, guardar el porcentaje redondeado a entero
                 $porcentajeRebajado = (int) round($diferencia);
                 Producto::where('id', $producto->id)->update(['rebajado' => $porcentajeRebajado]);
@@ -322,6 +312,9 @@ class PrecioHotController extends Controller
                 ];
                 
                 $productosHot[] = $productoHotData;
+            } else {
+                // Si la diferencia es menor al 5%, limpiar rebajado (poner a null)
+                Producto::where('id', $producto->id)->update(['rebajado' => null]);
             }
         }
 
