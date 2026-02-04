@@ -23,6 +23,32 @@ class PccomponentesController extends PlantillaTiendaController
 
         $html = $resultado['html'];
 
+        // Verificar si el producto está sin stock (texto "Avísame cuando esté disponible")
+        if (strpos($html, 'Avísame cuando esté disponible') !== false) {
+            // Si tenemos oferta, generar aviso y ocultar
+            if ($oferta && $oferta instanceof OfertaProducto) {
+                // Actualizar oferta para no mostrar
+                $oferta->update(['mostrar' => 'no']);
+                
+                // Crear aviso con fecha a un día vista
+                DB::table('avisos')->insertGetId([
+                    'texto_aviso'     => 'SIN STOCK 1A VEZ - GENERADO AUTOMÁTICAMENTE',
+                    'fecha_aviso'     => now()->addDay(), // Un día vista
+                    'user_id'         => 1,                 // usuario sistema
+                    'avisoable_type'  => \App\Models\OfertaProducto::class,
+                    'avisoable_id'    => $oferta->id,
+                    'oculto'          => 0,                 // visible
+                    'created_at'      => now(),
+                    'updated_at'      => now(),
+                ]);
+            }
+
+            return response()->json([
+                'success' => false,
+                'error'   => 'Producto sin stock'
+            ]);
+        }
+
         // Verificar si es una página 404 (producto no encontrado)
         if ($this->esPagina404($html)) {
             // Si tenemos oferta, generar aviso y ocultar
