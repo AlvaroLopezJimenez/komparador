@@ -5331,8 +5331,8 @@
     let v9 = '3m';
     {{-- v10: productoId - ID del producto actual --}}
     const v10 = {{ $producto->id }};
-    {{-- v11: tokenSeguridad - Token de seguridad para las peticiones API --}}
-    const v11 = '{{ hash('md5', $producto->id . env('APP_KEY', 'default_key')) }}';
+    {{-- v11: tokenSeguridad - Token HMAC seguro generado en el servidor (no expuesto en código fuente) --}}
+    const v11 = @json($tokenPreciosHistoricos ?? null);
     
     {{-- Función para detectar el mejor período inicial --}}
     {{-- _dmp1: detectarMejorPeriodo - Detecta el mejor período inicial para mostrar en el gráfico de precios --}}
@@ -5519,6 +5519,12 @@
       async function _cp1(periodo) {
         if (periodo === v9) return;
         
+        {{-- Validar que el token esté disponible --}}
+        if (!v11) {
+          console.error('Token de seguridad no disponible. Por favor, recarga la página.');
+          return;
+        }
+        
         try {
           {{-- Deshabilitar botones durante la carga --}}
           const botones = document.querySelectorAll('[data-periodo]');
@@ -5528,7 +5534,14 @@
             btn.style.opacity = '0.6';
           });
           
-          const response = await fetch(`/api/precios-historicos/${v10}?periodo=${periodo}&token=${v11}`);
+          const response = await fetch(`/api/precios-historicos/${v10}?periodo=${periodo}`, {
+            method: 'GET',
+            headers: {
+              'X-Auth-Token': v11,
+              'Content-Type': 'application/json',
+              'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+            }
+          });
           
           if (!response.ok) {
             throw new Error('Error al cargar datos');

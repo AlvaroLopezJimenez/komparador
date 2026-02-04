@@ -1922,31 +1922,28 @@ public function generarContenido(Request $request)
             'periodo' => 'required|in:3m,6m,9m,12m,1y',
         ]);
 
-        // Verificar si usa el sistema antiguo (token en query) o nuevo (token en header)
+        // Verificar token en header (sistema nuevo con HMAC)
         $tokenHeader = $request->header('X-Auth-Token');
-        $tokenQuery = $request->query('token');
         
-        if ($tokenQuery) {
-            // Sistema antiguo: validar token MD5
-            $expectedToken = hash('md5', $productoId . env('APP_KEY', 'default_key'));
-            if ($tokenQuery !== $expectedToken) {
-                return response()->json(['error' => 'Token inválido'], 403);
-            }
-            
-            // Rate limiting antiguo (más restrictivo)
-            $key = 'precios_historicos_' . $request->ip();
-            $maxAttempts = 10;
-            $decayMinutes = 1;
-            
-            if (RateLimiter::tooManyAttempts($key, $maxAttempts)) {
-                return response()->json(['error' => 'Demasiadas solicitudes'], 429);
-            }
-            RateLimiter::hit($key, $decayMinutes * 60);
-        } else if (!$tokenHeader) {
-            // Si no tiene ningún token, rechazar
+        if (!$tokenHeader) {
             return response()->json(['error' => 'Token requerido'], 401);
         }
-        // Si tiene token en header, el middleware anti-scraping ya lo validó
+        
+        // Validar token usando el servicio
+        $tokenService = app(\App\Services\PreciosHistoricosTokenService::class);
+        if (!$tokenService->validarToken($tokenHeader, $productoId)) {
+            return response()->json(['error' => 'Token inválido o expirado'], 403);
+        }
+        
+        // Rate limiting por IP (el middleware anti-scraping también aplica rate limiting)
+        $key = 'precios_historicos_' . $request->ip();
+        $maxAttempts = 30; // Aumentado porque ahora es más seguro
+        $decayMinutes = 1;
+        
+        if (RateLimiter::tooManyAttempts($key, $maxAttempts)) {
+            return response()->json(['error' => 'Demasiadas solicitudes'], 429);
+        }
+        RateLimiter::hit($key, $decayMinutes * 60);
 
         // Verificar que el producto existe
         $producto = Producto::find($productoId);

@@ -1313,7 +1313,11 @@ for ($i = 0; $i < 90; $i++) {
         
     }
 
-    return view('comparador.unidades', compact('producto', 'ofertas', 'breadcrumb', 'relacionados', 'productosPrecioMedio', 'productosPreciosHot', 'precios', 'filtrosAplicadosDesdeUrl'));
+    // Generar token seguro para precios históricos
+    $tokenService = app(\App\Services\PreciosHistoricosTokenService::class);
+    $tokenPreciosHistoricos = $tokenService->generarToken($producto->id, 3600); // 1 hora de expiración
+
+    return view('comparador.unidades', compact('producto', 'ofertas', 'breadcrumb', 'relacionados', 'productosPrecioMedio', 'productosPreciosHot', 'precios', 'filtrosAplicadosDesdeUrl', 'tokenPreciosHistoricos'));
 })->where('path', '.*');
 
 // Cierre del grupo de rutas públicas con security.headers (iniciado en línea 44)

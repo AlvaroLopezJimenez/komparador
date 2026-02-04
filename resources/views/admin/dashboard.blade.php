@@ -26,8 +26,20 @@
                             </a>
                             <h1 class="text-2xl font-light text-gray-800 dark:text-gray-200">Panel Privado</h1>
                         </div>
-                        <div class="text-sm text-gray-500 dark:text-gray-400">
-                            {{ now()->format('d/m/Y H:i') }}
+                        <div class="flex items-center space-x-4">
+                            <div class="text-sm text-gray-500 dark:text-gray-400">
+                                {{ now()->format('d/m/Y H:i') }}
+                            </div>
+                            <form method="POST" action="{{ route('logout') }}" class="inline">
+                                @csrf
+                                <button type="submit" 
+                                    class="inline-flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2">
+                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                                    </svg>
+                                    Cerrar Sesión
+                                </button>
+                            </form>
                         </div>
                     </div>
                 </div>
