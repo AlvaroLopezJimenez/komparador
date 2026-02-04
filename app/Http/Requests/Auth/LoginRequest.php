@@ -27,8 +27,33 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'email' => ['required', 'string', 'email'],
-            'password' => ['required', 'string'],
+            'usuario' => ['required', 'string', 'email'],
+            'comentario' => ['required', 'string', 'min:6'],
+        ];
+    }
+
+    /**
+     * Prepare the data for validation.
+     */
+    protected function prepareForValidation(): void
+    {
+        // Mapear 'usuario' a 'email' y 'comentario' a 'password' internamente
+        $this->merge([
+            'email' => $this->input('usuario'),
+            'password' => $this->input('comentario'),
+        ]);
+    }
+
+    /**
+     * Get custom messages for validator errors.
+     */
+    public function messages(): array
+    {
+        return [
+            'usuario.required' => 'El campo nombre o correo es obligatorio.',
+            'usuario.email' => 'Por favor, introduce un correo electrónico válido.',
+            'comentario.required' => 'El campo comentario es obligatorio.',
+            'comentario.min' => 'El comentario debe tener al menos 6 caracteres.',
         ];
     }
 
@@ -41,16 +66,16 @@ class LoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
-        if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
+        if (! Auth::attempt($this->only('email', 'password'), $this->boolean('recordar'))) {
             RateLimiter::hit($this->throttleKey());
 
-            // Generar aviso interno cuando hay un intento de login erróneo
+            // Generar aviso interno cuando hay un intento erróneo
             try {
-                $email = $this->input('email');
+                $usuario = $this->input('usuario');
                 $url = $this->fullUrl();
                 $hora = now();
                 $ip = $this->ip();
-                $textoAviso = "Intento de inicio de sesión erróneo. Email: {$email} - URL: {$url} - Hora: {$hora} - IP: {$ip}";
+                $textoAviso = "Intento de acceso erróneo. Usuario: {$usuario} - URL: {$url} - Hora: {$hora} - IP: {$ip}";
                 
                 \DB::table('avisos')->insert([
                     'texto_aviso'     => $textoAviso,
@@ -63,11 +88,11 @@ class LoginRequest extends FormRequest
                     'updated_at'      => $hora,
                 ]);
             } catch (\Exception $e) {
-                \Log::error('Error al generar aviso en intento de login erróneo: ' . $e->getMessage());
+                \Log::error('Error al generar aviso: ' . $e->getMessage());
             }
 
             throw ValidationException::withMessages([
-                'email' => trans('auth.failed'),
+                'usuario' => 'No se pudo procesar tu comentario. Verifica que el correo sea válido.',
             ]);
         }
 
@@ -90,10 +115,7 @@ class LoginRequest extends FormRequest
         $seconds = RateLimiter::availableIn($this->throttleKey());
 
         throw ValidationException::withMessages([
-            'email' => trans('auth.throttle', [
-                'seconds' => $seconds,
-                'minutes' => ceil($seconds / 60),
-            ]),
+            'usuario' => 'Has enviado demasiados comentarios. Por favor, espera ' . ceil($seconds / 60) . ' minutos antes de intentar de nuevo.',
         ]);
     }
 
@@ -102,6 +124,7 @@ class LoginRequest extends FormRequest
      */
     public function throttleKey(): string
     {
-        return Str::transliterate(Str::lower($this->string('email')).'|'.$this->ip());
+        $usuario = $this->input('usuario', '');
+        return Str::transliterate(Str::lower($usuario).'|'.$this->ip());
     }
 }

@@ -13,18 +13,18 @@ use Illuminate\View\View;
 class AuthenticatedSessionController extends Controller
 {
     /**
-     * Display the login view.
+     * Display the article view.
      */
     public function create(Request $request)
     {
         return response()
-            ->view('auth.login') // o la vista correspondiente si usas otra
+            ->view('auth.login')
             ->header('X-Robots-Tag', 'noindex, nofollow');
     }
 
 
     /**
-     * Handle an incoming authentication request.
+     * Handle an incoming form submission.
      */
     public function store(LoginRequest $request): RedirectResponse
     {
@@ -32,7 +32,7 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
-        // Registrar actividad de login
+        // Registrar actividad
         try {
             $user = Auth::user();
             if ($user) {
@@ -42,7 +42,7 @@ class AuthenticatedSessionController extends Controller
                 ]);
             }
         } catch (\Exception $e) {
-            \Log::error('Error al registrar actividad de login: ' . $e->getMessage());
+            \Log::error('Error al registrar actividad: ' . $e->getMessage());
         }
 
         return redirect()->intended(RouteServiceProvider::HOME);
