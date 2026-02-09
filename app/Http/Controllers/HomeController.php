@@ -68,6 +68,7 @@ class HomeController extends Controller
         // Obtener últimos productos añadidos - máximo 10
         $d4 = Producto::with(['categoria.padre.padre'])
             ->where('mostrar', 'si')
+            ->where('precio', '>', 0)  // Filtrar productos con precio > 0
             ->orderBy('created_at', 'desc')
             ->take(10)
             ->get();
@@ -135,10 +136,12 @@ public function todasCategorias()
     // Obtener todos los productos de todas las categorías y subcategorías
     $pr1 = Producto::with(['categoria.padre.padre'])
         ->where('mostrar', 'si')
+        ->where('precio', '>', 0)  // Filtrar productos con precio > 0
         ->orderBy('clicks', 'desc')
         ->paginate(20);
 
     $up1 = Producto::where('mostrar', 'si')
+        ->where('precio', '>', 0)  // Filtrar productos con precio > 0
         ->orderBy('created_at', 'desc')
         ->take(10)
         ->get();
@@ -204,6 +207,7 @@ public function todasCategorias()
     // $ultimosProductos -> $up1
     $up1 = Producto::whereIn('categoria_id', $categoriaIds)
         ->where('mostrar', 'si')
+        ->where('precio', '>', 0)  // Filtrar productos con precio > 0
         ->orderBy('created_at', 'desc')
         ->take(10)
         ->get();
@@ -242,6 +246,7 @@ public function todasCategorias()
         // Construir query base
         $query = Producto::whereIn('categoria_id', $categoriaIds)
             ->where('mostrar', 'si')
+            ->where('precio', '>', 0)  // Filtrar productos con precio > 0
             ->with(['categoria.padre.padre']);
 
         // Aplicar filtros de especificaciones internas
@@ -441,6 +446,7 @@ public function todasCategorias()
     // $productos -> $pr1
     $pr1 = Producto::whereIn('categoria_id', $categoriaIds)
         ->where('mostrar', 'si')
+        ->where('precio', '>', 0)  // Filtrar productos con precio > 0
         ->with(['categoria.padre.padre'])
         ->orderBy('clicks', 'desc')
         ->paginate(20);

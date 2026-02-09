@@ -108,63 +108,6 @@ class BuscadorController extends Controller
             fn($palabra) => strlen($palabra) >= 2
         );
 
-        $queryBuilder = Producto::where('obsoleto', 'no')
-            ->where('mostrar', 'si');
-
-        if (!empty($palabras)) {
-            // Obtener IDs de categorías que coinciden con las palabras
-            $categoriaIds = $this->obtenerCategoriaIdsPorPalabras($palabras, $queryLower);
-
-            $queryBuilder->where(function($q) use ($palabras, $queryLower, $categoriaIds) {
-                // 1. Búsqueda directa: nombre del producto contiene la búsqueda completa
-                $q->whereRaw('LOWER(nombre) LIKE ?', ['%' . $queryLower . '%'])
-                  ->orWhereRaw('LOWER(marca) LIKE ?', ['%' . $queryLower . '%'])
-                  ->orWhereRaw('LOWER(modelo) LIKE ?', ['%' . $queryLower . '%'])
-                  ->orWhereRaw('LOWER(talla) LIKE ?', ['%' . $queryLower . '%']);
-
-                // 2. Búsqueda por palabras individuales (si hay más de una palabra)
-                if (count($palabras) > 1) {
-                    $q->orWhere(function($subQ) use ($palabras) {
-                        // Todas las palabras deben aparecer en algún campo
-                        foreach ($palabras as $palabra) {
-                            $subQ->where(function($palabraQ) use ($palabra) {
-                                $palabraQ->whereRaw('LOWER(nombre) LIKE ?', ['%' . $palabra . '%'])
-                                         ->orWhereRaw('LOWER(marca) LIKE ?', ['%' . $palabra . '%'])
-                                         ->orWhereRaw('LOWER(modelo) LIKE ?', ['%' . $palabra . '%'])
-                                         ->orWhereRaw('LOWER(talla) LIKE ?', ['%' . $palabra . '%']);
-                            });
-                        }
-                    });
-                }
-
-                // 3. Búsqueda por categorías en la jerarquía
-                if (!empty($categoriaIds)) {
-                    $q->orWhereIn('categoria_id', $categoriaIds);
-                }
-
-                // 4. Búsqueda en especificaciones internas (igual que en buscarProductos)
-                $q->orWhere(function($specQ) use ($palabras) {
-                    $specQ->whereNotNull('especificaciones_busqueda_texto');
-                    // Al menos una palabra debe estar en especificaciones_busqueda_texto
-                    foreach ($palabras as $palabra) {
-                        $specQ->orWhereRaw('LOWER(especificaciones_busqueda_texto) LIKE ?', ['%' . $palabra . '%']);
-                    }
-                });
-            });
-        } else {
-            // Fallback a búsqueda original si no hay palabras válidas
-            $queryBuilder->where(function($q) use ($queryLower) {
-                $q->whereRaw('LOWER(nombre) LIKE ?', ['%' . $queryLower . '%'])
-                  ->orWhereRaw('LOWER(marca) LIKE ?', ['%' . $queryLower . '%'])
-                  ->orWhereRaw('LOWER(modelo) LIKE ?', ['%' . $queryLower . '%'])
-                  ->orWhereRaw('LOWER(talla) LIKE ?', ['%' . $queryLower . '%'])
-                  ->orWhere(function($specQ) use ($queryLower) {
-                      $specQ->whereNotNull('especificaciones_busqueda_texto')
-                            ->whereRaw('LOWER(especificaciones_busqueda_texto) LIKE ?', ['%' . $queryLower . '%']);
-                  });
-            });
-        }
-
         // Limitar a máximo 5 páginas (100 productos)
         $maxProductos = 100;
         $perPage = 20;
@@ -178,73 +121,8 @@ class BuscadorController extends Controller
             return redirect()->route('buscar', $queryParams);
         }
         
-        // Obtener productos limitados
-        $productos = $queryBuilder
-            ->orderBy('clicks', 'desc')
-            ->limit($maxProductos * 2) // Obtener más productos para generar variantes
-            ->with('categoria.parent.parent')
-            ->get();
-        
-        // Generar variantes de productos (igual que en buscarProductos)
-        $productosConVariantes = $this->generarVariantesProductosParaBuscar($productos, $palabras, $queryLower);
-        
-        // Ordenar por relevancia (coincidencia con la búsqueda) y luego por clicks
-        $productosConVariantes = $productosConVariantes->sortByDesc(function($item) use ($queryLower, $palabras) {
-            $relevancia = 0;
-            $producto = $item['producto'];
-            $variante = $item['variante'] ?? null;
-            
-            // Construir nombre completo para comparar
-            $nombreCompleto = strtolower($producto->nombre);
-            if ($variante) {
-                $partesNombre = [];
-                if (!empty($producto->marca)) {
-                    $partesNombre[] = strtolower($producto->marca);
-                }
-                if (!empty($producto->modelo)) {
-                    $partesNombre[] = strtolower($producto->modelo);
-                }
-                if (!empty($variante)) {
-                    $partesNombre[] = strtolower($variante);
-                }
-                $nombreCompleto = !empty($partesNombre) ? implode(' ', $partesNombre) : strtolower($producto->nombre);
-            } else {
-                $nombreCompleto = strtolower($producto->nombre . ' ' . $producto->marca . ' ' . $producto->modelo);
-            }
-            
-            // 1. Coincidencia exacta con la búsqueda completa (máxima relevancia)
-            if ($nombreCompleto === $queryLower) {
-                $relevancia += 10000;
-            }
-            // 2. La búsqueda completa está contenida en el nombre
-            elseif (str_contains($nombreCompleto, $queryLower)) {
-                $relevancia += 5000;
-            }
-            // 3. El nombre está contenido en la búsqueda
-            elseif (str_contains($queryLower, $nombreCompleto)) {
-                $relevancia += 4000;
-            }
-            
-            // 4. Contar cuántas palabras de la búsqueda están en el nombre
-            $palabrasCoincidentes = 0;
-            foreach ($palabras as $palabra) {
-                if (str_contains($nombreCompleto, strtolower($palabra))) {
-                    $palabrasCoincidentes++;
-                }
-            }
-            $relevancia += $palabrasCoincidentes * 1000;
-            
-            // 5. Verificar si el nombre del producto (sin variante) coincide
-            $nombreProductoLower = strtolower($producto->nombre . ' ' . $producto->marca . ' ' . $producto->modelo);
-            if (str_contains($nombreProductoLower, $queryLower)) {
-                $relevancia += 500;
-            }
-            
-            // 6. Añadir clicks como factor secundario (dividido por 1000 para que no sobrescriba la relevancia)
-            $relevancia += ($producto->clicks ?? 0) / 1000;
-            
-            return $relevancia;
-        })->values();
+        // Usar el mismo método común que buscarProductos() para garantizar resultados idénticos
+        $productosConVariantes = $this->obtenerProductosOrdenadosPorRelevancia($palabras, $queryLower, $maxProductos * 2);
         
         // Paginación manual
         $items = $productosConVariantes->slice(($currentPage - 1) * $perPage, $perPage)->values();
@@ -497,10 +375,10 @@ class BuscadorController extends Controller
     }
 
     /**
-     * Busca productos considerando nombre, marca, modelo, talla, jerarquía de categorías
-     * y especificaciones internas (usando el índice de búsqueda)
+     * Método común que obtiene productos ordenados por relevancia
+     * Usado tanto por buscar() como por productos() para garantizar resultados idénticos
      */
-    private function buscarProductos(array $palabras, string $queryCompleta, int $limite)
+    private function obtenerProductosOrdenadosPorRelevancia(array $palabras, string $queryCompleta, int $limiteProductos = null)
     {
         // Obtener IDs de categorías que coinciden con las palabras
         $categoriaIds = $this->obtenerCategoriaIdsPorPalabras($palabras, $queryCompleta);
@@ -514,24 +392,41 @@ class BuscadorController extends Controller
                   ->orWhereRaw('LOWER(modelo) LIKE ?', ['%' . $queryCompleta . '%'])
                   ->orWhereRaw('LOWER(talla) LIKE ?', ['%' . $queryCompleta . '%']);
 
-                // 2. Búsqueda por palabras individuales (si hay más de una palabra)
-                if (count($palabras) > 1) {
-                    $q->orWhere(function($subQ) use ($palabras) {
-                        // Todas las palabras deben aparecer en algún campo
-                        foreach ($palabras as $palabra) {
-                            $subQ->where(function($palabraQ) use ($palabra) {
-                                $palabraQ->whereRaw('LOWER(nombre) LIKE ?', ['%' . $palabra . '%'])
-                                         ->orWhereRaw('LOWER(marca) LIKE ?', ['%' . $palabra . '%'])
-                                         ->orWhereRaw('LOWER(modelo) LIKE ?', ['%' . $palabra . '%'])
-                                         ->orWhereRaw('LOWER(talla) LIKE ?', ['%' . $palabra . '%']);
-                            });
-                        }
-                    });
-                }
+                // 2. Búsqueda por palabras individuales (también para una sola palabra)
+                // Esto asegura que si buscas "dodot" y el producto tiene "Dodot" en marca, lo encuentre
+                $q->orWhere(function($subQ) use ($palabras) {
+                    // Al menos una palabra debe aparecer en algún campo
+                    foreach ($palabras as $palabra) {
+                        $subQ->orWhere(function($palabraQ) use ($palabra) {
+                            $palabraQ->whereRaw('LOWER(nombre) LIKE ?', ['%' . $palabra . '%'])
+                                     ->orWhereRaw('LOWER(marca) LIKE ?', ['%' . $palabra . '%'])
+                                     ->orWhereRaw('LOWER(modelo) LIKE ?', ['%' . $palabra . '%'])
+                                     ->orWhereRaw('LOWER(talla) LIKE ?', ['%' . $palabra . '%']);
+                        });
+                    }
+                });
 
-                // 3. Búsqueda por categorías en la jerarquía
+                // 3. Búsqueda por categorías en la jerarquía (solo si también coincide con el texto)
+                // Esto evita que aparezcan productos de categorías que no tienen nada que ver con la búsqueda
                 if (!empty($categoriaIds)) {
-                    $q->orWhereIn('categoria_id', $categoriaIds);
+                    $q->orWhere(function($catQ) use ($categoriaIds, $palabras, $queryCompleta) {
+                        $catQ->whereIn('categoria_id', $categoriaIds)
+                             ->where(function($textQ) use ($palabras, $queryCompleta) {
+                                 // El producto también debe coincidir con el texto de búsqueda
+                                 $textQ->whereRaw('LOWER(nombre) LIKE ?', ['%' . $queryCompleta . '%'])
+                                       ->orWhereRaw('LOWER(marca) LIKE ?', ['%' . $queryCompleta . '%'])
+                                       ->orWhereRaw('LOWER(modelo) LIKE ?', ['%' . $queryCompleta . '%'])
+                                       ->orWhereRaw('LOWER(talla) LIKE ?', ['%' . $queryCompleta . '%']);
+                                 
+                                 // O al menos una palabra debe estar en algún campo
+                                 foreach ($palabras as $palabra) {
+                                     $textQ->orWhereRaw('LOWER(nombre) LIKE ?', ['%' . $palabra . '%'])
+                                           ->orWhereRaw('LOWER(marca) LIKE ?', ['%' . $palabra . '%'])
+                                           ->orWhereRaw('LOWER(modelo) LIKE ?', ['%' . $palabra . '%'])
+                                           ->orWhereRaw('LOWER(talla) LIKE ?', ['%' . $palabra . '%']);
+                                 }
+                             });
+                    });
                 }
 
                 // 4. Búsqueda en especificaciones internas
@@ -546,57 +441,121 @@ class BuscadorController extends Controller
             });
 
         try {
+            $limiteQuery = $limiteProductos ?? 200; // Por defecto 200 para la vista de búsqueda
             $productos = $query
                 ->orderBy('clicks', 'desc')
-                ->limit($limite * 2) // Obtener más productos para generar variantes
+                ->limit($limiteQuery)
                 ->with('categoria.parent.parent')
                 ->get();
 
-            // Generar variantes de productos
-            $resultados = $this->generarVariantesProductos($productos, $palabras, $queryCompleta);
+            // Usar la misma función de generación de variantes que buscar() para garantizar resultados idénticos
+            $productosConVariantes = $this->generarVariantesProductosParaBuscar($productos, $palabras, $queryCompleta);
 
-            // Ordenar por relevancia (coincidencia con la búsqueda) y luego por clicks
-            $resultados = $resultados->sortByDesc(function($item) use ($queryCompleta, $palabras) {
+            // Usar exactamente la misma lógica de ordenamiento que buscar()
+            $productosConVariantes = $productosConVariantes->sortByDesc(function($item) use ($queryCompleta, $palabras) {
                 $relevancia = 0;
                 $queryLower = strtolower($queryCompleta);
+                $producto = $item['producto'];
+                $variante = $item['variante'] ?? null;
                 
-                // Obtener el nombre del producto o variante
-                $nombreBusqueda = strtolower($item['nombre'] ?? '');
+                // Construir nombre completo para comparar (igual que en buscar())
+                $nombreCompleto = strtolower($producto->nombre);
+                $marcaCompleta = strtolower($producto->marca ?? '');
+                if ($variante) {
+                    $partesNombre = [];
+                    if (!empty($producto->marca)) {
+                        $partesNombre[] = strtolower($producto->marca);
+                    }
+                    if (!empty($producto->modelo)) {
+                        $partesNombre[] = strtolower($producto->modelo);
+                    }
+                    if (!empty($variante)) {
+                        $partesNombre[] = strtolower($variante);
+                    }
+                    $nombreCompleto = !empty($partesNombre) ? implode(' ', $partesNombre) : strtolower($producto->nombre);
+                } else {
+                    $nombreCompleto = strtolower($producto->nombre . ' ' . $producto->marca . ' ' . $producto->modelo);
+                }
                 
-                // 1. Coincidencia exacta con la búsqueda completa (máxima relevancia)
-                if ($nombreBusqueda === $queryLower) {
-                    $relevancia += 1000;
+                // 1. Coincidencia exacta con la búsqueda completa en nombre (máxima relevancia)
+                if ($nombreCompleto === $queryLower) {
+                    $relevancia += 10000;
                 }
-                // 2. La búsqueda completa está contenida en el nombre
-                elseif (str_contains($nombreBusqueda, $queryLower)) {
-                    $relevancia += 500;
+                // 2. Coincidencia exacta con la búsqueda completa en marca (alta relevancia)
+                elseif ($marcaCompleta === $queryLower) {
+                    $relevancia += 9000;
                 }
-                // 3. El nombre está contenido en la búsqueda
-                elseif (str_contains($queryLower, $nombreBusqueda)) {
-                    $relevancia += 400;
+                // 3. La búsqueda completa está contenida en el nombre
+                elseif (str_contains($nombreCompleto, $queryLower)) {
+                    $relevancia += 5000;
+                }
+                // 4. La búsqueda completa está contenida en la marca
+                elseif (str_contains($marcaCompleta, $queryLower)) {
+                    $relevancia += 4500;
+                }
+                // 5. El nombre está contenido en la búsqueda
+                elseif (str_contains($queryLower, $nombreCompleto)) {
+                    $relevancia += 4000;
                 }
                 
-                // 4. Contar cuántas palabras de la búsqueda están en el nombre
+                // 6. Contar cuántas palabras de la búsqueda están en el nombre o marca
                 $palabrasCoincidentes = 0;
                 foreach ($palabras as $palabra) {
-                    if (str_contains($nombreBusqueda, strtolower($palabra))) {
+                    if (str_contains($nombreCompleto, strtolower($palabra))) {
                         $palabrasCoincidentes++;
+                    } elseif (str_contains($marcaCompleta, strtolower($palabra))) {
+                        $palabrasCoincidentes += 0.8; // Marca tiene un poco menos de peso que nombre
                     }
                 }
-                $relevancia += $palabrasCoincidentes * 100;
+                $relevancia += $palabrasCoincidentes * 1000;
                 
-                // 5. Añadir clicks como factor secundario (dividido por 1000 para que no sobrescriba la relevancia)
-                $relevancia += ($item['clicks'] ?? 0) / 1000;
+                // 7. Verificar si el nombre del producto (sin variante) coincide
+                $nombreProductoLower = strtolower($producto->nombre . ' ' . $producto->marca . ' ' . $producto->modelo);
+                if (str_contains($nombreProductoLower, $queryLower)) {
+                    $relevancia += 500;
+                }
+                
+                // 8. Añadir clicks como factor secundario (dividido por 1000 para que no sobrescriba la relevancia)
+                $relevancia += ($producto->clicks ?? 0) / 1000;
                 
                 return $relevancia;
             })->values();
 
-            // Limitar resultados finales
-            return $resultados->take($limite);
+            return $productosConVariantes;
         } catch (\Exception $e) {
             // Si hay un error, devolver colección vacía
-            \Log::error('Error en buscarProductos: ' . $e->getMessage());
+            \Log::error('Error en obtenerProductosOrdenadosPorRelevancia: ' . $e->getMessage());
             \Log::error('Stack trace: ' . $e->getTraceAsString());
+            return collect();
+        }
+    }
+
+    /**
+     * Busca productos para las sugerencias del header (API)
+     * Usa el mismo método que buscar() pero convierte el formato
+     */
+    private function buscarProductos(array $palabras, string $queryCompleta, int $limite)
+    {
+        try {
+            // Usar el mismo método que buscar() para obtener productos ordenados por relevancia
+            // IMPORTANTE: Obtener el mismo número de productos que la vista de búsqueda (200) 
+            // para garantizar que el ordenamiento por relevancia sea idéntico
+            $productosConVariantes = $this->obtenerProductosOrdenadosPorRelevancia($palabras, $queryCompleta, 200);
+            
+            // Limitar resultados y convertir al formato de sugerencias
+            $resultados = $productosConVariantes->take($limite)->map(function($item) {
+                $producto = $item['producto'];
+                $variante = $item['variante'] ?? null;
+                $precioVariante = $item['precio_variante'] ?? null;
+                $imagenVariante = $item['imagen_variante'] ?? null;
+                
+                // Usar formatearResultadoProducto para mantener compatibilidad con el formato de sugerencias
+                return $this->formatearResultadoProducto($producto, $variante, $precioVariante, $imagenVariante);
+            });
+
+            return $resultados;
+        } catch (\Exception $e) {
+            \Log::error('Error en buscarProductos: ' . $e->getMessage());
             return collect();
         }
     }

@@ -379,6 +379,12 @@ $ocultarHamburguesa = $esHome || $esComparadorUnidades;
                 } else if (_um === '100ml') {
                     _uh = '<span class="text-xs text-gray-500">/100ml.</span>';
                 }
+                // Convertir el precio de formato europeo (coma) a formato numérico válido
+                // Reemplazar punto (separador de miles) y coma (decimal) por formato estándar
+                const _p1Num = parseFloat(_p1.replace(/\./g, '').replace(',', '.'));
+                const precioHtml = _p1Num > 0 
+                    ? `<p class="text-lg font-bold" style="color: #73b112;">${_p1}€${_uh}</p>`
+                    : `<p class="text-sm font-semibold text-gray-500">Sin Ofertas Disponibles</p>`;
                 return `
                     <a href="${_u2}" 
                        class="block px-4 py-3 hover:bg-gray-100 border-b border-gray-200 last:border-b-0">
@@ -388,9 +394,7 @@ $ocultarHamburguesa = $esHome || $esComparadorUnidades;
                                  class="w-12 h-12 object-cover rounded">
                             <div class="flex-1 min-w-0">
                                 <p class="text-sm font-medium text-gray-900 truncate">${_n2}</p>
-                                <p class="text-lg font-bold" style="color: #73b112;">
-                                    ${_p1}€${_uh}
-                                </p>
+                                ${precioHtml}
                             </div>
                         </div>
                     </a>

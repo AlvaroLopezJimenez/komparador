@@ -363,25 +363,27 @@ if (!function_exists('_f1')) {
                     @endif
                 </div>
                 <p class="font-semibold text-gray-700 text-center text-sm mb-1 line-clamp-2">{{ $pr2->nombre }}</p>
-                <p class="text-center mb-1">
-                    <span class="text-xs text-gray-500">Desde:</span>
-                    <span class="text-xl font-bold" style="color: #e97b11;">{{ $pr2->unidadDeMedida === 'unidadMilesima' ? number_format($pr2->precio, 3) : number_format($pr2->precio, 2) }}€
+                <p class="text-center mb-1 flex items-center justify-center gap-1">
+                    @if($pr2->precio > 0)
+                        <span class="text-xl font-bold" style="color: #e97b11;">{{ $pr2->unidadDeMedida === 'unidadMilesima' ? number_format($pr2->precio, 3) : number_format($pr2->precio, 2) }}€</span>
                         @if($pr2->unidadDeMedida === 'unidad')
-                            <span class="text-xs text-gray-500">/Und.</span>
+                            <span class="text-sm md:text-base text-gray-500">/Und.</span>
                         @elseif($pr2->unidadDeMedida === 'kilos')
-                            <span class="text-xs text-gray-500">/Kg.</span>
+                            <span class="text-sm md:text-base text-gray-500">/Kg.</span>
                         @elseif($pr2->unidadDeMedida === 'litros')
-                            <span class="text-xs text-gray-500">/L.</span>
+                            <span class="text-sm md:text-base text-gray-500">/L.</span>
                         @elseif($pr2->unidadDeMedida === 'unidadMilesima')
-                            <span class="text-xs text-gray-500">/Und.</span>
+                            <span class="text-sm md:text-base text-gray-500">/Und.</span>
                         @elseif($pr2->unidadDeMedida === 'unidadUnica')
                             {{-- No mostrar sufijo para UnidadUnica --}}
                         @elseif($pr2->unidadDeMedida === '800gramos')
-                            <span class="text-xs text-gray-500">/800gr.</span>
+                            <span class="text-sm md:text-base text-gray-500">/800gr.</span>
                         @elseif($pr2->unidadDeMedida === '100ml')
-                            <span class="text-xs text-gray-500">/100ml.</span>
+                            <span class="text-sm md:text-base text-gray-500">/100ml.</span>
                         @endif
-                    </span>
+                    @else
+                        <span class="text-sm font-semibold" style="color: #e97b11;">Sin Ofertas Disponibles</span>
+                    @endif
                 </p>
             </a>
             @endforeach
@@ -405,25 +407,27 @@ if (!function_exists('_f1')) {
                         @endif
                     </div>
                     <p class="font-semibold text-gray-700 text-center text-sm mb-1 line-clamp-2">{{ $pr3->nombre }}</p>
-                    <p class="text-center mb-1">
-                        <span class="text-xs text-gray-500">Desde:</span>
-                        <span class="text-xl font-bold" style="color: #e97b11;">{{ $pr3->unidadDeMedida === 'unidadMilesima' ? number_format($pr3->precio, 3) : number_format($pr3->precio, 2) }}€
+                    <p class="text-center mb-1 flex items-center justify-center gap-1">
+                        @if($pr3->precio > 0)
+                            <span class="text-xl font-bold" style="color: #e97b11;">{{ $pr3->unidadDeMedida === 'unidadMilesima' ? number_format($pr3->precio, 3) : number_format($pr3->precio, 2) }}€</span>
                             @if($pr3->unidadDeMedida === 'unidad')
-                                <span class="text-xs text-gray-500">/Und.</span>
+                                <span class="text-sm md:text-base text-gray-500">/Und.</span>
                             @elseif($pr3->unidadDeMedida === 'kilos')
-                                <span class="text-xs text-gray-500">/Kg.</span>
+                                <span class="text-sm md:text-base text-gray-500">/Kg.</span>
                             @elseif($pr3->unidadDeMedida === 'litros')
-                                <span class="text-xs text-gray-500">/L.</span>
+                                <span class="text-sm md:text-base text-gray-500">/L.</span>
                             @elseif($pr3->unidadDeMedida === 'unidadMilesima')
-                                <span class="text-xs text-gray-500">/Und.</span>
+                                <span class="text-sm md:text-base text-gray-500">/Und.</span>
                             @elseif($pr3->unidadDeMedida === 'unidadUnica')
                                 {{-- No mostrar sufijo para UnidadUnica --}}
                             @elseif($pr3->unidadDeMedida === '800gramos')
-                                <span class="text-xs text-gray-500">/800gr.</span>
+                                <span class="text-sm md:text-base text-gray-500">/800gr.</span>
                             @elseif($pr3->unidadDeMedida === '100ml')
-                                <span class="text-xs text-gray-500">/100ml.</span>
+                                <span class="text-sm md:text-base text-gray-500">/100ml.</span>
                             @endif
-                        </span>
+                        @else
+                            <span class="text-sm font-semibold" style="color: #e97b11;">Sin Ofertas Disponibles</span>
+                        @endif
                     </p>
                 </a>
                 @endforeach
@@ -537,24 +541,27 @@ if (!function_exists('_f1')) {
                         <h3 class="font-semibold text-gray-700 text-center text-sm mb-1 line-clamp-2">
                             {{ $pr4->nombre }}
                         </h3>
-                        <p class="text-center mb-1">
-                            <span class="text-xl font-bold" style="color: #e97b11;">{{ $pr4->unidadDeMedida === 'unidadMilesima' ? number_format($pr4->precio, 3) : number_format($pr4->precio, 2) }}€
+                        <p class="text-center mb-1 flex items-center justify-center gap-1">
+                            @if($pr4->precio > 0)
+                                <span class="text-xl font-bold" style="color: #e97b11;">{{ $pr4->unidadDeMedida === 'unidadMilesima' ? number_format($pr4->precio, 3) : number_format($pr4->precio, 2) }}€</span>
                                 @if($pr4->unidadDeMedida === 'unidad')
-                                    <span class="text-xs text-gray-500">/Und.</span>
+                                    <span class="text-sm md:text-base text-gray-500">/Und.</span>
                                 @elseif($pr4->unidadDeMedida === 'kilos')
-                                    <span class="text-xs text-gray-500">/Kg.</span>
+                                    <span class="text-sm md:text-base text-gray-500">/Kg.</span>
                                 @elseif($pr4->unidadDeMedida === 'litros')
-                                    <span class="text-xs text-gray-500">/L.</span>
+                                    <span class="text-sm md:text-base text-gray-500">/L.</span>
                                 @elseif($pr4->unidadDeMedida === 'unidadMilesima')
-                                    <span class="text-xs text-gray-500">/Und.</span>
+                                    <span class="text-sm md:text-base text-gray-500">/Und.</span>
                                 @elseif($pr4->unidadDeMedida === 'unidadUnica')
                                     {{-- No mostrar sufijo para UnidadUnica --}}
                                 @elseif($pr4->unidadDeMedida === '800gramos')
-                                    <span class="text-xs text-gray-500">/800gr.</span>
+                                    <span class="text-sm md:text-base text-gray-500">/800gr.</span>
                                 @elseif($pr4->unidadDeMedida === '100ml')
-                                    <span class="text-xs text-gray-500">/100ml.</span>
+                                    <span class="text-sm md:text-base text-gray-500">/100ml.</span>
                                 @endif
-                            </span>
+                            @else
+                                <span class="text-sm font-semibold" style="color: #e97b11;">Sin Ofertas Disponibles</span>
+                            @endif
                         </p>
                     </a>
                     @endforeach

@@ -95,19 +95,31 @@ class CalcularPreciosHot extends Command
 
         foreach ($productos as $producto) {
             try {
+                // Verificar primero si hay ofertas disponibles para este producto
+                $tieneOfertas = $producto->ofertas()
+                    ->where('mostrar', 'si')
+                    ->whereHas('tienda', function($query) {
+                        $query->where('mostrar_tienda', 'si');
+                    })
+                    ->exists();
+                
+                // Si no hay ofertas disponibles, poner precio a 0
+                if (!$tieneOfertas) {
+                    if ($producto->precio != 0) {
+                        $producto->precio = 0;
+                        $producto->save();
+                        $preciosActualizados++;
+                    }
+                    continue;
+                }
+                
                 // Usar el servicio para obtener la oferta más barata con descuentos y chollos aplicados
                 $mejorOferta = $servicioOfertas->obtener($producto);
 
-                // IMPORTANTE: Solo actualizar el precio si hay una oferta válida
-                // Si no hay oferta, mantener el precio actual (no poner NULL)
-                if ($mejorOferta && $mejorOferta->precio_unidad !== null) {
+                // Si el servicio devuelve una oferta válida con precio_unidad
+                if ($mejorOferta && $mejorOferta->precio_unidad !== null && $mejorOferta->precio_unidad > 0) {
                     // El precio_unidad ya viene con descuentos y chollos aplicados del servicio
                     $precioRealMasBajo = $mejorOferta->precio_unidad;
-                    
-                    // Validar que el precio es válido (mayor que 0)
-                    if ($precioRealMasBajo <= 0) {
-                        continue; // Saltar este producto, mantener precio actual
-                    }
                     
                     // Si el producto tiene unidadDeMedida = unidadMilesima, redondear a 3 decimales
                     if ($producto->unidadDeMedida === 'unidadMilesima') {
@@ -116,20 +128,23 @@ class CalcularPreciosHot extends Command
                         $precioNuevo = $precioRealMasBajo;
                     }
                     
-                    // Validar que el precio nuevo no es NULL ni negativo
-                    if ($precioNuevo === null || $precioNuevo <= 0) {
-                        continue; // Saltar este producto, mantener precio actual
+                    // Validar que el precio nuevo es válido
+                    if ($precioNuevo !== null && $precioNuevo > 0) {
+                        // Comparar si el precio es diferente
+                        if ($producto->precio != $precioNuevo) {
+                            // Actualizar el precio del producto
+                            $producto->precio = $precioNuevo;
+                            $producto->save();
+                            $preciosActualizados++;
+                        }
+                    } else {
+                        // Si el precio calculado es inválido pero hay ofertas, mantener precio actual
+                        // (no poner a 0 porque sabemos que hay ofertas)
                     }
-                    
-                    // Comparar si el precio es diferente
-                    if ($producto->precio != $precioNuevo) {
-                        // Actualizar el precio del producto
-                        $producto->precio = $precioNuevo;
-                        $producto->save();
-                        $preciosActualizados++;
-                    }
+                } else {
+                    // Si el servicio no devuelve oferta válida pero sabemos que hay ofertas,
+                    // mantener el precio actual (no poner a 0)
                 }
-                // Si no hay oferta, NO actualizar el precio (mantener el precio actual)
             } catch (\Exception $e) {
                 // Continuar con el siguiente producto si hay error
                 \Log::warning("Error al actualizar precio del producto {$producto->id}: " . $e->getMessage());

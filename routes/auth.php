@@ -19,19 +19,19 @@ Route::middleware('guest')->group(function () {
                 ->middleware('throttle:5,1'); // 5 intentos de login por minuto
 
     // Recuperación de contraseña (debe estar en guest para usuarios no autenticados)
-    Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])
-                ->name('password.request');
+    // Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])
+    //             ->name('password.request');
 
-    Route::post('forgot-password', [PasswordResetLinkController::class, 'store'])
-                ->name('password.email')
-                ->middleware('throttle:3,1'); // 3 solicitudes de reset por minuto
+    // Route::post('forgot-password', [PasswordResetLinkController::class, 'store'])
+    //             ->name('password.email')
+    //             ->middleware('throttle:3,1'); // 3 solicitudes de reset por minuto
 
-    Route::get('reset-password/{token}', [NewPasswordController::class, 'create'])
-                ->name('password.reset');
+    // Route::get('reset-password/{token}', [NewPasswordController::class, 'create'])
+    //             ->name('password.reset');
 
-    Route::post('reset-password', [NewPasswordController::class, 'store'])
-                ->name('password.store')
-                ->middleware('throttle:3,1'); // 3 intentos de reset por minuto
+    // Route::post('reset-password', [NewPasswordController::class, 'store'])
+    //             ->name('password.store')
+    //             ->middleware('throttle:3,1'); // 3 intentos de reset por minuto
 });
 
 Route::middleware('auth')->group(function () {

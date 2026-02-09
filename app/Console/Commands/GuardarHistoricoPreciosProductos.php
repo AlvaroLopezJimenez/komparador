@@ -85,9 +85,43 @@ class GuardarHistoricoPreciosProductos extends Command
             try {
                 $this->line("🔄 Procesando producto: {$producto->nombre}");
                 
-                // Obtener el precio mínimo actual del producto
-                $precioMinimo = $producto->precio_minimo ?? 0;
-                $precioMaximo = $producto->precio_maximo ?? 0;
+                // Obtener el precio actual del producto
+                $precioActual = $producto->precio ?? 0;
+                
+                // Si el precio es 0, buscar el precio del día anterior en el historial
+                if ($precioActual == 0) {
+                    $historicoAnterior = HistoricoPrecioProducto::where('producto_id', $producto->id)
+                        ->where('fecha', '<', now()->toDateString())
+                        ->orderBy('fecha', 'desc')
+                        ->first();
+                    
+                    if ($historicoAnterior) {
+                        $precioActual = $historicoAnterior->precio_minimo ?? $historicoAnterior->precio_maximo ?? 0;
+                    }
+                }
+                
+                // Buscar la oferta con precio más bajo para este producto considerando descuentos
+                $ofertas = \App\Models\OfertaProducto::where('producto_id', $producto->id)
+                    ->where('mostrar', 'si')
+                    ->get(['id', 'precio_unidad', 'precio_total', 'unidades', 'descuentos']);
+
+                $ofertaMasBarata = null;
+                $precioRealMasBajo = null;
+
+                // Usar el servicio de descuentos para calcular el precio real
+                $descuentosController = new \App\Http\Controllers\DescuentosController();
+                
+                foreach ($ofertas as $oferta) {
+                    $ofertaConDescuento = $descuentosController->aplicarDescuento($oferta);
+                    $precioReal = $ofertaConDescuento->precio_unidad;
+                    if ($precioRealMasBajo === null || $precioReal < $precioRealMasBajo) {
+                        $precioRealMasBajo = $precioReal;
+                        $ofertaMasBarata = $oferta;
+                    }
+                }
+                
+                // Si hay oferta, usar el precio de la oferta, si no, usar el precio actual (que puede ser del historial)
+                $precioMinimo = $ofertaMasBarata ? $precioRealMasBajo : $precioActual;
                 
                 // Guardar en el histórico
                 HistoricoPrecioProducto::updateOrCreate(
@@ -97,13 +131,13 @@ class GuardarHistoricoPreciosProductos extends Command
                     ],
                     [
                         'precio_minimo' => $precioMinimo,
-                        'precio_maximo' => $precioMaximo
+                        'precio_maximo' => $precioActual
                     ]
                 );
                 
                 $guardados++;
-                $log[] = "✅ Producto '{$producto->nombre}': histórico guardado (min: {$precioMinimo}, max: {$precioMaximo})";
-                $this->info("✅ Producto '{$producto->nombre}': histórico guardado (min: {$precioMinimo}, max: {$precioMaximo})");
+                $log[] = "✅ Producto '{$producto->nombre}': histórico guardado (min: {$precioMinimo}, max: {$precioActual})";
+                $this->info("✅ Producto '{$producto->nombre}': histórico guardado (min: {$precioMinimo}, max: {$precioActual})");
                 
             } catch (\Exception $e) {
                 $errores++;

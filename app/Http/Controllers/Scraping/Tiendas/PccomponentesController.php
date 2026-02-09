@@ -75,6 +75,32 @@ class PccomponentesController extends PlantillaTiendaController
             ]);
         }
 
+        // Verificar si el producto es reacondicionado (en el título)
+        if ($this->esReacondicionado($html)) {
+            // Si tenemos oferta, generar aviso y ocultar
+            if ($oferta && $oferta instanceof OfertaProducto) {
+                // Actualizar oferta para no mostrar
+                $oferta->update(['mostrar' => 'no']);
+                
+                // Crear aviso con fecha a 4 días vista
+                DB::table('avisos')->insertGetId([
+                    'texto_aviso'     => 'Reacondicionado 1a vez',
+                    'fecha_aviso'     => now()->addDays(4), // 4 días vista
+                    'user_id'         => 1,                 // usuario sistema
+                    'avisoable_type'  => \App\Models\OfertaProducto::class,
+                    'avisoable_id'    => $oferta->id,
+                    'oculto'          => 0,                 // visible
+                    'created_at'      => now(),
+                    'updated_at'      => now(),
+                ]);
+            }
+
+            return response()->json([
+                'success' => false,
+                'error'   => 'Producto reacondicionado'
+            ]);
+        }
+
         // Extraer precio (varios fallbacks, porque el HTML de PCC puede variar / tener spans anidados)
         $precio = $this->extraerPrecio($html);
         if ($precio !== null) {
@@ -93,6 +119,21 @@ class PccomponentesController extends PlantillaTiendaController
     private function esPagina404(string $html): bool
     {
         return strpos($html, '<div class="content-message">Nuestro equipo de expertos en tecnología no puede encontrar lo que buscas...') !== false;
+    }
+
+    /**
+     * Verifica si el producto es reacondicionado buscando la palabra en la etiqueta <title>
+     */
+    private function esReacondicionado(string $html): bool
+    {
+        // Buscar la etiqueta <title> con cualquier atributo (ej: <title data-rh="true">...)
+        if (preg_match('/<title[^>]*>(.*?)<\/title>/i', $html, $matches)) {
+            $titulo = $matches[1];
+            // Buscar "reacondicionado" o "Reacondicionado" (case-insensitive)
+            return stripos($titulo, 'reacondicionado') !== false;
+        }
+        
+        return false;
     }
 
     /**

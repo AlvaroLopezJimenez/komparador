@@ -17,7 +17,7 @@ class AdminOnly
     {
         // Solo permitir al primer usuario (ID = 1) crear nuevos usuarios
         if (auth()->id() !== 1) {
-            abort(403, 'Solo el administrador puede crear nuevos usuarios.');
+            return redirect()->route('home');
         }
 
         return $next($request);

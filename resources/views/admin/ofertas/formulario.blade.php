@@ -3133,6 +3133,44 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // Función para limpiar URL de pccomponentes (quitar # al final y ?refurbished)
+    function limpiarUrlPccomponentes(url) {
+        try {
+            // Verificar si la URL contiene "pccomponentes"
+            if (!url || !url.toLowerCase().includes('pccomponentes')) {
+                return url; // No es pccomponentes, devolver URL original
+            }
+            
+            let urlLimpia = url;
+            
+            // Si la URL termina con #, quitarlo
+            if (urlLimpia.endsWith('#')) {
+                urlLimpia = urlLimpia.slice(0, -1);
+            }
+            
+            // Quitar el parámetro ?refurbished o &refurbished (con o sin valor)
+            // Caso 1: ?refurbished al inicio de la query string
+            urlLimpia = urlLimpia.replace(/\?refurbished(=[^&]*)?(&|$)/gi, function(match, p1, p2) {
+                // Si hay más parámetros después (p2 === '&'), reemplazar con ?
+                return p2 === '&' ? '?' : '';
+            });
+            
+            // Caso 2: &refurbished como parámetro intermedio o final
+            urlLimpia = urlLimpia.replace(/&refurbished(=[^&]*)?(&|$)/gi, function(match, p1, p2) {
+                // Si hay más parámetros después (p2 === '&'), mantener &
+                return p2 === '&' ? '&' : '';
+            });
+            
+            // Limpiar ? o & al final si quedaron solos
+            urlLimpia = urlLimpia.replace(/[?&]$/, '');
+            
+            return urlLimpia;
+        } catch (error) {
+            console.error('Error al limpiar URL de pccomponentes:', error);
+            return url; // En caso de error, devolver URL original
+        }
+    }
+
     // Función para extraer y normalizar el dominio de una URL
     function extraerDominioNormalizado(url) {
         try {
@@ -3245,13 +3283,34 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Event listener para pegar URL (limpiar automáticamente URLs de Amazon y detectar tienda)
+    // Event listener para pegar URL (limpiar automáticamente URLs de Amazon y pccomponentes, y detectar tienda)
     urlInput.addEventListener('paste', function(e) {
         // Usar setTimeout para acceder al valor después de que se pegue
         setTimeout(() => {
             const urlPegada = urlInput.value.trim();
             if (urlPegada) {
-                const urlLimpia = limpiarUrlAmazon(urlPegada);
+                // Verificar si es URL de pccomponentes y si tiene # o ?refurbished
+                const esPccomponentes = urlPegada.toLowerCase().includes('pccomponentes');
+                const tieneHash = urlPegada.includes('#');
+                const tieneRefurbished = /[?&]refurbished/i.test(urlPegada);
+                
+                // Limpiar URL de Amazon primero
+                let urlLimpia = limpiarUrlAmazon(urlPegada);
+                // Luego limpiar URL de pccomponentes (quitar # al final y ?refurbished)
+                urlLimpia = limpiarUrlPccomponentes(urlLimpia);
+                
+                // Si es pccomponentes y tiene # o ?refurbished, establecer precio total a 0
+                if (esPccomponentes && (tieneHash || tieneRefurbished)) {
+                    const precioTotalInput = document.querySelector('[name="precio_total"]');
+                    if (precioTotalInput) {
+                        precioTotalInput.value = '0';
+                        // Disparar evento input para que se recalcule el precio por unidad
+                        precioTotalInput.dispatchEvent(new Event('input', { bubbles: true }));
+                        // Disparar evento change para que se ejecute la lógica de precio 0 (poner "no mostrar" y aviso)
+                        precioTotalInput.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                }
+                
                 if (urlLimpia !== urlPegada) {
                     urlInput.value = urlLimpia;
                     // Disparar evento input para que se ejecute la validación
@@ -3269,7 +3328,31 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Event listener para cambios en el campo URL
     urlInput.addEventListener('input', function(e) {
-        const url = e.target.value.trim();
+        let url = e.target.value.trim();
+        
+        // Verificar si es URL de pccomponentes y si tiene # o ?refurbished antes de limpiar
+        const esPccomponentes = url.toLowerCase().includes('pccomponentes');
+        const tieneHash = url.includes('#');
+        const tieneRefurbished = /[?&]refurbished/i.test(url);
+        
+        // Limpiar URL de pccomponentes (quitar # al final y ?refurbished) si aplica
+        const urlLimpiaPccomponentes = limpiarUrlPccomponentes(url);
+        if (urlLimpiaPccomponentes !== url) {
+            url = urlLimpiaPccomponentes;
+            urlInput.value = url;
+            
+            // Si es pccomponentes y tenía # o ?refurbished, establecer precio total a 0
+            if (esPccomponentes && (tieneHash || tieneRefurbished)) {
+                const precioTotalInput = document.querySelector('[name="precio_total"]');
+                if (precioTotalInput) {
+                    precioTotalInput.value = '0';
+                    // Disparar evento input para que se recalcule el precio por unidad
+                    precioTotalInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    // Disparar evento change para que se ejecute la lógica de precio 0 (poner "no mostrar" y aviso)
+                    precioTotalInput.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            }
+        }
         
         // Actualizar el href del botón "Ir a la URL"
         const btnIrUrl = document.getElementById('btn_ir_url');

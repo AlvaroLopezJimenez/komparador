@@ -898,6 +898,7 @@ for ($i = 0; $i < 90; $i++) {
             
             $relacionados = Producto::where('id', '!=', $producto->id)
                 ->whereIn('categoria_id', $idsCategoriasRelacionadas)
+                ->where('precio', '>', 0)  // Filtrar productos con precio > 0
                 ->get()
                 ->filter(function ($rel) use ($producto) {
                     $coincidencias = 0;
@@ -939,6 +940,7 @@ for ($i = 0; $i < 90; $i++) {
         
         $relacionados = Producto::where('id', '!=', $producto->id)
             ->whereIn('categoria_id', $idsObjetivo) // OR implícito
+            ->where('precio', '>', 0)  // Filtrar productos con precio > 0
             ->get()
             ->filter(function ($rel) use ($producto) {
                 $coincidencias = 0;

@@ -176,22 +176,25 @@ if (!function_exists('_f1')) {
                     </div>
                     <p class="font-semibold text-gray-700 text-center text-sm mb-1 line-clamp-2">{{ $p->nombre }}</p>
 <p class="text-center mb-1 flex items-center justify-center gap-1">
-    <span class="text-[8px] text-gray-500">Desde:</span>
-    <span class="text-xl font-bold" style="color: #e97b11;">{{ $p->unidadDeMedida === 'unidadMilesima' ? number_format($p->precio, 3) : number_format($p->precio, 2) }}€</span>
-    @if($p->unidadDeMedida === 'unidad')
-        <span class="text-[10px] text-gray-500">/Und.</span>
-    @elseif($p->unidadDeMedida === 'kilos')
-        <span class="text-[10px] text-gray-500">/Kg.</span>
-    @elseif($p->unidadDeMedida === 'litros')
-        <span class="text-[10px] text-gray-500">/L.</span>
-    @elseif($p->unidadDeMedida === 'unidadMilesima')
-        <span class="text-[10px] text-gray-500">/Und.</span>
-    @elseif($p->unidadDeMedida === 'unidadUnica')
-        {{-- No mostrar sufijo para UnidadUnica --}}
-    @elseif($p->unidadDeMedida === '800gramos')
-        <span class="text-[10px] text-gray-500">/800gr.</span>
-    @elseif($p->unidadDeMedida === '100ml')
-        <span class="text-[10px] text-gray-500">/100ml.</span>
+    @if($p->precio > 0)
+        <span class="text-xl font-bold" style="color: #e97b11;">{{ $p->unidadDeMedida === 'unidadMilesima' ? number_format($p->precio, 3) : number_format($p->precio, 2) }}€</span>
+        @if($p->unidadDeMedida === 'unidad')
+            <span class="text-sm md:text-base text-gray-500">/Und.</span>
+        @elseif($p->unidadDeMedida === 'kilos')
+            <span class="text-sm md:text-base text-gray-500">/Kg.</span>
+        @elseif($p->unidadDeMedida === 'litros')
+            <span class="text-sm md:text-base text-gray-500">/L.</span>
+        @elseif($p->unidadDeMedida === 'unidadMilesima')
+            <span class="text-sm md:text-base text-gray-500">/Und.</span>
+        @elseif($p->unidadDeMedida === 'unidadUnica')
+            {{-- No mostrar sufijo para UnidadUnica --}}
+        @elseif($p->unidadDeMedida === '800gramos')
+            <span class="text-sm md:text-base text-gray-500">/800gr.</span>
+        @elseif($p->unidadDeMedida === '100ml')
+            <span class="text-sm md:text-base text-gray-500">/100ml.</span>
+        @endif
+    @else
+        <span class="text-sm font-semibold" style="color: #e97b11;">Sin Ofertas Disponibles</span>
     @endif
 </p>
 </a>
@@ -402,22 +405,25 @@ if (!function_exists('_f1')) {
                             {{ $p->nombre }}
                         </h3>
                         <p class="text-center mb-1 flex items-center justify-center gap-1">
-                            <span class="text-[8px] text-gray-500">Desde:</span>
-                            <span class="text-xl font-bold" style="color: #e97b11;">{{ $p->unidadDeMedida === 'unidadMilesima' ? number_format($p->precio, 3) : number_format($p->precio, 2) }}€</span>
-                            @if($p->unidadDeMedida === 'unidad')
-                                <span class="text-[10px] text-gray-500">/Und.</span>
-                            @elseif($p->unidadDeMedida === 'kilos')
-                                <span class="text-[10px] text-gray-500">/Kg.</span>
-                            @elseif($p->unidadDeMedida === 'litros')
-                                <span class="text-[10px] text-gray-500">/L.</span>
-                            @elseif($p->unidadDeMedida === 'unidadMilesima')
-                                <span class="text-[10px] text-gray-500">/Und.</span>
-                            @elseif($p->unidadDeMedida === 'unidadUnica')
-                                {{-- No mostrar sufijo para UnidadUnica --}}
-                            @elseif($p->unidadDeMedida === '800gramos')
-                                <span class="text-[10px] text-gray-500">/800gr.</span>
-                            @elseif($p->unidadDeMedida === '100ml')
-                                <span class="text-[10px] text-gray-500">/100ml.</span>
+                            @if($p->precio > 0)
+                                <span class="text-xl font-bold" style="color: #e97b11;">{{ $p->unidadDeMedida === 'unidadMilesima' ? number_format($p->precio, 3) : number_format($p->precio, 2) }}€</span>
+                                @if($p->unidadDeMedida === 'unidad')
+                                    <span class="text-sm md:text-base text-gray-500">/Und.</span>
+                                @elseif($p->unidadDeMedida === 'kilos')
+                                    <span class="text-sm md:text-base text-gray-500">/Kg.</span>
+                                @elseif($p->unidadDeMedida === 'litros')
+                                    <span class="text-sm md:text-base text-gray-500">/L.</span>
+                                @elseif($p->unidadDeMedida === 'unidadMilesima')
+                                    <span class="text-sm md:text-base text-gray-500">/Und.</span>
+                                @elseif($p->unidadDeMedida === 'unidadUnica')
+                                    {{-- No mostrar sufijo para UnidadUnica --}}
+                                @elseif($p->unidadDeMedida === '800gramos')
+                                    <span class="text-sm md:text-base text-gray-500">/800gr.</span>
+                                @elseif($p->unidadDeMedida === '100ml')
+                                    <span class="text-sm md:text-base text-gray-500">/100ml.</span>
+                                @endif
+                            @else
+                                <span class="text-sm font-semibold" style="color: #e97b11;">Sin Ofertas Disponibles</span>
                             @endif
                         </p>
                     </a>
