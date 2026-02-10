@@ -563,6 +563,7 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
         Route::post('/{aviso}/aplazar', [AvisoController::class, 'aplazar'])->name('aplazar');
         Route::get('/elemento', [AvisoController::class, 'getAvisosElemento'])->name('get.elemento');
         Route::get('/oferta-mas-barata', [AvisoController::class, 'obtenerOfertaMasBarata'])->name('oferta-mas-barata');
+        Route::post('/toggle-mostrar-todos', [AvisoController::class, 'toggleMostrarTodos'])->name('toggle.mostrar.todos');
         
         // Ejecuciones de comprobaciones
         Route::post('/ejecutar/comprobacion/productos-sin-ofertas', [AvisoController::class, 'ejecutarComprobacionProductosSinOfertas'])->name('ejecutar.comprobacion.productos-sin-ofertas');

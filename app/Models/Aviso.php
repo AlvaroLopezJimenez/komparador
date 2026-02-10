@@ -68,9 +68,7 @@ class Aviso extends Model
 
     public function scopeVisiblesPorUsuario($query, $userId)
     {
-        return $query->where(function($q) use ($userId) {
-            $q->where('user_id', $userId)->orWhere('user_id', 1);
-        });
+        return $query->where('user_id', $userId);
     }
 
     // Métodos helper

@@ -11,6 +11,7 @@ use App\Models\Producto;
 use App\Models\Chollo;
 use App\Models\OfertaProducto;
 use App\Models\ProductoOfertaMasBarataPorProducto;
+use App\Models\User;
 use Carbon\Carbon;
 
 class AvisoController extends Controller
@@ -25,12 +26,23 @@ class AvisoController extends Controller
             $perPage = 20;
         }
         
+        // Verificar si el usuario ID 1 quiere ver todos los avisos
+        $mostrarTodos = false;
+        if ($userId === 1 && session('avisos_mostrar_todos', false)) {
+            $mostrarTodos = true;
+        }
+        
         // Obtener avisos vencidos (solo visibles) con paginación
         $avisosVencidosQuery = Aviso::with(['user'])
             ->vencidos()
-            ->visibles()
-            ->visiblesPorUsuario($userId)
-            ->orderBy('fecha_aviso', 'desc');
+            ->visibles();
+        
+        // Aplicar filtro por usuario solo si no se está mostrando todos
+        if (!$mostrarTodos) {
+            $avisosVencidosQuery->visiblesPorUsuario($userId);
+        }
+        
+        $avisosVencidosQuery->orderBy('fecha_aviso', 'desc');
         
         $totalVencidos = $avisosVencidosQuery->count();
         $avisosVencidos = $avisosVencidosQuery->paginate($perPage, ['*'], 'vencidos_page');
@@ -39,9 +51,14 @@ class AvisoController extends Controller
         // Obtener avisos pendientes (solo visibles) con paginación
         $avisosPendientesQuery = Aviso::with(['user'])
             ->pendientes()
-            ->visibles()
-            ->visiblesPorUsuario($userId)
-            ->orderBy('fecha_aviso', 'asc');
+            ->visibles();
+        
+        // Aplicar filtro por usuario solo si no se está mostrando todos
+        if (!$mostrarTodos) {
+            $avisosPendientesQuery->visiblesPorUsuario($userId);
+        }
+        
+        $avisosPendientesQuery->orderBy('fecha_aviso', 'asc');
         
         $totalPendientes = $avisosPendientesQuery->count();
         $avisosPendientes = $avisosPendientesQuery->paginate($perPage, ['*'], 'pendientes_page');
@@ -49,9 +66,14 @@ class AvisoController extends Controller
 
         // Obtener avisos ocultos con paginación
         $avisosOcultosQuery = Aviso::with(['user'])
-            ->ocultos()
-            ->visiblesPorUsuario($userId)
-            ->orderBy('fecha_aviso', 'desc');
+            ->ocultos();
+        
+        // Aplicar filtro por usuario solo si no se está mostrando todos
+        if (!$mostrarTodos) {
+            $avisosOcultosQuery->visiblesPorUsuario($userId);
+        }
+        
+        $avisosOcultosQuery->orderBy('fecha_aviso', 'desc');
         
         $totalOcultos = $avisosOcultosQuery->count();
         $avisosOcultos = $avisosOcultosQuery->paginate($perPage, ['*'], 'ocultos_page');
@@ -87,9 +109,14 @@ class AvisoController extends Controller
             ->leftJoin('productos', 'productos.id', '=', 'avisos.avisoable_id')
             ->where('avisos.avisoable_type', 'App\Models\Producto')
             ->where('avisos.texto_aviso', 'like', '%Precio actualizado producto%')
-            ->whereNull('productos.precio')
-            ->visiblesPorUsuario($userId)
-            ->select([
+            ->whereNull('productos.precio');
+        
+        // Aplicar filtro por usuario solo si no se está mostrando todos
+        if (!$mostrarTodos) {
+            $avisosProductoPrecioNullQuery->visiblesPorUsuario($userId);
+        }
+        
+        $avisosProductoPrecioNullQuery->select([
                 'avisos.id as aviso_id',
                 'avisos.avisoable_id as producto_id',
                 'avisos.fecha_aviso as fecha_aviso',
@@ -101,7 +128,10 @@ class AvisoController extends Controller
         $avisosProductoPrecioNullCount = (clone $avisosProductoPrecioNullQuery)->count('avisos.id');
         $avisosProductoPrecioNull = $avisosProductoPrecioNullQuery->limit(50)->get();
 
-        return view('admin.avisos.index', compact('avisosVencidos', 'avisosPendientes', 'avisosOcultos', 'perPage', 'totalVencidos', 'totalPendientes', 'totalOcultos', 'avisosProductoPrecioNullCount', 'avisosProductoPrecioNull'));
+        // Obtener todos los usuarios para el desplegable de crear aviso interno
+        $usuarios = User::orderBy('name')->get();
+
+        return view('admin.avisos.index', compact('avisosVencidos', 'avisosPendientes', 'avisosOcultos', 'perPage', 'totalVencidos', 'totalPendientes', 'totalOcultos', 'avisosProductoPrecioNullCount', 'avisosProductoPrecioNull', 'mostrarTodos', 'usuarios'));
     }
 
     public function store(Request $request)
@@ -137,7 +167,11 @@ class AvisoController extends Controller
             $request->validate([
                 'texto_aviso' => 'required|string|max:1000',
                 'fecha_aviso' => 'required|date',
-                'oculto' => 'boolean'
+                'oculto' => 'boolean',
+                'user_ids' => 'nullable|array',
+                'user_ids.*' => 'integer|exists:users,id',
+                // Mantener compatibilidad con el formato anterior
+                'user_id' => 'nullable|integer|exists:users,id'
             ]);
 
             // Verificar que el usuario está autenticado
@@ -148,24 +182,68 @@ class AvisoController extends Controller
                 ], 401);
             }
 
-                        // Crear el aviso interno con 0
-            $aviso = Aviso::create([
-                'texto_aviso' => $request->texto_aviso,
-                'fecha_aviso' => $request->fecha_aviso,
-                'user_id' => auth()->id(),
-                'avisoable_type' => 'Interno',
-                'avisoable_id' => 0,
-                'oculto' => $request->oculto ?? false
-            ]);
+            $textoAviso = $request->texto_aviso;
+            $fechaAviso = $request->fecha_aviso;
+            $oculto = $request->oculto ?? false;
+            
+            // Obtener los IDs de usuarios seleccionados
+            $userIds = $request->user_ids;
+            
+            // Compatibilidad con el formato anterior (user_id único)
+            if ($userIds === null && $request->has('user_id')) {
+                $userIdSeleccionado = $request->user_id;
+                if ($userIdSeleccionado === null || $userIdSeleccionado === 'todos' || $userIdSeleccionado === '') {
+                    $userIds = null; // null significa "todos"
+                } else {
+                    $userIds = [$userIdSeleccionado];
+                }
+            }
 
-            // Cargar solo la relación user para evitar problemas
-            $aviso->load('user');
+            // Si user_ids es null, crear aviso para todos los usuarios
+            if ($userIds === null) {
+                // Obtener todos los usuarios
+                $usuarios = User::all();
+                $avisosCreados = [];
 
-            return response()->json([
-                'success' => true,
-                'aviso' => $aviso,
-                'message' => 'Aviso interno creado correctamente'
-            ]);
+                foreach ($usuarios as $usuario) {
+                    $aviso = Aviso::create([
+                        'texto_aviso' => $textoAviso,
+                        'fecha_aviso' => $fechaAviso,
+                        'user_id' => $usuario->id,
+                        'avisoable_type' => 'Interno',
+                        'avisoable_id' => 0,
+                        'oculto' => $oculto
+                    ]);
+                    $avisosCreados[] = $aviso;
+                }
+
+                return response()->json([
+                    'success' => true,
+                    'avisos' => $avisosCreados,
+                    'message' => 'Aviso interno creado correctamente para ' . count($avisosCreados) . ' usuario(s)'
+                ]);
+            } else {
+                // Crear aviso para cada usuario seleccionado
+                $avisosCreados = [];
+
+                foreach ($userIds as $userId) {
+                    $aviso = Aviso::create([
+                        'texto_aviso' => $textoAviso,
+                        'fecha_aviso' => $fechaAviso,
+                        'user_id' => $userId,
+                        'avisoable_type' => 'Interno',
+                        'avisoable_id' => 0,
+                        'oculto' => $oculto
+                    ]);
+                    $avisosCreados[] = $aviso;
+                }
+
+                return response()->json([
+                    'success' => true,
+                    'avisos' => $avisosCreados,
+                    'message' => 'Aviso interno creado correctamente para ' . count($avisosCreados) . ' usuario(s)'
+                ]);
+            }
 
         } catch (\Illuminate\Validation\ValidationException $e) {
             \Log::warning('Error de validación al crear aviso interno: ' . json_encode($e->errors()));
@@ -310,6 +388,7 @@ class AvisoController extends Controller
                     $avisoExistente = Aviso::where('avisoable_type', 'App\Models\Tienda')
                         ->where('avisoable_id', $tienda->id)
                         ->where('texto_aviso', 'like', '%comisión%' . $categoria->nombre . '%')
+                        ->where('user_id', $userId)
                         ->first();
 
                     if (!$avisoExistente) {
@@ -347,6 +426,7 @@ class AvisoController extends Controller
             $avisoExistente = Aviso::where('avisoable_type', 'App\Models\Producto')
                 ->where('avisoable_id', $producto->id)
                 ->where('texto_aviso', 'like', '%sin ofertas%')
+                ->where('user_id', $userId)
                 ->first();
 
             if (!$avisoExistente) {
@@ -382,6 +462,7 @@ class AvisoController extends Controller
             $avisoExistente = Aviso::where('avisoable_type', 'App\Models\OfertaProducto')
                 ->where('avisoable_id', $oferta->id)
                 ->where('texto_aviso', 'like', '%revisar%')
+                ->where('user_id', $userId)
                 ->first();
 
             if (!$avisoExistente) {
@@ -653,10 +734,12 @@ class AvisoController extends Controller
             // - Mismo avisoable_id
             // - Que empiecen con las mismas 3 palabras
             // - Que estén vencidos
+            // - Mismo usuario (solo eliminar duplicados del mismo usuario)
             // - Excluyendo el aviso gestionado
             $avisosDuplicados = Aviso::where('avisoable_type', $avisoGestionado->avisoable_type)
                 ->where('avisoable_id', $avisoGestionado->avisoable_id)
                 ->where('texto_aviso', 'like', $prefijoEscapado . '%')
+                ->where('user_id', $avisoGestionado->user_id)
                 ->vencidos()
                 ->where('id', '!=', $avisoGestionado->id)
                 ->get();
@@ -671,5 +754,33 @@ class AvisoController extends Controller
             \Log::error('Error al eliminar avisos duplicados vencidos: ' . $e->getMessage());
             // No lanzar excepción para no interrumpir el flujo principal
         }
+    }
+
+    /**
+     * Guardar el estado de "mostrar todos los avisos" en la sesión
+     * Solo disponible para el usuario ID 1
+     */
+    public function toggleMostrarTodos(Request $request)
+    {
+        // Solo permitir al usuario ID 1
+        if (auth()->id() !== 1) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No tienes permisos para realizar esta acción'
+            ], 403);
+        }
+
+        $request->validate([
+            'mostrar_todos' => 'required|boolean'
+        ]);
+
+        // Guardar en la sesión
+        session(['avisos_mostrar_todos' => $request->mostrar_todos]);
+
+        return response()->json([
+            'success' => true,
+            'message' => $request->mostrar_todos ? 'Mostrando avisos de todos los usuarios' : 'Mostrando solo tus avisos',
+            'mostrar_todos' => $request->mostrar_todos
+        ]);
     }
 }

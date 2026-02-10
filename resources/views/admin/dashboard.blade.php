@@ -98,6 +98,23 @@
                 </a>
 
                 <!-- Avisos Pendientes -->
+                @if($totalAvisos > 0)
+                <a href="{{ route('admin.avisos.index') }}" class="avisos-container-animado relative overflow-hidden rounded-lg transition-colors cursor-pointer" style="border: 1px solid transparent; padding: 1px; background: linear-gradient(45deg, #fbbf24, #fcd34d, #fde68a, #fef3c7, #fef08a, #fde047, #facc15, #eab308, #ca8a04, #a16207, #fbbf24, #fcd34d); background-size: 400% 400%; animation: avisosBorder 40s ease-in-out infinite; box-shadow: 0 0 8px rgba(251, 191, 36, 0.25);">
+                    <div class="flex items-center space-x-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg hover:bg-yellow-100 dark:hover:bg-yellow-900/40 transition-colors">
+                        <div class="p-1.5 bg-yellow-100 dark:bg-yellow-800 rounded-md">
+                            <svg class="w-4 h-4 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                            </svg>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm font-medium text-white">Avisos</span>
+                                <span class="text-lg font-bold text-yellow-600 dark:text-yellow-400">{{ number_format($totalAvisos) }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+                @else
                 <a href="{{ route('admin.avisos.index') }}" class="flex items-center space-x-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg hover:bg-yellow-100 dark:hover:bg-yellow-900/40 transition-colors cursor-pointer">
                     <div class="p-1.5 bg-yellow-100 dark:bg-yellow-800 rounded-md">
                         <svg class="w-4 h-4 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -111,6 +128,7 @@
                         </div>
                     </div>
                 </a>
+                @endif
 
                 <!-- Manual Pendientes -->
                 <a href="{{ route('admin.chollos.comprobar') }}" class="flex items-center space-x-2 p-2 bg-pink-50 dark:bg-pink-900/20 rounded-lg hover:bg-pink-100 dark:hover:bg-pink-900/40 transition-colors cursor-pointer">
@@ -1807,6 +1825,32 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
+
+<style>
+    {{-- Animación para el borde de avisos (similar a rebajado pero con colores amarillos) --}}
+    @keyframes avisosBorder {
+        0% {
+            background-position: 0% 50%;
+            box-shadow: 0 0 8px rgba(251, 191, 36, 0.25), 0 0 4px rgba(252, 211, 77, 0.2);
+        }
+        25% {
+            background-position: 100% 50%;
+            box-shadow: 0 0 6px rgba(252, 211, 77, 0.25), 0 0 6px rgba(253, 230, 138, 0.25);
+        }
+        50% {
+            background-position: 100% 100%;
+            box-shadow: 0 0 8px rgba(245, 158, 11, 0.25), 0 0 4px rgba(251, 191, 36, 0.2);
+        }
+        75% {
+            background-position: 0% 100%;
+            box-shadow: 0 0 6px rgba(234, 179, 8, 0.25), 0 0 6px rgba(253, 230, 138, 0.25);
+        }
+        100% {
+            background-position: 0% 50%;
+            box-shadow: 0 0 8px rgba(251, 191, 36, 0.25), 0 0 4px rgba(252, 211, 77, 0.2);
+        }
+    }
+</style>
             </main>
         </div>
     </body>

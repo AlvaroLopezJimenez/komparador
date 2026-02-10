@@ -142,6 +142,27 @@
                     disabled>
                     Eliminar Seleccionados
                 </button>
+                @if(auth()->id() === 1)
+                    <div class="flex items-center space-x-2">
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" 
+                                   id="mostrar-todos-avisos" 
+                                   class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                   {{ session('avisos_mostrar_todos', false) ? 'checked' : '' }}
+                                   onchange="toggleMostrarTodosAvisos(this.checked)">
+                            <span class="text-sm text-gray-300">Mostrar todos</span>
+                        </label>
+                        <button type="button" 
+                                class="tooltip-btn-avisos text-gray-400 hover:text-gray-300 cursor-help focus:outline-none ml-1" 
+                                aria-label="Ayuda" 
+                                data-tooltip="Si marcamos este check se mostrarán los avisos de todos los usuarios"
+                                onclick="event.stopPropagation()">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
+                            </svg>
+                        </button>
+                    </div>
+                @endif
             </div>
             <div class="flex items-center space-x-3">
                 <form method="GET" class="flex flex-col items-start gap-3 md:flex-row md:items-center">
@@ -1088,6 +1109,41 @@
             <form id="form-nuevo-aviso-interno">
                 <input type="hidden" name="tipo_aviso" value="interno">
                 <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-300 dark:text-gray-300 mb-2">Usuarios</label>
+                    <div class="relative">
+                        <button type="button" 
+                                id="dropdown-usuarios-btn" 
+                                class="w-full px-3 py-2 text-left border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 flex items-center justify-between">
+                            <span id="dropdown-usuarios-text">Seleccionar usuarios...</span>
+                            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        <div id="dropdown-usuarios-menu" class="hidden absolute z-10 w-full mt-1 bg-gray-700 border border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                            <div class="p-2">
+                                <label class="flex items-center px-3 py-2 hover:bg-gray-600 rounded cursor-pointer">
+                                    <input type="checkbox" 
+                                           id="checkbox-todos" 
+                                           class="checkbox-usuario rounded border-gray-300 text-blue-600 focus:ring-blue-500" 
+                                           value="todos" 
+                                           checked>
+                                    <span class="ml-2 text-sm text-gray-200">Todos</span>
+                                </label>
+                                @foreach($usuarios as $usuario)
+                                    <label class="flex items-center px-3 py-2 hover:bg-gray-600 rounded cursor-pointer">
+                                        <input type="checkbox" 
+                                               class="checkbox-usuario rounded border-gray-300 text-blue-600 focus:ring-blue-500" 
+                                               value="{{ $usuario->id }}" 
+                                               data-user-name="{{ $usuario->name }}">
+                                        <span class="ml-2 text-sm text-gray-200">{{ $usuario->name }}</span>
+                                    </label>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-400 dark:text-gray-400 mt-1">Se creará un aviso para cada usuario seleccionado</p>
+                </div>
+                <div class="mb-4">
                     <label for="texto-nuevo-aviso" class="block text-sm font-medium text-gray-300 dark:text-gray-300 mb-2">Texto del aviso</label>
                     <textarea id="texto-nuevo-aviso" name="texto_aviso" rows="3" class="w-full px-3 py-2 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 resize-none" required></textarea>
                 </div>
@@ -1541,10 +1597,91 @@
             tomorrow.setHours(0, 1, 0, 0);
             document.getElementById('fecha-nuevo-aviso').value = tomorrow.toISOString().slice(0, 16);
             
+            // Resetear checkboxes: marcar solo "Todos"
+            const checkboxTodos = document.getElementById('checkbox-todos');
+            const checkboxesUsuarios = document.querySelectorAll('.checkbox-usuario:not(#checkbox-todos)');
+            checkboxTodos.checked = true;
+            checkboxesUsuarios.forEach(cb => cb.checked = false);
+            actualizarTextoDropdownUsuarios();
+            
+            // Cerrar el dropdown si está abierto
+            document.getElementById('dropdown-usuarios-menu').classList.add('hidden');
+            
             document.getElementById('modal-nuevo-aviso-interno').classList.remove('hidden');
         }
+        
+        // Función para actualizar el texto del botón del dropdown
+        function actualizarTextoDropdownUsuarios() {
+            const checkboxTodos = document.getElementById('checkbox-todos');
+            const checkboxesUsuarios = document.querySelectorAll('.checkbox-usuario:not(#checkbox-todos)');
+            const checkboxesMarcados = Array.from(checkboxesUsuarios).filter(cb => cb.checked);
+            const textoDropdown = document.getElementById('dropdown-usuarios-text');
+            
+            if (checkboxTodos.checked) {
+                textoDropdown.textContent = 'Todos';
+            } else if (checkboxesMarcados.length === 0) {
+                textoDropdown.textContent = 'Seleccionar usuarios...';
+            } else if (checkboxesMarcados.length === 1) {
+                textoDropdown.textContent = checkboxesMarcados[0].dataset.userName;
+            } else {
+                textoDropdown.textContent = `${checkboxesMarcados.length} usuarios seleccionados`;
+            }
+        }
+        
+        // Configurar el dropdown de usuarios
+        document.addEventListener('DOMContentLoaded', function() {
+            const dropdownBtn = document.getElementById('dropdown-usuarios-btn');
+            const dropdownMenu = document.getElementById('dropdown-usuarios-menu');
+            const checkboxTodos = document.getElementById('checkbox-todos');
+            const checkboxesUsuarios = document.querySelectorAll('.checkbox-usuario:not(#checkbox-todos)');
+            
+            // Abrir/cerrar dropdown
+            if (dropdownBtn && dropdownMenu) {
+                dropdownBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    dropdownMenu.classList.toggle('hidden');
+                });
+                
+                // Cerrar dropdown al hacer clic fuera
+                document.addEventListener('click', function(e) {
+                    if (!dropdownBtn.contains(e.target) && !dropdownMenu.contains(e.target)) {
+                        dropdownMenu.classList.add('hidden');
+                    }
+                });
+            }
+            
+            // Lógica de checkboxes: "Todos" vs usuarios individuales
+            if (checkboxTodos) {
+                checkboxTodos.addEventListener('change', function() {
+                    if (this.checked) {
+                        // Si se marca "Todos", desmarcar todos los usuarios
+                        checkboxesUsuarios.forEach(cb => cb.checked = false);
+                    }
+                    actualizarTextoDropdownUsuarios();
+                });
+            }
+            
+            // Si se marca un usuario, desmarcar "Todos"
+            checkboxesUsuarios.forEach(checkbox => {
+                checkbox.addEventListener('change', function() {
+                    if (this.checked) {
+                        checkboxTodos.checked = false;
+                    }
+                    actualizarTextoDropdownUsuarios();
+                });
+            });
+            
+            // Inicializar texto del dropdown
+            actualizarTextoDropdownUsuarios();
+        });
 
         function cerrarModalNuevoAvisoInterno() {
+            // Cerrar el dropdown si está abierto
+            const dropdownMenu = document.getElementById('dropdown-usuarios-menu');
+            if (dropdownMenu) {
+                dropdownMenu.classList.add('hidden');
+            }
+            
             document.getElementById('modal-nuevo-aviso-interno').classList.add('hidden');
         }
 
@@ -1556,9 +1693,40 @@
             const submitButton = this.querySelector('button[type="submit"]');
             const originalText = submitButton.textContent;
             
+            // Cerrar el dropdown si está abierto
+            const dropdownMenu = document.getElementById('dropdown-usuarios-menu');
+            if (dropdownMenu) {
+                dropdownMenu.classList.add('hidden');
+            }
+            
             // Deshabilitar botón y mostrar estado de carga
             submitButton.disabled = true;
             submitButton.textContent = 'Guardando...';
+            
+            // Obtener los usuarios seleccionados
+            const checkboxTodos = document.getElementById('checkbox-todos');
+            const checkboxesUsuarios = document.querySelectorAll('.checkbox-usuario:not(#checkbox-todos)');
+            let userIds = [];
+            
+            if (checkboxTodos && checkboxTodos.checked) {
+                // Si "Todos" está marcado, enviar null para que el backend cree para todos
+                userIds = null;
+            } else {
+                // Obtener los IDs de los usuarios marcados
+                checkboxesUsuarios.forEach(checkbox => {
+                    if (checkbox.checked) {
+                        userIds.push(parseInt(checkbox.value));
+                    }
+                });
+                
+                // Validar que al menos un usuario esté seleccionado
+                if (userIds.length === 0) {
+                    alert('Por favor, selecciona al menos un usuario o marca "Todos"');
+                    submitButton.disabled = false;
+                    submitButton.textContent = originalText;
+                    return;
+                }
+            }
             
             fetch('/panel-privado/avisos/interno', {
                 method: 'POST',
@@ -1569,7 +1737,8 @@
                 body: JSON.stringify({
                     texto_aviso: formData.get('texto_aviso'),
                     fecha_aviso: formData.get('fecha_aviso'),
-                    oculto: formData.get('oculto') === 'on'
+                    oculto: formData.get('oculto') === 'on',
+                    user_ids: userIds
                 })
             })
             .then(response => {
@@ -2129,6 +2298,105 @@
                 alert('Error de conexión al guardar el precio');
                 input.value = input.dataset.precioOriginal;
             }
+        }
+
+        // Función para configurar tooltips con click (similar a formulario.blade.php)
+        function configurarTooltipsAvisos() {
+            const tooltipButtons = document.querySelectorAll('.tooltip-btn-avisos');
+            let tooltipActual = null;
+            
+            tooltipButtons.forEach(button => {
+                button.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const tooltipTexto = this.getAttribute('data-tooltip');
+                    
+                    // Cerrar tooltip anterior si existe
+                    if (tooltipActual) {
+                        tooltipActual.remove();
+                        tooltipActual = null;
+                        return;
+                    }
+                    
+                    // Crear nuevo tooltip
+                    const tooltip = document.createElement('div');
+                    tooltip.className = 'fixed z-50 bg-gray-900 text-white text-xs rounded shadow-lg p-2 max-w-xs pointer-events-none';
+                    tooltip.textContent = tooltipTexto;
+                    tooltip.style.opacity = '0';
+                    tooltip.style.transition = 'opacity 0.2s';
+                    document.body.appendChild(tooltip);
+                    
+                    // Posicionar tooltip
+                    const rect = this.getBoundingClientRect();
+                    tooltip.style.left = rect.left + 'px';
+                    tooltip.style.top = (rect.top - tooltip.offsetHeight - 8) + 'px';
+                    
+                    // Ajustar si se sale de la pantalla
+                    setTimeout(() => {
+                        const tooltipRect = tooltip.getBoundingClientRect();
+                        if (tooltipRect.left < 0) {
+                            tooltip.style.left = '8px';
+                        }
+                        if (tooltipRect.right > window.innerWidth) {
+                            tooltip.style.left = (window.innerWidth - tooltipRect.width - 8) + 'px';
+                        }
+                        if (tooltipRect.top < 0) {
+                            tooltip.style.top = (rect.bottom + 8) + 'px';
+                        }
+                        tooltip.style.opacity = '1';
+                    }, 10);
+                    
+                    tooltipActual = tooltip;
+                    
+                    // Cerrar tooltip al hacer click fuera o en otro botón
+                    const cerrarTooltip = (e) => {
+                        if (tooltipActual && !tooltipActual.contains(e.target) && e.target !== button) {
+                            tooltipActual.remove();
+                            tooltipActual = null;
+                            document.removeEventListener('click', cerrarTooltip);
+                        }
+                    };
+                    
+                    setTimeout(() => {
+                        document.addEventListener('click', cerrarTooltip);
+                    }, 100);
+                });
+            });
+        }
+
+        // Inicializar tooltips al cargar la página
+        document.addEventListener('DOMContentLoaded', function() {
+            configurarTooltipsAvisos();
+        });
+
+        // Función para toggle mostrar todos los avisos (solo usuario ID 1)
+        function toggleMostrarTodosAvisos(checked) {
+            fetch('{{ route("admin.avisos.toggle.mostrar.todos") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify({
+                    mostrar_todos: checked
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Recargar la página para mostrar los cambios
+                    location.reload();
+                } else {
+                    alert('Error: ' + (data.message || 'Error desconocido'));
+                    // Revertir el checkbox si hay error
+                    document.getElementById('mostrar-todos-avisos').checked = !checked;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error de conexión al cambiar el filtro');
+                // Revertir el checkbox si hay error
+                document.getElementById('mostrar-todos-avisos').checked = !checked;
+            });
         }
     </script>
 </x-app-layout>

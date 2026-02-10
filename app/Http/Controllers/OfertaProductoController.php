@@ -50,11 +50,13 @@ class OfertaProductoController extends Controller
     {
         $fechaAviso = now()->addDays(4)->setTime(0, 1, 0);
         $texto = 'Sin stock - 1a vez';
+        $userId = auth()->id();
 
         $existe = Aviso::where('avisoable_type', OfertaProducto::class)
             ->where('avisoable_id', $oferta->id)
             ->where('texto_aviso', $texto)
             ->where('fecha_aviso', $fechaAviso)
+            ->where('user_id', $userId)
             ->exists();
 
         if ($existe) {
