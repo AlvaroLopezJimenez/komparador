@@ -9,132 +9,52 @@ use Carbon\Carbon;
 class TiemposActualizacionOfertasDinamicos
 {
     // ============================================================================
-    // CONFIGURACIÓN DE RANGOS DE HISTORIAL
-    // ============================================================================
-    // Define cuántas actualizaciones se necesitan para aplicar diferentes niveles
-    // de análisis. Con pocos datos, el sistema es más conservador.
-    
-    const RANGO_CONSERVADOR_MIN = 2;
-    // Mínimo de actualizaciones exitosas necesarias para empezar a aplicar
-    // ajustes conservadores (ajustes más pequeños y cautelosos)
-    
-    const RANGO_CONSERVADOR_MAX = 5;
-    // Máximo de actualizaciones para estar en modo conservador.
-    // Con 6 o más actualizaciones, se aplica el análisis completo.
-    
-    const RANGO_COMPLETO_MIN = 6;
-    // Mínimo de actualizaciones exitosas necesarias para aplicar el análisis
-    // completo con todos los ajustes normales de frecuencia
-    
-    // ============================================================================
-    // CONFIGURACIÓN DE VENTANA DE ANÁLISIS
+    // CONFIGURACIÓN DEL NUEVO SISTEMA BASADO EN λ (LAMBDA) PONDERADO
     // ============================================================================
     
-    const VENTANA_ANALISIS_DIAS = 30;
-    // Días hacia atrás desde hoy que se analizarán para detectar patrones.
-    // Solo se consideran actualizaciones dentro de esta ventana temporal.
+    const VENTANA_ANALISIS_DIAS = 7;
+    // Ventana de análisis: solo últimos 7 días
+    // Trabajamos todo en minutos para mayor precisión
     
-    // ============================================================================
-    // VALIDACIÓN DE INTERVALOS ENTRE ACTUALIZACIONES
-    // ============================================================================
+    const MINIMO_REGISTROS_REQUERIDOS = 2;
+    // Mínimo de registros necesarios para calcular λ
+    // Si hay menos, se mantiene el intervalo actual
     
-    const FACTOR_INTERVALO_VALIDO = 1.5;
-    // Si el tiempo entre dos actualizaciones consecutivas es mayor a
-    // (frecuencia_actual * FACTOR_INTERVALO_VALIDO), se ignora ese intervalo.
-    // Ejemplo: Si frecuencia es 1440 min (24h) y hay un gap de 3 días (4320 min),
-    // se ignora porque 4320 > (1440 * 1.5 = 2160). Esto evita considerar
-    // períodos donde la oferta estuvo desactivada o sin scrapear.
+    const UMBRAL_CAMBIO_PORCENTAJE = 1.0;
+    // Porcentaje mínimo de diferencia para considerar un cambio válido
+    // Si la variación es > 1%, se marca como cambio (1), sino (0)
     
-    // ============================================================================
-    // MARGEN DE TOLERANCIA PARA CAMBIOS DE PRECIO
-    // ============================================================================
+    const FACTOR_DECAY_EXPONENCIAL = 0.0003;
+    // Factor k para el peso exponencial: peso = exp(-k * minutos_desde_ahora)
+    // Valores más recientes tienen mucho más peso que los antiguos
     
-    const MARGEN_TOLERANCIA_PORCENTAJE = 1;
-    // Porcentaje mínimo de diferencia entre dos precios para considerar que
-    // hubo un "cambio significativo". Si la diferencia es <= 1%, se considera
-    // que el precio no cambió (estable). Si es > 1%, se marca como "cambio".
-    // Ejemplo: Precio anterior 50€, nuevo 50.30€ → diferencia 0.6% → SIN CAMBIO
-    //          Precio anterior 50€, nuevo 51€ → diferencia 2% → CAMBIO
+    const FACTOR_C = 1.1;
+    // Factor c en la fórmula: intervalo = 1 / (c * λ + epsilon)
+    // Controla qué tan agresivo es el ajuste basado en la tasa de cambios
     
-    // ============================================================================
-    // AJUSTES DE FRECUENCIA SEGÚN MOVIMIENTO (PORCENTUAL)
-    // ============================================================================
+    const EPSILON = 0.0000001;
+    // Valor epsilon para evitar división por cero
+    // Muy pequeño, solo para estabilidad numérica
     
-    const REDUCCION_MUCHO_MOVIMIENTO_PORCENTAJE = 15;
-    // Porcentaje a REDUCIR de la frecuencia actual cuando hay mucho movimiento
-    // (2 cambios consecutivos). Reducir frecuencia = actualizar más seguido.
-    // Ejemplo: 24h → 20.4h (reducción de 3.6h), 12h → 10.2h (reducción de 1.8h)
-    // Se adapta automáticamente a diferentes frecuencias base.
+    const FACTOR_SUAVIZADO_ACTUAL = 0.8;
+    // Porcentaje del intervalo actual que se mantiene (80%)
     
-    const AUMENTO_POCO_MOVIMIENTO_PORCENTAJE = 5;
-    // Porcentaje a AUMENTAR de la frecuencia actual cuando hay poco movimiento
-    // (3 sin cambios consecutivos). Aumentar frecuencia = actualizar menos seguido.
-    // Ejemplo: 20h → 21h (aumento de 1h), 12h → 12.6h (aumento de 0.6h)
-    // Más conservador que la reducción (5% vs 15%).
-    
-    // ============================================================================
-    // LÍMITE MÍNIMO ABSOLUTO DE FRECUENCIA
-    // ============================================================================
+    const FACTOR_SUAVIZADO_NUEVO = 0.2;
+    // Porcentaje del nuevo intervalo calculado que se aplica (20%)
     
     const FRECUENCIA_MINIMA_ABSOLUTA_MINUTOS = 15;
-    // Límite absoluto mínimo de frecuencia, incluso si el cálculo sugiere menos.
-    // Evita actualizar demasiado frecuentemente y sobrecargar el sistema.
-    // Este límite se aplica ANTES de validar los límites de la tienda.
-    // Ninguna oferta tendrá una frecuencia menor a 15 minutos.
-    
-    // ============================================================================
-    // PESOS TEMPORALES PARA ANÁLISIS (Dar más importancia a lo reciente)
-    // ============================================================================
-    
-    const PESO_RECIENTE_DIAS = 7;
-    // Días desde hoy hacia atrás que se consideran "recientes" y tienen más peso
-    // en el análisis. Los cambios recientes son más relevantes que los antiguos.
-    
-    const PESO_RECIENTE = 3;
-    // Multiplicador de peso para actualizaciones de los últimos 7 días.
-    // Un cambio reciente vale 3x más que uno antiguo en el análisis.
-    
-    const PESO_MEDIO_DIAS = 15;
-    // Días desde hoy hasta el día 15. Actualizaciones en este rango tienen
-    // peso medio (menos que recientes, más que antiguas).
-    
-    const PESO_MEDIO = 2;
-    // Multiplicador de peso para actualizaciones de los días 8-15.
-    // Un cambio de este período vale 2x más que uno antiguo.
-    
-    const PESO_ANTIGUO_DIAS = 30;
-    // Días desde hoy hasta el día 30. Actualizaciones en este rango tienen
-    // peso base (el menor peso en el análisis).
-    
-    const PESO_ANTIGUO = 1;
-    // Multiplicador de peso base para actualizaciones de los días 16-30.
-    // Este es el peso de referencia (1x).
-    
-    // ============================================================================
-    // DETECCIÓN DE PATRONES CONSECUTIVOS
-    // ============================================================================
-    
-    const CAMBIOS_CONSECUTIVOS_MUCHO_MOVIMIENTO = 2;
-    // Número de cambios de precio consecutivos (con diferencia > 1%) necesarios
-    // para detectar "mucho movimiento" y reducir la frecuencia.
-    // Se analizan desde el más reciente hacia atrás, aplicando pesos temporales.
-    
-    const SIN_CAMBIOS_CONSECUTIVOS_POCO_MOVIMIENTO = 3;
-    // Número de actualizaciones sin cambios consecutivas (diferencia <= 1%)
-    // necesarias para detectar "poco movimiento" y aumentar la frecuencia.
-    // Requiere más confirmación que los cambios (3 vs 2) para ser más conservador
-    // al aumentar la frecuencia.
-    
-    // ============================================================================
-    // FACTOR DE REDUCCIÓN PARA MODO CONSERVADOR
-    // ============================================================================
-    
-    const FACTOR_CONSERVADOR = 0.5;
-    // Factor de reducción para ajustes en modo conservador (2-5 actualizaciones).
-    // Los ajustes se reducen al 50% de su valor normal.
+    // Límite absoluto mínimo de frecuencia (nunca menos de 15 minutos)
+    // Se aplica ANTES de los límites de tienda
     
     /**
-     * Calcula la frecuencia adaptativa basada en el historial de actualizaciones
+     * Calcula la frecuencia adaptativa basada en λ (lambda) ponderado exponencialmente
+     * 
+     * Sistema nuevo:
+     * - Ventana de 7 días (no 30)
+     * - Cálculo de tasa de cambios (λ) con pesos exponenciales
+     * - Fórmula: intervalo = 1 / (c * λ + epsilon)
+     * - Suavizado: 80% actual + 20% nuevo
+     * - Respeta límites de tienda
      * 
      * @param int $ofertaId
      * @return int Frecuencia en minutos
@@ -144,214 +64,155 @@ class TiemposActualizacionOfertasDinamicos
         $oferta = OfertaProducto::with('tienda')->findOrFail($ofertaId);
         $frecuenciaActual = $oferta->frecuencia_actualizar_precio_minutos ?? 1440;
         
-        // Obtener historial de los últimos 30 días
-        $fechaInicio = Carbon::now()->subDays(self::VENTANA_ANALISIS_DIAS);
+        // Obtener historial de los últimos 7 días (en minutos)
+        $fechaLimite = Carbon::now()->subDays(self::VENTANA_ANALISIS_DIAS);
         $historial = HistoricoTiempoActualizacionPrecioOferta::where('oferta_id', $ofertaId)
-            ->where('created_at', '>=', $fechaInicio)
-            ->orderBy('created_at', 'desc')
+            ->where('created_at', '>=', $fechaLimite)
+            ->orderBy('created_at', 'asc') // Ordenar de más antiguo a más reciente
             ->get();
         
         // Si no hay suficiente historial, mantener frecuencia actual
-        if ($historial->count() < self::RANGO_CONSERVADOR_MIN) {
+        if ($historial->count() < self::MINIMO_REGISTROS_REQUERIDOS) {
             return $frecuenciaActual;
         }
         
-        // Filtrar actualizaciones válidas (intervalos no excesivos)
-        $actualizacionesValidas = $this->filtrarActualizacionesValidas($historial, $frecuenciaActual);
+        // Calcular λ ponderado
+        $lambda = $this->calcularLambdaPonderado($historial);
         
-        if ($actualizacionesValidas->count() < self::RANGO_CONSERVADOR_MIN) {
+        // Si no se pudo calcular λ (suma_tiempo_ponderado == 0), mantener actual
+        if ($lambda === null) {
             return $frecuenciaActual;
         }
         
-        // Determinar modo (conservador o completo)
-        $esModoConservador = $actualizacionesValidas->count() >= self::RANGO_CONSERVADOR_MIN 
-                          && $actualizacionesValidas->count() <= self::RANGO_CONSERVADOR_MAX;
+        // Calcular nuevo intervalo en minutos
+        $intervaloCalculado = $this->calcularIntervaloDesdeLambda($lambda);
         
-        // Clasificar cambios de precio
-        $clasificaciones = $this->clasificarCambiosPrecio($actualizacionesValidas);
-        
-        // Detectar movimiento consecutivo
-        $nuevaFrecuencia = $this->detectarMovimientoYCalcularFrecuencia(
-            $clasificaciones,
-            $frecuenciaActual,
-            $esModoConservador
-        );
+        // Aplicar suavizado: 80% actual + 20% nuevo
+        $intervaloSuavizado = (self::FACTOR_SUAVIZADO_ACTUAL * $frecuenciaActual) 
+                             + (self::FACTOR_SUAVIZADO_NUEVO * $intervaloCalculado);
         
         // Aplicar límite mínimo absoluto
-        if ($nuevaFrecuencia < self::FRECUENCIA_MINIMA_ABSOLUTA_MINUTOS) {
-            $nuevaFrecuencia = self::FRECUENCIA_MINIMA_ABSOLUTA_MINUTOS;
-        }
-        
-        // Validar límites de tienda
-        $tienda = $oferta->tienda;
-        $frecuenciaMinimaTienda = $tienda->frecuencia_minima_minutos ?? self::FRECUENCIA_MINIMA_ABSOLUTA_MINUTOS;
-        $frecuenciaMaximaTienda = $tienda->frecuencia_maxima_minutos ?? 10080;
-        
-        // Si la frecuencia actual ya está en el mínimo de la tienda, no bajar más
-        if ($frecuenciaActual <= $frecuenciaMinimaTienda && $nuevaFrecuencia < $frecuenciaActual) {
-            $nuevaFrecuencia = $frecuenciaActual;
+        if ($intervaloSuavizado < self::FRECUENCIA_MINIMA_ABSOLUTA_MINUTOS) {
+            $intervaloSuavizado = self::FRECUENCIA_MINIMA_ABSOLUTA_MINUTOS;
         }
         
         // Aplicar límites de tienda
-        if ($nuevaFrecuencia < $frecuenciaMinimaTienda) {
-            $nuevaFrecuencia = $frecuenciaMinimaTienda;
+        $tienda = $oferta->tienda;
+        $frecuenciaMinimaTienda = $tienda->frecuencia_minima_minutos ?? self::FRECUENCIA_MINIMA_ABSOLUTA_MINUTOS;
+        $frecuenciaMaximaTienda = $tienda->frecuencia_maxima_minutos ?? 10080; // 7 días por defecto
+        
+        // Aplicar límite mínimo de tienda
+        if ($intervaloSuavizado < $frecuenciaMinimaTienda) {
+            $intervaloSuavizado = $frecuenciaMinimaTienda;
         }
-        if ($nuevaFrecuencia > $frecuenciaMaximaTienda) {
-            $nuevaFrecuencia = $frecuenciaMaximaTienda;
+        
+        // Aplicar límite máximo de tienda
+        if ($intervaloSuavizado > $frecuenciaMaximaTienda) {
+            $intervaloSuavizado = $frecuenciaMaximaTienda;
         }
+        
+        // Redondear y convertir a entero
+        $intervaloFinal = (int) round($intervaloSuavizado);
         
         // Actualizar frecuencia en la oferta
         $oferta->update([
-            'frecuencia_actualizar_precio_minutos' => $nuevaFrecuencia
+            'frecuencia_actualizar_precio_minutos' => $intervaloFinal
         ]);
         
-        return $nuevaFrecuencia;
+        return $intervaloFinal;
     }
     
     /**
-     * Filtra actualizaciones válidas (ignora intervalos excesivos)
+     * Calcula λ (lambda) ponderado exponencialmente
+     * 
+     * λ = suma_cambios_ponderados / suma_tiempo_ponderado
+     * 
+     * Unidad: cambios por minuto
+     * 
+     * @param \Illuminate\Support\Collection $historial
+     * @return float|null Lambda en cambios por minuto, o null si no se puede calcular
      */
-    private function filtrarActualizacionesValidas($historial, $frecuenciaActual)
+    private function calcularLambdaPonderado($historial)
     {
-        $validas = collect();
-        $limiteIntervalo = $frecuenciaActual * self::FACTOR_INTERVALO_VALIDO;
+        $ahora = Carbon::now();
+        $sumaCambiosPonderados = 0.0;
+        $sumaTiempoPonderado = 0.0;
         
-        foreach ($historial as $index => $actualizacion) {
-            if ($index === 0) {
-                // La más reciente siempre es válida
-                $validas->push($actualizacion);
+        // Iterar sobre pares consecutivos de registros
+        for ($i = 1; $i < $historial->count(); $i++) {
+            $actualizacionAnterior = $historial[$i - 1];
+            $actualizacionActual = $historial[$i];
+            
+            // Calcular tiempo del intervalo en minutos
+            $tiempoIntervaloMinutos = $actualizacionAnterior->created_at->diffInMinutes($actualizacionActual->created_at);
+            
+            // ⚠️ PROTECCIÓN: Si el intervalo es 0 o negativo, saltar este par
+            // Evita explosiones de λ cuando hay timestamps duplicados o muy cercanos
+            if ($tiempoIntervaloMinutos <= 0) {
                 continue;
             }
             
-            // Calcular intervalo con la anterior
-            $anterior = $historial[$index - 1];
-            $intervalo = $actualizacion->created_at->diffInMinutes($anterior->created_at);
+            // ✅ CORRECCIÓN: Calcular minutos desde ahora con protección contra timestamps futuros
+            // El segundo parámetro false permite valores negativos si la fecha es futura
+            // Luego forzamos a 0 mínimo para evitar pesos incorrectos por desfases de servidor/colas/timezone
+            $minutosDesdeAhora = $actualizacionActual->created_at->diffInMinutes($ahora, false);
+            $minutosDesdeAhora = max(0, $minutosDesdeAhora);
             
-            // Si el intervalo es válido, incluir esta actualización
-            if ($intervalo <= $limiteIntervalo) {
-                $validas->push($actualizacion);
-            } else {
-                // Si encontramos un intervalo inválido, parar (las anteriores también serían inválidas)
-                break;
-            }
-        }
-        
-        return $validas->reverse()->values(); // Ordenar de más antiguo a más reciente
-    }
-    
-    /**
-     * Clasifica cada actualización como "cambio" o "sin cambio"
-     */
-    private function clasificarCambiosPrecio($actualizacionesValidas)
-    {
-        $clasificaciones = [];
-        
-        foreach ($actualizacionesValidas as $index => $actualizacion) {
-            if ($index === 0) {
-                // La más antigua no tiene anterior para comparar
-                $clasificaciones[] = [
-                    'actualizacion' => $actualizacion,
-                    'tipo' => 'sin_cambio', // Por defecto
-                    'peso' => $this->obtenerPeso($actualizacion->created_at)
-                ];
-                continue;
-            }
+            // Calcular peso exponencial: peso = exp(-k * minutos_desde_ahora)
+            $peso = exp(-self::FACTOR_DECAY_EXPONENCIAL * $minutosDesdeAhora);
             
-            $anterior = $actualizacionesValidas[$index - 1];
-            $diferenciaPorcentual = $this->calcularDiferenciaPorcentual(
-                $anterior->precio_total,
-                $actualizacion->precio_total
-            );
+            // Determinar si hubo cambio (variación > 1%)
+            $precioAnterior = (float) $actualizacionAnterior->precio_total;
+            $precioActual = (float) $actualizacionActual->precio_total;
             
-            $tipo = $diferenciaPorcentual > self::MARGEN_TOLERANCIA_PORCENTAJE 
-                ? 'cambio' 
-                : 'sin_cambio';
+            $cambio = 0; // Por defecto sin cambio
             
-            $clasificaciones[] = [
-                'actualizacion' => $actualizacion,
-                'tipo' => $tipo,
-                'peso' => $this->obtenerPeso($actualizacion->created_at),
-                'diferencia_porcentual' => $diferenciaPorcentual
-            ];
-        }
-        
-        return array_reverse($clasificaciones); // De más reciente a más antiguo
-    }
-    
-    /**
-     * Calcula diferencia porcentual entre dos precios
-     */
-    private function calcularDiferenciaPorcentual($precioAnterior, $precioNuevo)
-    {
-        if ($precioAnterior == 0) {
-            return 100; // Si precio anterior es 0, considerar cambio total
-        }
-        
-        return abs(($precioNuevo - $precioAnterior) / $precioAnterior * 100);
-    }
-    
-    /**
-     * Obtiene el peso temporal según los días desde hoy
-     */
-    private function obtenerPeso($fecha)
-    {
-        $diasDesdeHoy = Carbon::now()->diffInDays($fecha);
-        
-        if ($diasDesdeHoy <= self::PESO_RECIENTE_DIAS) {
-            return self::PESO_RECIENTE;
-        } elseif ($diasDesdeHoy <= self::PESO_MEDIO_DIAS) {
-            return self::PESO_MEDIO;
-        } else {
-            return self::PESO_ANTIGUO;
-        }
-    }
-    
-    /**
-     * Detecta movimiento consecutivo y calcula nueva frecuencia
-     */
-    private function detectarMovimientoYCalcularFrecuencia($clasificaciones, $frecuenciaActual, $esModoConservador)
-    {
-        $contadorCambios = 0;
-        $contadorSinCambios = 0;
-        $puntosCambios = 0;
-        $puntosSinCambios = 0;
-        
-        foreach ($clasificaciones as $clasificacion) {
-            if ($clasificacion['tipo'] === 'cambio') {
-                $contadorCambios++;
-                $puntosCambios += $clasificacion['peso'];
-                $contadorSinCambios = 0;
-                $puntosSinCambios = 0;
+            if ($precioAnterior > 0) {
+                $variacion = abs($precioActual - $precioAnterior) / $precioAnterior;
                 
-                // Si tenemos suficientes cambios consecutivos (considerando pesos)
-                if ($contadorCambios >= self::CAMBIOS_CONSECUTIVOS_MUCHO_MOVIMIENTO) {
-                    $reduccionPorcentaje = self::REDUCCION_MUCHO_MOVIMIENTO_PORCENTAJE;
-                    if ($esModoConservador) {
-                        $reduccionPorcentaje *= self::FACTOR_CONSERVADOR;
-                    }
-                    $reduccion = $frecuenciaActual * ($reduccionPorcentaje / 100);
-                    return max(self::FRECUENCIA_MINIMA_ABSOLUTA_MINUTOS, $frecuenciaActual - $reduccion);
+                if ($variacion > (self::UMBRAL_CAMBIO_PORCENTAJE / 100)) {
+                    $cambio = 1; // Hubo cambio significativo
                 }
             } else {
-                $contadorSinCambios++;
-                $puntosSinCambios += $clasificacion['peso'];
-                $contadorCambios = 0;
-                $puntosCambios = 0;
-                
-                // Si tenemos suficientes sin cambios consecutivos (considerando pesos)
-                if ($contadorSinCambios >= self::SIN_CAMBIOS_CONSECUTIVOS_POCO_MOVIMIENTO) {
-                    $aumentoPorcentaje = self::AUMENTO_POCO_MOVIMIENTO_PORCENTAJE;
-                    if ($esModoConservador) {
-                        $aumentoPorcentaje *= self::FACTOR_CONSERVADOR;
-                    }
-                    $aumento = $frecuenciaActual * ($aumentoPorcentaje / 100);
-                    return $frecuenciaActual + $aumento;
+                // Si precio anterior es 0, considerar cambio total
+                if ($precioActual > 0) {
+                    $cambio = 1;
                 }
             }
+            
+            // Acumular cambios ponderados
+            $sumaCambiosPonderados += $cambio * $peso;
+            
+            // Acumular tiempo ponderado
+            $sumaTiempoPonderado += $tiempoIntervaloMinutos * $peso;
         }
         
-        // Si no se detectó ningún patrón, mantener frecuencia actual
-        return $frecuenciaActual;
+        // Si no hay tiempo ponderado acumulado, no se puede calcular λ
+        if ($sumaTiempoPonderado == 0) {
+            return null;
+        }
+        
+        // Calcular λ: cambios por minuto
+        $lambda = $sumaCambiosPonderados / $sumaTiempoPonderado;
+        
+        return $lambda;
+    }
+    
+    /**
+     * Calcula el nuevo intervalo en minutos desde λ
+     * 
+     * Fórmula: intervalo = 1 / (c * λ + epsilon)
+     * 
+     * @param float $lambda Tasa de cambios por minuto
+     * @return float Intervalo en minutos
+     */
+    private function calcularIntervaloDesdeLambda($lambda)
+    {
+        // Fórmula: intervalo = 1 / (c * λ + epsilon)
+        $denominador = (self::FACTOR_C * $lambda) + self::EPSILON;
+        $intervalo = 1.0 / $denominador;
+        
+        return $intervalo;
     }
     
     /**
@@ -392,6 +253,8 @@ class TiemposActualizacionOfertasDinamicos
      * Si el último registro supera el tiempo de actualización, crea uno nuevo.
      * Si no, actualiza el precio del último registro.
      * 
+     * ✅ CORREGIDO: Ahora crea el registro PRIMERO, luego calcula λ con el historial actualizado
+     * 
      * @param int $ofertaId
      * @param float $precioTotal
      * @param string $tipo 'automatico' o 'manual'
@@ -422,17 +285,21 @@ class TiemposActualizacionOfertasDinamicos
         
         // Si el tiempo transcurrido supera la frecuencia de actualización, crear nuevo registro
         if ($tiempoTranscurridoMinutos >= $frecuenciaActual) {
-            // Calcular frecuencia ANTES de crear el nuevo registro (sin contar el que vamos a crear)
-            // Esto usa el historial existente sin incluir el registro que vamos a crear ahora
-            $frecuenciaCalculada = $this->calcularFrecuencia($ofertaId);
-            
-            // Crear nuevo registro
+            // ✅ CORRECCIÓN: Crear el registro PRIMERO (el precio ya cambió)
             $registro = HistoricoTiempoActualizacionPrecioOferta::create([
                 'oferta_id' => $ofertaId,
                 'precio_total' => $precioTotal,
                 'tipo_actualizacion' => $tipo,
                 'frecuencia_aplicada_minutos' => $frecuenciaActual,
-                'frecuencia_calculada_minutos' => $frecuenciaCalculada,
+                'frecuencia_calculada_minutos' => null, // Se calculará después
+            ]);
+            
+            // ✅ CORRECCIÓN: Luego calcular frecuencia usando el historial ACTUALIZADO (incluye el nuevo registro)
+            $frecuenciaCalculada = $this->calcularFrecuencia($ofertaId);
+            
+            // Actualizar el registro con la frecuencia calculada
+            $registro->update([
+                'frecuencia_calculada_minutos' => $frecuenciaCalculada
             ]);
             
             return $registro;
@@ -455,4 +322,3 @@ class TiemposActualizacionOfertasDinamicos
         }
     }
 }
-

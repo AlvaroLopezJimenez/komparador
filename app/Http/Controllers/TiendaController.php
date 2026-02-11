@@ -379,6 +379,8 @@ if ($request->has('comisiones')) {
 
         return response()->json([
             'tienda' => $tienda->nombre,
+            'frecuencia_minima_minutos' => $tienda->frecuencia_minima_minutos ?? 0,
+            'frecuencia_maxima_minutos' => $tienda->frecuencia_maxima_minutos ?? 1440,
             'desglose' => $desglose
         ]);
     }

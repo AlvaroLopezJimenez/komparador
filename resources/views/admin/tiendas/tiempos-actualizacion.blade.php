@@ -8,6 +8,8 @@
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2/dist/chartjs-plugin-datalabels.min.js"></script>
 </head>
 <body class="font-sans antialiased">
     <div class="min-h-screen bg-gray-100 dark:bg-gray-900">
@@ -80,7 +82,7 @@
 
                 <!-- Desglose de Tiempos (se muestra al seleccionar una tienda) -->
                 <div id="desglose-container" class="hidden">
-                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden mb-6">
+                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
                         <div class="p-6 border-b border-gray-200 dark:border-gray-700">
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center">
@@ -102,15 +104,21 @@
                             </div>
                         </div>
                         
+                    </div>
+                    
+                    <!-- Gráfico de barras horizontal - Ocupa todo el ancho del main -->
+                    <div class="bg-white dark:bg-gray-800 p-4 shadow mb-6" style="margin-left: -1rem; margin-right: -1rem; width: calc(100% + 2rem); box-sizing: border-box;">
+                        <div style="position: relative; height: 256px; width: 100%;">
+                            <canvas id="grafico-tiempos" style="width: 100% !important; height: 100% !important;"></canvas>
+                        </div>
+                        <div id="mensaje-grafico" class="text-center text-gray-500 dark:text-gray-400 mt-4 hidden">No hay ofertas en esta tienda.</div>
+                    </div>
+                    
+                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
                         <div class="p-6">
-                            <!-- Desglose de ofertas por tiempo -->
-                            <div class="mb-6">
-                                <h4 class="text-md font-medium text-gray-900 dark:text-white mb-4">
-                                    Distribución de Tiempos de Actualización
-                                </h4>
-                                <div id="desglose-tiempos" class="space-y-2">
-                                    <!-- Se llena dinámicamente -->
-                                </div>
+                            <!-- Estadísticas -->
+                            <div id="estadisticas-desglose" class="mb-4 text-sm text-gray-600 dark:text-gray-400">
+                                <!-- Se llena dinámicamente -->
                             </div>
 
                             <!-- Formulario para cambiar tiempo -->
@@ -207,40 +215,208 @@
             tiendaSeleccionadaNombre = null;
         }
 
+        // Variables globales para el gráfico
+        let graficoTiempos = null;
+        
         // Cargar desglose de tiempos
         async function cargarDesgloseTiempos(tiendaId) {
             try {
                 const response = await fetch(`/panel-privado/tiendas/${tiendaId}/desglose-tiempos`);
                 const data = await response.json();
                 
-                const container = document.getElementById('desglose-tiempos');
-                container.innerHTML = '';
+                const mensajeGrafico = document.getElementById('mensaje-grafico');
+                const canvas = document.getElementById('grafico-tiempos');
                 
-                if (data.desglose.length === 0) {
-                    container.innerHTML = '<p class="text-gray-500 dark:text-gray-400">No hay ofertas en esta tienda.</p>';
+                if (!canvas) {
+                    console.error('No se encontró el elemento canvas del gráfico');
+                    mostrarNotificacion('Error: No se encontró el elemento del gráfico', 'error');
                     return;
                 }
                 
-                data.desglose.forEach(item => {
-                    const div = document.createElement('div');
-                    div.className = 'flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg';
-                    div.innerHTML = `
-                        <div class="flex items-center">
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 mr-3">
-                                ${item.formato}
-                            </span>
-                            <span class="text-sm text-gray-600 dark:text-gray-300">${item.cantidad} ofertas</span>
-                        </div>
-                        <div class="text-xs text-gray-500 dark:text-gray-400">
-                            ${item.minutos} minutos
-                        </div>
-                    `;
-                    container.appendChild(div);
+                if (data.desglose.length === 0) {
+                    if (mensajeGrafico) {
+                        mensajeGrafico.classList.remove('hidden');
+                    }
+                    if (graficoTiempos) {
+                        graficoTiempos.destroy();
+                        graficoTiempos = null;
+                    }
+                    return;
+                }
+                
+                if (mensajeGrafico) {
+                    mensajeGrafico.classList.add('hidden');
+                }
+                
+                // Obtener valores de rango configurado
+                const minRango = data.frecuencia_minima_minutos || 0;
+                const maxRango = data.frecuencia_maxima_minutos || 1440;
+                
+                // Ordenar desglose por tiempo
+                const desgloseOrdenado = [...data.desglose].sort((a, b) => a.minutos - b.minutos);
+                
+                // Preparar datos para Chart.js
+                const labels = desgloseOrdenado.map(item => formatearTiempo(item.minutos));
+                const valores = desgloseOrdenado.map(item => item.cantidad);
+                
+                const isDark = document.documentElement.classList.contains('dark');
+                
+                // Color del área rellena (azul)
+                const colorArea = isDark ? 'rgba(96, 165, 250, 0.3)' : 'rgba(59, 130, 246, 0.3)';
+                
+                // Color de la línea (azul)
+                const colorLinea = isDark ? 'rgba(96, 165, 250, 1)' : 'rgba(59, 130, 246, 1)';
+                
+                // Destruir gráfico anterior si existe
+                if (graficoTiempos) {
+                    graficoTiempos.destroy();
+                    graficoTiempos = null;
+                }
+                
+                // Configurar plugins
+                const pluginsConfig = {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            color: isDark ? '#e5e7eb' : '#374151',
+                            font: {
+                                size: 12,
+                                weight: 'bold'
+                            }
+                        }
+                    },
+                    tooltip: {
+                        enabled: true,
+                        intersect: false,
+                        mode: 'index',
+                        callbacks: {
+                            label: function(context) {
+                                const item = desgloseOrdenado[context.dataIndex];
+                                return `${context.parsed.y} ofertas - ${item.formato} (${item.minutos} min)`;
+                            }
+                        }
+                    }
+                };
+                
+                // Crear nuevo gráfico
+                const ctx = canvas.getContext('2d');
+                graficoTiempos = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Cantidad de ofertas',
+                            data: valores,
+                            borderColor: colorLinea,
+                            backgroundColor: colorArea,
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 0,
+                            pointHoverRadius: 5,
+                            pointHoverBorderWidth: 2,
+                            pointHoverBackgroundColor: colorLinea
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false
+                        },
+                        plugins: pluginsConfig,
+                        scales: {
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Tiempo de actualización',
+                                    color: isDark ? '#9ca3af' : '#6b7280',
+                                    font: {
+                                        size: 12,
+                                        weight: 'bold'
+                                    }
+                                },
+                                ticks: {
+                                    color: isDark ? '#9ca3af' : '#6b7280',
+                                    maxRotation: 45,
+                                    minRotation: 45
+                                },
+                                grid: {
+                                    color: isDark ? 'rgba(75, 85, 99, 0.2)' : 'rgba(229, 231, 235, 0.5)'
+                                }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Cantidad de ofertas',
+                                    color: isDark ? '#9ca3af' : '#6b7280',
+                                    font: {
+                                        size: 12,
+                                        weight: 'bold'
+                                    }
+                                },
+                                beginAtZero: true,
+                                ticks: {
+                                    stepSize: 1,
+                                    color: isDark ? '#9ca3af' : '#6b7280'
+                                },
+                                grid: {
+                                    color: isDark ? 'rgba(75, 85, 99, 0.2)' : 'rgba(229, 231, 235, 0.5)'
+                                }
+                            }
+                        }
+                    }
                 });
+                
+                // Mostrar estadísticas
+                const totalOfertas = data.desglose.reduce((sum, item) => sum + item.cantidad, 0);
+                const estadisticas = document.getElementById('estadisticas-desglose');
+                estadisticas.innerHTML = `
+                    <div class="grid grid-cols-4 gap-4 mt-4">
+                        <div class="text-center p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                            <div class="text-xl font-bold text-gray-900 dark:text-white">${totalOfertas}</div>
+                            <div class="text-xs text-gray-600 dark:text-gray-400">Total Ofertas</div>
+                        </div>
+                        <div class="text-center p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                            <div class="text-xl font-bold text-gray-900 dark:text-white">${data.desglose.length}</div>
+                            <div class="text-xs text-gray-600 dark:text-gray-400">Tiempos Diferentes</div>
+                        </div>
+                        <div class="text-center p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                            <div class="text-xl font-bold text-gray-900 dark:text-white">${formatearTiempo(minRango)}</div>
+                            <div class="text-xs text-gray-600 dark:text-gray-400">Frecuencia Mínima</div>
+                        </div>
+                        <div class="text-center p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                            <div class="text-xl font-bold text-gray-900 dark:text-white">${formatearTiempo(maxRango)}</div>
+                            <div class="text-xs text-gray-600 dark:text-gray-400">Frecuencia Máxima</div>
+                        </div>
+                    </div>
+                `;
                 
             } catch (error) {
                 console.error('Error al cargar desglose:', error);
-                mostrarNotificacion('Error al cargar el desglose de tiempos', 'error');
+                mostrarNotificacion('Error al cargar el desglose de tiempos: ' + error.message, 'error');
+                
+                // Mostrar mensaje de error en el gráfico
+                const mensajeGrafico = document.getElementById('mensaje-grafico');
+                if (mensajeGrafico) {
+                    mensajeGrafico.textContent = 'Error al cargar el gráfico. Por favor, recarga la página.';
+                    mensajeGrafico.classList.remove('hidden');
+                }
+            }
+        }
+        
+        // Función auxiliar para formatear tiempo
+        function formatearTiempo(minutos) {
+            if (minutos < 60) {
+                return `${Math.round(minutos)} min`;
+            } else if (minutos < 24 * 60) {
+                const horas = Math.round(minutos / 60 * 10) / 10;
+                return `${horas} h`;
+            } else {
+                const dias = Math.round(minutos / (24 * 60) * 10) / 10;
+                return `${dias} d`;
             }
         }
 
