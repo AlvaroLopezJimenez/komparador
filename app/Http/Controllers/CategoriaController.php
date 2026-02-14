@@ -73,9 +73,13 @@ class CategoriaController extends Controller
             ->orderBy('nombre')
             ->get();
 
+        // Calcular conteos de productos por sublínea
+        $conteosProductos = $this->calcularConteosProductos($categoria);
+
         return view('admin.categorias.formulario', [
             'categoria' => $categoria,
-            'categoriasRaiz' => $categoriasRaiz
+            'categoriasRaiz' => $categoriasRaiz,
+            'conteosProductos' => $conteosProductos
         ]);
     }
 
@@ -287,5 +291,77 @@ class CategoriaController extends Controller
             'success' => true,
             'info_adicional' => $categoria->info_adicional_chatgpt ?? ''
         ]);
+    }
+
+    /**
+     * Calcula el número de productos que tienen cada sublínea marcada
+     */
+    private function calcularConteosProductos(Categoria $categoria)
+    {
+        $conteos = [];
+        
+        // Si la categoría no tiene especificaciones internas, retornar array vacío
+        if (!$categoria->especificaciones_internas || !isset($categoria->especificaciones_internas['filtros'])) {
+            return $conteos;
+        }
+        
+        // Obtener todos los productos que usan esta categoría para especificaciones internas
+        $productos = \App\Models\Producto::where('categoria_id_especificaciones_internas', $categoria->id)
+            ->whereNotNull('categoria_especificaciones_internas_elegidas')
+            ->where('mostrar', 'si')
+            ->get(['id', 'categoria_especificaciones_internas_elegidas']);
+        
+        // Recorrer cada línea principal
+        foreach ($categoria->especificaciones_internas['filtros'] as $filtro) {
+            $lineaId = (string) ($filtro['id'] ?? '');
+            
+            if (empty($lineaId)) {
+                continue;
+            }
+            
+            // Inicializar array para esta línea
+            if (!isset($conteos[$lineaId])) {
+                $conteos[$lineaId] = [];
+            }
+            
+            // Recorrer cada sublínea
+            foreach ($filtro['subprincipales'] ?? [] as $sub) {
+                $sublineaId = (string) ($sub['id'] ?? '');
+                
+                if (empty($sublineaId)) {
+                    continue;
+                }
+                
+                // Contar productos que tienen esta sublínea
+                $contador = 0;
+                foreach ($productos as $producto) {
+                    $especificaciones = $producto->categoria_especificaciones_internas_elegidas;
+                    
+                    if (!$especificaciones || !is_array($especificaciones)) {
+                        continue;
+                    }
+                    
+                    $productoLinea = $especificaciones[$lineaId] ?? null;
+                    if (!$productoLinea) {
+                        continue;
+                    }
+                    
+                    $productoSublineas = is_array($productoLinea) ? $productoLinea : [$productoLinea];
+                    
+                    foreach ($productoSublineas as $item) {
+                        $itemId = (is_array($item) && isset($item['id'])) ? strval($item['id']) : strval($item);
+                        
+                        if ($sublineaId === $itemId) {
+                            $contador++;
+                            break; // Evitar contar el mismo producto dos veces
+                        }
+                    }
+                }
+                
+                $conteos[$lineaId][$sublineaId] = $contador;
+            }
+        }
+        
+        return $conteos;
     }
 }

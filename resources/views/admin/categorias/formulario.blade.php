@@ -1661,6 +1661,17 @@
         let contadorIntermedia = 0;
         let datosCargados = false;
         
+        // Obtener conteos de productos desde el servidor
+        const conteosProductos = @json($conteosProductos ?? []);
+        
+        // Función para obtener el contador de productos de una sublínea
+        function obtenerContadorProductos(lineaId, sublineaId) {
+            if (!conteosProductos || !conteosProductos[lineaId]) {
+                return null;
+            }
+            return conteosProductos[lineaId][sublineaId] ?? null;
+        }
+        
         // Generar ID único para líneas
         function generarIdUnico() {
             return Date.now() + '_' + Math.random().toString(36).substr(2, 9);
@@ -1685,7 +1696,16 @@
             if (datos && datos.length > 0) {
                 // Cargar datos existentes
                 datos.forEach((filtro, index) => {
-                    crearLineaPrincipal(filtro.texto || '', filtro.importante || false, filtro.subprincipales || [], filtro.id || null, filtro.slug || null);
+                    // Obtener conteos para las sublíneas de este filtro
+                    const subprincipalesConConteos = (filtro.subprincipales || []).map(sub => {
+                        const productosCount = obtenerContadorProductos(filtro.id, sub.id);
+                        return {
+                            ...sub,
+                            productosCount: productosCount
+                        };
+                    });
+                    
+                    crearLineaPrincipal(filtro.texto || '', filtro.importante || false, subprincipalesConConteos, filtro.id || null, filtro.slug || null);
                 });
             } else {
                 // Crear 3 líneas por defecto
@@ -1781,7 +1801,8 @@
             // Cargar subprincipales si existen
             if (subprincipales && subprincipales.length > 0) {
                 subprincipales.forEach(sub => {
-                    crearLineaIntermedia(containerSubprincipales, sub.texto || '', sub.id || null, sub.slug || null);
+                    const productosCount = sub.productosCount !== undefined ? sub.productosCount : obtenerContadorProductos(idUnicoLinea, sub.id);
+                    crearLineaIntermedia(containerSubprincipales, sub.texto || '', sub.id || null, sub.slug || null, productosCount);
                 });
             } else {
                 // Siempre crear al menos una línea intermedia por defecto
@@ -1832,7 +1853,7 @@
         }
 
         // Crear una línea intermedia
-        function crearLineaIntermedia(containerPadre, texto = '', idUnico = null, slugUnico = null) {
+        function crearLineaIntermedia(containerPadre, texto = '', idUnico = null, slugUnico = null, productosCount = null) {
             const idIntermedia = `intermedia-${contadorIntermedia++}`;
             const idUnicoLinea = idUnico || generarIdUnico();
             
@@ -1846,6 +1867,9 @@
             divIntermedia.dataset.slug = slugLinea;
             divIntermedia.draggable = false;
             
+            // Mostrar contador de productos si existe
+            const contadorTexto = productosCount !== null && productosCount !== undefined ? `(${productosCount} productos)` : '';
+            
             divIntermedia.innerHTML = `
                 <div class="drag-handle-intermedia cursor-move text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" title="Arrastrar para reordenar" draggable="true">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1856,6 +1880,7 @@
                        class="linea-intermedia-texto flex-1 px-3 py-2 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600" 
                        placeholder="Texto intermedio"
                        value="${texto}">
+                ${contadorTexto ? `<span class="text-sm text-gray-500 dark:text-gray-400 productos-count-display">${contadorTexto}</span>` : ''}
                 <button type="button" class="btn-eliminar-intermedia bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs" title="Eliminar línea intermedia">
                     -
                 </button>
