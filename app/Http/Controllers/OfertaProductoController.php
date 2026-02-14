@@ -198,6 +198,7 @@ class OfertaProductoController extends Controller
         $request->merge([
             'precio_total' => str_replace(',', '.', $request->precio_total),
             'precio_unidad' => str_replace(',', '.', $request->precio_unidad),
+            'envio' => $request->filled('envio') ? str_replace(',', '.', $request->envio) : null,
         ]);
 
         $validated = $request->validate([
@@ -206,6 +207,7 @@ class OfertaProductoController extends Controller
             'unidades' => 'required|numeric|min:0.01',
             'precio_total' => 'required|numeric|min:0',
             'precio_unidad' => 'required|numeric|min:0',
+            'envio' => 'nullable|numeric|min:0|max:99.99',
             'url' => 'required|url',
             'variante' => 'nullable|string|max:255',
             'descuentos' => 'nullable|string',
@@ -402,6 +404,18 @@ class OfertaProductoController extends Controller
         $precioNuevo = (float) $validated['precio_total'];
         $precioCambio = abs($precioAnterior - $precioNuevo) > 0.01; // Considerar cambio si diferencia > 1 céntimo
 
+        // Verificar si el campo envio ha cambiado
+        $envioAnterior = $oferta->envio;
+        $envioNuevo = $request->filled('envio') ? (float) $validated['envio'] : null;
+        $envioCambio = false;
+        
+        // Comparar valores (considerando null y 0)
+        if (($envioAnterior === null && $envioNuevo !== null) || 
+            ($envioAnterior !== null && $envioNuevo === null) ||
+            ($envioAnterior !== null && $envioNuevo !== null && abs($envioAnterior - $envioNuevo) > 0.01)) {
+            $envioCambio = true;
+        }
+
         // Deshabilitar timestamps automáticos temporalmente
         $oferta->timestamps = false;
 
@@ -411,15 +425,20 @@ class OfertaProductoController extends Controller
             $especificacionesInternas = json_decode($request->especificaciones_internas, true);
         }
 
-        $oferta->update(array_merge($datosBase, [
+        // Si se proporciona envio, establecer frecuencia_actualizar_envio_minutos con el valor por defecto
+        $datosActualizar = [
             'frecuencia_actualizar_precio_minutos' => round($minutos),
             'aviso' => $avisoFecha,
             'descuentos' => $descuentos,
             'especificaciones_internas' => $especificacionesInternas,
-            'frecuencia_actualizar_precio_minutos' => round($minutos),
-            'aviso' => $avisoFecha,
-            'descuentos' => $descuentos,
-        ]));
+        ];
+        
+        // Si el campo envio ha cambiado, actualizar fecha_actualizacion_envio
+        if ($envioCambio) {
+            $datosActualizar['fecha_actualizacion_envio'] = now();
+        }
+
+        $oferta->update(array_merge($datosBase, $datosActualizar));
 
         // Si se proporcionó una fecha de actualización manual, establecerla
         if ($request->filled('fecha_actualizacion_manual')) {
@@ -706,6 +725,7 @@ class OfertaProductoController extends Controller
         $request->merge([
             'precio_total' => str_replace(',', '.', $request->precio_total),
             'precio_unidad' => str_replace(',', '.', $request->precio_unidad),
+            'envio' => $request->filled('envio') ? str_replace(',', '.', $request->envio) : null,
         ]);
 
         try {
@@ -715,6 +735,7 @@ class OfertaProductoController extends Controller
                 'unidades' => 'required|numeric|min:0.01',
                 'precio_total' => 'required|numeric|min:0',
                 'precio_unidad' => 'required|numeric|min:0',
+                'envio' => 'nullable|numeric|min:0|max:99.99',
                 'url' => 'required|url',
                 'variante' => 'nullable|string|max:255',
                 'descuentos' => 'nullable|string',
@@ -844,12 +865,18 @@ class OfertaProductoController extends Controller
             $especificacionesInternas = json_decode($request->especificaciones_internas, true);
         }
 
-        $oferta = OfertaProducto::create(array_merge($datosBase, [
+        // Si se proporciona envio, establecer fecha_actualizacion_envio con la fecha actual
+        $datosCrear = [
             'frecuencia_actualizar_precio_minutos' => round($minutos),
             'descuentos' => $descuentos,
             'aviso' => $avisoFecha,
             'especificaciones_internas' => $especificacionesInternas,
-        ]));
+        ];
+        
+        // Al crear una oferta nueva, siempre establecer fecha_actualizacion_envio
+        $datosCrear['fecha_actualizacion_envio'] = now();
+
+        $oferta = OfertaProducto::create(array_merge($datosBase, $datosCrear));
 
         // Si se proporcionó una fecha de actualización manual, establecerla
         if ($request->filled('fecha_actualizacion_manual')) {
@@ -2487,14 +2514,16 @@ class OfertaProductoController extends Controller
      */
     public function obtenerTiendasDisponibles()
     {
-        $tiendas = \App\Models\Tienda::select('id', 'nombre', 'url')
+        $tiendas = \App\Models\Tienda::select('id', 'nombre', 'url', 'envio_gratis', 'envio_normal')
             ->orderBy('nombre', 'asc')
             ->get()
             ->map(function ($tienda) {
                 return [
                     'id' => $tienda->id,
                     'nombre' => $tienda->nombre,
-                    'url' => $tienda->url
+                    'url' => $tienda->url,
+                    'envio_gratis' => $tienda->envio_gratis ?? null,
+                    'envio_normal' => $tienda->envio_normal ?? null
                 ];
             });
         
@@ -3394,6 +3423,128 @@ class OfertaProductoController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Error al procesar: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Comprobar ofertas con gastos de envío diferentes a los de la tienda
+     * Cron que se ejecuta periódicamente para detectar ofertas que tienen
+     * gastos de envío diferentes a los configurados en la tienda
+     */
+    public function comprobarGastosEnvioOfertas()
+    {
+        try {
+            $fecha30DiasAtras = now()->subDays(30);
+            
+            // Buscar ofertas que cumplan los criterios
+            $ofertas = OfertaProducto::where('mostrar', 'si')
+                ->whereNull('chollo_id')
+                ->whereNotNull('envio')
+                ->where('envio', '>', 0)
+                ->where(function($query) use ($fecha30DiasAtras) {
+                    $query->whereNull('fecha_actualizacion_envio')
+                          ->orWhere('fecha_actualizacion_envio', '<', $fecha30DiasAtras);
+                })
+                ->whereHas('tienda', function($query) {
+                    $query->where('mostrar', 'si');
+                })
+                ->with('tienda')
+                ->get();
+
+            $avisosCreados = 0;
+
+            foreach ($ofertas as $oferta) {
+                $tienda = $oferta->tienda;
+                
+                // Obtener el valor de envío esperado de la tienda (misma lógica que en el formulario)
+                $envioEsperado = null;
+                $envioTexto = null;
+                
+                // Buscar primero en envio_gratis, si es null o vacío, buscar en envio_normal
+                if ($tienda->envio_gratis && trim($tienda->envio_gratis) !== '') {
+                    $envioTexto = $tienda->envio_gratis;
+                } elseif ($tienda->envio_normal && trim($tienda->envio_normal) !== '') {
+                    $envioTexto = $tienda->envio_normal;
+                }
+                
+                // Si no hay envio_texto, la tienda no tiene configurado envío, saltar
+                if (!$envioTexto) {
+                    continue;
+                }
+                
+                $envioTextoLower = strtolower($envioTexto);
+                
+                // Verificar si contiene "gratis"
+                if (strpos($envioTextoLower, 'gratis') !== false) {
+                    // Si la tienda tiene envío gratis, la oferta no debería tener envío
+                    $envioEsperado = 0;
+                } else {
+                    // Si no es gratis, intentar extraer el precio
+                    // Puede ser "2,99 € < 40€", "2€ < 40€", "2,99 €" o "2€"
+                    if (preg_match('/(\d+[,.]?\d*)\s*€?/', $envioTexto, $matches)) {
+                        // Extraer el número y convertir coma a punto
+                        $envioEsperado = (float) str_replace(',', '.', $matches[1]);
+                    }
+                }
+                
+                // Comparar el envío de la oferta con el esperado
+                $envioOferta = (float) $oferta->envio;
+                $esDiferente = false;
+                
+                if ($envioEsperado === null) {
+                    // No se pudo determinar el envío esperado, saltar
+                    continue;
+                }
+                
+                // Comparar con tolerancia de 0.01 para evitar problemas de precisión
+                if (abs($envioOferta - $envioEsperado) > 0.01) {
+                    $esDiferente = true;
+                }
+                
+                // Si el envío es diferente, crear aviso
+                if ($esDiferente) {
+                    // Verificar si ya existe un aviso para esta oferta con el mismo texto
+                    $avisoExistente = DB::table('avisos')
+                        ->where('avisoable_type', OfertaProducto::class)
+                        ->where('avisoable_id', $oferta->id)
+                        ->where('texto_aviso', 'Comprobar gastos de envio')
+                        ->where('fecha_aviso', '>=', now())
+                        ->first();
+                    
+                    if (!$avisoExistente) {
+                        // Crear aviso con fecha actual
+                        DB::table('avisos')->insert([
+                            'texto_aviso'     => 'Comprobar gastos de envio',
+                            'fecha_aviso'     => now(),
+                            'user_id'         => 1, // usuario sistema
+                            'avisoable_type'  => OfertaProducto::class,
+                            'avisoable_id'    => $oferta->id,
+                            'oculto'          => 0, // visible
+                            'created_at'      => now(),
+                            'updated_at'      => now(),
+                        ]);
+                        
+                        $avisosCreados++;
+                    }
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => "Se procesaron {$ofertas->count()} ofertas y se crearon {$avisosCreados} avisos.",
+                'ofertas_procesadas' => $ofertas->count(),
+                'avisos_creados' => $avisosCreados
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error en comprobarGastosEnvioOfertas: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al comprobar gastos de envío: ' . $e->getMessage()
             ], 500);
         }
     }

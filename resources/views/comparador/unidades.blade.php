@@ -2279,6 +2279,12 @@
                 ? route('click.redirigir', ['ofertaId' => $item->id])
                 : $signedUrlService->generarUrlFirmada($item->id);
             
+            // Obtener el valor de envío de la oferta si existe
+            $envioOferta = null;
+            if (isset($item->envio) && $item->envio !== null && $item->envio > 0) {
+              $envioOferta = number_format($item->envio, 2, ',', '');
+            }
+            
             return [
               "id" => $item->id,
               "nombre" => $item->tienda->nombre ?? 'N/A',
@@ -2286,6 +2292,7 @@
               "logo" => asset('images/' . ($item->tienda->url_imagen ?? '')),
               "envio_gratis" => $item->tienda->envio_gratis ?? '',
               "envio_normal" => $item->tienda->envio_normal ?? '',
+              "envio" => $envioOferta,
               "unidades" => $unidadesFormateadas,
               "unidades_originales" => $unidadesFormateadas,
               "precio_total" => number_format($item->precio_total ?? 0, 2, ',', ''),
@@ -4145,8 +4152,10 @@
                       <img src="${primeraOferta.logo}" loading="lazy" alt="${primeraOferta.nombre}" class="w-full max-w-[130px] sm:h-[45px] h-[36px] object-contain">
                     </div>
                     <div class="envio text-gray-700 divider text-center min-w-0 overflow-hidden ${ordenEnvio}">
-                      <p class="text-sm text-gray-500 font-bold"><img src='{{ asset('images/van.png') }}' loading="lazy" alt='Van' class='icon-small'> ${primeraOferta.envio_gratis}</p>
-                      <p class="text-sm text-gray-500"><img src='{{ asset('images/van.png') }}' loading="lazy" alt='Van' class='icon-small'> ${primeraOferta.envio_normal}</p>
+                      ${primeraOferta.envio ? 
+                        `<p class="text-sm text-gray-500 font-bold"><img src='{{ asset('images/van.png') }}' loading="lazy" alt='Van' class='icon-small'> ${primeraOferta.envio} €</p>` :
+                        `${primeraOferta.envio_gratis ? '<p class="text-sm text-gray-500 font-bold"><img src=\'{{ asset('images/van.png') }}\' loading="lazy" alt=\'Van\' class=\'icon-small\'> ' + primeraOferta.envio_gratis + '</p>' : ''}${primeraOferta.envio_normal ? '<p class="text-sm text-gray-500"><img src=\'{{ asset('images/van.png') }}\' loading="lazy" alt=\'Van\' class=\'icon-small\'> ' + primeraOferta.envio_normal + '</p>' : ''}`
+                      }
                     </div>
                     ${mostrarCantidad ? `
                     <div class="und text-gray-700 divider text-center min-w-0 overflow-hidden">
@@ -4157,14 +4166,21 @@
                     ${columnasDinamicas}
                     ${!mostrarPrecioTotal && !mostrarPrecioUnidad ? `
                     <div class="precio-total text-gray-700 divider text-center min-w-0 overflow-hidden ${ordenPrecio}">
-                      <div class="text-sm text-gray-500">Precio total</div>
+                      <div class="text-sm text-gray-500">Precio total${primeraOferta.envio ? ' <span class="text-xs text-gray-400">(envio Incl.)</span>' : ''}</div>
                       <div class="text-2xl font-extrabold" style="color: #e97b11;">${primeraOferta.precio_total} <span class="text-sm text-gray-500 font-normal">€</span></div>
                     </div>
                     ` : ''}
                     ${mostrarPrecioTotal ? `
                     <div class="precio-total text-gray-700 divider text-center min-w-0 overflow-hidden ${ordenPrecio} ${esUnidadUnicaSinColumnas ? 'precio-unidad-unica-sin-columnas' : ''}">
-                      <div class="${precioTotalLabelClass}">Precio total</div>
-                      <div class="${precioTotalClass}" ${esUnidadUnica ? 'style="color: #e97b11; font-weight: 900;"' : (ordenActual === 'precio_total' ? 'style="color: #e97b11; font-weight: 900;"' : 'style="color: #111827;"')}>${primeraOferta.precio_total} <span class="text-sm text-gray-500 font-normal">€</span></div>
+                      ${!esUnidadUnica && primeraOferta.envio ? `
+                        <div class="${precioTotalLabelClass}">Precio total</div>
+                        <div class="text-xs text-gray-400 hidden sm:block">(envio Incl.)</div>
+                        <div class="${precioTotalLabelClass} sm:hidden">Precio total <span class="text-xs text-gray-400">(envio Incl.)</span></div>
+                        <div class="${precioTotalClass}" ${ordenActual === 'precio_total' ? 'style="color: #e97b11; font-weight: 900;"' : 'style="color: #111827;"'}>${primeraOferta.precio_total} <span class="text-sm text-gray-500 font-normal">€</span></div>
+                      ` : `
+                        <div class="${precioTotalLabelClass}">Precio total${primeraOferta.envio ? ' <span class="text-xs text-gray-400">(envio Incl.)</span>' : ''}</div>
+                        <div class="${precioTotalClass}" ${esUnidadUnica ? 'style="color: #e97b11; font-weight: 900;"' : (ordenActual === 'precio_total' ? 'style="color: #e97b11; font-weight: 900;"' : 'style="color: #111827;"')}>${primeraOferta.precio_total} <span class="text-sm text-gray-500 font-normal">€</span></div>
+                      `}
                     </div>
                     ` : ''}
                     ${mostrarPrecioUnidad ? `
@@ -4340,8 +4356,10 @@
                         <img src="${itemGrupo.logo}" loading="lazy" alt="${itemGrupo.nombre}" class="w-full max-w-[130px] sm:h-[45px] h-[36px] object-contain">
                       </div>
                       <div class="envio text-gray-700 divider text-center min-w-0 overflow-hidden ${ordenEnvio}">
-                        <p class="text-sm text-gray-500 font-bold"><img src='{{ asset('images/van.png') }}' loading="lazy" alt='Van' class='icon-small'> ${itemGrupo.envio_gratis}</p>
-                        <p class="text-sm text-gray-500"><img src='{{ asset('images/van.png') }}' loading="lazy" alt='Van' class='icon-small'> ${itemGrupo.envio_normal}</p>
+                        ${itemGrupo.envio ? 
+                          `<p class="text-sm text-gray-500 font-bold"><img src='{{ asset('images/van.png') }}' loading="lazy" alt='Van' class='icon-small'> ${itemGrupo.envio} €</p>` :
+                          `${itemGrupo.envio_gratis ? '<p class="text-sm text-gray-500 font-bold"><img src=\'{{ asset('images/van.png') }}\' loading="lazy" alt=\'Van\' class=\'icon-small\'> ' + itemGrupo.envio_gratis + '</p>' : ''}${itemGrupo.envio_normal ? '<p class="text-sm text-gray-500"><img src=\'{{ asset('images/van.png') }}\' loading="lazy" alt=\'Van\' class=\'icon-small\'> ' + itemGrupo.envio_normal + '</p>' : ''}`
+                        }
                       </div>
                       ${mostrarCantidad ? `
                       <div class="und text-gray-700 divider text-center min-w-0 overflow-hidden">
@@ -4352,14 +4370,21 @@
                       ${columnasDinamicas}
                       ${!mostrarPrecioTotal && !mostrarPrecioUnidad ? `
                       <div class="precio-total text-gray-700 divider text-center min-w-0 overflow-hidden ${ordenPrecio}">
-                        <div class="text-sm text-gray-500">Precio total</div>
+                        <div class="text-sm text-gray-500">Precio total${itemGrupo.envio ? ' <span class="text-xs text-gray-400">(envio Incl.)</span>' : ''}</div>
                         <div class="text-2xl font-extrabold" style="color: #e97b11;">${itemGrupo.precio_total} <span class="text-sm text-gray-500 font-normal">€</span></div>
                       </div>
                       ` : ''}
                       ${mostrarPrecioTotal ? `
                       <div class="precio-total text-gray-700 divider text-center min-w-0 overflow-hidden ${ordenPrecio} ${esUnidadUnicaSinColumnas ? 'precio-unidad-unica-sin-columnas' : ''}">
-                        <div class="${precioTotalLabelClass}">Precio total</div>
-                        <div class="${precioTotalClass}" ${esUnidadUnica ? 'style="color: #e97b11; font-weight: 900;"' : (ordenActual === 'precio_total' ? 'style="color: #e97b11; font-weight: 900;"' : 'style="color: #111827;"')}>${itemGrupo.precio_total} <span class="text-sm text-gray-500 font-normal">€</span></div>
+                        ${!esUnidadUnica && itemGrupo.envio ? `
+                          <div class="${precioTotalLabelClass}">Precio total</div>
+                          <div class="text-xs text-gray-400 hidden sm:block">(envio Incl.)</div>
+                          <div class="${precioTotalLabelClass} sm:hidden">Precio total <span class="text-xs text-gray-400">(envio Incl.)</span></div>
+                          <div class="${precioTotalClass}" ${ordenActual === 'precio_total' ? 'style="color: #e97b11; font-weight: 900;"' : 'style="color: #111827;"'}>${itemGrupo.precio_total} <span class="text-sm text-gray-500 font-normal">€</span></div>
+                        ` : `
+                          <div class="${precioTotalLabelClass}">Precio total${itemGrupo.envio ? ' <span class="text-xs text-gray-400">(envio Incl.)</span>' : ''}</div>
+                          <div class="${precioTotalClass}" ${esUnidadUnica ? 'style="color: #e97b11; font-weight: 900;"' : (ordenActual === 'precio_total' ? 'style="color: #e97b11; font-weight: 900;"' : 'style="color: #111827;"')}>${itemGrupo.precio_total} <span class="text-sm text-gray-500 font-normal">€</span></div>
+                        `}
                       </div>
                       ` : ''}
                       ${mostrarPrecioUnidad ? `
@@ -4566,8 +4591,10 @@
                       <img src="${item.logo}" loading="lazy" alt="${item.nombre}" class="w-full max-w-[130px] sm:h-[45px] h-[36px] object-contain">
                     </div>
                     <div class="envio text-gray-700 divider text-center min-w-0 overflow-hidden ${ordenEnvio}">
-                      <p class="text-sm text-gray-500 font-bold"><img src='{{ asset('images/van.png') }}' loading="lazy" alt='Van' class='icon-small'> ${item.envio_gratis}</p>
-                      <p class="text-sm text-gray-500"><img src='{{ asset('images/van.png') }}' loading="lazy" alt='Van' class='icon-small'> ${item.envio_normal}</p>
+                      ${item.envio ? 
+                        `<p class="text-sm text-gray-500 font-bold"><img src='{{ asset('images/van.png') }}' loading="lazy" alt='Van' class='icon-small'> ${item.envio} €</p>` :
+                        `${item.envio_gratis ? '<p class="text-sm text-gray-500 font-bold"><img src=\'{{ asset('images/van.png') }}\' loading="lazy" alt=\'Van\' class=\'icon-small\'> ' + item.envio_gratis + '</p>' : ''}${item.envio_normal ? '<p class="text-sm text-gray-500"><img src=\'{{ asset('images/van.png') }}\' loading="lazy" alt=\'Van\' class=\'icon-small\'> ' + item.envio_normal + '</p>' : ''}`
+                      }
                     </div>
                     ${mostrarCantidad ? `
                     <div class="und text-gray-700 divider text-center min-w-0 overflow-hidden">
@@ -4578,14 +4605,21 @@
                     ${columnasDinamicas}
                     ${!mostrarPrecioTotal && !mostrarPrecioUnidad ? `
                     <div class="precio-total text-gray-700 divider text-center min-w-0 overflow-hidden ${ordenPrecio}">
-                      <div class="text-sm text-gray-500">Precio total</div>
+                      <div class="text-sm text-gray-500">Precio total${item.envio ? ' <span class="text-xs text-gray-400">(envio Incl.)</span>' : ''}</div>
                       <div class="text-2xl font-extrabold" style="color: #e97b11;">${item.precio_total} <span class="text-sm text-gray-500 font-normal">€</span></div>
                     </div>
                     ` : ''}
                     ${mostrarPrecioTotal ? `
                     <div class="precio-total text-gray-700 divider text-center min-w-0 overflow-hidden ${ordenPrecio} ${esUnidadUnicaSinColumnas ? 'precio-unidad-unica-sin-columnas' : ''}">
-                      <div class="${precioTotalLabelClass}">Precio total</div>
-                      <div class="${precioTotalClass}" ${esUnidadUnica ? 'style="color: #e97b11; font-weight: 900;"' : (ordenActual === 'precio_total' ? 'style="color: #e97b11; font-weight: 900;"' : 'style="color: #111827;"')}>${item.precio_total} <span class="text-sm text-gray-500 font-normal">€</span></div>
+                      ${!esUnidadUnica && item.envio ? `
+                        <div class="${precioTotalLabelClass}">Precio total</div>
+                        <div class="text-xs text-gray-400 hidden sm:block">(envio Incl.)</div>
+                        <div class="${precioTotalLabelClass} sm:hidden">Precio total <span class="text-xs text-gray-400">(envio Incl.)</span></div>
+                        <div class="${precioTotalClass}" ${ordenActual === 'precio_total' ? 'style="color: #e97b11; font-weight: 900;"' : 'style="color: #111827;"'}>${item.precio_total} <span class="text-sm text-gray-500 font-normal">€</span></div>
+                      ` : `
+                        <div class="${precioTotalLabelClass}">Precio total${item.envio ? ' <span class="text-xs text-gray-400">(envio Incl.)</span>' : ''}</div>
+                        <div class="${precioTotalClass}" ${esUnidadUnica ? 'style="color: #e97b11; font-weight: 900;"' : (ordenActual === 'precio_total' ? 'style="color: #e97b11; font-weight: 900;"' : 'style="color: #111827;"')}>${item.precio_total} <span class="text-sm text-gray-500 font-normal">€</span></div>
+                      `}
                     </div>
                     ` : ''}
                     ${mostrarPrecioUnidad ? `
@@ -7469,8 +7503,10 @@ function _rod1() {
   html += `
       <div class="text-center mb-4 pb-4 border-b border-gray-200">
         <div class="envio text-gray-700">
-          ${primeraOferta.envio_gratis ? '<p class="text-sm text-gray-500 font-bold"><img src="' + vanIconUrlModal + '" loading="lazy" alt="Van" class="icon-small inline-block align-middle mr-1"> ' + primeraOferta.envio_gratis + '</p>' : ''}
-          ${primeraOferta.envio_normal ? '<p class="text-sm text-gray-500"><img src="' + vanIconUrlModal + '" loading="lazy" alt="Van" class="icon-small inline-block align-middle mr-1"> ' + primeraOferta.envio_normal + '</p>' : ''}
+          ${primeraOferta.envio ? 
+            '<p class="text-sm text-gray-500 font-bold"><img src="' + vanIconUrlModal + '" loading="lazy" alt="Van" class="icon-small inline-block align-middle mr-1"> ' + primeraOferta.envio + ' €</p>' :
+            `${primeraOferta.envio_gratis ? '<p class="text-sm text-gray-500 font-bold"><img src="' + vanIconUrlModal + '" loading="lazy" alt="Van" class="icon-small inline-block align-middle mr-1"> ' + primeraOferta.envio_gratis + '</p>' : ''}${primeraOferta.envio_normal ? '<p class="text-sm text-gray-500"><img src="' + vanIconUrlModal + '" loading="lazy" alt="Van" class="icon-small inline-block align-middle mr-1"> ' + primeraOferta.envio_normal + '</p>' : ''}`
+          }
         </div>
       </div>
   `;
@@ -7498,7 +7534,7 @@ function _rod1() {
     html += `
       <div class="text-center mb-4 pb-4 border-b border-gray-200">
         <div class="precio-total text-gray-700">
-          <div class="text-sm text-gray-500">Precio total</div>
+          <div class="text-sm text-gray-500">Precio total${primeraOferta.envio ? ' <span class="text-xs text-gray-400">(envio Incl.)</span>' : ''}</div>
           <div class="text-2xl font-extrabold" style="color: #e97b11;">${primeraOferta.precio_total} <span class="text-sm text-gray-500 font-normal">€</span></div>
         </div>
       </div>
@@ -7510,7 +7546,7 @@ function _rod1() {
     html += `
       <div class="text-center mb-4 pb-4 border-b border-gray-200">
         <div class="precio-total text-gray-700">
-          <div class="${precioTotalLabelClass}">Precio total</div>
+          <div class="${precioTotalLabelClass}">Precio total${primeraOferta.envio ? ' <span class="text-xs text-gray-400">(envio Incl.)</span>' : ''}</div>
           <div class="${precioTotalClass}">${primeraOferta.precio_total} <span class="text-sm text-gray-500 font-normal">€</span></div>
         </div>
       </div>

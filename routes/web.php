@@ -279,6 +279,14 @@ Route::prefix('admin')->group(function () {
         return app(\App\Http\Controllers\OfertaProductoController::class)->ejecutarHistoricoPrecios();
     });
 
+    // Comprobar gastos de envío de ofertas
+    Route::get('ofertas/comprobar-gastos-envio', function (Request $request) {
+        if ($request->get('token') !== env('TOKEN_ACTUALIZAR_PRECIOS')) {
+            abort(403, 'Token inválido');
+        }
+        return app(\App\Http\Controllers\OfertaProductoController::class)->comprobarGastosEnvioOfertas();
+    });
+
     // RUTAS PARA PRECIOS HOT
     // Ejecución en segundo plano (para cron jobs)
     Route::get('precios-hot/ejecutar-segundo-plano', [App\Http\Controllers\PrecioHotController::class, 'ejecutarSegundoPlano'])->name('precios-hot.ejecutar.segundo-plano');
@@ -561,6 +569,7 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
         Route::get('/{aviso}/texto', [AvisoController::class, 'getTextoAviso'])->name('get.texto');
         Route::delete('/{aviso}', [AvisoController::class, 'destroy'])->name('destroy');
         Route::post('/{aviso}/aplazar', [AvisoController::class, 'aplazar'])->name('aplazar');
+        Route::post('/marcar-envio-comprobado', [AvisoController::class, 'marcarEnvioComprobado'])->name('marcar.envio.comprobado');
         Route::get('/elemento', [AvisoController::class, 'getAvisosElemento'])->name('get.elemento');
         Route::get('/oferta-mas-barata', [AvisoController::class, 'obtenerOfertaMasBarata'])->name('oferta-mas-barata');
         Route::post('/toggle-mostrar-todos', [AvisoController::class, 'toggleMostrarTodos'])->name('toggle.mostrar.todos');

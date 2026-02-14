@@ -276,6 +276,12 @@ class OfertasController extends Controller
                     ? route('click.redirigir', ['ofertaId' => $item->id])
                     : $this->signedUrlService->generarUrlFirmada($item->id);
                 
+                // Obtener el valor de envío de la oferta si existe
+                $envioOferta = null;
+                if (isset($item->envio) && $item->envio !== null && $item->envio > 0) {
+                    $envioOferta = number_format($item->envio, 2, ',', '');
+                }
+                
                 return [
                     "id" => $item->id,
                     "nombre" => $item->tienda->nombre ?? 'N/A',
@@ -283,6 +289,7 @@ class OfertasController extends Controller
                     "logo" => asset('images/' . ($item->tienda->url_imagen ?? '')),
                     "envio_gratis" => $item->tienda->envio_gratis ?? '',
                     "envio_normal" => $item->tienda->envio_normal ?? '',
+                    "envio" => $envioOferta,
                     "unidades" => $unidadesFormateadas,
                     "unidades_originales" => $unidadesFormateadas,
                     "precio_total" => number_format($item->precio_total ?? 0, 2, ',', ''),

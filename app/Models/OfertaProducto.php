@@ -16,6 +16,8 @@ class OfertaProducto extends Model
         'chollo_id',
         'unidades',
         'precio_total',
+        'envio',
+        'fecha_actualizacion_envio',
         'frecuencia_actualizar_precio_minutos',
         'precio_unidad',
         'url',
@@ -41,6 +43,7 @@ class OfertaProducto extends Model
         'fecha_inicio' => 'datetime',
         'fecha_final' => 'datetime',
         'comprobada' => 'datetime',
+        'fecha_actualizacion_envio' => 'datetime',
     ];
 
     public function producto()

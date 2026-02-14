@@ -554,6 +554,46 @@ class AvisoController extends Controller
     }
 
     /**
+     * Marcar envío como comprobado (actualizar fecha_actualizacion_envio de la oferta)
+     */
+    public function marcarEnvioComprobado(Request $request)
+    {
+        $request->validate([
+            'oferta_id' => 'required|exists:ofertas_producto,id',
+            'aviso_id' => 'required|exists:avisos,id'
+        ]);
+
+        try {
+            $oferta = OfertaProducto::findOrFail($request->oferta_id);
+            
+            // Actualizar fecha_actualizacion_envio a la fecha actual
+            $oferta->fecha_actualizacion_envio = now();
+            $oferta->save();
+
+            // Eliminar el aviso
+            $aviso = Aviso::findOrFail($request->aviso_id);
+            $aviso->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Envío marcado como comprobado correctamente'
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error al marcar envío como comprobado: ' . $e->getMessage(), [
+                'oferta_id' => $request->oferta_id,
+                'aviso_id' => $request->aviso_id,
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al marcar como comprobado: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Aplazar un aviso según el patrón de texto
      */
     public function aplazar(Aviso $aviso)

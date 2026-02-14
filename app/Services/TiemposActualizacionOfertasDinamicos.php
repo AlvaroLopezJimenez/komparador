@@ -12,7 +12,7 @@ class TiemposActualizacionOfertasDinamicos
     // CONFIGURACIÓN DEL NUEVO SISTEMA BASADO EN λ (LAMBDA) PONDERADO
     // ============================================================================
     
-    const VENTANA_ANALISIS_DIAS = 7;
+    const VENTANA_ANALISIS_DIAS = 14;
     // Ventana de análisis: solo últimos 7 días
     // Trabajamos todo en minutos para mayor precisión
     

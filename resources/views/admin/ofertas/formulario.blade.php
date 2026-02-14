@@ -81,9 +81,9 @@
                         @enderror
                     </div>
 
-                    {{-- TIENDA, UNIDADES, PRECIO TOTAL Y PRECIO POR UNIDAD --}}
+                    {{-- TIENDA, ENVÍO Y UNIDADES --}}
                     <div>
-                        <div class="grid gap-4" style="grid-template-columns: 0.7fr 0.3fr;">
+                        <div class="grid gap-4" style="grid-template-columns: 0.5fr 0.3fr 0.2fr;">
                             {{-- TIENDA --}}
                             <div>
                                 <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">Tienda *</label>
@@ -101,6 +101,32 @@
                                 @enderror
                             </div>
 
+                            {{-- ENVÍO --}}
+                            <div>
+                                <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200 flex items-center gap-2">
+                                    Envío (€)
+                                    <div class="relative inline-block group">
+                                        <button type="button" class="w-5 h-5 rounded-full bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold flex items-center justify-center cursor-help focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                                onclick="document.getElementById('envio-tooltip').classList.toggle('hidden')"
+                                                onblur="setTimeout(() => document.getElementById('envio-tooltip').classList.add('hidden'), 200)">
+                                            ?
+                                        </button>
+                                        <div id="envio-tooltip" class="hidden absolute z-50 w-64 p-3 mt-2 text-sm text-white bg-gray-800 dark:bg-gray-700 rounded-lg shadow-lg left-0 bottom-full mb-2">
+                                            <p>Esto es solo para las excepciones. Por ejemplo, Amazon tiene Prime y gastos de envío gratis, entonces este campo se deja vacío ya que es lo que está por defecto, pero si hay un producto que es la excepción que sí tiene gastos de envío, entonces este campo sí se rellenaría.</p>
+                                            <div class="absolute left-4 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800 dark:border-t-gray-700"></div>
+                                        </div>
+                                    </div>
+                                </label>
+                                <input type="number" name="envio" id="envio_input" step="0.01" min="0" max="99.99"
+                                    value="{{ old('envio', $oferta->envio ?? '') }}"
+                                    placeholder="(opcional)"
+                                    class="w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <p id="envio_error" class="text-sm text-red-500 mt-1 hidden"></p>
+                                @error('envio')
+                                <p class="text-sm text-red-500 mt-1">{{ $message }}</p>
+                                @enderror
+                            </div>
+
                             {{-- UNIDADES --}}
                             <div>
                                 <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">Unidades *</label>
@@ -113,7 +139,7 @@
 
                     {{-- PRECIO TOTAL Y PRECIO POR UNIDAD --}}
                     <div>
-                        <div class="grid gap-4" style="grid-template-columns: 1fr 1fr;">
+                        <div class="grid gap-4" style="grid-template-columns: 0.85fr 1.15fr;">
                             {{-- PRECIO TOTAL --}}
                             <div>
                                 <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">Precio total (€) *</label>
@@ -1497,6 +1523,9 @@
              
              console.log('✅ Tienda seleccionada:', tienda.id, tienda.nombre);
              
+             // Actualizar campo de envío según envio_gratis y envio_normal de la tienda
+             actualizarEnvioSegunTienda(tienda.envio_gratis, tienda.envio_normal);
+             
              // Actualizar desplegable de como_scrapear según la tienda
              actualizarComoScrapearSegunTienda(tienda.id);
 
@@ -1507,6 +1536,79 @@
              const cholloCheckbox = document.getElementById('es_chollo_checkbox');
              if (cholloCheckbox && cholloCheckbox.checked) {
                  verificarOfertaCholloExistente();
+             }
+         }
+
+         // Función para actualizar el campo de envío según envio_gratis y envio_normal de la tienda
+         function actualizarEnvioSegunTienda(envioGratis, envioNormal) {
+             const envioInput = document.getElementById('envio_input');
+             const envioError = document.getElementById('envio_error');
+             
+             // Solo actualizar si el campo está vacío (no sobrescribir si ya tiene un valor)
+             if (envioInput.value && envioInput.value.trim() !== '') {
+                 // Ocultar error si existe
+                 if (envioError) {
+                     envioError.classList.add('hidden');
+                     envioError.textContent = '';
+                 }
+                 return;
+             }
+             
+             // Ocultar error inicialmente
+             if (envioError) {
+                 envioError.classList.add('hidden');
+                 envioError.textContent = '';
+             }
+             
+             // Buscar primero en envio_gratis, si es null o vacío, buscar en envio_normal
+             let envioTexto = null;
+             if (envioGratis && envioGratis.trim() !== '') {
+                 envioTexto = envioGratis;
+             } else if (envioNormal && envioNormal.trim() !== '') {
+                 envioTexto = envioNormal;
+             }
+             
+             // Si ambos son null o vacíos, mostrar error
+             if (!envioTexto) {
+                 envioInput.value = '';
+                 envioInput.placeholder = '(opcional)';
+                 envioInput.classList.remove('bg-gray-200', 'dark:bg-gray-600');
+                 envioInput.classList.add('bg-gray-100', 'dark:bg-gray-700');
+                 if (envioError) {
+                     envioError.textContent = 'La tienda seleccionada no tiene asignados gastos de envío (ni gratis ni de pago)';
+                     envioError.classList.remove('hidden');
+                 }
+                 return;
+             }
+             
+             const envioTextoLower = envioTexto.toLowerCase();
+             
+             // Verificar si contiene "gratis" (puede ser "Gratis > 40€", "gratis > 40€", o simplemente "Gratis")
+             if (envioTextoLower.includes('gratis')) {
+                 // Mostrar "gratis" como placeholder y dejar el campo vacío
+                 envioInput.value = '';
+                 envioInput.placeholder = 'gratis';
+                 envioInput.classList.remove('bg-gray-100', 'dark:bg-gray-700');
+                 envioInput.classList.add('bg-gray-200', 'dark:bg-gray-600');
+                 return;
+             }
+             
+             // Si no es gratis, intentar extraer el precio
+             // Puede ser "2,99 € < 40€", "2€ < 40€", "2,99 €" o "2€"
+             const precioMatch = envioTexto.match(/(\d+[,.]?\d*)\s*€?/);
+             if (precioMatch) {
+                 // Extraer el número y convertir coma a punto
+                 let precio = precioMatch[1].replace(',', '.');
+                 envioInput.value = precio;
+                 envioInput.placeholder = '(opcional)';
+                 envioInput.classList.remove('bg-gray-200', 'dark:bg-gray-600');
+                 envioInput.classList.add('bg-gray-100', 'dark:bg-gray-700');
+             } else {
+                 // Si no se puede extraer precio, dejar vacío
+                 envioInput.value = '';
+                 envioInput.placeholder = '(opcional)';
+                 envioInput.classList.remove('bg-gray-200', 'dark:bg-gray-600');
+                 envioInput.classList.add('bg-gray-100', 'dark:bg-gray-700');
              }
          }
 
@@ -1920,6 +2022,26 @@
             }
         });
 
+        // Restaurar placeholder y fondo del campo de envío cuando el usuario interactúe
+        const envioInput = document.getElementById('envio_input');
+        if (envioInput) {
+            envioInput.addEventListener('focus', function() {
+                if (this.placeholder === 'gratis') {
+                    this.placeholder = '(opcional)';
+                    this.classList.remove('bg-gray-200', 'dark:bg-gray-600');
+                    this.classList.add('bg-gray-100', 'dark:bg-gray-700');
+                }
+            });
+            
+            envioInput.addEventListener('input', function() {
+                if (this.placeholder === 'gratis' && this.value && this.value.trim() !== '') {
+                    this.placeholder = '(opcional)';
+                    this.classList.remove('bg-gray-200', 'dark:bg-gray-600');
+                    this.classList.add('bg-gray-100', 'dark:bg-gray-700');
+                }
+            });
+        }
+
         // Manejar cambios en el select de descuentos para mostrar/ocultar campos de cupón
         const selectDescuentos = document.querySelector('[name="descuentos"]');
         const cuponCamposContainer = document.getElementById('cupon_campos_container');
@@ -1970,6 +2092,12 @@
 
         // Interceptar el envío del formulario para construir el valor del cupón
         document.querySelector('form').addEventListener('submit', function(e) {
+            // Limpiar el campo de envío si está vacío con placeholder "gratis" (no enviar valor)
+            const envioInput = document.getElementById('envio_input');
+            if (envioInput && (!envioInput.value || envioInput.value.trim() === '') && envioInput.placeholder === 'gratis') {
+                envioInput.value = '';
+            }
+            
             const valorSeleccionado = selectDescuentos.value;
             const codigoCupon = cuponCodigoInput.value.trim();
             const cantidadCupon = cuponCantidadInput.value;

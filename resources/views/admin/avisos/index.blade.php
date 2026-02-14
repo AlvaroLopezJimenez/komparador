@@ -434,6 +434,13 @@
                                         <div class="mt-0 p-1 bg-gray-700 rounded text-xs text-gray-300">
                                             <div class="flex flex-wrap items-center gap-1 text-xs">
                                                 <span class="font-medium">{{ $aviso->avisoable->tienda->nombre ?? 'Tienda ID: ' . $aviso->avisoable->tienda_id }}</span>
+                                                @if($aviso->avisoable->envio && $aviso->avisoable->envio > 0)
+                                                    <span>•</span>
+                                                    <span class="flex items-center gap-1 text-orange-500">
+                                                        <img src="{{ asset('images/van.png') }}" loading="lazy" alt="Van" class="w-4 h-4">
+                                                        <span>{{ number_format($aviso->avisoable->envio, 2, ',', '') }} €</span>
+                                                    </span>
+                                                @endif
                                                 <span>•</span>
                                                 <span>{{ formatearUnidades($aviso->avisoable->unidades, $aviso->avisoable->producto->unidadDeMedida ?? 'unidades') }} uds</span>
                                                 <span>•</span>
@@ -483,50 +490,57 @@
                             </td>
                             <td class="px-6 py-1" onclick="event.stopPropagation()">
                                 <div class="flex items-center space-x-2">
-                                    <button onclick="editarAviso({{ $aviso->id }}, {{ json_encode($aviso->texto_aviso) }}, '{{ $aviso->fecha_aviso->format('Y-m-d\TH:i') }}', {{ $aviso->oculto ? 'true' : 'false' }})" 
-                                        class="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors">
-                                        Editar
-                                    </button>
-                                    @if($aviso->avisoable_type === 'App\Models\Producto' && strpos($aviso->texto_aviso, 'Precio actualizado producto') !== false)
-                                        @php
-                                            $precioActual = $aviso->avisoable?->precio;
-                                            $alertasCount = 0;
-                                            
-                                            // Solo contar alertas si el precio no es NULL
-                                            if ($aviso->avisoable_id && $precioActual !== null) {
-                                                $alertasCount = \App\Models\CorreoAvisoPrecio::where('producto_id', $aviso->avisoable_id)
-                                                    ->where('precio_limite', '>=', $precioActual)
-                                                    ->where(function($query) {
-                                                        $query->whereNull('ultimo_envio_correo')
-                                                              ->orWhere('ultimo_envio_correo', '<', now()->subWeek());
-                                                    })
-                                                    ->count();
-                                            }
-                                        @endphp
-                                        @if($precioActual === null)
-                                            <div class="px-3 py-1 text-xs bg-red-600 text-white rounded">
-                                                ERROR: Producto #{{ $aviso->avisoable_id }} con precio NULL
-                                            </div>
-                                        @elseif($alertasCount > 0)
-                                            <button onclick="enviarAlertasProducto({{ $aviso->avisoable_id }}, {{ $precioActual }})" 
-                                                class="px-3 py-1 text-sm text-white rounded-md transition-all duration-300 bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 animate-pulse shadow-lg font-bold">
-                                                📧 Correos ({{ $alertasCount }})
+                                    @if($aviso->avisoable_type === 'App\Models\OfertaProducto' && $aviso->texto_aviso === 'Comprobar gastos de envio')
+                                        <button onclick="marcarEnvioComprobado({{ $aviso->avisoable_id }}, {{ $aviso->id }})" 
+                                            class="px-4 py-2 text-sm bg-orange-600 hover:bg-orange-700 text-white rounded-md transition-colors">
+                                            Comprobado
+                                        </button>
+                                    @else
+                                        <button onclick="editarAviso({{ $aviso->id }}, {{ json_encode($aviso->texto_aviso) }}, '{{ $aviso->fecha_aviso->format('Y-m-d\TH:i') }}', {{ $aviso->oculto ? 'true' : 'false' }})" 
+                                            class="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors">
+                                            Editar
+                                        </button>
+                                        @if($aviso->avisoable_type === 'App\Models\Producto' && strpos($aviso->texto_aviso, 'Precio actualizado producto') !== false)
+                                            @php
+                                                $precioActual = $aviso->avisoable?->precio;
+                                                $alertasCount = 0;
+                                                
+                                                // Solo contar alertas si el precio no es NULL
+                                                if ($aviso->avisoable_id && $precioActual !== null) {
+                                                    $alertasCount = \App\Models\CorreoAvisoPrecio::where('producto_id', $aviso->avisoable_id)
+                                                        ->where('precio_limite', '>=', $precioActual)
+                                                        ->where(function($query) {
+                                                            $query->whereNull('ultimo_envio_correo')
+                                                                  ->orWhere('ultimo_envio_correo', '<', now()->subWeek());
+                                                        })
+                                                        ->count();
+                                                }
+                                            @endphp
+                                            @if($precioActual === null)
+                                                <div class="px-3 py-1 text-xs bg-red-600 text-white rounded">
+                                                    ERROR: Producto #{{ $aviso->avisoable_id }} con precio NULL
+                                                </div>
+                                            @elseif($alertasCount > 0)
+                                                <button onclick="enviarAlertasProducto({{ $aviso->avisoable_id }}, {{ $precioActual }})" 
+                                                    class="px-3 py-1 text-sm text-white rounded-md transition-all duration-300 bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 animate-pulse shadow-lg font-bold">
+                                                    📧 Correos ({{ $alertasCount }})
+                                                </button>
+                                            @endif
+                                        @endif
+                                        @if($aviso->avisoable_type === 'App\Models\OfertaProducto' && preg_match('/\d+\s*(?:a\s*)?vez/i', $aviso->texto_aviso))
+                                            <button onclick="aplazarAviso({{ $aviso->id }})" 
+                                                class="px-3 py-1 text-sm bg-yellow-600 hover:bg-yellow-700 text-white rounded-md transition-colors">
+                                                Aplazar
                                             </button>
                                         @endif
-                                    @endif
-                                    @if($aviso->avisoable_type === 'App\Models\OfertaProducto' && preg_match('/\d+\s*(?:a\s*)?vez/i', $aviso->texto_aviso))
-                                        <button onclick="aplazarAviso({{ $aviso->id }})" 
-                                            class="px-3 py-1 text-sm bg-yellow-600 hover:bg-yellow-700 text-white rounded-md transition-colors">
-                                            Aplazar
-                                        </button>
-                                    @endif
-                                    @if(!($aviso->avisoable_type === 'App\Models\OfertaProducto' && preg_match('/\d+\s*(?:a\s*)?vez/i', $aviso->texto_aviso)))
-                                        <button onclick="eliminarAviso({{ $aviso->id }})" 
-                                            class="text-red-400 hover:text-red-300 dark:text-red-400 dark:hover:text-red-300 p-0.5">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                            </svg>
-                                        </button>
+                                        @if(!($aviso->avisoable_type === 'App\Models\OfertaProducto' && preg_match('/\d+\s*(?:a\s*)?vez/i', $aviso->texto_aviso)))
+                                            <button onclick="eliminarAviso({{ $aviso->id }})" 
+                                                class="text-red-400 hover:text-red-300 dark:text-red-400 dark:hover:text-red-300 p-0.5">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                </svg>
+                                            </button>
+                                        @endif
                                     @endif
                                 </div>
                             </td>
@@ -722,6 +736,13 @@
                                         <div class="mt-1 p-1.5 bg-gray-700 rounded text-xs text-gray-300">
                                             <div class="flex flex-wrap items-center gap-2 text-xs">
                                                 <span class="font-medium">{{ $aviso->avisoable->tienda->nombre ?? 'Tienda ID: ' . $aviso->avisoable->tienda_id }}</span>
+                                                @if($aviso->avisoable->envio && $aviso->avisoable->envio > 0)
+                                                    <span>•</span>
+                                                    <span class="flex items-center gap-1 text-orange-500">
+                                                        <img src="{{ asset('images/van.png') }}" loading="lazy" alt="Van" class="w-4 h-4">
+                                                        <span>{{ number_format($aviso->avisoable->envio, 2, ',', '') }} €</span>
+                                                    </span>
+                                                @endif
                                                 <span>•</span>
                                                 <span>{{ formatearUnidades($aviso->avisoable->unidades, $aviso->avisoable->producto->unidadDeMedida ?? 'unidades') }} uds</span>
                                                 <span>•</span>
@@ -751,23 +772,30 @@
                             </td>
                             <td class="px-6 py-1" onclick="event.stopPropagation()">
                                 <div class="flex items-center space-x-2">
-                                    <button onclick="editarAviso({{ $aviso->id }}, {{ json_encode($aviso->texto_aviso) }}, '{{ $aviso->fecha_aviso->format('Y-m-d\TH:i') }}', {{ $aviso->oculto ? 'true' : 'false' }})" 
-                                        class="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors">
-                                        Editar
-                                    </button>
-                                    @if($aviso->avisoable_type === 'App\Models\OfertaProducto' && preg_match('/\d+\s*(?:a\s*)?vez/i', $aviso->texto_aviso))
-                                        <button onclick="aplazarAviso({{ $aviso->id }})" 
-                                            class="px-3 py-1 text-sm bg-yellow-600 hover:bg-yellow-700 text-white rounded-md transition-colors">
-                                            Aplazar
+                                    @if($aviso->avisoable_type === 'App\Models\OfertaProducto' && $aviso->texto_aviso === 'Comprobar gastos de envio')
+                                        <button onclick="marcarEnvioComprobado({{ $aviso->avisoable_id }}, {{ $aviso->id }})" 
+                                            class="px-4 py-2 text-sm bg-orange-600 hover:bg-orange-700 text-white rounded-md transition-colors">
+                                            Comprobado
                                         </button>
-                                    @endif
-                                    @if(!($aviso->avisoable_type === 'App\Models\OfertaProducto' && preg_match('/\d+\s*(?:a\s*)?vez/i', $aviso->texto_aviso)))
-                                        <button onclick="eliminarAviso({{ $aviso->id }})" 
-                                            class="text-red-400 hover:text-red-300 dark:text-red-400 dark:hover:text-red-300 p-1">
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                            </svg>
+                                    @else
+                                        <button onclick="editarAviso({{ $aviso->id }}, {{ json_encode($aviso->texto_aviso) }}, '{{ $aviso->fecha_aviso->format('Y-m-d\TH:i') }}', {{ $aviso->oculto ? 'true' : 'false' }})" 
+                                            class="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors">
+                                            Editar
                                         </button>
+                                        @if($aviso->avisoable_type === 'App\Models\OfertaProducto' && preg_match('/\d+\s*(?:a\s*)?vez/i', $aviso->texto_aviso))
+                                            <button onclick="aplazarAviso({{ $aviso->id }})" 
+                                                class="px-3 py-1 text-sm bg-yellow-600 hover:bg-yellow-700 text-white rounded-md transition-colors">
+                                                Aplazar
+                                            </button>
+                                        @endif
+                                        @if(!($aviso->avisoable_type === 'App\Models\OfertaProducto' && preg_match('/\d+\s*(?:a\s*)?vez/i', $aviso->texto_aviso)))
+                                            <button onclick="eliminarAviso({{ $aviso->id }})" 
+                                                class="text-red-400 hover:text-red-300 dark:text-red-400 dark:hover:text-red-300 p-1">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                </svg>
+                                            </button>
+                                        @endif
                                     @endif
                                 </div>
                             </td>
@@ -963,6 +991,13 @@
                                         <div class="mt-1 p-1.5 bg-gray-700 rounded text-xs text-gray-300">
                                             <div class="flex flex-wrap items-center gap-2 text-xs">
                                                 <span class="font-medium">{{ $aviso->avisoable->tienda->nombre ?? 'Tienda ID: ' . $aviso->avisoable->tienda_id }}</span>
+                                                @if($aviso->avisoable->envio && $aviso->avisoable->envio > 0)
+                                                    <span>•</span>
+                                                    <span class="flex items-center gap-1 text-orange-500">
+                                                        <img src="{{ asset('images/van.png') }}" loading="lazy" alt="Van" class="w-4 h-4">
+                                                        <span>{{ number_format($aviso->avisoable->envio, 2, ',', '') }} €</span>
+                                                    </span>
+                                                @endif
                                                 <span>•</span>
                                                 <span>{{ formatearUnidades($aviso->avisoable->unidades, $aviso->avisoable->producto->unidadDeMedida ?? 'unidades') }} uds</span>
                                                 <span>•</span>
@@ -992,23 +1027,30 @@
                             </td>
                             <td class="px-6 py-1" onclick="event.stopPropagation()">
                                 <div class="flex items-center space-x-2">
-                                    <button onclick="editarAviso({{ $aviso->id }}, {{ json_encode($aviso->texto_aviso) }}, '{{ $aviso->fecha_aviso->format('Y-m-d\TH:i') }}', {{ $aviso->oculto ? 'true' : 'false' }})" 
-                                        class="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors">
-                                        Editar
-                                    </button>
-                                    @if($aviso->avisoable_type === 'App\Models\OfertaProducto' && preg_match('/\d+\s*(?:a\s*)?vez/i', $aviso->texto_aviso))
-                                        <button onclick="aplazarAviso({{ $aviso->id }})" 
-                                            class="px-3 py-1 text-sm bg-yellow-600 hover:bg-yellow-700 text-white rounded-md transition-colors">
-                                            Aplazar
+                                    @if($aviso->avisoable_type === 'App\Models\OfertaProducto' && $aviso->texto_aviso === 'Comprobar gastos de envio')
+                                        <button onclick="marcarEnvioComprobado({{ $aviso->avisoable_id }}, {{ $aviso->id }})" 
+                                            class="px-4 py-2 text-sm bg-orange-600 hover:bg-orange-700 text-white rounded-md transition-colors">
+                                            Comprobado
                                         </button>
-                                    @endif
-                                    @if(!($aviso->avisoable_type === 'App\Models\OfertaProducto' && preg_match('/\d+\s*(?:a\s*)?vez/i', $aviso->texto_aviso)))
-                                        <button onclick="eliminarAviso({{ $aviso->id }})" 
-                                            class="text-red-400 hover:text-red-300 dark:text-red-400 dark:hover:text-red-300 p-1">
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                            </svg>
+                                    @else
+                                        <button onclick="editarAviso({{ $aviso->id }}, {{ json_encode($aviso->texto_aviso) }}, '{{ $aviso->fecha_aviso->format('Y-m-d\TH:i') }}', {{ $aviso->oculto ? 'true' : 'false' }})" 
+                                            class="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors">
+                                            Editar
                                         </button>
+                                        @if($aviso->avisoable_type === 'App\Models\OfertaProducto' && preg_match('/\d+\s*(?:a\s*)?vez/i', $aviso->texto_aviso))
+                                            <button onclick="aplazarAviso({{ $aviso->id }})" 
+                                                class="px-3 py-1 text-sm bg-yellow-600 hover:bg-yellow-700 text-white rounded-md transition-colors">
+                                                Aplazar
+                                            </button>
+                                        @endif
+                                        @if(!($aviso->avisoable_type === 'App\Models\OfertaProducto' && preg_match('/\d+\s*(?:a\s*)?vez/i', $aviso->texto_aviso)))
+                                            <button onclick="eliminarAviso({{ $aviso->id }})" 
+                                                class="text-red-400 hover:text-red-300 dark:text-red-400 dark:hover:text-red-300 p-1">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                </svg>
+                                            </button>
+                                        @endif
                                     @endif
                                 </div>
                             </td>
@@ -2196,6 +2238,35 @@
                     btnEliminar.textContent = originalText;
                 }
             });
+        }
+
+        // Función para marcar envío como comprobado
+        async function marcarEnvioComprobado(ofertaId, avisoId) {
+            try {
+                const response = await fetch(`/panel-privado/avisos/marcar-envio-comprobado`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    },
+                    body: JSON.stringify({
+                        oferta_id: ofertaId,
+                        aviso_id: avisoId
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('Envío marcado como comprobado. La fecha de actualización ha sido actualizada.');
+                    location.reload();
+                } else {
+                    alert('Error al marcar como comprobado: ' + (data.message || 'Error desconocido'));
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error al marcar como comprobado');
+            }
         }
 
         // Función para aplazar aviso

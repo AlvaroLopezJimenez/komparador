@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Producto;
 use App\Http\Controllers\DescuentosController;
+use App\Services\CalcularPrecioUnidad;
 
 class SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos
 {
@@ -136,19 +137,11 @@ class SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos
         $descuentosController = new DescuentosController();
         $ofertas = $descuentosController->aplicarDescuentosYOrdenar($ofertasOriginales);
         
-        // Si el producto tiene unidadDeMedida === 'unidadMilesima', recalcular precio_unidad con 3 decimales
-        if ($producto->unidadDeMedida === 'unidadMilesima') {
-            $ofertas = $ofertas->map(function($oferta) {
-                // Recalcular precio_unidad = precio_total / unidades con precisión de 3 decimales
-                if ($oferta->unidades > 0) {
-                    $oferta->precio_unidad = round($oferta->precio_total / $oferta->unidades, 3);
-                }
-                return $oferta;
-            });
-            
-            // Reordenar las ofertas después de recalcular precios
-            $ofertas = $ofertas->sortBy('precio_unidad')->values();
-        }
+        // Aplicar gastos de envío y recalcular precio_unidad según unidad de medida
+        $ofertas = $this->aplicarEnvioYRecalcularPrecioUnidad($ofertas, $producto);
+        
+        // Reordenar las ofertas después de recalcular precios
+        $ofertas = $ofertas->sortBy('precio_unidad')->values();
         
         // Devolver la primera oferta (la más barata)
         return $ofertas->first();
@@ -277,18 +270,11 @@ class SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos
         $descuentosController = new DescuentosController();
         $ofertas = $descuentosController->aplicarDescuentosYOrdenar($ofertasOriginales);
         
-        // Si el producto tiene unidadDeMedida === 'unidadMilesima', recalcular precio_unidad con 3 decimales
-        if ($producto->unidadDeMedida === 'unidadMilesima') {
-            $ofertas = $ofertas->map(function($oferta) {
-                if ($oferta->unidades > 0) {
-                    $oferta->precio_unidad = round($oferta->precio_total / $oferta->unidades, 3);
-                }
-                return $oferta;
-            });
-            
-            // Reordenar las ofertas después de recalcular precios
-            $ofertas = $ofertas->sortBy('precio_unidad')->values();
-        }
+        // Aplicar gastos de envío y recalcular precio_unidad según unidad de medida
+        $ofertas = $this->aplicarEnvioYRecalcularPrecioUnidad($ofertas, $producto);
+        
+        // Reordenar las ofertas después de recalcular precios
+        $ofertas = $ofertas->sortBy('precio_unidad')->values();
         
         return $ofertas;
     }
@@ -304,6 +290,53 @@ class SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos
     {
         $oferta = $this->obtener($producto);
         return $oferta ? $oferta->id : null;
+    }
+
+    /**
+     * Aplica los gastos de envío al precio_total y recalcula el precio_unidad según la unidad de medida
+     * 
+     * @param \Illuminate\Support\Collection $ofertas Colección de ofertas
+     * @param Producto $producto El producto asociado a las ofertas
+     * @return \Illuminate\Support\Collection Colección de ofertas con precios recalculados
+     */
+    private function aplicarEnvioYRecalcularPrecioUnidad($ofertas, Producto $producto)
+    {
+        $unidadDeMedida = $producto->unidadDeMedida ?? 'unidad';
+        $calcularPrecioUnidad = new CalcularPrecioUnidad();
+        
+        return $ofertas->map(function($oferta) use ($unidadDeMedida, $calcularPrecioUnidad) {
+            // Obtener el valor de envío (puede ser null)
+            $envio = $oferta->envio ?? ($oferta->getAttribute('envio') ?? null);
+            $envio = $envio ? (float) $envio : 0;
+            
+            // Sumar el envío al precio_total si existe
+            $precioTotalConEnvio = $oferta->precio_total + $envio;
+            
+            // Recalcular precio_unidad según la unidad de medida
+            if ($unidadDeMedida === 'unidadUnica') {
+                // Para unidadUnica: precio_unidad = precio_total + envio (sin dividir)
+                $oferta->precio_unidad = round($precioTotalConEnvio, 2);
+            } else {
+                // Para las demás unidades de medida: usar el servicio CalcularPrecioUnidad
+                // pero con el precio_total que incluye el envío
+                if ($oferta->unidades > 0) {
+                    $precioUnidadCalculado = $calcularPrecioUnidad->calcular(
+                        $unidadDeMedida,
+                        $precioTotalConEnvio,
+                        $oferta->unidades
+                    );
+                    
+                    if ($precioUnidadCalculado !== null) {
+                        $oferta->precio_unidad = $precioUnidadCalculado;
+                    }
+                }
+            }
+            
+            // Actualizar también el precio_total para reflejar el envío (solo para mostrar, no se guarda)
+            $oferta->precio_total = $precioTotalConEnvio;
+            
+            return $oferta;
+        });
     }
 }
 
