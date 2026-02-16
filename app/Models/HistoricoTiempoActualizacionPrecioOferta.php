@@ -35,3 +35,4 @@ class HistoricoTiempoActualizacionPrecioOferta extends Model
 
 
 
+

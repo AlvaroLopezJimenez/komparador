@@ -30,8 +30,43 @@
             <fieldset class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 space-y-6 border border-gray-200 dark:border-gray-700">
                 <legend class="text-lg font-semibold text-gray-700 dark:text-gray-200">Categoría</legend>
 
-                <div id="categorias-container" class="space-y-4">
-                    <!-- Los selectores de categorías se generarán dinámicamente aquí -->
+                <!-- Pestañas -->
+                <div class="border-b border-gray-200 dark:border-gray-600 mb-4">
+                    <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+                        <button type="button" id="tab-buscador-categoria" class="tab-categoria border-b-2 border-blue-500 py-2 px-1 text-sm font-medium text-blue-600 dark:text-blue-400">
+                            Buscador
+                        </button>
+                        <button type="button" id="tab-manual-categoria" class="tab-categoria border-b-2 border-transparent py-2 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300">
+                            Manual
+                        </button>
+                    </nav>
+                </div>
+
+                <!-- Contenido pestaña Buscador -->
+                <div id="content-buscador-categoria" class="tab-content-categoria space-y-4">
+                    <div>
+                        <label class="block mb-2 font-medium text-gray-700 dark:text-gray-200">Buscar categoría</label>
+                        <div class="relative">
+                            <input type="text" id="categoria-buscador-input"
+                                class="w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="Escribe para buscar categorías..."
+                                autocomplete="off">
+                            <div id="categoria-buscador-sugerencias" class="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg hidden max-h-60 overflow-y-auto"></div>
+                        </div>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Selecciona una categoría para ver su jerarquía completa</p>
+                    </div>
+                    
+                    <!-- Contenedor para mostrar la jerarquía seleccionada -->
+                    <div id="categorias-container-buscador" class="space-y-4">
+                        <!-- La jerarquía se mostrará aquí al seleccionar una categoría -->
+                    </div>
+                </div>
+
+                <!-- Contenido pestaña Manual -->
+                <div id="content-manual-categoria" class="tab-content-categoria space-y-4 hidden">
+                    <div id="categorias-container" class="space-y-4">
+                        <!-- Los selectores de categorías se generarán dinámicamente aquí -->
+                    </div>
                 </div>
 
                 <div class="flex gap-2">
@@ -45,6 +80,23 @@
 
                 <!-- Campo oculto para la categoría final -->
                 <input type="hidden" name="categoria_id" id="categoria-final" value="{{ old('categoria_id', $producto->categoria_id ?? '') }}">
+                
+                <!-- Mensaje de advertencia si la categoría tiene subcategorías -->
+                <div id="categoria-advertencia-subcategorias" class="hidden mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                    <div class="flex items-start">
+                        <svg class="w-5 h-5 text-yellow-600 dark:text-yellow-400 mt-0.5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                        </svg>
+                        <div class="flex-1">
+                            <p class="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                                La categoría seleccionada tiene subcategorías disponibles.
+                            </p>
+                            <p class="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                                Debes seleccionar la última categoría de la jerarquía (sin subcategorías) para poder guardar el producto.
+                            </p>
+                        </div>
+                    </div>
+                </div>
             </fieldset>
 
             {{-- UNIDAD DE MEDIDA --}}
@@ -964,6 +1016,9 @@
                     <button type="button" id="tab-subir-nueva" class="tab-modal border-b-2 border-transparent py-2 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300">
                         Subir imagen
                     </button>
+                    <button type="button" id="tab-amazon-nueva" class="tab-modal border-b-2 border-transparent py-2 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300">
+                        Amazon
+                    </button>
                 </nav>
             </div>
 
@@ -1022,6 +1077,37 @@
                         </div>
                     </div>
                     <span id="nombre-archivo-nueva" class="text-sm text-gray-500 dark:text-gray-400"></span>
+                </div>
+            </div>
+
+            <!-- Contenido pestaña Amazon -->
+            <div id="content-amazon-nueva" class="tab-content-modal space-y-4 hidden">
+                <div>
+                    <label class="block mb-2 text-sm text-gray-600 dark:text-gray-400">URL del producto de Amazon</label>
+                    <div class="flex gap-2">
+                        <input type="url" id="url-amazon-nueva" class="flex-1 px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border text-sm" placeholder="https://www.amazon.es/dp/XXXXXXXXXX">
+                        <button type="button" id="btn-buscar-amazon-nueva" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm">
+                            Buscar
+                        </button>
+                    </div>
+                    <div id="error-amazon-nueva" class="mt-1 text-sm text-red-500 hidden"></div>
+                    <div id="loading-amazon-nueva" class="mt-2 text-sm text-gray-500 dark:text-gray-400 hidden">
+                        Buscando imágenes...
+                    </div>
+                </div>
+                
+                <!-- Grid de imágenes de Amazon -->
+                <div id="imagenes-amazon-nueva" class="hidden">
+                    <label class="block mb-2 text-sm font-semibold text-gray-700 dark:text-gray-200">Selecciona las imágenes que deseas guardar:</label>
+                    <div id="grid-imagenes-amazon-nueva" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-h-96 overflow-y-auto p-2">
+                        <!-- Las imágenes se cargarán aquí dinámicamente -->
+                    </div>
+                    <div class="mt-4">
+                        <label class="block mb-2 text-sm text-gray-600 dark:text-gray-400">Carpeta</label>
+                        <select id="carpeta-amazon-nueva" class="w-full px-3 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border text-sm">
+                            <option value="">Selecciona una carpeta</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
@@ -1113,6 +1199,9 @@
                     <button type="button" id="tab-subir-sublinea" class="tab-modal-sublinea border-b-2 border-transparent py-2 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300">
                         Subir imagen
                     </button>
+                    <button type="button" id="tab-amazon-sublinea" class="tab-modal-sublinea border-b-2 border-transparent py-2 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300">
+                        Amazon
+                    </button>
                 </nav>
             </div>
 
@@ -1171,6 +1260,37 @@
                         </div>
                     </div>
                     <span id="nombre-archivo-sublinea" class="text-sm text-gray-500 dark:text-gray-400"></span>
+                </div>
+            </div>
+
+            <!-- Contenido pestaña Amazon -->
+            <div id="content-amazon-sublinea" class="tab-content-modal-sublinea space-y-4 hidden">
+                <div>
+                    <label class="block mb-2 text-sm text-gray-600 dark:text-gray-400">URL del producto de Amazon</label>
+                    <div class="flex gap-2">
+                        <input type="url" id="url-amazon-sublinea" class="flex-1 px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border text-sm" placeholder="https://www.amazon.es/dp/XXXXXXXXXX">
+                        <button type="button" id="btn-buscar-amazon-sublinea" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm">
+                            Buscar
+                        </button>
+                    </div>
+                    <div id="error-amazon-sublinea" class="mt-1 text-sm text-red-500 hidden"></div>
+                    <div id="loading-amazon-sublinea" class="mt-2 text-sm text-gray-500 dark:text-gray-400 hidden">
+                        Buscando imágenes...
+                    </div>
+                </div>
+                
+                <!-- Grid de imágenes de Amazon -->
+                <div id="imagenes-amazon-sublinea" class="hidden">
+                    <label class="block mb-2 text-sm font-semibold text-gray-700 dark:text-gray-200">Selecciona las imágenes que deseas guardar:</label>
+                    <div id="grid-imagenes-amazon-sublinea" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-h-96 overflow-y-auto p-2">
+                        <!-- Las imágenes se cargarán aquí dinámicamente -->
+                    </div>
+                    <div class="mt-4">
+                        <label class="block mb-2 text-sm text-gray-600 dark:text-gray-400">Carpeta</label>
+                        <select id="carpeta-amazon-sublinea" class="w-full px-3 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border text-sm">
+                            <option value="">Selecciona una carpeta</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
@@ -1390,6 +1510,11 @@
         // Variables globales
         let categoriasRaiz = [];
         let categoriaProducto = null;
+        let timeoutBusquedaCategoria = null;
+        let indiceSeleccionadoCategoriaBuscador = -1;
+        let categoriasActualesBuscador = [];
+        let categoriaSeleccionadaBuscador = null;
+        let pestañaActiva = 'buscador'; // 'buscador' o 'manual'
 
         // Inicialización cuando se carga la página
         document.addEventListener('DOMContentLoaded', () => {
@@ -1397,17 +1522,423 @@
             categoriasRaiz = JSON.parse(datos.dataset.categoriasRaiz || '[]');
             categoriaProducto = datos.dataset.categoriaId || null;
 
+            // Configurar pestañas
+            configurarPestañas();
+
             if (categoriaProducto) {
-                // Es un producto existente - cargar toda la jerarquía
-                cargarJerarquiaCompleta(categoriaProducto);
+                // Es un producto existente - cargar toda la jerarquía en manual
+                cargarJerarquiaCompleta(categoriaProducto, 'manual');
+                // Cargar el nombre de la categoría para el buscador
+                cargarNombreCategoriaParaBuscador(categoriaProducto);
+                // Verificar si la categoría tiene subcategorías
+                verificarCategoriaParaGuardar(categoriaProducto);
+                // Mostrar pestaña manual por defecto
+                cambiarPestaña('manual');
             } else {
-                // Es un producto nuevo - crear solo el primer selector
-                crearSelectorCategoria(0, categoriasRaiz, null);
+                // Es un producto nuevo - mostrar pestaña de buscador por defecto
+                cambiarPestaña('buscador');
             }
 
             // Configurar botones
             configurarBotones();
+
+            // Configurar buscador de categorías (con delay para asegurar que el DOM esté listo)
+            setTimeout(() => {
+                configurarBuscadorCategorias();
+            }, 100);
+
+            // Configurar validación del formulario
+            configurarValidacionFormulario();
         });
+
+        // Función para configurar las pestañas
+        function configurarPestañas() {
+            const tabBuscador = document.getElementById('tab-buscador-categoria');
+            const tabManual = document.getElementById('tab-manual-categoria');
+
+            if (tabBuscador) {
+                tabBuscador.addEventListener('click', () => cambiarPestaña('buscador'));
+            }
+
+            if (tabManual) {
+                tabManual.addEventListener('click', () => cambiarPestaña('manual'));
+            }
+        }
+
+        // Función para cambiar de pestaña
+        function cambiarPestaña(pestaña) {
+            pestañaActiva = pestaña;
+            const tabBuscador = document.getElementById('tab-buscador-categoria');
+            const tabManual = document.getElementById('tab-manual-categoria');
+            const contentBuscador = document.getElementById('content-buscador-categoria');
+            const contentManual = document.getElementById('content-manual-categoria');
+
+            if (!tabBuscador || !tabManual || !contentBuscador || !contentManual) {
+                console.error('No se encontraron los elementos de las pestañas');
+                return;
+            }
+
+            if (pestaña === 'buscador') {
+                // Activar pestaña buscador
+                tabBuscador.classList.add('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
+                tabBuscador.classList.remove('border-transparent', 'text-gray-500');
+                tabManual.classList.remove('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
+                tabManual.classList.add('border-transparent', 'text-gray-500');
+                contentBuscador.classList.remove('hidden');
+                contentManual.classList.add('hidden');
+
+                // Reconfigurar el buscador cuando se cambia a esta pestaña
+                setTimeout(() => {
+                    configurarBuscadorCategorias();
+                }, 50);
+
+                // Si hay categoría seleccionada, mostrarla en el buscador
+                if (categoriaProducto) {
+                    mostrarJerarquiaEnBuscador(categoriaProducto);
+                    // Actualizar el input del buscador con el nombre de la categoría
+                    const inputBuscador = document.getElementById('categoria-buscador-input');
+                    if (inputBuscador && categoriaSeleccionadaBuscador) {
+                        inputBuscador.value = categoriaSeleccionadaBuscador.nombre;
+                        inputBuscador.classList.add('border-green-500');
+                    }
+                }
+            } else {
+                // Activar pestaña manual
+                tabManual.classList.add('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
+                tabManual.classList.remove('border-transparent', 'text-gray-500');
+                tabBuscador.classList.remove('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
+                tabBuscador.classList.add('border-transparent', 'text-gray-500');
+                contentManual.classList.remove('hidden');
+                contentBuscador.classList.add('hidden');
+
+                // Si hay categoría seleccionada, mostrarla en manual
+                if (categoriaProducto) {
+                    cargarJerarquiaCompleta(categoriaProducto, 'manual');
+                } else {
+                    // Si no hay categoría, crear el primer selector
+                    const container = document.getElementById('categorias-container');
+                    if (container && container.children.length === 0) {
+                        crearSelectorCategoria(0, categoriasRaiz, null);
+                    }
+                }
+            }
+            
+            // Actualizar el indicador del botón agregar
+            actualizarIndicadorBotonAgregar();
+        }
+
+        // Función para configurar el buscador de categorías
+        function configurarBuscadorCategorias() {
+            const inputBuscador = document.getElementById('categoria-buscador-input');
+            if (!inputBuscador) {
+                return;
+            }
+
+            // Remover event listeners anteriores si existen
+            const nuevoInput = inputBuscador.cloneNode(true);
+            inputBuscador.parentNode.replaceChild(nuevoInput, inputBuscador);
+
+            // Evento de escritura
+            nuevoInput.addEventListener('input', function(e) {
+                const query = e.target.value.trim();
+                
+                if (timeoutBusquedaCategoria) {
+                    clearTimeout(timeoutBusquedaCategoria);
+                }
+
+                timeoutBusquedaCategoria = setTimeout(() => {
+                    buscarCategoriasBuscador(query);
+                }, 300);
+            });
+
+            // Evento de teclado
+            nuevoInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    ocultarSugerenciasCategoriaBuscador();
+                    nuevoInput.blur();
+                } else if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    navegarSugerenciasCategoria('abajo');
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    navegarSugerenciasCategoria('arriba');
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (indiceSeleccionadoCategoriaBuscador >= 0) {
+                        seleccionarCategoriaResaltada();
+                    }
+                }
+            });
+
+            // Ocultar sugerencias al hacer clic fuera
+            if (!window.buscadorCategoriaClickHandler) {
+                window.buscadorCategoriaClickHandler = function(e) {
+                    if (!e.target.closest('#categoria-buscador-input') && !e.target.closest('#categoria-buscador-sugerencias')) {
+                        ocultarSugerenciasCategoriaBuscador();
+                    }
+                };
+                document.addEventListener('click', window.buscadorCategoriaClickHandler);
+            }
+        }
+
+        // Función para buscar categorías (buscador principal)
+        async function buscarCategoriasBuscador(query) {
+            if (query.length < 2) {
+                ocultarSugerenciasCategoriaBuscador();
+                return;
+            }
+
+            try {
+                const response = await fetch(`/panel-privado/productos/buscar/categorias?q=${encodeURIComponent(query)}`);
+                const categorias = await response.json();
+                categoriasActualesBuscador = categorias;
+                mostrarSugerenciasCategoriaBuscador(categorias);
+            } catch (error) {
+                console.error('Error al buscar categorías:', error);
+            }
+        }
+
+        // Función para mostrar sugerencias (buscador principal)
+        function mostrarSugerenciasCategoriaBuscador(categorias) {
+            const contenedor = document.getElementById('categoria-buscador-sugerencias');
+            contenedor.innerHTML = '';
+            indiceSeleccionadoCategoriaBuscador = -1;
+
+            if (categorias.length === 0) {
+                contenedor.innerHTML = '<div class="px-4 py-2 text-gray-500 dark:text-gray-400">No se encontraron categorías</div>';
+                contenedor.classList.remove('hidden');
+                return;
+            }
+
+            categorias.forEach((categoria, index) => {
+                const div = document.createElement('div');
+                div.className = 'px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-600 last:border-b-0';
+                div.textContent = categoria.nombre;
+                div.dataset.index = index;
+                div.dataset.categoriaId = categoria.id;
+                
+                div.onclick = () => {
+                    seleccionarCategoriaBuscador(categoria);
+                };
+
+                div.onmouseenter = () => {
+                    indiceSeleccionadoCategoriaBuscador = index;
+                    actualizarResaltadoCategoriaBuscador();
+                };
+
+                contenedor.appendChild(div);
+            });
+
+            contenedor.classList.remove('hidden');
+        }
+
+        // Función para ocultar sugerencias (buscador principal)
+        function ocultarSugerenciasCategoriaBuscador() {
+            const contenedor = document.getElementById('categoria-buscador-sugerencias');
+            if (contenedor) {
+                contenedor.classList.add('hidden');
+            }
+            indiceSeleccionadoCategoriaBuscador = -1;
+        }
+
+        // Función para navegar sugerencias con teclado (buscador principal)
+        function navegarSugerenciasCategoria(direccion) {
+            const contenedor = document.getElementById('categoria-buscador-sugerencias');
+            const elementos = contenedor.querySelectorAll('div[data-index]');
+            
+            if (elementos.length === 0) return;
+            
+            // Remover selección anterior
+            elementos.forEach(el => el.classList.remove('bg-blue-100', 'dark:bg-blue-700'));
+            
+            if (direccion === 'arriba') {
+                indiceSeleccionadoCategoriaBuscador = indiceSeleccionadoCategoriaBuscador <= 0 ? elementos.length - 1 : indiceSeleccionadoCategoriaBuscador - 1;
+            } else if (direccion === 'abajo') {
+                indiceSeleccionadoCategoriaBuscador = indiceSeleccionadoCategoriaBuscador >= elementos.length - 1 ? 0 : indiceSeleccionadoCategoriaBuscador + 1;
+            }
+            
+            // Aplicar selección
+            if (indiceSeleccionadoCategoriaBuscador >= 0 && indiceSeleccionadoCategoriaBuscador < elementos.length) {
+                elementos[indiceSeleccionadoCategoriaBuscador].classList.add('bg-blue-100', 'dark:bg-blue-700');
+                elementos[indiceSeleccionadoCategoriaBuscador].scrollIntoView({ block: 'nearest' });
+            }
+        }
+
+        // Función para actualizar resaltado visual (buscador principal)
+        function actualizarResaltadoCategoriaBuscador() {
+            const contenedor = document.getElementById('categoria-buscador-sugerencias');
+            const elementos = contenedor.querySelectorAll('div[data-index]');
+            elementos.forEach((el, index) => {
+                if (index === indiceSeleccionadoCategoriaBuscador) {
+                    el.classList.add('bg-blue-100', 'dark:bg-blue-700');
+                } else {
+                    el.classList.remove('bg-blue-100', 'dark:bg-blue-700');
+                }
+            });
+        }
+
+        // Función para seleccionar categoría resaltada (buscador principal)
+        function seleccionarCategoriaResaltada() {
+            if (indiceSeleccionadoCategoriaBuscador >= 0 && categoriasActualesBuscador[indiceSeleccionadoCategoriaBuscador]) {
+                seleccionarCategoriaBuscador(categoriasActualesBuscador[indiceSeleccionadoCategoriaBuscador]);
+            }
+        }
+
+        // Función para seleccionar una categoría del buscador
+        function seleccionarCategoriaBuscador(categoria) {
+            categoriaSeleccionadaBuscador = categoria;
+            const inputBuscador = document.getElementById('categoria-buscador-input');
+            if (inputBuscador) {
+                inputBuscador.value = categoria.nombre;
+                inputBuscador.classList.add('border-green-500');
+            }
+            
+            // Ocultar las sugerencias
+            ocultarSugerenciasCategoriaBuscador();
+
+            // Cargar la jerarquía completa de la categoría seleccionada
+            mostrarJerarquiaEnBuscador(categoria.id);
+            
+            // Actualizar la categoría final y validar
+            document.getElementById('categoria-final').value = categoria.id;
+            categoriaProducto = categoria.id;
+            verificarCategoriaParaGuardar(categoria.id);
+            
+            // Si estamos en la pestaña manual, también actualizar allí
+            if (pestañaActiva === 'manual') {
+                cargarJerarquiaCompleta(categoria.id, 'manual');
+            }
+        }
+
+        // Función para mostrar la jerarquía en el buscador
+        function mostrarJerarquiaEnBuscador(categoriaId) {
+            fetch(`/panel-privado/categorias/${categoriaId}/jerarquia`, {
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.jerarquia && data.jerarquia.length > 0) {
+                    construirJerarquiaEnBuscador(data.jerarquia);
+                    // Actualizar el campo final
+                    document.getElementById('categoria-final').value = categoriaId;
+                    categoriaProducto = categoriaId;
+                    actualizarIndicadorBotonAgregar();
+                }
+            })
+            .catch(error => {
+                console.error('Error cargando jerarquía:', error);
+            });
+        }
+
+        // Función para construir la jerarquía en el contenedor del buscador
+        function construirJerarquiaEnBuscador(jerarquia) {
+            const container = document.getElementById('categorias-container-buscador');
+            container.innerHTML = '';
+
+            // Crear un elemento para mostrar la jerarquía
+            const divJerarquia = document.createElement('div');
+            divJerarquia.className = 'space-y-2 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600';
+
+            const titulo = document.createElement('h4');
+            titulo.className = 'font-semibold text-gray-700 dark:text-gray-200 mb-2';
+            titulo.textContent = 'Jerarquía de la categoría seleccionada:';
+            divJerarquia.appendChild(titulo);
+
+            const lista = document.createElement('div');
+            lista.className = 'space-y-1';
+
+            jerarquia.forEach((nivel, index) => {
+                const item = document.createElement('div');
+                item.className = 'flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300';
+                
+                // Agregar flecha si no es el primer nivel
+                if (index > 0) {
+                    const flecha = document.createElement('span');
+                    flecha.textContent = '→';
+                    flecha.className = 'text-gray-400';
+                    item.appendChild(flecha);
+                }
+
+                const nombre = document.createElement('span');
+                nombre.textContent = nivel.nombre;
+                if (index === jerarquia.length - 1) {
+                    nombre.className = 'font-semibold text-blue-600 dark:text-blue-400';
+                }
+                item.appendChild(nombre);
+
+                lista.appendChild(item);
+            });
+
+            divJerarquia.appendChild(lista);
+            container.appendChild(divJerarquia);
+
+            // Actualizar campos de especificaciones internas y productos relacionados
+            const ultimaCategoria = jerarquia[jerarquia.length - 1];
+            actualizarCamposConNombre(ultimaCategoria.id, ultimaCategoria.nombre);
+
+            // Verificar si la categoría tiene subcategorías para validar el guardado
+            verificarCategoriaParaGuardar(ultimaCategoria.id);
+
+            // Verificar si la última categoría tiene subcategorías y mostrarlas si es necesario
+            verificarYMostrarSubcategoriasBuscador(ultimaCategoria.id);
+        }
+
+        // Función para verificar y mostrar subcategorías en el buscador
+        function verificarYMostrarSubcategoriasBuscador(categoriaId) {
+            fetch(`/panel-privado/categorias/${categoriaId}/subcategorias`, {
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(res => res.json())
+            .then(subcategorias => {
+                if (subcategorias && subcategorias.length > 0) {
+                    // No mostrar automáticamente, solo actualizar el botón
+                    actualizarIndicadorBotonAgregar();
+                } else {
+                    actualizarIndicadorBotonAgregar();
+                }
+            })
+            .catch(error => {
+                console.error('Error verificando subcategorías:', error);
+                actualizarIndicadorBotonAgregar();
+            });
+        }
+
+        // Función para cargar el nombre de la categoría en el buscador
+        function cargarNombreCategoriaParaBuscador(categoriaId) {
+            fetch(`/panel-privado/categorias/${categoriaId}/jerarquia`, {
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.jerarquia && data.jerarquia.length > 0) {
+                    const ultimaCategoria = data.jerarquia[data.jerarquia.length - 1];
+                    categoriaSeleccionadaBuscador = {
+                        id: ultimaCategoria.id,
+                        nombre: ultimaCategoria.nombre
+                    };
+                    const inputBuscador = document.getElementById('categoria-buscador-input');
+                    if (inputBuscador) {
+                        inputBuscador.value = ultimaCategoria.nombre;
+                        inputBuscador.classList.add('border-green-500');
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error cargando nombre de categoría:', error);
+            });
+        }
 
         function configurarBotones() {
             // Botón para limpiar todo
@@ -1428,7 +1959,13 @@
         }
 
         function agregarNivelCategoria() {
-            // Obtener el último selector con valor
+            // Si estamos en la pestaña de buscador, usar la categoría seleccionada
+            if (pestañaActiva === 'buscador' && categoriaProducto) {
+                verificarYAgregarSubcategoriaBuscador(categoriaProducto);
+                return;
+            }
+
+            // Si estamos en la pestaña manual, usar los selectores
             const selectores = document.querySelectorAll('.categoria-select');
             let ultimoNivel = -1;
             let ultimaCategoriaId = null;
@@ -1449,6 +1986,98 @@
                 // Si no hay categoría seleccionada, mostrar mensaje
                 alert('Primero debes seleccionar una categoría para poder agregar un nivel adicional.');
             }
+        }
+
+        // Función para agregar nivel en el buscador
+        function verificarYAgregarSubcategoriaBuscador(categoriaId) {
+            fetch(`/panel-privado/categorias/${categoriaId}/subcategorias`, {
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(res => res.json())
+            .then(subcategorias => {
+                if (subcategorias && subcategorias.length > 0) {
+                    // Mostrar selector de subcategorías en el buscador
+                    mostrarSelectorSubcategoriasBuscador(subcategorias, categoriaId);
+                } else {
+                    alert('La categoría seleccionada no tiene subcategorías disponibles.');
+                }
+            })
+            .catch(error => {
+                console.error('Error verificando subcategorías:', error);
+                alert('Error al verificar si hay subcategorías disponibles.');
+            });
+        }
+
+        // Función para mostrar selector de subcategorías en el buscador
+        function mostrarSelectorSubcategoriasBuscador(subcategorias, categoriaPadreId) {
+            const container = document.getElementById('categorias-container-buscador');
+            
+            // Buscar si ya existe un selector de subcategorías
+            const selectorExistente = container.querySelector('.selector-subcategoria-buscador');
+            if (selectorExistente) {
+                selectorExistente.remove();
+            }
+
+            // Crear contenedor para el selector
+            const divSelector = document.createElement('div');
+            divSelector.className = 'selector-subcategoria-buscador mt-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600';
+
+            const label = document.createElement('label');
+            label.className = 'block mb-2 font-medium text-gray-700 dark:text-gray-200';
+            label.textContent = 'Selecciona una subcategoría:';
+            divSelector.appendChild(label);
+
+            const select = document.createElement('select');
+            select.className = 'w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border';
+            
+            const optionDefault = document.createElement('option');
+            optionDefault.value = '';
+            optionDefault.textContent = 'Selecciona una subcategoría';
+            select.appendChild(optionDefault);
+
+            // Ordenar subcategorías alfabéticamente
+            const subcategoriasOrdenadas = [...subcategorias].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', {sensitivity: 'base'}));
+            
+            subcategoriasOrdenadas.forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat.id;
+                option.textContent = cat.nombre;
+                select.appendChild(option);
+            });
+
+            select.addEventListener('change', function() {
+                if (this.value) {
+                    // Actualizar la categoría final y recargar la jerarquía
+                    const nuevaCategoriaId = this.value;
+                    document.getElementById('categoria-final').value = nuevaCategoriaId;
+                    categoriaProducto = nuevaCategoriaId;
+                    
+                    // Actualizar el objeto categoriaSeleccionadaBuscador
+                    const categoriaSeleccionada = subcategorias.find(cat => cat.id == nuevaCategoriaId);
+                    if (categoriaSeleccionada) {
+                        categoriaSeleccionadaBuscador = categoriaSeleccionada;
+                        const inputBuscador = document.getElementById('categoria-buscador-input');
+                        if (inputBuscador) {
+                            inputBuscador.value = categoriaSeleccionada.nombre;
+                        }
+                        // Actualizar campos de especificaciones internas y productos relacionados
+                        actualizarCamposConNombre(nuevaCategoriaId, categoriaSeleccionada.nombre);
+                    }
+                    
+                    // Verificar si la categoría tiene subcategorías
+                    verificarCategoriaParaGuardar(nuevaCategoriaId);
+                    
+                    mostrarJerarquiaEnBuscador(nuevaCategoriaId);
+                    actualizarIndicadorBotonAgregar();
+                }
+            });
+
+            divSelector.appendChild(select);
+            container.appendChild(divSelector);
         }
 
         function verificarYAgregarSubcategoria(nivel, categoriaId) {
@@ -1477,7 +2106,7 @@
             });
         }
 
-        function cargarJerarquiaCompleta(categoriaId) {
+        function cargarJerarquiaCompleta(categoriaId, tipoPestaña = 'manual') {
             // Obtener la jerarquía completa de la categoría
             fetch(`/panel-privado/categorias/${categoriaId}/jerarquia`, {
                 headers: {
@@ -1489,18 +2118,29 @@
             .then(res => res.json())
             .then(data => {
                 if (data.jerarquia && data.jerarquia.length > 0) {
-                    construirJerarquiaCompleta(data.jerarquia);
+                    if (tipoPestaña === 'buscador') {
+                        construirJerarquiaEnBuscador(data.jerarquia);
+                    } else {
+                        construirJerarquiaCompleta(data.jerarquia);
+                    }
+                    // Actualizar el campo final (ya se actualiza en las funciones construirJerarquia)
+                    // pero también actualizamos aquí por si acaso
+                    const ultimaCategoria = data.jerarquia[data.jerarquia.length - 1];
+                    document.getElementById('categoria-final').value = ultimaCategoria.id;
+                    categoriaProducto = ultimaCategoria.id;
                 }
             })
             .catch(error => {
                 console.error('Error cargando jerarquía:', error);
-                // Fallback: crear selector básico
-                crearSelectorCategoria(0, categoriasRaiz, null);
+                // Fallback: crear selector básico solo en manual
+                if (tipoPestaña === 'manual') {
+                    crearSelectorCategoria(0, categoriasRaiz, null);
+                }
             });
         }
 
         function construirJerarquiaCompleta(jerarquia) {
-            // Limpiar contenedor
+            // Limpiar contenedor manual
             const container = document.getElementById('categorias-container');
             container.innerHTML = '';
 
@@ -1517,7 +2157,17 @@
             });
 
             // Actualizar campo final
-            document.getElementById('categoria-final').value = categoriaProducto;
+            const ultimaCategoria = jerarquia[jerarquia.length - 1];
+            document.getElementById('categoria-final').value = ultimaCategoria.id;
+            categoriaProducto = ultimaCategoria.id;
+            
+            // Actualizar campos de especificaciones internas y productos relacionados
+            actualizarCamposConNombre(ultimaCategoria.id, ultimaCategoria.nombre);
+            
+            // Verificar si la categoría tiene subcategorías
+            verificarCategoriaParaGuardar(ultimaCategoria.id);
+            
+            actualizarIndicadorBotonAgregar();
         }
 
         function cargarSubcategoriasParaJerarquia(nivel, categoriaId, valorSeleccionado) {
@@ -1667,43 +2317,296 @@
         }
 
         function limpiarTodasLasCategorias() {
+            // Limpiar contenedor manual
             const container = document.getElementById('categorias-container');
             container.innerHTML = '';
+            
+            // Limpiar contenedor buscador
+            const containerBuscador = document.getElementById('categorias-container-buscador');
+            containerBuscador.innerHTML = '';
+            
+            // Limpiar input del buscador
+            const inputBuscador = document.getElementById('categoria-buscador-input');
+            if (inputBuscador) {
+                inputBuscador.value = '';
+                inputBuscador.classList.remove('border-green-500');
+            }
+            
+            // Limpiar campo final
             document.getElementById('categoria-final').value = '';
-            // Solo crear el primer selector, no duplicar
-            crearSelectorCategoria(0, categoriasRaiz, null);
+            categoriaProducto = null;
+            categoriaSeleccionadaBuscador = null;
+            categoriaTieneSubcategorias = false;
+            
+            // Ocultar advertencia
+            mostrarAdvertenciaSubcategorias(false);
+            
+            // Habilitar botón de guardar (se validará que haya categoría en el submit)
+            actualizarBotonGuardar(true, '');
+            
+            // Solo crear el primer selector en manual si estamos en esa pestaña
+            if (pestañaActiva === 'manual') {
+                crearSelectorCategoria(0, categoriasRaiz, null);
+            }
+            
+            actualizarIndicadorBotonAgregar();
         }
 
         function actualizarCategoriaFinal() {
-            const selectores = document.querySelectorAll('.categoria-select');
             let categoriaFinal = null;
-            
-            // Buscar el último selector con valor
-            for (let i = selectores.length - 1; i >= 0; i--) {
-                if (selectores[i].value) {
-                    categoriaFinal = selectores[i].value;
-                    break;
+            let nombreCategoriaFinal = null;
+
+            // Si estamos en la pestaña de buscador y hay categoría seleccionada
+            if (pestañaActiva === 'buscador' && categoriaProducto) {
+                categoriaFinal = categoriaProducto;
+                // Obtener el nombre de la categoría seleccionada en el buscador
+                if (categoriaSeleccionadaBuscador) {
+                    nombreCategoriaFinal = categoriaSeleccionadaBuscador.nombre;
+                }
+            } else {
+                // Si estamos en manual, buscar en los selectores
+                const selectores = document.querySelectorAll('.categoria-select');
+                for (let i = selectores.length - 1; i >= 0; i--) {
+                    if (selectores[i].value) {
+                        categoriaFinal = selectores[i].value;
+                        // Obtener el nombre del option seleccionado
+                        const optionSeleccionada = selectores[i].options[selectores[i].selectedIndex];
+                        if (optionSeleccionada && optionSeleccionada.textContent) {
+                            nombreCategoriaFinal = optionSeleccionada.textContent;
+                        }
+                        break;
+                    }
                 }
             }
             
             document.getElementById('categoria-final').value = categoriaFinal || '';
+            if (categoriaFinal) {
+                categoriaProducto = categoriaFinal;
+                
+                // Actualizar campos de especificaciones internas y productos relacionados
+                actualizarCamposCategoriaAutomaticos(categoriaFinal, nombreCategoriaFinal);
+                
+                // Verificar si la categoría tiene subcategorías y validar el botón de guardar
+                verificarCategoriaParaGuardar(categoriaFinal);
+            } else {
+                // Si no hay categoría, habilitar el botón de guardar (se validará en el submit)
+                actualizarBotonGuardar(true, '');
+            }
             
             // Actualizar indicador visual del botón agregar
             actualizarIndicadorBotonAgregar();
+        }
+
+        // Función para verificar si la categoría tiene subcategorías y validar el botón de guardar
+        function verificarCategoriaParaGuardar(categoriaId) {
+            if (!categoriaId) {
+                categoriaTieneSubcategorias = false;
+                actualizarBotonGuardar(true, '');
+                mostrarAdvertenciaSubcategorias(false);
+                return;
+            }
+
+            fetch(`/panel-privado/categorias/${categoriaId}/subcategorias`, {
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(res => res.json())
+            .then(subcategorias => {
+                if (subcategorias && subcategorias.length > 0) {
+                    // La categoría tiene subcategorías - no permitir guardar
+                    categoriaTieneSubcategorias = true;
+                    actualizarBotonGuardar(false, 'La categoría seleccionada tiene subcategorías. Debes seleccionar la última categoría de la jerarquía.');
+                    mostrarAdvertenciaSubcategorias(true);
+                } else {
+                    // La categoría no tiene subcategorías - permitir guardar
+                    categoriaTieneSubcategorias = false;
+                    actualizarBotonGuardar(true, '');
+                    mostrarAdvertenciaSubcategorias(false);
+                }
+            })
+            .catch(error => {
+                console.error('Error verificando subcategorías:', error);
+                // En caso de error, permitir guardar (mejor permitir que bloquear)
+                categoriaTieneSubcategorias = false;
+                actualizarBotonGuardar(true, '');
+                mostrarAdvertenciaSubcategorias(false);
+            });
+        }
+
+        // Función para actualizar el estado del botón de guardar
+        function actualizarBotonGuardar(habilitado, mensaje) {
+            const btnGuardar = document.querySelector('button[type="submit"]');
+            if (!btnGuardar) return;
+
+            if (habilitado) {
+                btnGuardar.disabled = false;
+                btnGuardar.className = 'inline-flex items-center bg-pink-600 hover:bg-pink-700 text-white font-semibold text-base px-6 py-3 rounded-md shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500';
+                btnGuardar.title = '';
+            } else {
+                btnGuardar.disabled = true;
+                btnGuardar.className = 'inline-flex items-center bg-gray-400 cursor-not-allowed text-white font-semibold text-base px-6 py-3 rounded-md shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500';
+                btnGuardar.title = mensaje || 'Debes seleccionar la última categoría de la jerarquía';
+            }
+        }
+
+        // Función para mostrar/ocultar la advertencia de subcategorías
+        function mostrarAdvertenciaSubcategorias(mostrar) {
+            const advertencia = document.getElementById('categoria-advertencia-subcategorias');
+            if (advertencia) {
+                if (mostrar) {
+                    advertencia.classList.remove('hidden');
+                } else {
+                    advertencia.classList.add('hidden');
+                }
+            }
+        }
+
+        // Variable global para controlar si la categoría tiene subcategorías
+        let categoriaTieneSubcategorias = false;
+
+        // Función para configurar la validación del formulario
+        function configurarValidacionFormulario() {
+            const form = document.querySelector('form');
+            if (!form) return;
+
+            form.addEventListener('submit', function(e) {
+                const categoriaId = document.getElementById('categoria-final').value;
+                
+                if (!categoriaId) {
+                    e.preventDefault();
+                    alert('Debes seleccionar una categoría para el producto.');
+                    return false;
+                }
+
+                // Verificar si la categoría tiene subcategorías (verificación síncrona antes de enviar)
+                if (categoriaTieneSubcategorias) {
+                    e.preventDefault();
+                    alert('No puedes guardar el producto. La categoría seleccionada tiene subcategorías disponibles. Debes seleccionar la última categoría de la jerarquía (sin subcategorías).');
+                    
+                    // Hacer scroll a la sección de categorías
+                    const fieldsetCategoria = document.querySelector('fieldset legend');
+                    if (fieldsetCategoria) {
+                        fieldsetCategoria.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                    
+                    return false;
+                }
+            });
+        }
+
+        // Función para actualizar automáticamente los campos de categoría
+        function actualizarCamposCategoriaAutomaticos(categoriaId, nombreCategoria = null) {
+            // Si no tenemos el nombre, obtenerlo de la jerarquía
+            if (!nombreCategoria) {
+                obtenerNombreCategoria(categoriaId).then(nombre => {
+                    if (nombre) {
+                        actualizarCamposConNombre(categoriaId, nombre);
+                    }
+                });
+            } else {
+                actualizarCamposConNombre(categoriaId, nombreCategoria);
+            }
+        }
+
+        // Función para obtener el nombre de una categoría
+        async function obtenerNombreCategoria(categoriaId) {
+            try {
+                const response = await fetch(`/panel-privado/categorias/${categoriaId}/jerarquia`, {
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                const data = await response.json();
+                if (data.jerarquia && data.jerarquia.length > 0) {
+                    const ultimaCategoria = data.jerarquia[data.jerarquia.length - 1];
+                    return ultimaCategoria.nombre;
+                }
+            } catch (error) {
+                console.error('Error obteniendo nombre de categoría:', error);
+            }
+            return null;
+        }
+
+        // Función para actualizar los campos con el nombre
+        function actualizarCamposConNombre(categoriaId, nombreCategoria) {
+            // Actualizar campo de especificaciones internas
+            const categoriaEspecificacionesId = document.getElementById('categoria_especificaciones_id');
+            const categoriaEspecificacionesNombre = document.getElementById('categoria_especificaciones_nombre');
+            if (categoriaEspecificacionesId && categoriaEspecificacionesNombre) {
+                // Solo actualizar si el campo está vacío o si la categoría es diferente
+                const categoriaActualId = categoriaEspecificacionesId.value;
+                if (!categoriaActualId || categoriaActualId !== categoriaId.toString()) {
+                    categoriaEspecificacionesId.value = categoriaId;
+                    categoriaEspecificacionesNombre.value = nombreCategoria;
+                    categoriaEspecificacionesNombre.classList.add('border-green-500');
+                    
+                    // Cargar las especificaciones internas de la categoría
+                    if (typeof obtenerEspecificacionesInternas === 'function') {
+                        obtenerEspecificacionesInternas(categoriaId);
+                    }
+                }
+            }
+
+            // Actualizar campo de productos relacionados
+            // IMPORTANTE: Solo actualizar si el campo está completamente vacío
+            // Si el usuario ya ha seleccionado una categoría o está escribiendo, no interferir
+            const categoriaRelacionadosId = document.getElementById('categoria_relacionados_id');
+            const categoriaRelacionadosNombre = document.getElementById('categoria_relacionados_nombre');
+            if (categoriaRelacionadosId && categoriaRelacionadosNombre) {
+                const categoriaActualId = categoriaRelacionadosId.value;
+                const categoriaActualNombre = categoriaRelacionadosNombre.value.trim();
+                // Verificar si el campo tiene el foco (usuario escribiendo) o si ya tiene un valor diferente
+                const tieneFoco = document.activeElement === categoriaRelacionadosNombre;
+                const tieneValor = categoriaActualId || categoriaActualNombre;
+                
+                // Solo actualizar automáticamente si:
+                // 1. El campo está completamente vacío (sin ID y sin nombre)
+                // 2. El usuario NO está escribiendo en el campo (no tiene el foco)
+                if (!tieneValor && !tieneFoco) {
+                    categoriaRelacionadosId.value = categoriaId;
+                    categoriaRelacionadosNombre.value = nombreCategoria;
+                    categoriaRelacionadosNombre.classList.add('border-green-500');
+                    
+                    // Cargar las palabras clave relacionadas
+                    setTimeout(() => {
+                        if (typeof cargarPalabrasClaveRelacionadas === 'function') {
+                            cargarPalabrasClaveRelacionadas(categoriaId);
+                        }
+                    }, 100);
+                } else if (categoriaActualId !== categoriaId.toString() && !tieneFoco) {
+                    // Si la categoría cambió pero el usuario no está escribiendo, solo cargar palabras clave
+                    // sin actualizar el campo visualmente
+                    setTimeout(() => {
+                        if (typeof cargarPalabrasClaveRelacionadas === 'function') {
+                            cargarPalabrasClaveRelacionadas(categoriaId);
+                        }
+                    }, 100);
+                }
+            }
         }
 
         function actualizarIndicadorBotonAgregar() {
             const btnAgregar = document.getElementById('agregar-categoria');
             if (!btnAgregar) return;
 
-            // Obtener el último selector con valor
-            const selectores = document.querySelectorAll('.categoria-select');
             let ultimaCategoriaId = null;
 
-            for (let i = selectores.length - 1; i >= 0; i--) {
-                if (selectores[i].value) {
-                    ultimaCategoriaId = selectores[i].value;
-                    break;
+            // Si estamos en buscador, usar categoriaProducto
+            if (pestañaActiva === 'buscador' && categoriaProducto) {
+                ultimaCategoriaId = categoriaProducto;
+            } else {
+                // Si estamos en manual, buscar en los selectores
+                const selectores = document.querySelectorAll('.categoria-select');
+                for (let i = selectores.length - 1; i >= 0; i--) {
+                    if (selectores[i].value) {
+                        ultimaCategoriaId = selectores[i].value;
+                        break;
+                    }
                 }
             }
 
@@ -3810,11 +4713,18 @@
         function limpiarModalAñadirSublinea() {
             document.getElementById('carpeta-subir-sublinea').value = '';
             document.getElementById('carpeta-url-sublinea').value = '';
+            document.getElementById('carpeta-amazon-sublinea').value = '';
             document.getElementById('file-subir-sublinea').value = '';
             document.getElementById('url-imagen-sublinea').value = '';
+            document.getElementById('url-amazon-sublinea').value = '';
             document.getElementById('nombre-archivo-sublinea').textContent = '';
             document.getElementById('error-url-sublinea').classList.add('hidden');
+            document.getElementById('error-amazon-sublinea').classList.add('hidden');
+            document.getElementById('loading-amazon-sublinea').classList.add('hidden');
+            document.getElementById('imagenes-amazon-sublinea').classList.add('hidden');
+            document.getElementById('grid-imagenes-amazon-sublinea').innerHTML = '';
             document.getElementById('area-recorte-sublinea').classList.add('hidden');
+            imagenesAmazonSeleccionadasSublinea = [];
             if (cropperSublinea) {
                 cropperSublinea.destroy();
                 cropperSublinea = null;
@@ -3825,23 +4735,31 @@
         function cambiarTabModalSublinea(tab) {
             const tabSubir = document.getElementById('tab-subir-sublinea');
             const tabUrl = document.getElementById('tab-url-sublinea');
+            const tabAmazon = document.getElementById('tab-amazon-sublinea');
             const contentSubir = document.getElementById('content-subir-sublinea');
             const contentUrl = document.getElementById('content-url-sublinea');
+            const contentAmazon = document.getElementById('content-amazon-sublinea');
+            
+            // Resetear todas las pestañas
+            [tabUrl, tabSubir, tabAmazon].forEach(t => {
+                t.classList.remove('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
+                t.classList.add('border-transparent', 'text-gray-500');
+            });
+            [contentUrl, contentSubir, contentAmazon].forEach(c => c.classList.add('hidden'));
             
             if (tab === 'url') {
                 tabUrl.classList.add('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
                 tabUrl.classList.remove('border-transparent', 'text-gray-500');
-                tabSubir.classList.remove('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
-                tabSubir.classList.add('border-transparent', 'text-gray-500');
                 contentUrl.classList.remove('hidden');
-                contentSubir.classList.add('hidden');
-            } else {
+            } else if (tab === 'subir') {
                 tabSubir.classList.add('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
                 tabSubir.classList.remove('border-transparent', 'text-gray-500');
-                tabUrl.classList.remove('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
-                tabUrl.classList.add('border-transparent', 'text-gray-500');
                 contentSubir.classList.remove('hidden');
-                contentUrl.classList.add('hidden');
+            } else if (tab === 'amazon') {
+                tabAmazon.classList.add('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
+                tabAmazon.classList.remove('border-transparent', 'text-gray-500');
+                contentAmazon.classList.remove('hidden');
+                cargarCarpetasModalSublinea(); // Cargar carpetas cuando se abre la pestaña Amazon
             }
         }
         
@@ -3853,6 +4771,7 @@
                     if (data.success && data.data.length > 0) {
                         actualizarSelectCarpetasSublinea('carpeta-subir-sublinea', data.data);
                         actualizarSelectCarpetasSublinea('carpeta-url-sublinea', data.data);
+                        actualizarSelectCarpetasSublinea('carpeta-amazon-sublinea', data.data);
                     }
                 })
                 .catch(error => console.error('Error al cargar carpetas:', error));
@@ -4118,6 +5037,246 @@
         // Event listeners para pestañas del modal de sublínea
         document.getElementById('tab-subir-sublinea').addEventListener('click', () => cambiarTabModalSublinea('subir'));
         document.getElementById('tab-url-sublinea').addEventListener('click', () => cambiarTabModalSublinea('url'));
+        
+        // ========== FUNCIONALIDAD AMAZON PARA MODAL SUBLÍNEA ==========
+        let imagenesAmazonSeleccionadasSublinea = [];
+        
+        // Limpiar URL de Amazon automáticamente al pegar o escribir (modal sublínea)
+        const urlAmazonInputSublinea = document.getElementById('url-amazon-sublinea');
+        if (urlAmazonInputSublinea) {
+            // Event listener para pegar
+            urlAmazonInputSublinea.addEventListener('paste', function(e) {
+                setTimeout(() => {
+                    const urlPegada = urlAmazonInputSublinea.value.trim();
+                    if (urlPegada) {
+                        const urlLimpia = limpiarUrlAmazon(urlPegada);
+                        if (urlLimpia !== urlPegada) {
+                            urlAmazonInputSublinea.value = urlLimpia;
+                        }
+                    }
+                }, 10);
+            });
+            
+            // Event listener para cuando cambia el input (por si se escribe manualmente)
+            urlAmazonInputSublinea.addEventListener('input', function(e) {
+                const url = e.target.value.trim();
+                if (url && url.includes('amazon')) {
+                    const urlLimpia = limpiarUrlAmazon(url);
+                    if (urlLimpia !== url && urlLimpia.length < url.length) {
+                        // Solo actualizar si la URL limpia es más corta (tiene sentido limpiarla)
+                        e.target.value = urlLimpia;
+                    }
+                }
+            });
+        }
+        
+        // Buscar imágenes de Amazon en modal de sublínea
+        document.getElementById('btn-buscar-amazon-sublinea').addEventListener('click', async () => {
+            const urlInput = document.getElementById('url-amazon-sublinea');
+            const errorDiv = document.getElementById('error-amazon-sublinea');
+            const loadingDiv = document.getElementById('loading-amazon-sublinea');
+            const imagenesDiv = document.getElementById('imagenes-amazon-sublinea');
+            const gridDiv = document.getElementById('grid-imagenes-amazon-sublinea');
+            
+            const url = urlInput.value.trim();
+            if (!url) {
+                errorDiv.textContent = 'Por favor, introduce una URL de Amazon';
+                errorDiv.classList.remove('hidden');
+                return;
+            }
+            
+            errorDiv.classList.add('hidden');
+            loadingDiv.classList.remove('hidden');
+            imagenesDiv.classList.add('hidden');
+            gridDiv.innerHTML = '';
+            imagenesAmazonSeleccionadasSublinea = [];
+            
+            try {
+                const response = await fetch('{{ route("admin.productos.obtener-imagenes-amazon") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({ url: url })
+                });
+                
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error(data.error || 'Error al obtener imágenes');
+                }
+                
+                if (!data.imagenes || data.imagenes.length === 0) {
+                    errorDiv.textContent = 'No se encontraron imágenes para este producto';
+                    errorDiv.classList.remove('hidden');
+                    loadingDiv.classList.add('hidden');
+                    return;
+                }
+                
+                // Mostrar imágenes
+                data.imagenes.forEach((imagen, index) => {
+                    const div = document.createElement('div');
+                    div.className = 'relative border-2 border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden cursor-pointer hover:border-blue-500 transition-colors';
+                    div.dataset.index = index;
+                    
+                    const img = document.createElement('img');
+                    img.src = imagen.url;
+                    img.className = 'w-full h-32 object-contain transition-transform duration-200';
+                    img.alt = `Imagen ${index + 1}`;
+                    img.dataset.originalClass = 'w-full h-32 object-contain transition-transform duration-200';
+                    
+                    // Contenedor para checkbox y etiqueta de tamaño
+                    const checkboxContainer = document.createElement('div');
+                    checkboxContainer.className = 'absolute top-2 right-2 flex items-center gap-1';
+                    
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.className = 'w-5 h-5';
+                    checkbox.dataset.index = index;
+                    
+                    // Etiqueta de tamaño (L, M, S)
+                    const sizeLabel = document.createElement('span');
+                    const sizeText = imagen.size === 'large' ? 'L' : (imagen.size === 'medium' ? 'M' : 'S');
+                    sizeLabel.textContent = sizeText;
+                    sizeLabel.className = 'text-xs font-semibold bg-blue-500 text-white px-1.5 py-0.5 rounded';
+                    sizeLabel.style.display = 'inline-block';
+                    
+                    checkboxContainer.appendChild(checkbox);
+                    checkboxContainer.appendChild(sizeLabel);
+                    
+                    div.appendChild(img);
+                    div.appendChild(checkboxContainer);
+                    
+                    // Funcionalidad de agrandar con espacio
+                    let espacioPresionado = false;
+                    let ratonEncima = false;
+                    
+                    div.addEventListener('mouseenter', () => {
+                        ratonEncima = true;
+                    });
+                    
+                    div.addEventListener('mouseleave', () => {
+                        ratonEncima = false;
+                        if (espacioPresionado) {
+                            img.className = img.dataset.originalClass;
+                            espacioPresionado = false;
+                        }
+                    });
+                    
+                    // Listener global para la tecla espacio
+                    const espacioKeydown = (e) => {
+                        if (e.code === 'Space' && ratonEncima && !espacioPresionado) {
+                            e.preventDefault();
+                            espacioPresionado = true;
+                            img.className = 'w-full max-h-[80vh] object-contain transition-transform duration-200 z-50';
+                            div.style.zIndex = '50';
+                            div.style.position = 'relative';
+                        }
+                    };
+                    
+                    const espacioKeyup = (e) => {
+                        if (e.code === 'Space' && espacioPresionado) {
+                            e.preventDefault();
+                            espacioPresionado = false;
+                            img.className = img.dataset.originalClass;
+                            div.style.zIndex = '';
+                        }
+                    };
+                    
+                    document.addEventListener('keydown', espacioKeydown);
+                    document.addEventListener('keyup', espacioKeyup);
+                    
+                    div.addEventListener('click', (e) => {
+                        if (e.target !== checkbox && e.target !== sizeLabel) {
+                            checkbox.checked = !checkbox.checked;
+                        }
+                        actualizarSeleccionAmazonSublinea(checkbox.checked, index, imagen);
+                    });
+                    
+                    checkbox.addEventListener('change', (e) => {
+                        actualizarSeleccionAmazonSublinea(e.target.checked, index, imagen);
+                    });
+                    
+                    gridDiv.appendChild(div);
+                });
+                
+                imagenesDiv.classList.remove('hidden');
+                loadingDiv.classList.add('hidden');
+                
+            } catch (error) {
+                console.error('Error:', error);
+                errorDiv.textContent = error.message || 'Error al obtener imágenes de Amazon';
+                errorDiv.classList.remove('hidden');
+                loadingDiv.classList.add('hidden');
+            }
+        });
+        
+        function actualizarSeleccionAmazonSublinea(seleccionada, index, imagen) {
+            if (seleccionada) {
+                if (!imagenesAmazonSeleccionadasSublinea.find(img => img.url === imagen.url)) {
+                    imagenesAmazonSeleccionadasSublinea.push(imagen);
+                }
+            } else {
+                imagenesAmazonSeleccionadasSublinea = imagenesAmazonSeleccionadasSublinea.filter(img => img.url !== imagen.url);
+            }
+        }
+        
+        // Guardar imágenes seleccionadas de Amazon en sublínea
+        document.getElementById('btn-guardar-imagen-sublinea').addEventListener('click', async () => {
+            const tabActiva = document.querySelector('.tab-modal-sublinea.border-blue-500');
+            if (!tabActiva || tabActiva.id !== 'tab-amazon-sublinea') {
+                return; // No es la pestaña de Amazon, dejar que el código existente maneje el guardado
+            }
+            
+            if (imagenesAmazonSeleccionadasSublinea.length === 0) {
+                alert('Por favor, selecciona al menos una imagen');
+                return;
+            }
+            
+            const carpetaSelect = document.getElementById('carpeta-amazon-sublinea');
+            const carpeta = carpetaSelect.value;
+            if (!carpeta) {
+                alert('Por favor, selecciona una carpeta');
+                return;
+            }
+            
+            try {
+                // Procesar cada imagen seleccionada
+                for (const imagen of imagenesAmazonSeleccionadasSublinea) {
+                    // Descargar la imagen desde la URL
+                    const response = await fetch('{{ route("admin.imagenes.descargar-url") }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                        },
+                        body: JSON.stringify({
+                            url: imagen.url,
+                            carpeta: carpeta
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // Añadir la imagen a la sublínea
+                        añadirImagenASublinea(data.data.ruta_relativa);
+                    } else {
+                        console.error('Error al descargar imagen:', data.message);
+                    }
+                }
+                
+                limpiarModalAñadirSublinea();
+                cargarCarpetasModalSublinea();
+                cambiarTabModalSublinea('url');
+                
+            } catch (error) {
+                console.error('Error al guardar imágenes:', error);
+                alert('Error al guardar las imágenes: ' + error.message);
+            }
+        });
+        document.getElementById('tab-amazon-sublinea').addEventListener('click', () => cambiarTabModalSublinea('amazon'));
         
         // Event listeners para subida de imágenes de sublínea (similar al modal principal)
         const fileInputSublinea = document.getElementById('file-subir-sublinea');
@@ -5434,11 +6593,18 @@ document.addEventListener('DOMContentLoaded', function() {
     function limpiarModalAñadir() {
         document.getElementById('carpeta-subir-nueva').value = '';
         document.getElementById('carpeta-url-nueva').value = '';
+        document.getElementById('carpeta-amazon-nueva').value = '';
         document.getElementById('file-subir-nueva').value = '';
         document.getElementById('url-imagen-nueva').value = '';
+        document.getElementById('url-amazon-nueva').value = '';
         document.getElementById('nombre-archivo-nueva').textContent = '';
         document.getElementById('error-url-nueva').classList.add('hidden');
+        document.getElementById('error-amazon-nueva').classList.add('hidden');
+        document.getElementById('loading-amazon-nueva').classList.add('hidden');
+        document.getElementById('imagenes-amazon-nueva').classList.add('hidden');
+        document.getElementById('grid-imagenes-amazon-nueva').innerHTML = '';
         document.getElementById('area-recorte-nueva').classList.add('hidden');
+        imagenesAmazonSeleccionadas = [];
         if (cropperNueva) {
             cropperNueva.destroy();
             cropperNueva = null;
@@ -5449,28 +6615,37 @@ document.addEventListener('DOMContentLoaded', function() {
     function cambiarTabModal(tab) {
         const tabSubir = document.getElementById('tab-subir-nueva');
         const tabUrl = document.getElementById('tab-url-nueva');
+        const tabAmazon = document.getElementById('tab-amazon-nueva');
         const contentSubir = document.getElementById('content-subir-nueva');
         const contentUrl = document.getElementById('content-url-nueva');
+        const contentAmazon = document.getElementById('content-amazon-nueva');
+        
+        // Resetear todas las pestañas
+        [tabUrl, tabSubir, tabAmazon].forEach(t => {
+            t.classList.remove('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
+            t.classList.add('border-transparent', 'text-gray-500');
+        });
+        [contentUrl, contentSubir, contentAmazon].forEach(c => c.classList.add('hidden'));
         
         if (tab === 'url') {
             tabUrl.classList.add('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
             tabUrl.classList.remove('border-transparent', 'text-gray-500');
-            tabSubir.classList.remove('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
-            tabSubir.classList.add('border-transparent', 'text-gray-500');
             contentUrl.classList.remove('hidden');
-            contentSubir.classList.add('hidden');
-        } else {
+        } else if (tab === 'subir') {
             tabSubir.classList.add('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
             tabSubir.classList.remove('border-transparent', 'text-gray-500');
-            tabUrl.classList.remove('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
-            tabUrl.classList.add('border-transparent', 'text-gray-500');
             contentSubir.classList.remove('hidden');
-            contentUrl.classList.add('hidden');
+        } else if (tab === 'amazon') {
+            tabAmazon.classList.add('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
+            tabAmazon.classList.remove('border-transparent', 'text-gray-500');
+            contentAmazon.classList.remove('hidden');
+            cargarCarpetasModal(); // Cargar carpetas cuando se abre la pestaña Amazon
         }
     }
     
     document.getElementById('tab-subir-nueva').addEventListener('click', () => cambiarTabModal('subir'));
     document.getElementById('tab-url-nueva').addEventListener('click', () => cambiarTabModal('url'));
+    document.getElementById('tab-amazon-nueva').addEventListener('click', () => cambiarTabModal('amazon'));
     
     // Cargar carpetas en modales
     function cargarCarpetasModal() {
@@ -5480,6 +6655,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.success && data.data.length > 0) {
                     actualizarSelectCarpetas('carpeta-subir-nueva', data.data);
                     actualizarSelectCarpetas('carpeta-url-nueva', data.data);
+                    actualizarSelectCarpetas('carpeta-amazon-nueva', data.data);
                 }
             })
             .catch(error => console.error('Error al cargar carpetas:', error));
@@ -5512,6 +6688,279 @@ document.addEventListener('DOMContentLoaded', function() {
             select.value = 'producto';
         }
     }
+
+    // ========== FUNCIONALIDAD AMAZON PARA MODAL PRINCIPAL ==========
+    let imagenesAmazonSeleccionadas = [];
+    
+    // Función para limpiar URL de Amazon (copiada de formulario de ofertas)
+    function limpiarUrlAmazon(url) {
+        try {
+            // Detectar URLs de Amazon (diferentes dominios: .es, .com, .co.uk, etc.)
+            const amazonRegex = /^https?:\/\/(www\.)?amazon\.(es|com|co\.uk|de|fr|it|ca|com\.au|co\.jp|in|com\.mx|com\.br|nl|se|pl|com\.tr|ae|sa|sg|com\.tw|com\.hk)\//i;
+            
+            if (!amazonRegex.test(url)) {
+                return url; // No es Amazon, devolver URL original
+            }
+            
+            // Extraer el dominio de Amazon (es, com, etc.)
+            const dominioMatch = url.match(/amazon\.([a-z.]+)/i);
+            if (!dominioMatch) {
+                return url;
+            }
+            const dominio = dominioMatch[1];
+            
+            // Buscar el código del producto después de /dp/ o /gp/product/
+            const dpMatch = url.match(/\/dp\/([A-Z0-9]+)/i) || url.match(/\/gp\/product\/([A-Z0-9]+)/i);
+            
+            if (dpMatch && dpMatch[1]) {
+                const codigoProducto = dpMatch[1];
+                // Construir URL limpia: https://www.amazon.{dominio}/dp/CODIGO
+                return `https://www.amazon.${dominio}/dp/${codigoProducto}`;
+            }
+            
+            // Si no se encuentra el código, devolver URL original
+            return url;
+        } catch (error) {
+            console.error('Error al limpiar URL de Amazon:', error);
+            return url; // En caso de error, devolver URL original
+        }
+    }
+    
+    // Limpiar URL de Amazon automáticamente al pegar o escribir
+    const urlAmazonInputNueva = document.getElementById('url-amazon-nueva');
+    if (urlAmazonInputNueva) {
+        // Event listener para pegar
+        urlAmazonInputNueva.addEventListener('paste', function(e) {
+            setTimeout(() => {
+                const urlPegada = urlAmazonInputNueva.value.trim();
+                if (urlPegada) {
+                    const urlLimpia = limpiarUrlAmazon(urlPegada);
+                    if (urlLimpia !== urlPegada) {
+                        urlAmazonInputNueva.value = urlLimpia;
+                    }
+                }
+            }, 10);
+        });
+        
+        // Event listener para cuando cambia el input (por si se escribe manualmente)
+        urlAmazonInputNueva.addEventListener('input', function(e) {
+            const url = e.target.value.trim();
+            if (url && url.includes('amazon')) {
+                const urlLimpia = limpiarUrlAmazon(url);
+                if (urlLimpia !== url && urlLimpia.length < url.length) {
+                    // Solo actualizar si la URL limpia es más corta (tiene sentido limpiarla)
+                    e.target.value = urlLimpia;
+                }
+            }
+        });
+    }
+    
+    // Buscar imágenes de Amazon
+    document.getElementById('btn-buscar-amazon-nueva').addEventListener('click', async () => {
+        const urlInput = document.getElementById('url-amazon-nueva');
+        const errorDiv = document.getElementById('error-amazon-nueva');
+        const loadingDiv = document.getElementById('loading-amazon-nueva');
+        const imagenesDiv = document.getElementById('imagenes-amazon-nueva');
+        const gridDiv = document.getElementById('grid-imagenes-amazon-nueva');
+        
+        const url = urlInput.value.trim();
+        if (!url) {
+            errorDiv.textContent = 'Por favor, introduce una URL de Amazon';
+            errorDiv.classList.remove('hidden');
+            return;
+        }
+        
+        errorDiv.classList.add('hidden');
+        loadingDiv.classList.remove('hidden');
+        imagenesDiv.classList.add('hidden');
+        gridDiv.innerHTML = '';
+        imagenesAmazonSeleccionadas = [];
+        
+        try {
+            const response = await fetch('{{ route("admin.productos.obtener-imagenes-amazon") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({ url: url })
+            });
+            
+            const data = await response.json();
+            
+            if (!data.success) {
+                throw new Error(data.error || 'Error al obtener imágenes');
+            }
+            
+            if (!data.imagenes || data.imagenes.length === 0) {
+                errorDiv.textContent = 'No se encontraron imágenes para este producto';
+                errorDiv.classList.remove('hidden');
+                loadingDiv.classList.add('hidden');
+                return;
+            }
+            
+            // Mostrar imágenes
+            data.imagenes.forEach((imagen, index) => {
+                const div = document.createElement('div');
+                div.className = 'relative border-2 border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden cursor-pointer hover:border-blue-500 transition-colors';
+                div.dataset.index = index;
+                
+                const img = document.createElement('img');
+                img.src = imagen.url;
+                img.className = 'w-full h-32 object-contain transition-transform duration-200';
+                img.alt = `Imagen ${index + 1}`;
+                img.dataset.originalClass = 'w-full h-32 object-contain transition-transform duration-200';
+                
+                // Contenedor para checkbox y etiqueta de tamaño
+                const checkboxContainer = document.createElement('div');
+                checkboxContainer.className = 'absolute top-2 right-2 flex items-center gap-1';
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'w-5 h-5';
+                checkbox.dataset.index = index;
+                
+                // Etiqueta de tamaño (L, M, S)
+                const sizeLabel = document.createElement('span');
+                const sizeText = imagen.size === 'large' ? 'L' : (imagen.size === 'medium' ? 'M' : 'S');
+                sizeLabel.textContent = sizeText;
+                sizeLabel.className = 'text-xs font-semibold bg-blue-500 text-white px-1.5 py-0.5 rounded';
+                sizeLabel.style.display = 'inline-block';
+                
+                checkboxContainer.appendChild(checkbox);
+                checkboxContainer.appendChild(sizeLabel);
+                
+                div.appendChild(img);
+                div.appendChild(checkboxContainer);
+                
+                // Funcionalidad de agrandar con espacio
+                let espacioPresionado = false;
+                let ratonEncima = false;
+                
+                div.addEventListener('mouseenter', () => {
+                    ratonEncima = true;
+                });
+                
+                div.addEventListener('mouseleave', () => {
+                    ratonEncima = false;
+                    if (espacioPresionado) {
+                        img.className = img.dataset.originalClass;
+                        espacioPresionado = false;
+                    }
+                });
+                
+                // Listener global para la tecla espacio
+                const espacioKeydown = (e) => {
+                    if (e.code === 'Space' && ratonEncima && !espacioPresionado) {
+                        e.preventDefault();
+                        espacioPresionado = true;
+                        img.className = 'w-full max-h-[80vh] object-contain transition-transform duration-200 z-50';
+                        div.style.zIndex = '50';
+                        div.style.position = 'relative';
+                    }
+                };
+                
+                const espacioKeyup = (e) => {
+                    if (e.code === 'Space' && espacioPresionado) {
+                        e.preventDefault();
+                        espacioPresionado = false;
+                        img.className = img.dataset.originalClass;
+                        div.style.zIndex = '';
+                    }
+                };
+                
+                document.addEventListener('keydown', espacioKeydown);
+                document.addEventListener('keyup', espacioKeyup);
+                
+                div.addEventListener('click', (e) => {
+                    if (e.target !== checkbox && e.target !== sizeLabel) {
+                        checkbox.checked = !checkbox.checked;
+                    }
+                    actualizarSeleccionAmazon(checkbox.checked, index, imagen);
+                });
+                
+                checkbox.addEventListener('change', (e) => {
+                    actualizarSeleccionAmazon(e.target.checked, index, imagen);
+                });
+                
+                gridDiv.appendChild(div);
+            });
+            
+            imagenesDiv.classList.remove('hidden');
+            loadingDiv.classList.add('hidden');
+            
+        } catch (error) {
+            console.error('Error:', error);
+            errorDiv.textContent = error.message || 'Error al obtener imágenes de Amazon';
+            errorDiv.classList.remove('hidden');
+            loadingDiv.classList.add('hidden');
+        }
+    });
+    
+    function actualizarSeleccionAmazon(seleccionada, index, imagen) {
+        if (seleccionada) {
+            if (!imagenesAmazonSeleccionadas.find(img => img.url === imagen.url)) {
+                imagenesAmazonSeleccionadas.push(imagen);
+            }
+        } else {
+            imagenesAmazonSeleccionadas = imagenesAmazonSeleccionadas.filter(img => img.url !== imagen.url);
+        }
+    }
+    
+    // Guardar imágenes seleccionadas de Amazon
+    document.getElementById('btn-guardar-nueva').addEventListener('click', async () => {
+        const tabActiva = document.querySelector('.tab-modal.border-blue-500');
+        if (!tabActiva || tabActiva.id !== 'tab-amazon-nueva') {
+            return; // No es la pestaña de Amazon, dejar que el código existente maneje el guardado
+        }
+        
+        if (imagenesAmazonSeleccionadas.length === 0) {
+            alert('Por favor, selecciona al menos una imagen');
+            return;
+        }
+        
+        const carpetaSelect = document.getElementById('carpeta-amazon-nueva');
+        const carpeta = carpetaSelect.value;
+        if (!carpeta) {
+            alert('Por favor, selecciona una carpeta');
+            return;
+        }
+        
+        try {
+            // Procesar cada imagen seleccionada
+            for (const imagen of imagenesAmazonSeleccionadas) {
+                // Descargar la imagen desde la URL
+                const response = await fetch('{{ route("admin.imagenes.descargar-url") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({
+                        url: imagen.url,
+                        carpeta: carpeta
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Añadir la imagen grande y pequeña
+                    imagenesGrandes.push(data.data.ruta_relativa);
+                    imagenesPequenas.push(data.data.ruta_relativa);
+                } else {
+                    console.error('Error al descargar imagen:', data.message);
+                }
+            }
+            
+            renderizarImagenes();
+            cerrarModalAñadirImagen();
+            
+        } catch (error) {
+            console.error('Error al guardar imágenes:', error);
+            alert('Error al guardar las imágenes: ' + error.message);
+        }
+    });
     
     // Configurar subida de archivo
     const fileInputNueva = document.getElementById('file-subir-nueva');

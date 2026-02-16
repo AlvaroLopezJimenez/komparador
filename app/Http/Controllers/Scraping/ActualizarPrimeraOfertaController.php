@@ -223,14 +223,82 @@ class ActualizarPrimeraOfertaController extends ScraperBaseController
     {
         // Evitar timeout en ejecuciones largas
         set_time_limit(0);
-
-        // 1) Selección de ofertas a procesar (primera oferta de cada producto) ANTES de crear la ejecución
-        $ofertas = $this->obtenerPrimerasOfertasElegibles();
+        ignore_user_abort(true);
+        
+        // Configurar headers para mostrar progreso en tiempo real
+        header('Content-Type: text/html; charset=utf-8');
+        header('Cache-Control: no-cache');
+        header('X-Accel-Buffering: no'); // Desactivar buffering de nginx
+        
+        // Iniciar output buffering con nivel 0 para que se muestre inmediatamente
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        ob_start();
+        
+        // Función helper para mostrar mensaje y hacer flush
+        $mostrar = function($mensaje, $tipo = 'info') {
+            $color = match($tipo) {
+                'success' => '#28a745',
+                'error' => '#dc3545',
+                'warning' => '#ffc107',
+                'info' => '#007bff',
+                default => '#000000'
+            };
+            $timestamp = now()->format('H:i:s');
+            $mensajeEscapado = htmlspecialchars($mensaje, ENT_QUOTES, 'UTF-8');
+            echo "<div style='color: {$color}; margin: 2px 0; font-family: monospace; font-size: 12px;'>[{$timestamp}] {$mensajeEscapado}</div>";
+            if (ob_get_level() > 0) {
+                ob_flush();
+            }
+            flush();
+            if (function_exists('fastcgi_finish_request')) {
+                fastcgi_finish_request();
+            }
+        };
+        
+        // HTML inicial
+        echo "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Actualizando Primera Oferta</title>";
+        echo "<style>body { background: #1a1a1a; color: #fff; padding: 20px; font-family: monospace; }</style></head><body>";
+        echo "<h2 style='color: #fff;'>Actualización de Primera Oferta en Progreso...</h2>";
+        echo "<div id='output' style='background: #2a2a2a; padding: 15px; border-radius: 5px; max-height: 80vh; overflow-y: auto;'>";
+        
+        $mostrar("=== INICIANDO ACTUALIZACIÓN DE PRIMERA OFERTA ===", 'info');
+        $mostrar("Token: " . ($token ?? 'N/A'), 'info');
+        
+        // 1) Selección de ofertas a procesar
+        $mostrar("Paso 1: Obteniendo ofertas elegibles...", 'info');
+        $inicioObtenerOfertas = microtime(true);
+        
+        try {
+            $ofertas = $this->obtenerPrimerasOfertasElegibles();
+        } catch (\Exception $e) {
+            $mostrar("✗ ERROR al obtener ofertas: " . $e->getMessage(), 'error');
+            $mostrar("Stack: " . substr($e->getTraceAsString(), 0, 500), 'error');
+            echo "</div></body></html>";
+            if (ob_get_level() > 0) {
+                ob_end_flush();
+            }
+            return;
+        }
+        
+        $tiempoObtenerOfertas = round(microtime(true) - $inicioObtenerOfertas, 2);
+        $mostrar("✓ Ofertas obtenidas en {$tiempoObtenerOfertas}s", 'success');
 
         $totalOfertas = $ofertas->count();
+        $mostrar("Total de ofertas a procesar: {$totalOfertas}", 'info');
 
-        // Si no hay ofertas para procesar, no crear ejecución y retornar directamente
+        // Si no hay ofertas para procesar
         if ($totalOfertas === 0) {
+            $mostrar("No hay ofertas para actualizar", 'warning');
+            echo "<br><strong style='color: #fff;'>RESUMEN FINAL:</strong><br>";
+            echo "<div style='color: #fff;'>Total ofertas: 0<br>";
+            echo "Actualizadas: 0<br>";
+            echo "Errores: 0</div>";
+            echo "</div></body></html>";
+            if (ob_get_level() > 0) {
+                ob_end_flush();
+            }
             return response()->json([
                 'status'         => 'ok',
                 'total_ofertas'  => 0,
@@ -240,31 +308,70 @@ class ActualizarPrimeraOfertaController extends ScraperBaseController
             ]);
         }
 
-        // Solo crear la ejecución si hay ofertas para procesar
-        $ejecucion = EjecucionGlobal::create([
-            'inicio' => now(),
-            'nombre' => 'actualizar_primera_oferta',
-            'log'    => $token ? ['token' => $token] : [],
-        ]);
+        // Crear ejecución
+        $mostrar("Paso 2: Creando registro de ejecución...", 'info');
+        try {
+            $ejecucion = EjecucionGlobal::create([
+                'inicio' => now(),
+                'nombre' => 'actualizar_primera_oferta',
+                'log'    => $token ? ['token' => $token] : [],
+            ]);
+            $mostrar("✓ Ejecución creada (ID: {$ejecucion->id})", 'success');
+        } catch (\Exception $e) {
+            $mostrar("✗ ERROR al crear ejecución: " . $e->getMessage(), 'error');
+            echo "</div></body></html>";
+            if (ob_get_level() > 0) {
+                ob_end_flush();
+            }
+            return;
+        }
 
         $actualizadas = 0;
         $errores      = 0;
         $log          = [];
+        $indiceActual = 0;
 
-        // 2) Procesar ofertas de forma secuencial sin pausas
+        // 2) Procesar ofertas de forma secuencial
+        $mostrar("Paso 3: Iniciando procesamiento de ofertas...", 'info');
+        $mostrar("================================================", 'info');
+        
         foreach ($ofertas as $oferta) {
+            $indiceActual++;
+            $tiendaNombre = $oferta->tienda->nombre ?? 'Sin tienda';
+            $productoNombre = $oferta->producto->nombre ?? 'Sin producto';
+            
+            $mostrar("", 'info'); // Línea en blanco
+            $mostrar("--- Oferta {$indiceActual}/{$totalOfertas} ---", 'info');
+            $mostrar("ID: {$oferta->id} | Tienda: {$tiendaNombre} | Producto: " . substr($productoNombre, 0, 50), 'info');
+            $mostrar("URL: " . substr($oferta->url, 0, 80) . "...", 'info');
+            $mostrar("Precio anterior: {$oferta->precio_total} €", 'info');
+            
             try {
+                $inicioProcesar = microtime(true);
+                $mostrar("→ Iniciando procesamiento...", 'info');
+                
                 $resultado = $this->procesarOfertaScraper($oferta);
+                
+                $tiempoProcesar = round(microtime(true) - $inicioProcesar, 2);
                 $log[] = $resultado;
 
                 if (!empty($resultado['success'])) {
                     $actualizadas++;
+                    $precioNuevo = $resultado['precio_nuevo'] ?? 'N/A';
+                    $mostrar("✓ ÉXITO - Precio nuevo: {$precioNuevo} € (tiempo: {$tiempoProcesar}s)", 'success');
                 } else {
                     $errores++;
+                    $errorMsg = $resultado['error'] ?? 'Error desconocido';
+                    $mostrar("✗ ERROR - {$errorMsg} (tiempo: {$tiempoProcesar}s)", 'error');
                 }
 
             } catch (\Exception $e) {
                 $errores++;
+                $errorMsg = $e->getMessage();
+                $mostrar("✗ EXCEPCIÓN - {$errorMsg}", 'error');
+                $mostrar("Archivo: " . $e->getFile() . " Línea: " . $e->getLine(), 'error');
+                $mostrar("Stack trace: " . substr($e->getTraceAsString(), 0, 300) . "...", 'error');
+                
                 $log[] = [
                     'oferta_id'                 => $oferta->id,
                     'tienda_nombre'             => $oferta->tienda->nombre ?? null,
@@ -280,6 +387,10 @@ class ActualizarPrimeraOfertaController extends ScraperBaseController
             }
         }
 
+        $mostrar("", 'info'); // Línea en blanco
+        $mostrar("================================================", 'info');
+        $mostrar("Paso 4: Finalizando ejecución...", 'info');
+
         // Crear estructura JSON organizada
         $logEstructurado = [
             'token' => $token,
@@ -292,20 +403,33 @@ class ActualizarPrimeraOfertaController extends ScraperBaseController
             'resultados' => $log
         ];
 
-        $ejecucion->update([
-            'fin'            => now(),
-            'total'          => $totalOfertas,
-            'total_guardado' => $actualizadas,
-            'total_errores'  => $errores,
-            'log'            => $logEstructurado,
-        ]);
+        try {
+            $ejecucion->update([
+                'fin'            => now(),
+                'total'          => $totalOfertas,
+                'total_guardado' => $actualizadas,
+                'total_errores'  => $errores,
+                'log'            => $logEstructurado,
+            ]);
+            $mostrar("✓ Ejecución finalizada y guardada", 'success');
+        } catch (\Exception $e) {
+            $mostrar("✗ ERROR al guardar ejecución: " . $e->getMessage(), 'error');
+        }
 
-        return response()->json([
-            'status'         => 'ok',
-            'total_ofertas'  => $totalOfertas,
-            'actualizadas'   => $actualizadas,
-            'errores'        => $errores,
-        ]);
+        $mostrar("", 'info');
+        $mostrar("=== RESUMEN FINAL ===", 'info');
+        $mostrar("Total ofertas procesadas: {$totalOfertas}", 'info');
+        $mostrar("Actualizadas correctamente: {$actualizadas}", 'success');
+        $mostrar("Errores: {$errores}", $errores > 0 ? 'error' : 'info');
+        $mostrar("Ejecución ID: {$ejecucion->id}", 'info');
+        
+        echo "</div>";
+        echo "<script>window.scrollTo(0, document.body.scrollHeight);</script>";
+        echo "</body></html>";
+        
+        if (ob_get_level() > 0) {
+            ob_end_flush();
+        }
     }
 
     /**

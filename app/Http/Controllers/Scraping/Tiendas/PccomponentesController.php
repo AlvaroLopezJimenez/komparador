@@ -58,7 +58,7 @@ class PccomponentesController extends PlantillaTiendaController
                 
                 // Crear aviso con fecha a una hora vista
                 DB::table('avisos')->insertGetId([
-                    'texto_aviso'     => 'PRODUCTO NO ENCONTRADO (404) - GENERADO AUTOMÁTICAMENTE',
+                    'texto_aviso'     => 'PRODUCTO NO ENCONTRADO (404) - 1a vez Generado Automáticamente',
                     'fecha_aviso'     => now()->addHour(), // Una hora vista
                     'user_id'         => 1,                 // usuario sistema
                     'avisoable_type'  => \App\Models\OfertaProducto::class,
@@ -84,7 +84,7 @@ class PccomponentesController extends PlantillaTiendaController
                 
                 // Crear aviso con fecha a 4 días vista
                 DB::table('avisos')->insertGetId([
-                    'texto_aviso'     => 'Reacondicionado 1a vez',
+                    'texto_aviso'     => 'Reacondicionado 1a vez - Generado Automaticamente',
                     'fecha_aviso'     => now()->addDays(4), // 4 días vista
                     'user_id'         => 1,                 // usuario sistema
                     'avisoable_type'  => \App\Models\OfertaProducto::class,

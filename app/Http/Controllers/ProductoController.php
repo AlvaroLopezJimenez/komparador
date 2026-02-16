@@ -17,10 +17,18 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\RateLimiter;
 use App\Models\Click;
 use App\Models\OfertaProducto;
+use Illuminate\Support\Facades\Http;
 
 
 class ProductoController extends Controller
 {
+    // ==== Amazon Product Advertising API (PA-API 5.0) ====
+    private $amazonAccessKey = 'AKPAT0P1HX1759785609';
+    private $amazonSecretKey = 'VGfXEBBUH/FSsv2jENSilcOsRljI7aMgf7hb94gl';
+    private $amazonAssociateTag = 'srto-21';
+    private $amazonEndpoint = 'webservices.amazon.es';
+    private $amazonRegion = 'eu-west-1';
+    private $amazonService = 'ProductAdvertisingAPI';
     public function index(Request $request)
     {
         $busqueda = $request->input('buscar');
@@ -2370,5 +2378,303 @@ public function generarContenido(Request $request)
                 'message' => 'Error interno del servidor: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Obtener imágenes de un producto de Amazon desde su URL
+     */
+    public function obtenerImagenesAmazon(Request $request)
+    {
+        try {
+            $request->validate([
+                'url' => 'required|url'
+            ]);
+
+            $url = $request->input('url');
+            
+            // Extraer ASIN de la URL
+            $asin = $this->amazonExtractASIN($url);
+            if (!$asin) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'No se pudo extraer el ASIN de la URL de Amazon'
+                ], 400);
+            }
+
+            // PA-API 5.0 GetItems - solicitar todas las imágenes en todos los tamaños
+            $payload = [
+                'ItemIds' => [$asin],
+                'ItemIdType' => 'ASIN',
+                'Marketplace' => 'www.amazon.es',
+                'PartnerType' => 'Associates',
+                'PartnerTag' => $this->amazonAssociateTag,
+                'LanguagesOfPreference' => ['es_ES'],
+                'CurrencyOfPreference' => 'EUR',
+                'Resources' => [
+                    'Images.Primary.Small',
+                    'Images.Primary.Medium',
+                    'Images.Primary.Large',
+                    'Images.Variants.Small',
+                    'Images.Variants.Medium',
+                    'Images.Variants.Large'
+                ]
+            ];
+
+            $apiUrl = 'https://webservices.amazon.es/paapi5/getitems';
+            $payloadJson = json_encode($payload);
+            $headers = $this->amazonCreateHeaders($apiUrl, $payloadJson);
+
+            $resp = Http::timeout(30)
+                ->withHeaders($headers)
+                ->withBody($payloadJson, 'application/json')
+                ->post($apiUrl);
+
+            if (!$resp->successful()) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Error al consultar la API de Amazon: ' . $resp->status()
+                ], 500);
+            }
+
+            $json = $resp->json();
+
+            // Verificar errores
+            if (isset($json['Errors'])) {
+                $error = $json['Errors'][0]['Message'] ?? 'Error desconocido';
+                return response()->json([
+                    'success' => false,
+                    'error' => $error
+                ], 400);
+            }
+
+            // Extraer imágenes de la respuesta
+            $imagenes = $this->procesarImagenesAmazon($json);
+
+            return response()->json([
+                'success' => true,
+                'imagenes' => $imagenes,
+                'asin' => $asin
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error al obtener imágenes de Amazon: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'error' => 'Error al obtener imágenes: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Procesar la respuesta de Amazon y extraer todas las imágenes
+     */
+    private function procesarImagenesAmazon(array $json): array
+    {
+        $imagenes = [];
+
+        // Obtener items de la respuesta
+        $items = $json['ItemsResult']['Items'] ?? $json['ItemResults']['Items'] ?? [];
+        
+        if (empty($items)) {
+            return $imagenes;
+        }
+
+        $item = $items[0];
+        $images = $item['Images'] ?? [];
+
+        // Procesar imagen primaria - solo la versión Large (o Medium si no hay Large, o Small como último recurso)
+        if (isset($images['Primary'])) {
+            $primary = $images['Primary'];
+            
+            // Preferir Large, luego Medium, luego Small
+            if (isset($primary['Large'])) {
+                $imagenes[] = [
+                    'url' => $primary['Large']['URL'],
+                    'height' => $primary['Large']['Height'] ?? null,
+                    'width' => $primary['Large']['Width'] ?? null,
+                    'type' => 'primary',
+                    'size' => 'large'
+                ];
+            } elseif (isset($primary['Medium'])) {
+                $imagenes[] = [
+                    'url' => $primary['Medium']['URL'],
+                    'height' => $primary['Medium']['Height'] ?? null,
+                    'width' => $primary['Medium']['Width'] ?? null,
+                    'type' => 'primary',
+                    'size' => 'medium'
+                ];
+            } elseif (isset($primary['Small'])) {
+                $imagenes[] = [
+                    'url' => $primary['Small']['URL'],
+                    'height' => $primary['Small']['Height'] ?? null,
+                    'width' => $primary['Small']['Width'] ?? null,
+                    'type' => 'primary',
+                    'size' => 'small'
+                ];
+            }
+        }
+
+        // Procesar imágenes variantes - solo la versión Large de cada variante
+        if (isset($images['Variants']) && is_array($images['Variants'])) {
+            foreach ($images['Variants'] as $variant) {
+                // Preferir Large, luego Medium, luego Small
+                if (isset($variant['Large'])) {
+                    $imagenes[] = [
+                        'url' => $variant['Large']['URL'],
+                        'height' => $variant['Large']['Height'] ?? null,
+                        'width' => $variant['Large']['Width'] ?? null,
+                        'type' => 'variant',
+                        'size' => 'large'
+                    ];
+                } elseif (isset($variant['Medium'])) {
+                    $imagenes[] = [
+                        'url' => $variant['Medium']['URL'],
+                        'height' => $variant['Medium']['Height'] ?? null,
+                        'width' => $variant['Medium']['Width'] ?? null,
+                        'type' => 'variant',
+                        'size' => 'medium'
+                    ];
+                } elseif (isset($variant['Small'])) {
+                    $imagenes[] = [
+                        'url' => $variant['Small']['URL'],
+                        'height' => $variant['Small']['Height'] ?? null,
+                        'width' => $variant['Small']['Width'] ?? null,
+                        'type' => 'variant',
+                        'size' => 'small'
+                    ];
+                }
+            }
+        }
+
+        // Normalizar URLs y eliminar duplicados reales
+        // Las URLs de Amazon pueden tener parámetros diferentes pero apuntar a la misma imagen
+        // Extraer el ID de la imagen de la URL para detectar duplicados reales
+        $imagenesUnicas = [];
+        $idsVistos = [];
+        
+        foreach ($imagenes as $imagen) {
+            // Extraer el ID de la imagen de la URL (ej: /images/I/41ABC123XYZ.jpg)
+            // Patrón: /images/I/[ID].jpg o similar
+            if (preg_match('/\/images\/I\/([^\/\?]+)/i', $imagen['url'], $matches)) {
+                $imagenId = $matches[1];
+                
+                // Si ya vimos esta imagen, saltarla
+                if (in_array($imagenId, $idsVistos)) {
+                    continue;
+                }
+                
+                $idsVistos[] = $imagenId;
+                $imagenesUnicas[] = $imagen;
+            } else {
+                // Si no podemos extraer el ID, usar la URL normalizada como fallback
+                $urlNormalizada = preg_replace('/\?.*$/', '', $imagen['url']); // Quitar query params
+                $urlsNormalizadas = array_map(function($img) {
+                    return preg_replace('/\?.*$/', '', $img['url']);
+                }, $imagenesUnicas);
+                
+                if (!in_array($urlNormalizada, $urlsNormalizadas)) {
+                    $imagenesUnicas[] = $imagen;
+                }
+            }
+        }
+
+        return $imagenesUnicas;
+    }
+
+    /**
+     * Extraer ASIN de una URL de Amazon
+     */
+    private function amazonExtractASIN(string $url): ?string
+    {
+        $url = trim($url);
+        
+        $patterns = [
+            '/\/dp\/([A-Z0-9]{10})/',
+            '/\/product\/([A-Z0-9]{10})/',
+            '/\/gp\/product\/([A-Z0-9]{10})/',
+            '/\/dp\/([A-Z0-9]{10})\//',
+            '/\/dp\/([A-Z0-9]{10})\?/',
+            '/\/dp\/([A-Z0-9]{10})$/',
+            '/\/([A-Z0-9]{10})(?:\/|$|\?)/',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $url, $matches)) {
+                return $matches[1];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Crear headers para la petición a Amazon API
+     */
+    private function amazonCreateHeaders(string $url, string $payload): array
+    {
+        $timestamp = gmdate('Ymd\THis\Z');
+        $date = gmdate('Ymd');
+        
+        $parsedUrl = parse_url($url);
+        $host = $parsedUrl['host'];
+        $path = $parsedUrl['path'];
+        
+        $xAmzTarget = 'com.amazon.paapi5.v1.ProductAdvertisingAPIv1.GetItems';
+        $contentEncoding = 'amz-1.0';
+        
+        $algorithm = 'AWS4-HMAC-SHA256';
+        $credentialScope = $date . '/eu-west-1/ProductAdvertisingAPI/aws4_request';
+        
+        $canonicalHeaders = "content-encoding:" . $contentEncoding . "\n" .
+                           "host:" . $host . "\n" .
+                           "x-amz-date:" . $timestamp . "\n" .
+                           "x-amz-target:" . $xAmzTarget . "\n";
+        
+        $signedHeaders = "content-encoding;host;x-amz-date;x-amz-target";
+        
+        $canonicalRequest = "POST\n" . 
+                           $path . "\n" . 
+                           "\n" . 
+                           $canonicalHeaders . 
+                           "\n" . 
+                           $signedHeaders . "\n" . 
+                           hash('sha256', $payload);
+        
+        $stringToSign = $algorithm . "\n" . 
+                       $timestamp . "\n" . 
+                       $credentialScope . "\n" . 
+                       hash('sha256', $canonicalRequest);
+        
+        $signingKey = $this->amazonGetSigningKey($date, 'eu-west-1');
+        $signature = hash_hmac('sha256', $stringToSign, $signingKey);
+        
+        $authorization = $algorithm . ' ' . 
+                        'Credential=' . $this->amazonAccessKey . '/' . $credentialScope . ', ' . 
+                        'SignedHeaders=' . $signedHeaders . ', ' . 
+                        'Signature=' . $signature;
+        
+        return [
+            'Host' => $host,
+            'Content-Type' => 'application/json; charset=UTF-8',
+            'X-Amz-Date' => $timestamp,
+            'X-Amz-Target' => $xAmzTarget,
+            'Content-Encoding' => $contentEncoding,
+            'User-Agent' => 'paapi-docs-curl/1.0.0',
+            'Authorization' => $authorization
+        ];
+    }
+    
+    /**
+     * Obtener la clave de firma para Amazon API
+     */
+    private function amazonGetSigningKey(string $date, string $region = null): string
+    {
+        $region = $region ?: $this->amazonRegion;
+        $kDate = hash_hmac('sha256', $date, 'AWS4' . $this->amazonSecretKey, true);
+        $kRegion = hash_hmac('sha256', $region, $kDate, true);
+        $kService = hash_hmac('sha256', 'ProductAdvertisingAPI', $kRegion, true);
+        $kSigning = hash_hmac('sha256', 'aws4_request', $kService, true);
+        
+        return $kSigning;
     }
 }

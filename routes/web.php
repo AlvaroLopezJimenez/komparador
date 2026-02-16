@@ -325,6 +325,7 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
     Route::post('chollos/ofertas/ocultar-multiples', [CholloController::class, 'ocultarMultiples'])->name('chollos.ofertas.ocultar-multiples');
     Route::post('chollos/{chollo}/aplicar-fechas-cupones', [CholloController::class, 'aplicarFechasYCupones'])->name('chollos.aplicar.fechas-cupones');
     Route::post('productos/verificar-slug', [ProductoController::class, 'verificarSlugExistente'])->name('productos.verificar.slug');
+    Route::post('productos/obtener-imagenes-amazon', [ProductoController::class, 'obtenerImagenesAmazon'])->name('productos.obtener-imagenes-amazon');
 
     Route::get('profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('profile', [ProfileController::class, 'update'])->name('profile.update');
