@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use App\Services\AntiScrapingScoringService;
 use App\Services\AntiScrapingAvisoService;
@@ -91,7 +92,7 @@ class AntiScrapingMiddleware
         // ✅ ORDEN 2: Validación rápida de token (rechazo inmediato)
         // Solo validar token si NO hay usuario autenticado (doble verificación)
         $token = $request->header('X-Auth-Token');
-        if (!$token || !$this->validarToken($token)) {
+        if (!$token || !$this->validarToken($token, $request)) {
             // Si no hay token y el usuario tampoco está autenticado, rechazar
             if (!$isAuthenticated) {
                 $this->avisoService->crearAvisoBloqueo(
@@ -128,23 +129,103 @@ class AntiScrapingMiddleware
         // ✅ ORDEN 4: Rate limiting (cache, rápido)
         // Solo se aplica si no es usuario autenticado ni bot legítimo
         $limits = config("anti-scraping.limits.{$type}");
-        if (!$this->pasaRateLimit($request, $limits, $type)) {
-            $retryAfter = $this->getRetryAfter($request, $type);
+        $rateLimitResult = $this->pasaRateLimit($request, $limits, $type);
+        
+        if (!$rateLimitResult['pasa']) {
+            // IMPORTANTE: Verificar de nuevo que no sea usuario autenticado ni bot
+            // (por si acaso, aunque ya debería estar filtrado)
+            if ($isAuthenticated || $this->esBotLegitimo($request)) {
+                // No debería llegar aquí, pero por seguridad permitir acceso
+                return $next($request);
+            }
             
-            // Crear aviso para rate limit excedido
+            $ip = $request->ip();
+            $fingerprint = $request->header('X-Fingerprint');
+            $limiteSuperado = $rateLimitResult['limite_superado'];
+            $permiteCaptcha = $rateLimitResult['permite_captcha'];
+            
+            // Si es límite diario, bloquear sin CAPTCHA
+            if ($limiteSuperado === 'day') {
+                // Verificar si ya está bloqueado
+                if (self::estaIPBloqueada($ip)) {
+                    // Ya está bloqueado por límite diario, mostrar mensaje sin CAPTCHA
+                    return response()->json([
+                        'error' => 'Demasiadas peticiones realizadas. Si es un error por favor ponte en contacto con info@komparador.com',
+                        'code' => 'RATE_LIMIT_EXCEEDED_DAY',
+                        'captcha_required' => false,
+                        'contact_email' => 'info@komparador.com'
+                    ], 429);
+                }
+                
+                // Primera vez que supera límite diario, bloquear por 7 días sin CAPTCHA
+                $this->bloquearPorRateLimit($ip, $fingerprint, false); // false = sin CAPTCHA
+                $this->avisoService->crearAvisoBloqueo(
+                    'rate_limit',
+                    $ip,
+                    $fingerprint,
+                    0,
+                    ['endpoint' => $request->path(), 'tipo' => $type, 'limite' => 'day']
+                );
+                
+                return response()->json([
+                    'error' => 'Demasiadas peticiones realizadas. Si es un error por favor ponte en contacto con info@komparador.com',
+                    'code' => 'RATE_LIMIT_EXCEEDED_DAY',
+                    'captcha_required' => false,
+                    'contact_email' => 'info@komparador.com'
+                ], 429);
+            }
+            
+            // Si es límite de minuto u hora, permitir CAPTCHA
+            // Verificar si ya está bloqueado por 7 días
+            if (self::estaIPBloqueada($ip)) {
+                // Verificar si permite CAPTCHA
+                $cacheKeyCaptcha = "ip_bloqueada_rate_limit_captcha_{$ip}";
+                $permiteCaptchaCache = Cache::get($cacheKeyCaptcha, true); // Por defecto true para compatibilidad
+                
+                if ($permiteCaptchaCache) {
+                    // Permitir CAPTCHA (límite minuto/hora)
+                    $captchaToken = $request->header('X-Captcha-Token');
+                    if ($captchaToken && $this->verificarCaptcha($captchaToken)) {
+                        // CAPTCHA válido, desbloquear
+                        $this->desbloquearIP($ip);
+                        // Permitir esta petición (pasar rate limit esta vez)
+                        return $next($request);
+                    }
+                    
+                    // Está bloqueado y no tiene CAPTCHA válido
+                    return response()->json([
+                        'error' => 'Has realizado demasiadas peticiones',
+                        'code' => 'RATE_LIMIT_EXCEEDED',
+                        'captcha_required' => true,
+                        'retry_after' => $this->getRetryAfter($request, $type)
+                    ], 429);
+                } else {
+                    // NO permite CAPTCHA (límite diario)
+                    return response()->json([
+                        'error' => 'Demasiadas peticiones realizadas. Si es un error por favor ponte en contacto con info@komparador.com',
+                        'code' => 'RATE_LIMIT_EXCEEDED_DAY',
+                        'captcha_required' => false,
+                        'contact_email' => 'info@komparador.com'
+                    ], 429);
+                }
+            }
+            
+            // Primera vez que supera el límite (minuto/hora), bloquear por 7 días con CAPTCHA
+            $this->bloquearPorRateLimit($ip, $fingerprint, true); // true = con CAPTCHA
             $this->avisoService->crearAvisoBloqueo(
                 'rate_limit',
-                $request->ip(),
-                $request->header('X-Fingerprint'),
+                $ip,
+                $fingerprint,
                 0,
-                ['endpoint' => $request->path(), 'tipo' => $type, 'retry_after' => $retryAfter]
+                ['endpoint' => $request->path(), 'tipo' => $type, 'limite' => $limiteSuperado]
             );
             
             return response()->json([
-                'error' => 'Rate limit excedido',
+                'error' => 'Has realizado demasiadas peticiones',
                 'code' => 'RATE_LIMIT_EXCEEDED',
-                'retry_after' => $retryAfter
-            ], 429)->header('Retry-After', $retryAfter);
+                'captcha_required' => true,
+                'retry_after' => $this->getRetryAfter($request, $type)
+            ], 429);
         }
 
         // ✅ ORDEN 5: Heurísticas (solo si pasa todo lo anterior)
@@ -233,9 +314,9 @@ class AntiScrapingMiddleware
     }
 
     /**
-     * Valida el formato y firma del token
+     * Valida el formato, firma, IP y fingerprint del token
      */
-    private function validarToken(string $token): bool
+    private function validarToken(string $token, Request $request): bool
     {
         try {
             $parts = explode('.', $token);
@@ -255,7 +336,42 @@ class AntiScrapingMiddleware
             $signature = hash_hmac('sha256', $parts[0] . '.' . $parts[1], $secret, true);
             $expectedSignature = $this->base64UrlEncode($signature);
             
-            return hash_equals($expectedSignature, $parts[2]);
+            if (!hash_equals($expectedSignature, $parts[2])) {
+                return false;
+            }
+
+            // Validar que la IP del token coincida con la IP de la solicitud
+            $tokenIP = $payload['ip'] ?? null;
+            if ($tokenIP) {
+                $requestIP = $this->obtenerIPReal($request);
+                
+                // Validar que la IP del token coincida con la IP real
+                if ($tokenIP !== $requestIP) {
+                    Log::warning('Token usado desde IP diferente', [
+                        'token_ip' => $tokenIP,
+                        'request_ip' => $requestIP,
+                        'endpoint' => $request->path()
+                    ]);
+                    return false;
+                }
+            }
+
+            // Validar que el fingerprint del token coincida con el fingerprint de la solicitud
+            $tokenFingerprint = $payload['fingerprint'] ?? null;
+            $requestFingerprint = $request->header('X-Fingerprint');
+            
+            if ($tokenFingerprint && $requestFingerprint) {
+                if ($tokenFingerprint !== $requestFingerprint) {
+                    Log::warning('Token usado con fingerprint diferente', [
+                        'token_fp' => $tokenFingerprint,
+                        'request_fp' => $requestFingerprint,
+                        'endpoint' => $request->path()
+                    ]);
+                    return false;
+                }
+            }
+
+            return true;
         } catch (\Exception $e) {
             Log::error('Error validando token', ['error' => $e->getMessage(), 'token_preview' => substr($token, 0, 20) . '...']);
             return false;
@@ -291,13 +407,26 @@ class AntiScrapingMiddleware
 
     /**
      * Verifica si es un bot legítimo (Google, Bing, etc.)
+     * PRIMERO verifica la IP (más confiable), luego el User-Agent
      */
     private function esBotLegitimo(Request $request): bool
     {
+        $ip = $this->obtenerIPReal($request);
         $ua = Str::lower($request->userAgent() ?? '');
-        $ip = $request->ip();
 
-        // Verificar User-Agent
+        // PRIMERO: Verificar si la IP pertenece a rangos conocidos de bots legítimos
+        // Esto es importante porque algunos bots pueden no tener User-Agent correcto
+        // o pueden estar detrás de proxies que modifican el User-Agent
+        if ($this->esIPDeBotLegitimo($ip)) {
+            Log::info('Bot legítimo detectado por IP', [
+                'ip' => $ip,
+                'user_agent' => $request->userAgent(),
+                'endpoint' => $request->path()
+            ]);
+            return true;
+        }
+
+        // SEGUNDO: Verificar User-Agent
         $botsLegitimos = [
             'googlebot',
             'bingbot',
@@ -316,8 +445,20 @@ class AntiScrapingMiddleware
             if (Str::contains($ua, $bot)) {
                 // Verificación adicional para Googlebot (verificar IP)
                 if ($bot === 'googlebot') {
-                    return $this->verificarGooglebotIP($ip);
+                    $esGooglebot = $this->verificarGooglebotIP($ip);
+                    if ($esGooglebot) {
+                        Log::info('Googlebot detectado por User-Agent e IP', [
+                            'ip' => $ip,
+                            'user_agent' => $request->userAgent()
+                        ]);
+                    }
+                    return $esGooglebot;
                 }
+                Log::info('Bot legítimo detectado por User-Agent', [
+                    'bot' => $bot,
+                    'ip' => $ip,
+                    'user_agent' => $request->userAgent()
+                ]);
                 return true;
             }
         }
@@ -327,20 +468,85 @@ class AntiScrapingMiddleware
 
     /**
      * Verifica que la IP pertenece a rangos conocidos de Googlebot
+     * Actualizado con más rangos de Google
      */
     private function verificarGooglebotIP(string $ip): bool
     {
         $rangosGooglebot = [
-            '66.249.',      // Principal
+            '66.249.',      // Principal (incluye 66.249.92.32)
             '64.233.',      // Google
             '72.14.',       // Google
             '74.125.',      // Google
             '108.177.',     // Google
             '172.217.',     // Google
             '209.85.',      // Google
+            '216.239.',     // Google (adicional)
+            '142.250.',     // Google (adicional)
         ];
 
         foreach ($rangosGooglebot as $rango) {
+            if (str_starts_with($ip, $rango)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Obtiene la IP real del cliente, considerando Cloudflare y otros proxies
+     * Prioriza CF-Connecting-IP (Cloudflare) sobre X-Forwarded-For
+     */
+    private function obtenerIPReal(Request $request): string
+    {
+        // 1. Cloudflare (prioridad - más confiable)
+        $cfIP = $request->header('CF-Connecting-IP');
+        if ($cfIP) {
+            return trim(explode(',', $cfIP)[0]);
+        }
+
+        // 2. X-Forwarded-For (otros proxies/load balancers)
+        $xff = $request->header('X-Forwarded-For');
+        if ($xff) {
+            // X-Forwarded-For puede contener múltiples IPs separadas por comas
+            // La primera es la IP real del cliente
+            return trim(explode(',', $xff)[0]);
+        }
+
+        // 3. IP directa del request (fallback)
+        return $request->ip();
+    }
+
+    /**
+     * Verifica si la IP pertenece a rangos conocidos de bots legítimos
+     * Esto permite detectar bots incluso si el User-Agent no es reconocido
+     * o está siendo modificado por proxies
+     */
+    private function esIPDeBotLegitimo(string $ip): bool
+    {
+        // Rangos de Googlebot (más importante)
+        if ($this->verificarGooglebotIP($ip)) {
+            return true;
+        }
+
+        // Rangos de otros bots legítimos
+        $rangosBots = [
+            // Bingbot
+            '40.77.167.',
+            '207.46.13.',
+            // Facebook
+            '31.13.24.',
+            '31.13.25.',
+            '31.13.26.',
+            '31.13.27.',
+            // Twitter
+            '199.16.156.',
+            '199.59.148.',
+            // LinkedIn
+            '108.174.10.',
+        ];
+
+        foreach ($rangosBots as $rango) {
             if (str_starts_with($ip, $rango)) {
                 return true;
             }
@@ -390,18 +596,28 @@ class AntiScrapingMiddleware
 
     /**
      * Verifica si pasa los rate limits
+     * Devuelve array con información sobre qué límite se superó
      */
-    private function pasaRateLimit(Request $request, array $limits, string $type): bool
+    private function pasaRateLimit(Request $request, array $limits, string $type): array
     {
         $ip = $request->ip();
         $fingerprint = $request->header('X-Fingerprint');
         $token = $request->header('X-Auth-Token');
+        
+        $resultado = [
+            'pasa' => true,
+            'limite_superado' => null, // 'minute', 'hour', 'day'
+            'permite_captcha' => true
+        ];
 
         // Rate limit por IP (minuto)
         if (isset($limits['per_minute_ip'])) {
             $key = "anti_scraping:ip:minute:{$ip}:{$type}";
             if (RateLimiter::tooManyAttempts($key, $limits['per_minute_ip'])) {
-                return false;
+                $resultado['pasa'] = false;
+                $resultado['limite_superado'] = 'minute';
+                $resultado['permite_captcha'] = true;
+                return $resultado;
             }
             RateLimiter::hit($key, 60);
         }
@@ -410,7 +626,10 @@ class AntiScrapingMiddleware
         if ($fingerprint && isset($limits['per_minute_fingerprint'])) {
             $key = "anti_scraping:fingerprint:minute:{$fingerprint}:{$type}";
             if (RateLimiter::tooManyAttempts($key, $limits['per_minute_fingerprint'])) {
-                return false;
+                $resultado['pasa'] = false;
+                $resultado['limite_superado'] = 'minute';
+                $resultado['permite_captcha'] = true;
+                return $resultado;
             }
             RateLimiter::hit($key, 60);
         }
@@ -419,7 +638,10 @@ class AntiScrapingMiddleware
         if ($token && isset($limits['per_minute_token'])) {
             $key = "anti_scraping:token:minute:{$token}:{$type}";
             if (RateLimiter::tooManyAttempts($key, $limits['per_minute_token'])) {
-                return false;
+                $resultado['pasa'] = false;
+                $resultado['limite_superado'] = 'minute';
+                $resultado['permite_captcha'] = true;
+                return $resultado;
             }
             RateLimiter::hit($key, 60);
         }
@@ -428,21 +650,27 @@ class AntiScrapingMiddleware
         if (isset($limits['per_hour_ip'])) {
             $key = "anti_scraping:ip:hour:{$ip}:{$type}";
             if (RateLimiter::tooManyAttempts($key, $limits['per_hour_ip'])) {
-                return false;
+                $resultado['pasa'] = false;
+                $resultado['limite_superado'] = 'hour';
+                $resultado['permite_captcha'] = true;
+                return $resultado;
             }
             RateLimiter::hit($key, 3600);
         }
 
-        // Rate limit por día (IP)
+        // Rate limit por día (IP) - SIN CAPTCHA
         if (isset($limits['per_day_ip'])) {
             $key = "anti_scraping:ip:day:{$ip}:{$type}";
             if (RateLimiter::tooManyAttempts($key, $limits['per_day_ip'])) {
-                return false;
+                $resultado['pasa'] = false;
+                $resultado['limite_superado'] = 'day';
+                $resultado['permite_captcha'] = false; // NO permite CAPTCHA
+                return $resultado;
             }
             RateLimiter::hit($key, 86400);
         }
 
-        return true;
+        return $resultado;
     }
 
     /**
@@ -517,12 +745,108 @@ class AntiScrapingMiddleware
     }
 
     /**
-     * Verifica si una IP está bloqueada
+     * Verifica si una IP está bloqueada por rate limit
+     * IMPORTANTE: Solo verifica bloqueos, no valida si es usuario autenticado o bot
+     * (esa validación se hace antes de llamar a esta función)
      */
     public static function estaIPBloqueada(string $ip): bool
     {
-        return Cache::has("ip_bloqueada_temp_{$ip}") || 
+        $cacheKey = "ip_bloqueada_rate_limit_{$ip}";
+        return Cache::has($cacheKey) || 
+               Cache::has("ip_bloqueada_temp_{$ip}") || 
                Cache::has("ip_bloqueada_prolongado_{$ip}");
+    }
+
+    /**
+     * Bloquea una IP/fingerprint por 7 días por superar rate limit
+     * IMPORTANTE: Solo se debe llamar si NO es usuario autenticado y NO es bot
+     * 
+     * @param string $ip IP a bloquear
+     * @param string|null $fingerprint Fingerprint a bloquear
+     * @param bool $permiteCaptcha Si true, permite desbloquear con CAPTCHA. Si false, bloqueo permanente hasta que expire.
+     */
+    private function bloquearPorRateLimit(string $ip, ?string $fingerprint, bool $permiteCaptcha = true): void
+    {
+        // Verificación de seguridad adicional (no debería llegar aquí si es autenticado o bot)
+        $request = request();
+        if (Auth::guard('web')->check() || $this->esBotLegitimo($request)) {
+            Log::warning('Intento de bloquear IP de usuario autenticado o bot', [
+                'ip' => $ip,
+                'fingerprint' => $fingerprint,
+                'authenticated' => Auth::guard('web')->check(),
+                'user_agent' => $request->userAgent()
+            ]);
+            return; // No bloquear
+        }
+        
+        $cacheKey = "ip_bloqueada_rate_limit_{$ip}";
+        $duration = 604800; // 7 días en segundos
+        
+        Cache::put($cacheKey, true, $duration);
+        
+        // Guardar si permite CAPTCHA o no
+        $cacheKeyCaptcha = "ip_bloqueada_rate_limit_captcha_{$ip}";
+        Cache::put($cacheKeyCaptcha, $permiteCaptcha, $duration);
+        
+        // También bloquear por fingerprint si existe
+        if ($fingerprint) {
+            $cacheKeyFP = "fp_bloqueado_rate_limit_{$fingerprint}";
+            Cache::put($cacheKeyFP, true, $duration);
+            
+            $cacheKeyFPCaptcha = "fp_bloqueado_rate_limit_captcha_{$fingerprint}";
+            Cache::put($cacheKeyFPCaptcha, $permiteCaptcha, $duration);
+        }
+        
+        Log::warning('IP bloqueada por rate limit (7 días)', [
+            'ip' => $ip,
+            'fingerprint' => $fingerprint,
+            'permite_captcha' => $permiteCaptcha
+        ]);
+    }
+
+    /**
+     * Desbloquea una IP después de resolver CAPTCHA
+     */
+    private function desbloquearIP(string $ip): void
+    {
+        $cacheKey = "ip_bloqueada_rate_limit_{$ip}";
+        Cache::forget($cacheKey);
+        
+        // También desbloquear fingerprint si existe
+        $fingerprint = request()->header('X-Fingerprint');
+        if ($fingerprint) {
+            $cacheKeyFP = "fp_bloqueado_rate_limit_{$fingerprint}";
+            Cache::forget($cacheKeyFP);
+        }
+        
+        Log::info('IP desbloqueada después de resolver CAPTCHA', ['ip' => $ip]);
+    }
+
+    /**
+     * Verifica CAPTCHA de Google reCAPTCHA
+     */
+    private function verificarCaptcha(string $token): bool
+    {
+        $secretKey = env('RECAPTCHA_SECRET_KEY');
+        
+        if (!$secretKey) {
+            Log::error('RECAPTCHA_SECRET_KEY no configurada');
+            return false;
+        }
+        
+        try {
+            $response = Http::asForm()->post('https://www.google.com/recaptcha/api/siteverify', [
+                'secret' => $secretKey,
+                'response' => $token,
+                'remoteip' => request()->ip()
+            ]);
+            
+            $result = $response->json();
+            return $result['success'] ?? false;
+        } catch (\Exception $e) {
+            Log::error('Error al verificar CAPTCHA', ['error' => $e->getMessage()]);
+            return false;
+        }
     }
 
     /**

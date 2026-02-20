@@ -58,6 +58,9 @@
     <link rel="icon" type="image/png" href="{{ asset('images/icono.webp') }}">
   @vite(['resources/css/app.css', 'resources/js/app.js', 'resources/js/fingerprint.js', 'resources/js/carga-datos-dinamica.js'])
 
+  {{-- Script de reCAPTCHA (igual que en redireccion.blade.php) --}}
+  <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+
   {{-- SCRIPT PARA GOOGLE ANALYTICS--}}
     @if (env('GA_MEASUREMENT_ID'))
         {{-- Google tag (gtag.js) --}}
@@ -2407,6 +2410,9 @@
           
           {{-- Indicar si el usuario está autenticado (para bypass del sistema anti-scraping) --}}
           window.usuarioAutenticado = {{ auth()->check() ? 'true' : 'false' }};
+          
+          {{-- Site key de reCAPTCHA --}}
+          window.recaptchaSiteKey = '{{ env("RECAPTCHA_SITE_KEY", "6LdVT0AsAAAAANV0xlEtKRr7y27sqoG1ICTAVBMV") }}';
           
           {{-- Configurar listeners ANTES de que se ejecute carga-datos-dinamica.js --}}
           (function() {

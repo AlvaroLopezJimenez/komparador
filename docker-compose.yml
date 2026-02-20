@@ -30,7 +30,7 @@ services:
       - mysql-data:/var/lib/mysql
 
   node:
-    image: node:18
+    image: node:22
     container_name: laravel_node
     working_dir: /app
     volumes:

@@ -22,15 +22,27 @@ class AntiScrapingAvisoService
     public function crearAvisoBloqueo(string $tipo, string $ip, ?string $fingerprint = null, int $score = 0, array $detalles = []): void
     {
         try {
-            // Verificar si ya existe un aviso similar reciente (últimas 24 horas)
-            $avisoReciente = Aviso::where('avisoable_type', 'AntiScraping')
+            // Verificar si ya existe un aviso similar reciente
+            // Mejorar: verificar por tipo específico y si está bloqueado
+            $tipoLimite = $detalles['tipo'] ?? 'general';
+            $estaBloqueado = $detalles['bloqueado'] ?? false;
+            
+            $query = Aviso::where('avisoable_type', 'AntiScraping')
                 ->where('avisoable_id', 0)
                 ->where('texto_aviso', 'like', "%{$ip}%")
-                ->where('created_at', '>=', now()->subHours(24))
-                ->first();
+                ->where('texto_aviso', 'like', "%{$tipoLimite}%");
+            
+            // Si está bloqueado, verificar si ya hay un aviso de bloqueo reciente
+            if ($estaBloqueado) {
+                $query->where('texto_aviso', 'like', '%RATE LIMIT%');
+            }
+            
+            // Verificar en las últimas 24 horas
+            $avisoReciente = $query->where('created_at', '>=', now()->subHours(24))->first();
 
             if ($avisoReciente) {
-                // Ya existe un aviso reciente para esta IP, no crear otro
+                // Ya existe un aviso reciente para esta IP y tipo, no crear otro
+                // Esto evita spam de avisos cuando alguien sigue haciendo peticiones después de estar bloqueado
                 return;
             }
 

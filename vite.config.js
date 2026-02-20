@@ -9,6 +9,22 @@ export default defineConfig({
             host: 'localhost', // O tu IP si accedes desde otra máquina
         },
     },
+    build: {
+        minify: 'terser',
+        terserOptions: {
+            compress: {
+                drop_console: false, // Mantener console para depuración si es necesario
+                drop_debugger: true,
+            },
+            mangle: {
+                toplevel: true, // Ofuscar nombres de variables y funciones en el nivel superior
+                properties: false, // No ofuscar propiedades de objetos (puede romper código)
+            },
+            format: {
+                comments: false, // Eliminar comentarios
+            },
+        },
+    },
     plugins: [
         laravel({
             input: [

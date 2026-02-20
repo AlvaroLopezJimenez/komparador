@@ -24,7 +24,7 @@ class TiemposActualizacionOfertasDinamicos
     // Porcentaje mínimo de diferencia para considerar un cambio válido
     // Si la variación es > 1%, se marca como cambio (1), sino (0)
     
-    const FACTOR_DECAY_EXPONENCIAL = 0.0003;
+    const FACTOR_DECAY_EXPONENCIAL = 0.0005;
     // Factor k para el peso exponencial: peso = exp(-k * minutos_desde_ahora)
     // Valores más recientes tienen mucho más peso que los antiguos
     
@@ -36,10 +36,10 @@ class TiemposActualizacionOfertasDinamicos
     // Valor epsilon para evitar división por cero
     // Muy pequeño, solo para estabilidad numérica
     
-    const FACTOR_SUAVIZADO_ACTUAL = 0.8;
+    const FACTOR_SUAVIZADO_ACTUAL = 0.4;
     // Porcentaje del intervalo actual que se mantiene (80%)
     
-    const FACTOR_SUAVIZADO_NUEVO = 0.2;
+    const FACTOR_SUAVIZADO_NUEVO = 0.6;
     // Porcentaje del nuevo intervalo calculado que se aplica (20%)
     
     const FRECUENCIA_MINIMA_ABSOLUTA_MINUTOS = 15;

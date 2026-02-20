@@ -2538,16 +2538,40 @@
             const categoriaEspecificacionesId = document.getElementById('categoria_especificaciones_id');
             const categoriaEspecificacionesNombre = document.getElementById('categoria_especificaciones_nombre');
             if (categoriaEspecificacionesId && categoriaEspecificacionesNombre) {
-                // Solo actualizar si el campo está vacío o si la categoría es diferente
                 const categoriaActualId = categoriaEspecificacionesId.value;
-                if (!categoriaActualId || categoriaActualId !== categoriaId.toString()) {
+                const categoriaActualNombre = categoriaEspecificacionesNombre.value.trim();
+                
+                // Verificar si el campo tiene el foco (usuario escribiendo)
+                const tieneFoco = document.activeElement === categoriaEspecificacionesNombre;
+                
+                // Solo actualizar automáticamente si:
+                // 1. El campo está completamente vacío (sin ID y sin nombre)
+                // 2. O si la categoría es diferente Y el usuario NO está escribiendo
+                if ((!categoriaActualId && !categoriaActualNombre) || 
+                    (categoriaActualId !== categoriaId.toString() && !tieneFoco)) {
+                    // Actualizar los campos
                     categoriaEspecificacionesId.value = categoriaId;
                     categoriaEspecificacionesNombre.value = nombreCategoria;
                     categoriaEspecificacionesNombre.classList.add('border-green-500');
                     
-                    // Cargar las especificaciones internas de la categoría
-                    if (typeof obtenerEspecificacionesInternas === 'function') {
-                        obtenerEspecificacionesInternas(categoriaId);
+                    // Cargar las especificaciones internas de la categoría con un pequeño delay
+                    // para asegurar que el DOM esté actualizado
+                    setTimeout(() => {
+                        if (typeof obtenerEspecificacionesInternas === 'function') {
+                            obtenerEspecificacionesInternas(categoriaId);
+                        }
+                    }, 100);
+                } else if (categoriaActualId === categoriaId.toString() && !tieneFoco) {
+                    // Si el ID ya es el mismo pero no se cargaron las especificaciones, cargarlas
+                    // Verificar si hay especificaciones cargadas
+                    const seleccionContainer = document.getElementById('especificaciones-internas-seleccion');
+                    if (seleccionContainer && seleccionContainer.classList.contains('hidden')) {
+                        // No hay especificaciones cargadas, cargarlas
+                        setTimeout(() => {
+                            if (typeof obtenerEspecificacionesInternas === 'function') {
+                                obtenerEspecificacionesInternas(categoriaId);
+                            }
+                        }, 100);
                     }
                 }
             }
@@ -3234,8 +3258,6 @@
             // Escuchar cambios en el valor del campo
             categoriaFinal.addEventListener('change', function() {
                 setTimeout(autoSeleccionarCategoriaPrincipal, 300);
-                // Auto-seleccionar categoría para especificaciones internas si no hay una seleccionada
-                autoSeleccionarCategoriaEspecificaciones();
             });
             
             // También observar cambios programáticos en el valor
@@ -3243,8 +3265,6 @@
                 mutations.forEach(function(mutation) {
                     if (mutation.type === 'attributes' && mutation.attributeName === 'value') {
                         setTimeout(autoSeleccionarCategoriaPrincipal, 300);
-                        // Auto-seleccionar categoría para especificaciones internas si no hay una seleccionada
-                        autoSeleccionarCategoriaEspecificaciones();
                     }
                 });
             });
@@ -3252,31 +3272,6 @@
             observer.observe(categoriaFinal, { attributes: true, attributeFilter: ['value'] });
         }
         
-        // Función para auto-seleccionar categoría para especificaciones internas
-        function autoSeleccionarCategoriaEspecificaciones() {
-            const categoriaEspecificacionesId = document.getElementById('categoria_especificaciones_id');
-            const categoriaEspecificacionesNombre = document.getElementById('categoria_especificaciones_nombre');
-            const categoriaFinal = document.getElementById('categoria-final');
-            
-            // Solo si no hay una categoría ya seleccionada para especificaciones internas
-            if (categoriaEspecificacionesId && !categoriaEspecificacionesId.value && categoriaFinal && categoriaFinal.value) {
-                // Buscar la categoría seleccionada
-                fetch(`/panel-privado/productos/buscar/categorias?q=`)
-                    .then(response => response.json())
-                    .then(categorias => {
-                        const categoriaSeleccionada = categorias.find(cat => cat.id == categoriaFinal.value);
-                        if (categoriaSeleccionada) {
-                            // Establecer la categoría en el campo de especificaciones internas
-                            categoriaEspecificacionesId.value = categoriaSeleccionada.id;
-                            categoriaEspecificacionesNombre.value = categoriaSeleccionada.nombre;
-                            
-                            // Cargar las especificaciones internas de esta categoría
-                            obtenerEspecificacionesInternas(categoriaSeleccionada.id);
-                        }
-                    })
-                    .catch(error => console.error('Error al auto-seleccionar categoría para especificaciones:', error));
-            }
-        }
 
         // Limpiar campo si el usuario sale sin seleccionar
         document.getElementById('categoria_relacionados_nombre').addEventListener('blur', (e) => {
@@ -3495,6 +3490,81 @@
                 seleccionContainer.classList.remove('hidden');
             }
         }
+
+        // Event listeners para el buscador de categorías (igual que productos relacionados)
+        const inputEspecificaciones = document.getElementById('categoria_especificaciones_nombre');
+        if (inputEspecificaciones) {
+            inputEspecificaciones.addEventListener('input', (e) => {
+                // Limpiar el ID cuando el usuario empiece a escribir algo nuevo
+                document.getElementById('categoria_especificaciones_id').value = '';
+                // Ocultar el contenedor de especificaciones internas cuando se empiece a escribir
+                const infoContainer = document.getElementById('especificaciones-internas-info');
+                if (infoContainer) {
+                    infoContainer.classList.add('hidden');
+                }
+                const seleccionContainer = document.getElementById('especificaciones-internas-seleccion');
+                if (seleccionContainer) {
+                    seleccionContainer.classList.add('hidden');
+                }
+                buscarCategoriasEspecificaciones(e.target.value);
+            });
+
+            inputEspecificaciones.addEventListener('keydown', (e) => {
+                const contenedor = document.getElementById('categoria_especificaciones_sugerencias');
+                
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    indiceSeleccionadoCategoriaEspecificaciones = Math.min(indiceSeleccionadoCategoriaEspecificaciones + 1, categoriasActualesEspecificaciones.length - 1);
+                    mostrarSugerenciasCategoriaEspecificaciones(categoriasActualesEspecificaciones);
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    indiceSeleccionadoCategoriaEspecificaciones = Math.max(indiceSeleccionadoCategoriaEspecificaciones - 1, -1);
+                    mostrarSugerenciasCategoriaEspecificaciones(categoriasActualesEspecificaciones);
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (indiceSeleccionadoCategoriaEspecificaciones >= 0 && categoriasActualesEspecificaciones[indiceSeleccionadoCategoriaEspecificaciones]) {
+                        seleccionarCategoriaEspecificaciones(categoriasActualesEspecificaciones[indiceSeleccionadoCategoriaEspecificaciones]);
+                    }
+                } else if (e.key === 'Escape') {
+                    ocultarSugerenciasCategoriaEspecificaciones();
+                }
+            });
+
+            inputEspecificaciones.addEventListener('blur', (e) => {
+                // Pequeño delay para permitir que se ejecute el click en las sugerencias
+                setTimeout(() => {
+                    const categoriaId = document.getElementById('categoria_especificaciones_id').value;
+                    const categoriaNombre = document.getElementById('categoria_especificaciones_nombre').value;
+                    
+                    // Si hay texto pero no hay ID válido, limpiar todo
+                    if (categoriaNombre && !categoriaId) {
+                        document.getElementById('categoria_especificaciones_nombre').value = '';
+                        document.getElementById('categoria_especificaciones_id').value = '';
+                    }
+                }, 300);
+            });
+        }
+
+        // Ocultar sugerencias al hacer clic fuera
+        document.addEventListener('click', (e) => {
+            const contenedor = document.getElementById('categoria_especificaciones_sugerencias');
+            const input = document.getElementById('categoria_especificaciones_nombre');
+            
+            if (contenedor && input && !contenedor.contains(e.target) && !input.contains(e.target)) {
+                ocultarSugerenciasCategoriaEspecificaciones();
+                
+                // Limpiar campo si hay texto pero no hay ID válido
+                setTimeout(() => {
+                    const categoriaId = document.getElementById('categoria_especificaciones_id').value;
+                    const categoriaNombre = document.getElementById('categoria_especificaciones_nombre').value;
+                    
+                    if (categoriaNombre && !categoriaId) {
+                        document.getElementById('categoria_especificaciones_nombre').value = '';
+                        document.getElementById('categoria_especificaciones_id').value = '';
+                    }
+                }, 200);
+            }
+        });
 
         // Función para mostrar los desplegables con checkboxes
         function mostrarDesplegablesEspecificacionesProducto(especificaciones, contenedor, opcionesGuardadas = {}) {
@@ -4866,77 +4936,6 @@
             });
         }
 
-        // Event listeners para el buscador de categorías
-        const inputEspecificaciones = document.getElementById('categoria_especificaciones_nombre');
-        if (inputEspecificaciones) {
-            inputEspecificaciones.addEventListener('input', (e) => {
-                // Limpiar el ID cuando el usuario empiece a escribir algo nuevo
-                document.getElementById('categoria_especificaciones_id').value = '';
-                // Ocultar el contenedor de especificaciones internas cuando se empiece a escribir
-                const infoContainer = document.getElementById('especificaciones-internas-info');
-                if (infoContainer) {
-                    infoContainer.classList.add('hidden');
-                }
-                buscarCategoriasEspecificaciones(e.target.value);
-            });
-
-            inputEspecificaciones.addEventListener('keydown', (e) => {
-                const contenedor = document.getElementById('categoria_especificaciones_sugerencias');
-                
-                if (e.key === 'ArrowDown') {
-                    e.preventDefault();
-                    indiceSeleccionadoCategoriaEspecificaciones = Math.min(indiceSeleccionadoCategoriaEspecificaciones + 1, categoriasActualesEspecificaciones.length - 1);
-                    mostrarSugerenciasCategoriaEspecificaciones(categoriasActualesEspecificaciones);
-                } else if (e.key === 'ArrowUp') {
-                    e.preventDefault();
-                    indiceSeleccionadoCategoriaEspecificaciones = Math.max(indiceSeleccionadoCategoriaEspecificaciones - 1, -1);
-                    mostrarSugerenciasCategoriaEspecificaciones(categoriasActualesEspecificaciones);
-                } else if (e.key === 'Enter') {
-                    e.preventDefault();
-                    if (indiceSeleccionadoCategoriaEspecificaciones >= 0 && categoriasActualesEspecificaciones[indiceSeleccionadoCategoriaEspecificaciones]) {
-                        seleccionarCategoriaEspecificaciones(categoriasActualesEspecificaciones[indiceSeleccionadoCategoriaEspecificaciones]);
-                    }
-                } else if (e.key === 'Escape') {
-                    ocultarSugerenciasCategoriaEspecificaciones();
-                }
-            });
-
-            inputEspecificaciones.addEventListener('blur', (e) => {
-                // Pequeño delay para permitir que se ejecute el click en las sugerencias
-                setTimeout(() => {
-                    const categoriaId = document.getElementById('categoria_especificaciones_id').value;
-                    const categoriaNombre = document.getElementById('categoria_especificaciones_nombre').value;
-                    
-                    // Si hay texto pero no hay ID válido, limpiar todo
-                    if (categoriaNombre && !categoriaId) {
-                        document.getElementById('categoria_especificaciones_nombre').value = '';
-                        document.getElementById('categoria_especificaciones_id').value = '';
-                    }
-                }, 300);
-            });
-        }
-
-        // Ocultar sugerencias al hacer clic fuera
-        document.addEventListener('click', (e) => {
-            const contenedor = document.getElementById('categoria_especificaciones_sugerencias');
-            const input = document.getElementById('categoria_especificaciones_nombre');
-            
-            if (contenedor && input && !contenedor.contains(e.target) && !input.contains(e.target)) {
-                ocultarSugerenciasCategoriaEspecificaciones();
-                
-                // Limpiar campo si hay texto pero no hay ID válido
-                setTimeout(() => {
-                    const categoriaId = document.getElementById('categoria_especificaciones_id').value;
-                    const categoriaNombre = document.getElementById('categoria_especificaciones_nombre').value;
-                    
-                    if (categoriaNombre && !categoriaId) {
-                        document.getElementById('categoria_especificaciones_nombre').value = '';
-                        document.getElementById('categoria_especificaciones_id').value = '';
-                    }
-                }, 200);
-            }
-        });
-
         // Función para auto-seleccionar la categoría final cuando se selecciona la categoría del producto
         function autoSeleccionarCategoriaEspecificaciones() {
             const categoriaFinal = document.getElementById('categoria-final');
@@ -5242,29 +5241,125 @@
             }
             
             try {
+                const slugInput = document.querySelector('input[name="slug"]');
+                const nombreBase = slugInput ? slugInput.value.trim() : 'imagen';
+                
+                // Mostrar indicador de progreso
+                const loadingDiv = document.getElementById('loading-amazon-sublinea');
+                const btnGuardar = document.getElementById('btn-guardar-imagen-sublinea');
+                const totalImagenes = imagenesAmazonSeleccionadasSublinea.length;
+                
+                // Deshabilitar botón y mostrar progreso
+                if (btnGuardar) {
+                    btnGuardar.disabled = true;
+                    btnGuardar.textContent = 'Procesando...';
+                }
+                if (loadingDiv) {
+                    loadingDiv.textContent = `Procesando imagen 0 de ${totalImagenes}...`;
+                    loadingDiv.classList.remove('hidden');
+                }
+                
                 // Procesar cada imagen seleccionada
-                for (const imagen of imagenesAmazonSeleccionadasSublinea) {
-                    // Descargar la imagen desde la URL
-                    const response = await fetch('{{ route("admin.imagenes.descargar-url") }}', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                        },
-                        body: JSON.stringify({
-                            url: imagen.url,
-                            carpeta: carpeta
-                        })
-                    });
+                for (let i = 0; i < imagenesAmazonSeleccionadasSublinea.length; i++) {
+                    const imagen = imagenesAmazonSeleccionadasSublinea[i];
+                    const timestamp = Date.now() + i; // Añadir índice para evitar colisiones
                     
-                    const data = await response.json();
-                    
-                    if (data.success) {
-                        // Añadir la imagen a la sublínea
-                        añadirImagenASublinea(data.data.ruta_relativa);
-                    } else {
-                        console.error('Error al descargar imagen:', data.message);
+                    // Actualizar progreso
+                    if (loadingDiv) {
+                        loadingDiv.textContent = `Procesando imagen ${i + 1} de ${totalImagenes}...`;
                     }
+                    
+                    // Cargar la imagen desde la URL usando proxy para evitar CORS
+                    const urlProxy = imagen.url.startsWith('http') 
+                        ? `{{ route('admin.imagenes.proxy') }}?url=${encodeURIComponent(imagen.url)}`
+                        : imagen.url;
+                    
+                    await new Promise((resolve, reject) => {
+                        const img = new Image();
+                        img.crossOrigin = 'anonymous';
+                        
+                        img.onload = async function() {
+                            try {
+                                // Grande: tamaño original
+                                const canvasGrande = document.createElement('canvas');
+                                canvasGrande.width = img.width;
+                                canvasGrande.height = img.height;
+                                const ctxGrande = canvasGrande.getContext('2d');
+                                ctxGrande.drawImage(img, 0, 0);
+                                
+                                // Pequeña: 300x250
+                                const canvasPequena = document.createElement('canvas');
+                                canvasPequena.width = 300;
+                                canvasPequena.height = 250;
+                                const ctxPequena = canvasPequena.getContext('2d');
+                                ctxPequena.drawImage(img, 0, 0, 300, 250);
+                                
+                                // Convertir a blob webp
+                                const blobGrande = await new Promise((resolveBlob, rejectBlob) => {
+                                    canvasGrande.toBlob((blob) => blob ? resolveBlob(blob) : rejectBlob(new Error('Error grande')), 'image/webp', 0.9);
+                                });
+                                
+                                const blobPequena = await new Promise((resolveBlob, rejectBlob) => {
+                                    canvasPequena.toBlob((blob) => blob ? resolveBlob(blob) : rejectBlob(new Error('Error pequeña')), 'image/webp', 0.9);
+                                });
+                                
+                                // Subir ambas versiones
+                                const formDataGrande = new FormData();
+                                formDataGrande.append('imagen', blobGrande, `${nombreBase}-${timestamp}.webp`);
+                                formDataGrande.append('carpeta', carpeta);
+                                formDataGrande.append('_token', '{{ csrf_token() }}');
+                                
+                                const formDataPequena = new FormData();
+                                formDataPequena.append('imagen', blobPequena, `${nombreBase}-${timestamp}-thumbnail.webp`);
+                                formDataPequena.append('carpeta', carpeta);
+                                formDataPequena.append('_token', '{{ csrf_token() }}');
+                                
+                                const [resGrande, resPequena] = await Promise.all([
+                                    fetch('{{ route("admin.imagenes.subir-simple") }}', {
+                                        method: 'POST',
+                                        headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                                        body: formDataGrande
+                                    }),
+                                    fetch('{{ route("admin.imagenes.subir-simple") }}', {
+                                        method: 'POST',
+                                        headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                                        body: formDataPequena
+                                    })
+                                ]);
+                                
+                                const dataGrande = await resGrande.json();
+                                const dataPequena = await resPequena.json();
+                                
+                                if (dataGrande.success && dataPequena.success) {
+                                    // Guardar solo la ruta de la imagen grande en las sublíneas (igual que las otras pestañas)
+                                    añadirImagenASublinea(dataGrande.data.ruta_relativa);
+                                    resolve();
+                                } else {
+                                    throw new Error(dataGrande.message || dataPequena.message || 'Error al subir');
+                                }
+                            } catch (error) {
+                                console.error('Error al procesar imagen:', error);
+                                reject(error);
+                            }
+                        };
+                        
+                        img.onerror = function() {
+                            reject(new Error('Error al cargar la imagen desde Amazon'));
+                        };
+                        
+                        img.src = urlProxy;
+                    });
+                }
+                
+                // Ocultar indicador de progreso y restaurar botón
+                const loadingDivFinal = document.getElementById('loading-amazon-sublinea');
+                const btnGuardarFinal = document.getElementById('btn-guardar-imagen-sublinea');
+                if (loadingDivFinal) {
+                    loadingDivFinal.classList.add('hidden');
+                }
+                if (btnGuardarFinal) {
+                    btnGuardarFinal.disabled = false;
+                    btnGuardarFinal.textContent = 'Guardar';
                 }
                 
                 limpiarModalAñadirSublinea();
@@ -5273,6 +5368,18 @@
                 
             } catch (error) {
                 console.error('Error al guardar imágenes:', error);
+                
+                // Restaurar botón y ocultar progreso en caso de error
+                const loadingDivError = document.getElementById('loading-amazon-sublinea');
+                const btnGuardarError = document.getElementById('btn-guardar-imagen-sublinea');
+                if (loadingDivError) {
+                    loadingDivError.classList.add('hidden');
+                }
+                if (btnGuardarError) {
+                    btnGuardarError.disabled = false;
+                    btnGuardarError.textContent = 'Guardar';
+                }
+                
                 alert('Error al guardar las imágenes: ' + error.message);
             }
         });
@@ -5497,6 +5604,11 @@
         document.getElementById('btn-guardar-imagen-sublinea').addEventListener('click', async () => {
             const tabActiva = document.querySelector('.tab-modal-sublinea.border-blue-500');
             const tabId = tabActiva ? tabActiva.id : 'tab-url-sublinea';
+            
+            // Si es la pestaña de Amazon, el código de Amazon ya lo maneja, no hacer nada aquí
+            if (tabId === 'tab-amazon-sublinea') {
+                return;
+            }
             
             if (tabId === 'tab-subir-sublinea') {
                 if (!fileInputSublinea.files.length) {
@@ -6927,37 +7039,128 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         try {
+            const slugInput = document.querySelector('input[name="slug"]');
+            const nombreBase = slugInput ? slugInput.value.trim() : 'imagen';
+            
+            // Mostrar indicador de progreso
+            const loadingDiv = document.getElementById('loading-amazon-nueva');
+            const btnGuardar = document.getElementById('btn-guardar-nueva');
+            const totalImagenes = imagenesAmazonSeleccionadas.length;
+            
+            // Deshabilitar botón y mostrar progreso
+            btnGuardar.disabled = true;
+            btnGuardar.textContent = 'Procesando...';
+            loadingDiv.textContent = `Procesando imagen 0 de ${totalImagenes}...`;
+            loadingDiv.classList.remove('hidden');
+            
             // Procesar cada imagen seleccionada
-            for (const imagen of imagenesAmazonSeleccionadas) {
-                // Descargar la imagen desde la URL
-                const response = await fetch('{{ route("admin.imagenes.descargar-url") }}', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                    },
-                    body: JSON.stringify({
-                        url: imagen.url,
-                        carpeta: carpeta
-                    })
+            for (let i = 0; i < imagenesAmazonSeleccionadas.length; i++) {
+                const imagen = imagenesAmazonSeleccionadas[i];
+                const timestamp = Date.now() + i; // Añadir índice para evitar colisiones
+                
+                // Actualizar progreso
+                loadingDiv.textContent = `Procesando imagen ${i + 1} de ${totalImagenes}...`;
+                
+                // Cargar la imagen desde la URL usando proxy para evitar CORS
+                const urlProxy = imagen.url.startsWith('http') 
+                    ? `{{ route('admin.imagenes.proxy') }}?url=${encodeURIComponent(imagen.url)}`
+                    : imagen.url;
+                
+                await new Promise((resolve, reject) => {
+                    const img = new Image();
+                    img.crossOrigin = 'anonymous';
+                    
+                    img.onload = async function() {
+                        try {
+                            // Grande: tamaño original
+                            const canvasGrande = document.createElement('canvas');
+                            canvasGrande.width = img.width;
+                            canvasGrande.height = img.height;
+                            const ctxGrande = canvasGrande.getContext('2d');
+                            ctxGrande.drawImage(img, 0, 0);
+                            
+                            // Pequeña: 300x250
+                            const canvasPequena = document.createElement('canvas');
+                            canvasPequena.width = 300;
+                            canvasPequena.height = 250;
+                            const ctxPequena = canvasPequena.getContext('2d');
+                            ctxPequena.drawImage(img, 0, 0, 300, 250);
+                            
+                            // Convertir a blob webp
+                            const blobGrande = await new Promise((resolveBlob, rejectBlob) => {
+                                canvasGrande.toBlob((blob) => blob ? resolveBlob(blob) : rejectBlob(new Error('Error grande')), 'image/webp', 0.9);
+                            });
+                            
+                            const blobPequena = await new Promise((resolveBlob, rejectBlob) => {
+                                canvasPequena.toBlob((blob) => blob ? resolveBlob(blob) : rejectBlob(new Error('Error pequeña')), 'image/webp', 0.9);
+                            });
+                            
+                            // Subir ambas versiones
+                            const formDataGrande = new FormData();
+                            formDataGrande.append('imagen', blobGrande, `${nombreBase}-${timestamp}.webp`);
+                            formDataGrande.append('carpeta', carpeta);
+                            formDataGrande.append('_token', '{{ csrf_token() }}');
+                            
+                            const formDataPequena = new FormData();
+                            formDataPequena.append('imagen', blobPequena, `${nombreBase}-${timestamp}-thumbnail.webp`);
+                            formDataPequena.append('carpeta', carpeta);
+                            formDataPequena.append('_token', '{{ csrf_token() }}');
+                            
+                            const [resGrande, resPequena] = await Promise.all([
+                                fetch('{{ route("admin.imagenes.subir-simple") }}', {
+                                    method: 'POST',
+                                    headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                                    body: formDataGrande
+                                }),
+                                fetch('{{ route("admin.imagenes.subir-simple") }}', {
+                                    method: 'POST',
+                                    headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                                    body: formDataPequena
+                                })
+                            ]);
+                            
+                            const dataGrande = await resGrande.json();
+                            const dataPequena = await resPequena.json();
+                            
+                            if (dataGrande.success && dataPequena.success) {
+                                imagenesGrandes.push(dataGrande.data.ruta_relativa);
+                                imagenesPequenas.push(dataPequena.data.ruta_relativa);
+                                resolve();
+                            } else {
+                                throw new Error(dataGrande.message || dataPequena.message || 'Error al subir');
+                            }
+                        } catch (error) {
+                            console.error('Error al procesar imagen:', error);
+                            reject(error);
+                        }
+                    };
+                    
+                    img.onerror = function() {
+                        reject(new Error('Error al cargar la imagen desde Amazon'));
+                    };
+                    
+                    img.src = urlProxy;
                 });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    // Añadir la imagen grande y pequeña
-                    imagenesGrandes.push(data.data.ruta_relativa);
-                    imagenesPequenas.push(data.data.ruta_relativa);
-                } else {
-                    console.error('Error al descargar imagen:', data.message);
-                }
             }
+            
+            // Ocultar indicador de progreso y restaurar botón
+            loadingDiv.classList.add('hidden');
+            btnGuardar.disabled = false;
+            btnGuardar.textContent = 'Guardar';
             
             renderizarImagenes();
             cerrarModalAñadirImagen();
             
         } catch (error) {
             console.error('Error al guardar imágenes:', error);
+            
+            // Restaurar botón y ocultar progreso en caso de error
+            const loadingDiv = document.getElementById('loading-amazon-nueva');
+            const btnGuardar = document.getElementById('btn-guardar-nueva');
+            loadingDiv.classList.add('hidden');
+            btnGuardar.disabled = false;
+            btnGuardar.textContent = 'Guardar';
+            
             alert('Error al guardar las imágenes: ' + error.message);
         }
     });
@@ -7175,6 +7378,11 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('btn-guardar-nueva').addEventListener('click', async () => {
         const tabActiva = document.querySelector('.tab-modal.border-blue-500');
         const tabId = tabActiva ? tabActiva.id : 'tab-url-nueva';
+        
+        // Si es la pestaña de Amazon, el código de Amazon ya lo maneja, no hacer nada aquí
+        if (tabId === 'tab-amazon-nueva') {
+            return;
+        }
         
         if (tabId === 'tab-subir-nueva') {
             // Ya se procesa en procesarArchivoNuevo

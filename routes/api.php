@@ -23,6 +23,10 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 Route::post('/token', [App\Http\Controllers\Api\TokenController::class, 'generate'])
     ->middleware(['throttle:15,1']); // Rate limit básico para token
 
+// Verificar CAPTCHA y desbloquear
+Route::post('/captcha/verificar', [App\Http\Controllers\Api\CaptchaController::class, 'verificar'])
+    ->middleware(['throttle:10,1']);
+
 // Endpoints protegidos con middleware anti-scraping
 // Añadir middlewares de sesión para detectar usuarios autenticados
 Route::middleware([
