@@ -3873,7 +3873,7 @@ function mostrarDesplegablesEspecificaciones(filtros, especificacionesGuardadas 
         html += `<label class="block mb-2 font-medium text-gray-700 dark:text-gray-200">${textoPrincipal}${filtro.importante ? ' <span class="text-yellow-600 dark:text-yellow-400">(Aplica Filtro Categoria)</span>' : ''}<span class="error-columna-msg text-red-600 dark:text-red-400 text-sm font-normal ml-2" style="display: none;">Falta marcar una opcion de columna</span></label>`;
         
         // Desplegable
-        html += `<details class="mb-2">`;
+        html += `<details class="mb-2" open>`;
         html += `<summary class="cursor-pointer text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium">Seleccionar opciones</summary>`;
         html += `<div class="mt-2 space-y-2 pl-4 border-l-2 border-gray-300 dark:border-gray-600">`;
         

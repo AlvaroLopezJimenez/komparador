@@ -3029,6 +3029,9 @@
                 contenedorBoton.appendChild(btnVerProductos);
                 botonesContainer.appendChild(contenedorBoton);
             });
+            
+            // Resaltar botones de palabras clave que coinciden con sublíneas marcadas
+            resaltarBotonesPalabrasClaveMarcadas();
         }
         
         // Función para abrir el modal de productos de una palabra clave
@@ -3126,6 +3129,51 @@
                 cerrarModalProductosPalabraClave();
             }
         });
+        
+        // Función para resaltar/quitar resaltado de botones de palabras clave relacionadas
+        function resaltarBotonesPalabrasClave(textoSublinea, resaltar) {
+            const botonesContainer = document.getElementById('palabras-clave-relacionadas-botones');
+            if (!botonesContainer) return;
+            
+            // Buscar todos los botones de palabras clave
+            const botones = botonesContainer.querySelectorAll('button[data-palabra]');
+            
+            botones.forEach(boton => {
+                const palabraClave = boton.dataset.palabra;
+                // Comparar el texto de la sublínea con la palabra clave (sin distinguir mayúsculas/minúsculas)
+                if (palabraClave && textoSublinea && 
+                    palabraClave.trim().toLowerCase() === textoSublinea.trim().toLowerCase()) {
+                    if (resaltar) {
+                        // Añadir borde amarillo más grueso
+                        boton.classList.add('border-4', 'border-yellow-400');
+                    } else {
+                        // Antes de quitar el resaltado, verificar si hay otros checkboxes marcados con el mismo texto
+                        const textoNormalizado = textoSublinea.trim().toLowerCase();
+                        const otrosCheckboxesMarcados = Array.from(document.querySelectorAll('.especificacion-checkbox:checked'))
+                            .filter(cb => {
+                                const textoOtro = cb.dataset.sublineaTexto;
+                                return textoOtro && textoOtro.trim().toLowerCase() === textoNormalizado;
+                            });
+                        
+                        // Solo quitar el resaltado si no hay otros checkboxes marcados con el mismo texto
+                        if (otrosCheckboxesMarcados.length === 0) {
+                            boton.classList.remove('border-4', 'border-yellow-400');
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Función para resaltar todos los botones de palabras clave basándose en las sublíneas marcadas
+        function resaltarBotonesPalabrasClaveMarcadas() {
+            const checkboxesMarcados = document.querySelectorAll('.especificacion-checkbox:checked');
+            checkboxesMarcados.forEach(checkbox => {
+                const textoSublinea = checkbox.dataset.sublineaTexto;
+                if (textoSublinea) {
+                    resaltarBotonesPalabrasClave(textoSublinea, true);
+                }
+            });
+        }
         
         // Función para añadir o quitar una palabra clave
         function togglePalabraClave(palabra, tieneActual) {
@@ -3448,11 +3496,6 @@
             
             if (!seleccionContainer || !contenidoContainer) return;
             
-            // Si el checkbox "No añadir" está marcado, no cargar
-            if (checkboxNoAnadir && checkboxNoAnadir.checked) {
-                return;
-            }
-            
             try {
                 const response = await fetch(`/panel-privado/productos/categoria/${categoriaId}/especificaciones-internas`);
                 const data = await response.json();
@@ -3464,6 +3507,23 @@
                 }
                 
                 const especificaciones = data.especificaciones_internas;
+                
+                // Actualizar el checkbox "No añadir especificaciones internas" según si tiene especificaciones
+                if (checkboxNoAnadir) {
+                    if (!especificaciones || especificaciones === null) {
+                        // Si no tiene especificaciones, marcar el checkbox
+                        checkboxNoAnadir.checked = true;
+                    } else {
+                        // Si tiene especificaciones, desmarcar el checkbox
+                        checkboxNoAnadir.checked = false;
+                    }
+                }
+                
+                // Si el checkbox "No añadir" está marcado después de actualizarlo, no mostrar el contenido
+                if (checkboxNoAnadir && checkboxNoAnadir.checked) {
+                    seleccionContainer.classList.add('hidden');
+                    return;
+                }
                 
                 if (!especificaciones || especificaciones === null) {
                     contenidoContainer.innerHTML = '<p class="text-gray-600 dark:text-gray-300 text-sm font-medium">Esta categoría tiene <span class="text-red-500 font-bold">null</span> en el campo especificaciones_internas.</p>';
@@ -3983,6 +4043,12 @@
                         textoAlternativoInput.disabled = !this.checked;
                     }
                     
+                    // Resaltar/quitar resaltado de botones de palabras clave relacionadas
+                    const textoSublinea = this.dataset.sublineaTexto;
+                    if (textoSublinea) {
+                        resaltarBotonesPalabrasClave(textoSublinea, this.checked);
+                    }
+                    
                     actualizarEspecificacionesElegidas();
                     actualizarVisibilidadFormatoVisualizacion(contenedor);
                 });
@@ -3992,6 +4058,34 @@
             const mostrarCheckboxes = contenedor.querySelectorAll('.especificacion-mostrar-checkbox');
             mostrarCheckboxes.forEach(checkbox => {
                 checkbox.addEventListener('change', function() {
+                    const principalId = this.dataset.principalId;
+                    const sublineaId = this.dataset.sublineaId;
+                    
+                    // Si se marca "Mostrar", marcar también "Oferta" de la misma sublínea
+                    if (this.checked) {
+                        const ofertaCheckbox = contenedor.querySelector(`.especificacion-oferta-checkbox[data-principal-id="${principalId}"][data-sublinea-id="${sublineaId}"]`);
+                        if (ofertaCheckbox && !ofertaCheckbox.checked) {
+                            ofertaCheckbox.checked = true;
+                        }
+                        
+                        // Marcar también "Columna oferta" del grupo (línea principal) si es unidadUnica y no está marcado
+                        const unidadDeMedidaSelect = document.getElementById('unidadDeMedida');
+                        const esUnidadUnica = unidadDeMedidaSelect && unidadDeMedidaSelect.value === 'unidadUnica';
+                        
+                        if (esUnidadUnica) {
+                            const columnaCheckbox = contenedor.querySelector(`.columna-oferta-checkbox[data-principal-id="${principalId}"]`);
+                            if (columnaCheckbox && !columnaCheckbox.checked) {
+                                // Verificar que no se excedan las 4 columnas permitidas
+                                const columnasMarcadas = Array.from(contenedor.querySelectorAll('.columna-oferta-checkbox:checked'));
+                                if (columnasMarcadas.length < 4) {
+                                    columnaCheckbox.checked = true;
+                                    // Disparar el evento change para actualizar los campos de texto alternativo
+                                    columnaCheckbox.dispatchEvent(new Event('change'));
+                                }
+                            }
+                        }
+                    }
+                    
                     actualizarEspecificacionesElegidas();
                     actualizarVisibilidadFormatoVisualizacion(contenedor);
                 });
@@ -4562,6 +4656,9 @@
                     abrirModalAñadirImagenSublinea(principalId, sublineaId);
                 });
             });
+            
+            // Resaltar botones de palabras clave que coinciden con sublíneas marcadas
+            resaltarBotonesPalabrasClaveMarcadas();
         }
         
         // Abrir modal para ver/gestionar imágenes de sublínea
@@ -4998,7 +5095,27 @@
         if (checkboxNoAnadir) {
             checkboxNoAnadir.addEventListener('change', function() {
                 if (this.checked) {
-                    // Limpiar todo
+                    // Obtener la categoría actual de los campos
+                    const categoriaId = document.getElementById('categoria_especificaciones_id').value;
+                    const categoriaNombre = document.getElementById('categoria_especificaciones_nombre').value;
+                    
+                    // Si hay una categoría en los campos, guardarla (actualizar la guardada)
+                    if (categoriaId && categoriaNombre) {
+                        this.dataset.categoriaIdGuardada = categoriaId;
+                        this.dataset.categoriaNombreGuardada = categoriaNombre;
+                    } else {
+                        // Si no hay categoría en los campos, verificar si hay una guardada
+                        // Si hay una guardada, mantenerla (no hacer nada, ya está en el dataset)
+                        // Si no hay ninguna, no hacer nada
+                        const categoriaIdGuardada = this.dataset.categoriaIdGuardada;
+                        if (!categoriaIdGuardada) {
+                            // No hay categoría ni en campos ni guardada
+                            // No hacer nada, no hay nada que guardar
+                        }
+                        // Si hay categoría guardada, se mantiene automáticamente en el dataset
+                    }
+                    
+                    // Limpiar todo (pero mantener la categoría guardada en el dataset)
                     document.getElementById('categoria_especificaciones_id').value = '';
                     document.getElementById('categoria_especificaciones_nombre').value = '';
                     document.getElementById('categoria_especificaciones_internas_elegidas_input').value = '';
@@ -5007,10 +5124,26 @@
                         seleccionContainer.classList.add('hidden');
                     }
                 } else {
-                    // Si hay una categoría seleccionada, recargar
-                    const categoriaId = document.getElementById('categoria_especificaciones_id').value;
-                    if (categoriaId) {
-                        obtenerEspecificacionesInternas(categoriaId);
+                    // Restaurar la categoría guardada si existe (NO eliminar los datos guardados)
+                    const categoriaIdGuardada = this.dataset.categoriaIdGuardada;
+                    const categoriaNombreGuardada = this.dataset.categoriaNombreGuardada;
+                    
+                    if (categoriaIdGuardada && categoriaNombreGuardada) {
+                        // Restaurar la categoría usando setTimeout para evitar interferencias
+                        setTimeout(() => {
+                            document.getElementById('categoria_especificaciones_id').value = categoriaIdGuardada;
+                            document.getElementById('categoria_especificaciones_nombre').value = categoriaNombreGuardada;
+                            
+                            // NO eliminar los datos guardados para que se puedan restaurar si se vuelve a marcar
+                            // Recargar las especificaciones
+                            obtenerEspecificacionesInternas(categoriaIdGuardada);
+                        }, 50);
+                    } else {
+                        // Si no hay categoría guardada, intentar recargar con la que esté en el campo
+                        const categoriaId = document.getElementById('categoria_especificaciones_id').value;
+                        if (categoriaId) {
+                            obtenerEspecificacionesInternas(categoriaId);
+                        }
                     }
                 }
             });
@@ -8311,6 +8444,34 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         mostrarCheckbox.addEventListener('change', function() {
+            const principalId = this.dataset.principalId;
+            const sublineaId = this.dataset.sublineaId;
+            
+            // Si se marca "Mostrar", marcar también "Oferta" de la misma sublínea
+            if (this.checked) {
+                if (ofertaCheckbox && !ofertaCheckbox.checked) {
+                    ofertaCheckbox.checked = true;
+                }
+                
+                // Marcar también "Columna oferta" del grupo (línea principal) si es unidadUnica y no está marcado
+                const unidadDeMedidaSelect = document.getElementById('unidadDeMedida');
+                const esUnidadUnica = unidadDeMedidaSelect && unidadDeMedidaSelect.value === 'unidadUnica';
+                
+                if (esUnidadUnica) {
+                    const columnaCheckbox = lineaPrincipal.querySelector(`.columna-oferta-producto-checkbox[data-principal-id="${principalId}"]`);
+                    if (columnaCheckbox && !columnaCheckbox.checked) {
+                        // Verificar que no se excedan las 4 columnas permitidas
+                        const container = document.getElementById('especificaciones-producto-container');
+                        const columnasMarcadas = Array.from(container.querySelectorAll('.columna-oferta-producto-checkbox:checked'));
+                        if (columnasMarcadas.length < 4) {
+                            columnaCheckbox.checked = true;
+                            // Disparar el evento change para actualizar los campos de texto alternativo
+                            columnaCheckbox.dispatchEvent(new Event('change'));
+                        }
+                    }
+                }
+            }
+            
             actualizarJSONProducto();
             // Actualizar visibilidad del selector de formato
             actualizarVisibilidadFormatoProducto(lineaPrincipal);

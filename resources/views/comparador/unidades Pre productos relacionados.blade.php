@@ -189,7 +189,7 @@
     {{-- Wrapper para manejar el badge sin desbordamiento --}}
     .mejor-oferta-wrapper {
       position: relative;
-      margin-bottom: 0;
+      margin-bottom: 1rem;
       display: flex;
       flex-direction: column;
       height: 100%;
@@ -206,9 +206,6 @@
       box-shadow: 0 0 20px rgba(255, 107, 107, 0.3);
       border-radius: 0.75rem;
       padding: 2px;
-      flex: 1;
-      display: flex;
-      flex-direction: column;
     }
 
     .mejor-oferta-gaming-container::before {
@@ -1336,7 +1333,7 @@
         <div class="pt-4 pb-2 px-4" id="contenedor-titulo-desktop">
           {{-- H1 único se moverá aquí en desktop mediante JavaScript --}}
           {{-- x14: Descripción corta (desktop) --}}
-          <div class="text-gray-600 text-sm leading-relaxed relative overflow-hidden" style="max-height: 4.5em; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis;" id="x14">
+          <div class="text-gray-600 text-sm leading-relaxed relative overflow-hidden max-h-[3em]" id="x14">
             {{ $producto->descripcion_corta}}
             {{-- x15: Botón leer más (desktop) --}}
             <span class="absolute bottom-0 right-0 bg-white pl-2 font-semibold cursor-pointer" id="x15" style="color: #d16a0f;" onmouseover="this.style.color='#e97b11'" onmouseout="this.style.color='#d16a0f'">Leer más</span>
@@ -1349,68 +1346,45 @@
           </div>
         </div>
 
-        {{-- LÍNEA DIVISORIA --}}
+        {{-- LÍNEA CON TEXTO EN MEDIO --}}
         <div class="flex items-center px-4 mt-2 mb-4 gap-2">
+          <div class="flex-grow border-t border-gray-200"></div>
+          <h2 class="text-base font-semibold text-gray-700 whitespace-nowrap">Ofertas similares a {{ $producto->marca }} {{ $producto->modelo }} {{ $producto->talla }}</h2>
           <div class="flex-grow border-t border-gray-200"></div>
         </div>
 
-        {{-- SECCIÓN DE 3 OFERTAS MÁS BARATAS (SOLO DESKTOP) --}}
-        <div class="hidden lg:block px-4 mt-2 mb-2">
-          <div id="mejor-oferta-grid-desktop" class="flex gap-2 items-stretch">
-            {{-- Las 3 ofertas más baratas se insertarán aquí dinámicamente --}}
-            <div class="flex-1" id="mejor-oferta-contenedor-desktop-1">
-              <div class="flex items-center justify-center mb-1">
-                <div id="mejor-oferta-logo-desktop-1" class="flex items-center justify-center">
-                  <div class="w-12 h-5 bg-gray-200 rounded animate-pulse"></div>
-                </div>
-              </div>
-              <div class="text-center">
-                <div id="mejor-oferta-precio-desktop-1" class="text-lg font-extrabold mb-1" style="color: #e97b11;">
-                  <div class="w-12 h-6 bg-gray-200 rounded animate-pulse mx-auto"></div>
-                </div>
-                <div id="mejor-oferta-boton-desktop-1" class="w-full">
-                  <div class="w-full h-6 bg-gray-200 rounded animate-pulse"></div>
-                </div>
-              </div>
+        {{-- CARRUSEL DE PRODUCTOS --}}
+        <div class="overflow-x-auto whitespace-nowrap pb-2 px-4">
+          @foreach ($relacionados as $relacionado)
+          <a href="{{ añadirCam($relacionado->categoria->construirUrlCategorias($relacionado->slug)) }}" class="inline-flex flex-col align-top card-hover px-1.5 py-1.5 border border-gray-200 rounded-lg text-center hover:bg-gray-50 transition-transform duration-200 w-[160px] mr-2">
+            <div class="flex justify-center mb-1">
+              <img src="{{ asset('images/' . ($relacionado->imagen_pequena[0] ?? '')) }}" loading="lazy" alt="{{$relacionado->nombre}}" class="w-[94px] max-w-full h-auto object-contain">
             </div>
-            
-            <div class="flex-1" id="mejor-oferta-contenedor-desktop-2">
-              <div class="flex items-center justify-center mb-1">
-                <div id="mejor-oferta-logo-desktop-2" class="flex items-center justify-center">
-                  <div class="w-12 h-5 bg-gray-200 rounded animate-pulse"></div>
-                </div>
-              </div>
-              <div class="text-center">
-                <div id="mejor-oferta-precio-desktop-2" class="text-lg font-extrabold mb-1" style="color: #e97b11;">
-                  <div class="w-12 h-6 bg-gray-200 rounded animate-pulse mx-auto"></div>
-                </div>
-                <div id="mejor-oferta-boton-desktop-2" class="w-full">
-                  <div class="w-full h-6 bg-gray-200 rounded animate-pulse"></div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="flex-1" id="mejor-oferta-contenedor-desktop-3">
-              <div class="flex items-center justify-center mb-1">
-                <div id="mejor-oferta-logo-desktop-3" class="flex items-center justify-center">
-                  <div class="w-12 h-5 bg-gray-200 rounded animate-pulse"></div>
-                </div>
-              </div>
-              <div class="text-center">
-                <div id="mejor-oferta-precio-desktop-3" class="text-lg font-extrabold mb-1" style="color: #e97b11;">
-                  <div class="w-12 h-6 bg-gray-200 rounded animate-pulse mx-auto"></div>
-                </div>
-                <div id="mejor-oferta-boton-desktop-3" class="w-full">
-                  <div class="w-full h-6 bg-gray-200 rounded animate-pulse"></div>
-                </div>
-              </div>
-            </div>
+            <div class="text-sm text-black-700 line-clamp-2 min-h-[2.5em] mb-1 w-full px-0.5" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; white-space: normal; word-break: break-word; line-height: 1.4;">{{ $relacionado->nombre }}</div>
+            <div class="text-lg mt-auto pb-0" style="color: #e97b11; margin-bottom: -2px;">{{ number_format($relacionado->precio, 2) }} €
+    @if($relacionado->unidadDeMedida === 'unidad')
+        <span class="text-xs text-gray-500">/Und.</span>
+    @elseif($relacionado->unidadDeMedida === 'kilos')
+        <span class="text-xs text-gray-500">/Kg.</span>
+    @elseif($relacionado->unidadDeMedida === 'litros')
+        <span class="text-xs text-gray-500">/L.</span>
+    @elseif($relacionado->unidadDeMedida === 'unidadMilesima')
+        <span class="text-xs text-gray-500">/Und.</span>
+    @elseif($relacionado->unidadDeMedida === 'unidadUnica')
+        {{-- No mostrar sufijo --}}
+    @elseif($relacionado->unidadDeMedida === '800gramos')
+        <span class="text-xs text-gray-500">/800gr.</span>
+    @elseif($relacionado->unidadDeMedida === '100ml')
+        <span class="text-xs text-gray-500">/100ml.</span>
+    @endif
           </div>
+          </a>
+          @endforeach
         </div>
       </div>
       
       {{-- GRAFICO HISTORICO PRECIO DESKTOP--}}
-      <div class="bg-white rounded-lg shadow p-4" style="height: 325px;">
+      <div class="bg-white rounded-lg shadow p-4" style="height: 360px;">
         <div class="flex justify-center items-center mb-4">
           <div class="flex space-x-2">
             <button id="btn-3m" class="px-3 py-1 text-sm border rounded hover:bg-gray-100 transition-colors" data-periodo="3m">3M</button>
@@ -1419,7 +1393,7 @@
             <button id="btn-1y" class="px-3 py-1 text-sm border rounded hover:bg-gray-100 transition-colors" data-periodo="1y">1A</button>
           </div>
         </div>
-        <div class="relative" style="height: 253px;">
+        <div class="relative" style="height: 280px;">
           <canvas id="graficoPrecios" class="w-full h-full"></canvas>
         </div>
       </div>
@@ -2099,44 +2073,6 @@
           </button>
         </div>
         
-        {{-- PRODUCTOS RELACIONADOS (DESKTOP) - Movido después del listado de ofertas --}}
-        <div class="hidden lg:block mt-6 bg-white rounded-lg shadow p-4">
-          <div class="flex items-center px-4 mt-2 mb-4 gap-2">
-            <div class="flex-grow border-t border-gray-200"></div>
-            <h2 class="text-base font-semibold text-gray-700 whitespace-nowrap">Ofertas similares a {{ $producto->marca }} {{ $producto->modelo }} {{ $producto->talla }}</h2>
-            <div class="flex-grow border-t border-gray-200"></div>
-          </div>
-
-          {{-- CARRUSEL DE PRODUCTOS --}}
-          <div class="overflow-x-auto whitespace-nowrap pb-2 px-4">
-            @foreach ($relacionados as $relacionado)
-            <a href="{{ añadirCam($relacionado->categoria->construirUrlCategorias($relacionado->slug)) }}" class="inline-flex flex-col align-top card-hover px-1.5 py-1.5 border border-gray-200 rounded-lg text-center hover:bg-gray-50 transition-transform duration-200 w-[160px] mr-2">
-              <div class="flex justify-center mb-1">
-                <img src="{{ asset('images/' . ($relacionado->imagen_pequena[0] ?? '')) }}" loading="lazy" alt="{{$relacionado->nombre}}" class="w-[94px] max-w-full h-auto object-contain">
-              </div>
-              <div class="text-sm text-black-700 line-clamp-2 min-h-[2.5em] mb-1 w-full px-0.5" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; white-space: normal; word-break: break-word; line-height: 1.4;">{{ $relacionado->nombre }}</div>
-              <div class="text-lg mt-auto pb-0" style="color: #e97b11; margin-bottom: -2px;">{{ number_format($relacionado->precio, 2) }} €
-    @if($relacionado->unidadDeMedida === 'unidad')
-        <span class="text-xs text-gray-500">/Und.</span>
-    @elseif($relacionado->unidadDeMedida === 'kilos')
-        <span class="text-xs text-gray-500">/Kg.</span>
-    @elseif($relacionado->unidadDeMedida === 'litros')
-        <span class="text-xs text-gray-500">/L.</span>
-    @elseif($relacionado->unidadDeMedida === 'unidadMilesima')
-        <span class="text-xs text-gray-500">/Und.</span>
-    @elseif($relacionado->unidadDeMedida === 'unidadUnica')
-        {{-- No mostrar sufijo --}}
-    @elseif($relacionado->unidadDeMedida === '800gramos')
-        <span class="text-xs text-gray-500">/800gr.</span>
-    @elseif($relacionado->unidadDeMedida === '100ml')
-        <span class="text-xs text-gray-500">/100ml.</span>
-    @endif
-          </div>
-          </a>
-          @endforeach
-        </div>
-        </div>
-        
         {{-- Productos similares (solo móvil) --}}
         <div class="block lg:hidden mt-6">
           <h3 class="text-lg font-semibold mb-3">Productos similares</h3>
@@ -2651,80 +2587,6 @@
             }
           }
 
-          {{-- Función para generar el botón de oferta --}}
-          {{-- _gbo1: generarBotonOferta - Genera el HTML del botón de oferta con badges de cupones --}}
-          function _gbo1(oferta) {
-            {{-- Siempre usar el mismo botón azul con "Ir a la tienda" (igual que sin descuento) --}}
-            const botonBase = 'inline-block w-full py-1 px-1 text-white text-base font-semibold rounded transition-colors text-center relative cursor-pointer';
-            let badgeHtml = '';
-            let dataAttrs = '';
-            let tieneDescuento = false;
-            
-            {{-- Asegurar que descuentos sea un string --}}
-            const descuentosStr = oferta.descuentos ? String(oferta.descuentos) : '';
-            
-            if (descuentosStr && typeof descuentosStr === 'string' && descuentosStr.startsWith('CholloTienda1SoloCuponQueAplicaDescuento;')) {
-              tieneDescuento = true;
-              badgeHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap; pointer-events: none; z-index: 10;">CUPÓN</span>';
-              dataAttrs = `data-cupon-chollo-tienda-solo="true" data-descuentos="${oferta.descuentos}" data-oferta-id="${oferta.id}" data-url="${oferta.url}"`;
-            } else if (descuentosStr && typeof descuentosStr === 'string' && descuentosStr.startsWith('CholloTienda;')) {
-              tieneDescuento = true;
-              badgeHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap; pointer-events: none; z-index: 10;">CUPÓN</span>';
-              dataAttrs = `data-cupon-chollo-tienda="true" data-descuentos="${oferta.descuentos}" data-oferta-id="${oferta.id}" data-url="${oferta.url}"`;
-            } else if (descuentosStr && typeof descuentosStr === 'string' && descuentosStr.startsWith('cupon;')) {
-              try {
-                tieneDescuento = true;
-                const cuponInfo = window._pc1(oferta.descuentos);
-                const valorCupon = cuponInfo ? cuponInfo.valor : (oferta.descuentos.split(';')[1] || '');
-                const codigoCupon = cuponInfo ? cuponInfo.codigo : null;
-                {{-- Escapar valores para evitar problemas con comillas y caracteres especiales --}}
-                const codigoCuponEscapado = codigoCupon ? codigoCupon.replace(/"/g, '&quot;').replace(/'/g, '&#39;') : '';
-                const valorCuponEscapado = String(valorCupon).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-                const urlEscapada = oferta.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-                badgeHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap; pointer-events: none; z-index: 10;">CUPÓN</span>';
-                dataAttrs = codigoCupon 
-                  ? `data-cupon="true" data-codigo-cupon="${codigoCuponEscapado}" data-valor-cupon="${valorCuponEscapado}" data-url="${urlEscapada}"` 
-                  : `data-cupon="true" data-valor-cupon="${valorCuponEscapado}" data-url="${urlEscapada}"`;
-              } catch (e) {
-                tieneDescuento = true;
-                badgeHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap; pointer-events: none; z-index: 10;">CUPÓN</span>';
-                dataAttrs = `data-cupon="true" data-url="${oferta.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;')}"`;
-              }
-            } else if (oferta.descuentos === 'cupon') {
-              tieneDescuento = true;
-              badgeHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap; pointer-events: none; z-index: 10;">CUPÓN</span>';
-              dataAttrs = `data-cupon="true" data-url="${oferta.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;')}"`;
-            } else if (oferta.descuentos === '3x2') {
-              tieneDescuento = true;
-              badgeHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #8b5cf6, #a855f7); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap; pointer-events: none; z-index: 10;">3x2</span>';
-              dataAttrs = `data-3x2="true" data-url="${oferta.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;')}"`;
-            } else if (oferta.descuentos === '2x1 - SoloCarrefour') {
-              tieneDescuento = true;
-              badgeHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #10b981, #059669); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap; pointer-events: none; z-index: 10;">2x1</span>';
-              dataAttrs = `data-2x1="true" data-url="${oferta.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;')}"`;
-            } else if (oferta.descuentos === '2a al 50 - cheque - SoloCarrefour') {
-              tieneDescuento = true;
-              badgeHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap; pointer-events: none; z-index: 10;">2a al 50%</span>';
-              dataAttrs = `data-2a-al-50-cheque="true" data-url="${oferta.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;')}"`;
-            } else if (oferta.descuentos === '2a al 70') {
-              tieneDescuento = true;
-              badgeHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap; pointer-events: none; z-index: 10;">2a AL 70%</span>';
-              dataAttrs = `data-2a-al-70="true" data-url="${oferta.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;')}"`;
-            } else if (oferta.descuentos === '2a al 50') {
-              tieneDescuento = true;
-              badgeHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap; pointer-events: none; z-index: 10;">2a al 50%</span>';
-              dataAttrs = `data-2a-al-50="true" data-url="${oferta.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;')}"`;
-            }
-            
-            {{-- Si tiene descuento, usar <span> en lugar de <a> para evitar enlaces anidados --}}
-            if (tieneDescuento) {
-              {{-- Siempre mostrar "Ir a la tienda" en el botón, el badge ya indica que hay cupón --}}
-              return `<div class="relative w-full">${badgeHtml}<span class="${botonBase}" style="background-color: #70b216;" onmouseover="this.style.backgroundColor='#60a013'" onmouseout="this.style.backgroundColor='#70b216'" ${dataAttrs}>Ir a la tienda</span></div>`;
-            } else {
-              return `<div class="relative w-full">${badgeHtml}<a href="${oferta.url}" target="_blank" rel="sponsored noopener noreferrer" class="${botonBase}" style="background-color: #70b216;" onmouseover="this.style.backgroundColor='#60a013'" onmouseout="this.style.backgroundColor='#70b216'" ${dataAttrs}>Ir a la tienda</a></div>`;
-            }
-          }
-
           {{-- Función para actualizar las mejores ofertas en móvil --}}
           {{-- _amom1: actualizarMejorOfertaMovil - Actualiza las mejores ofertas mostradas en la vista móvil --}}
           function _amom1(filtradas) {
@@ -2971,6 +2833,80 @@
                 }
               }
             }
+
+            {{-- Función para generar el botón de oferta --}}
+            {{-- _gbo1: generarBotonOferta - Genera el HTML del botón de oferta con badges de cupones --}}
+            function _gbo1(oferta) {
+              {{-- Siempre usar el mismo botón azul con "Ir a la tienda" (igual que sin descuento) --}}
+              const botonBase = 'inline-block w-full py-1 px-1 text-white text-base font-semibold rounded transition-colors text-center relative cursor-pointer';
+              let badgeHtml = '';
+              let dataAttrs = '';
+              let tieneDescuento = false;
+              
+              {{-- Asegurar que descuentos sea un string --}}
+              const descuentosStr = oferta.descuentos ? String(oferta.descuentos) : '';
+              
+              if (descuentosStr && typeof descuentosStr === 'string' && descuentosStr.startsWith('CholloTienda1SoloCuponQueAplicaDescuento;')) {
+                tieneDescuento = true;
+                badgeHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap; pointer-events: none; z-index: 10;">CUPÓN</span>';
+                dataAttrs = `data-cupon-chollo-tienda-solo="true" data-descuentos="${oferta.descuentos}" data-oferta-id="${oferta.id}" data-url="${oferta.url}"`;
+              } else if (descuentosStr && typeof descuentosStr === 'string' && descuentosStr.startsWith('CholloTienda;')) {
+                tieneDescuento = true;
+                badgeHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap; pointer-events: none; z-index: 10;">CUPÓN</span>';
+                dataAttrs = `data-cupon-chollo-tienda="true" data-descuentos="${oferta.descuentos}" data-oferta-id="${oferta.id}" data-url="${oferta.url}"`;
+              } else if (descuentosStr && typeof descuentosStr === 'string' && descuentosStr.startsWith('cupon;')) {
+                try {
+                  tieneDescuento = true;
+                  const cuponInfo = window._pc1(oferta.descuentos);
+                  const valorCupon = cuponInfo ? cuponInfo.valor : (oferta.descuentos.split(';')[1] || '');
+                  const codigoCupon = cuponInfo ? cuponInfo.codigo : null;
+                  {{-- Escapar valores para evitar problemas con comillas y caracteres especiales --}}
+                  const codigoCuponEscapado = codigoCupon ? codigoCupon.replace(/"/g, '&quot;').replace(/'/g, '&#39;') : '';
+                  const valorCuponEscapado = String(valorCupon).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                  const urlEscapada = oferta.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                  badgeHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap; pointer-events: none; z-index: 10;">CUPÓN</span>';
+                  dataAttrs = codigoCupon 
+                    ? `data-cupon="true" data-codigo-cupon="${codigoCuponEscapado}" data-valor-cupon="${valorCuponEscapado}" data-url="${urlEscapada}"` 
+                    : `data-cupon="true" data-valor-cupon="${valorCuponEscapado}" data-url="${urlEscapada}"`;
+                } catch (e) {
+                  tieneDescuento = true;
+                  badgeHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap; pointer-events: none; z-index: 10;">CUPÓN</span>';
+                  dataAttrs = `data-cupon="true" data-url="${oferta.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;')}"`;
+                }
+              } else if (oferta.descuentos === 'cupon') {
+                tieneDescuento = true;
+                badgeHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap; pointer-events: none; z-index: 10;">CUPÓN</span>';
+                dataAttrs = `data-cupon="true" data-url="${oferta.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;')}"`;
+              } else if (oferta.descuentos === '3x2') {
+                tieneDescuento = true;
+                badgeHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #8b5cf6, #a855f7); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap; pointer-events: none; z-index: 10;">3x2</span>';
+                dataAttrs = `data-3x2="true" data-url="${oferta.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;')}"`;
+              } else if (oferta.descuentos === '2x1 - SoloCarrefour') {
+                tieneDescuento = true;
+                badgeHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #10b981, #059669); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap; pointer-events: none; z-index: 10;">2x1</span>';
+                dataAttrs = `data-2x1="true" data-url="${oferta.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;')}"`;
+              } else if (oferta.descuentos === '2a al 50 - cheque - SoloCarrefour') {
+                tieneDescuento = true;
+                badgeHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap; pointer-events: none; z-index: 10;">2a al 50%</span>';
+                dataAttrs = `data-2a-al-50-cheque="true" data-url="${oferta.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;')}"`;
+              } else if (oferta.descuentos === '2a al 70') {
+                tieneDescuento = true;
+                badgeHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap; pointer-events: none; z-index: 10;">2a AL 70%</span>';
+                dataAttrs = `data-2a-al-70="true" data-url="${oferta.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;')}"`;
+              } else if (oferta.descuentos === '2a al 50') {
+                tieneDescuento = true;
+                badgeHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap; pointer-events: none; z-index: 10;">2a al 50%</span>';
+                dataAttrs = `data-2a-al-50="true" data-url="${oferta.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;')}"`;
+              }
+              
+              {{-- Si tiene descuento, usar <span> en lugar de <a> para evitar enlaces anidados --}}
+              if (tieneDescuento) {
+                {{-- Siempre mostrar "Ir a la tienda" en el botón, el badge ya indica que hay cupón --}}
+                return `<div class="relative w-full">${badgeHtml}<span class="${botonBase}" style="background-color: #70b216;" onmouseover="this.style.backgroundColor='#60a013'" onmouseout="this.style.backgroundColor='#70b216'" ${dataAttrs}>Ir a la tienda</span></div>`;
+              } else {
+                return `<div class="relative w-full">${badgeHtml}<a href="${oferta.url}" target="_blank" rel="sponsored noopener noreferrer" class="${botonBase}" style="background-color: #70b216;" onmouseover="this.style.backgroundColor='#60a013'" onmouseout="this.style.backgroundColor='#70b216'" ${dataAttrs}>Ir a la tienda</a></div>`;
+              }
+            }
             
             {{-- Actualizar todas las ofertas con mejor precio --}}
             ofertasMejorPrecio.forEach((oferta, index) => {
@@ -3038,147 +2974,6 @@
                 }
               }
             }
-          }
-
-          {{-- Función para actualizar las 3 ofertas más baratas en desktop --}}
-          {{-- _amod1: actualizarMejorOfertaDesktop - Actualiza las 3 ofertas más baratas mostradas en la vista desktop --}}
-          function _amod1(filtradas) {
-            const gridContenedor = document.getElementById('mejor-oferta-grid-desktop');
-            
-            {{-- Si no hay ofertas, ocultar el contenedor --}}
-            if (filtradas.length === 0) {
-              if (gridContenedor && gridContenedor.parentElement) {
-                gridContenedor.parentElement.style.display = 'none';
-              }
-              return;
-            }
-            
-            {{-- Mostrar el contenedor si estaba oculto --}}
-            if (gridContenedor && gridContenedor.parentElement) {
-              gridContenedor.parentElement.style.display = 'block';
-            }
-            
-            {{-- Ordenar ofertas por precio (de menor a mayor) y tomar las 3 primeras --}}
-            const ofertasOrdenadas = filtradas
-              .map(o => ({...o, precioUnidadNum: parseFloat(o.precio_unidad.replace(',', '.'))}))
-              .sort((a, b) => a.precioUnidadNum - b.precioUnidadNum)
-              .slice(0, 3);
-            
-            {{-- Calcular el precio mínimo entre las 3 ofertas --}}
-            const precioMinimo = ofertasOrdenadas.length > 0 ? Math.min(...ofertasOrdenadas.map(o => o.precioUnidadNum)) : Infinity;
-            
-            {{-- Identificar cuáles tienen el mejor precio --}}
-            const ofertasConMejorPrecio = ofertasOrdenadas.filter(o => o.precioUnidadNum === precioMinimo);
-            const tieneSoloUnaMejorPrecio = ofertasConMejorPrecio.length === 1;
-            const tieneDosMejorPrecio = ofertasConMejorPrecio.length === 2;
-            
-            {{-- Función para actualizar una oferta específica --}}
-            function actualizarOfertaDesktop(oferta, index) {
-              const tieneMejorPrecio = oferta.precioUnidadNum === precioMinimo;
-              const contenedorElement = document.getElementById(`mejor-oferta-contenedor-desktop-${index}`);
-              
-              if (!contenedorElement) return;
-              
-              {{-- Determinar si es la primera oferta con mejor precio (para mostrar badge) --}}
-              const esPrimeraMejorPrecio = tieneMejorPrecio && index === 1;
-              
-              {{-- Asegurar que todos los contenedores tengan la misma altura base --}}
-              contenedorElement.className = 'flex-1';
-              contenedorElement.style.display = 'flex';
-              contenedorElement.style.flexDirection = 'column';
-              contenedorElement.style.height = '100%';
-              
-              if (tieneMejorPrecio) {
-                {{-- Oferta con mejor precio: aplicar borde animado --}}
-                contenedorElement.classList.add('mejor-oferta-wrapper');
-                
-                {{-- Si hay dos con mejor precio, la segunda no tiene padding --}}
-                if (tieneDosMejorPrecio && index === 2) {
-                  contenedorElement.style.paddingTop = '0px';
-                } else {
-                  contenedorElement.style.paddingTop = '0px';
-                }
-                
-                let precioHtml = `
-                  <div class="text-center mb-1.5">
-                    <div id="mejor-oferta-precio-desktop-${index}" class="text-xl font-extrabold" style="color: #e97b11;">
-                      <span class="text-xl font-extrabold" style="color: #e97b11;">${oferta.precio_unidad} <span class="text-sm text-gray-500 font-normal">${_gsp1(unidadMedida)}</span></span>
-                    </div>
-                  </div>
-                `;
-                
-                let badgeHtml = '';
-                if (esPrimeraMejorPrecio) {
-                  badgeHtml = '<div class="mejor-oferta-badge-grupo" style="right: -30px; top: -20px;">🏆 Mejor precio</div>';
-                }
-                
-                contenedorElement.innerHTML = `
-                  ${badgeHtml}
-                  <div class="mejor-oferta-gaming-container" style="height: 100%; display: flex; flex-direction: column;">
-                    <div class="ofertas-grupo" style="flex: 1; display: flex; flex-direction: column; padding: 0.5rem; padding-bottom: 0; gap: 0;">
-                      <a href="${oferta.url}" target="_blank" rel="sponsored noopener noreferrer" class="block cursor-pointer flex-1 flex flex-col">
-                        <div class="flex items-center justify-center mb-3 mt-2">
-                          <div id="mejor-oferta-logo-desktop-${index}" class="flex items-center justify-center w-full">
-                            <img src="${oferta.logo}" loading="lazy" alt="${oferta.nombre}" class="w-full max-w-[130px] sm:h-[45px] h-[36px] object-contain">
-                          </div>
-                        </div>
-                        ${precioHtml}
-                        <div id="mejor-oferta-boton-desktop-${index}" class="w-full mt-auto" style="margin-bottom: 0;">
-                          ${_gbo1(oferta)}
-                        </div>
-                      </a>
-                    </div>
-                  </div>
-                `;
-              } else {
-                {{-- Oferta normal sin mejor precio --}}
-                contenedorElement.style.paddingTop = '0px';
-                
-                let precioHtmlNormal = `
-                  <div class="text-center mb-1.5">
-                    <div id="mejor-oferta-precio-desktop-${index}" class="text-xl font-extrabold" style="color: #e97b11;">
-                      <span class="text-xl font-extrabold" style="color: #e97b11;">${oferta.precio_unidad} <span class="text-sm text-gray-500 font-normal">${_gsp1(unidadMedida)}</span></span>
-                    </div>
-                  </div>
-                `;
-                
-                contenedorElement.innerHTML = `
-                  <div class="border border-gray-200 rounded-lg h-full flex flex-col" style="padding: 2px;">
-                    <div style="flex: 1; display: flex; flex-direction: column; padding: 0.5rem; padding-bottom: 0;">
-                      <a href="${oferta.url}" target="_blank" rel="sponsored noopener noreferrer" class="block cursor-pointer flex-1 flex flex-col">
-                        <div class="flex items-center justify-center mb-3 mt-2">
-                          <div id="mejor-oferta-logo-desktop-${index}" class="flex items-center justify-center w-full">
-                            <img src="${oferta.logo}" loading="lazy" alt="${oferta.nombre}" class="w-full max-w-[130px] sm:h-[45px] h-[36px] object-contain">
-                          </div>
-                        </div>
-                        ${precioHtmlNormal}
-                        <div id="mejor-oferta-boton-desktop-${index}" class="w-full mt-auto" style="margin-bottom: 0;">
-                          ${_gbo1(oferta)}
-                        </div>
-                      </a>
-                    </div>
-                  </div>
-                `;
-              }
-            }
-            
-            {{-- Actualizar las 3 ofertas --}}
-            ofertasOrdenadas.forEach((oferta, index) => {
-              actualizarOfertaDesktop(oferta, index + 1);
-            });
-            
-            {{-- Ocultar contenedores no utilizados --}}
-            for (let i = ofertasOrdenadas.length + 1; i <= 3; i++) {
-              const contenedor = document.getElementById(`mejor-oferta-contenedor-desktop-${i}`);
-              if (contenedor) {
-                contenedor.style.display = 'none';
-              }
-            }
-            
-            {{-- Configurar event listeners después de actualizar las ofertas --}}
-            setTimeout(() => {
-              _scel1();
-            }, 100);
           }
 
           {{-- Obtener el parámetro v de la URL para filtrado inicial --}}
@@ -4870,9 +4665,6 @@
             
             {{-- Actualizar mejor oferta en móvil --}}
             _amom1(filtradas);
-            
-            {{-- Actualizar 3 ofertas más baratas en desktop --}}
-            _amod1(filtradas);
             } catch (error) {
               {{-- x6: Contenedor del listado de ofertas --}}
               const cont = document.getElementById('x6');
