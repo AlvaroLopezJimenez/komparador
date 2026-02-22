@@ -1365,6 +1365,9 @@ public function generarContenido(Request $request)
         $guardados = 0;
         $errores = 0;
         $log = [];
+        
+        // Instanciar el servicio una sola vez
+        $servicioOfertas = new SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos();
 
         foreach ($productos as $producto) {
             try {
@@ -1374,6 +1377,7 @@ public function generarContenido(Request $request)
                 // Si el precio es 0, buscar el precio del día anterior en el historial
                 if ($precioActual == 0) {
                     $historicoAnterior = HistoricoPrecioProducto::where('producto_id', $producto->id)
+                        ->whereNull('especificacion_interna_id')
                         ->where('fecha', '<', now()->toDateString())
                         ->orderBy('fecha', 'desc')
                         ->first();
@@ -1383,29 +1387,17 @@ public function generarContenido(Request $request)
                     }
                 }
                 
-                // Buscar la oferta con precio más bajo para este producto considerando descuentos
-                $ofertas = \App\Models\OfertaProducto::where('producto_id', $producto->id)
-                    ->where('mostrar', 'si')
-                    ->get(['id', 'precio_unidad', 'precio_total', 'unidades', 'descuentos']);
-
-                $ofertaMasBarata = null;
-                $precioRealMasBajo = null;
-
-                foreach ($ofertas as $oferta) {
-                    $precioReal = $this->calcularPrecioRealPorUnidad($oferta);
-                    if ($precioRealMasBajo === null || $precioReal < $precioRealMasBajo) {
-                        $precioRealMasBajo = $precioReal;
-                        $ofertaMasBarata = $oferta;
-                    }
-                }
+                // Usar el servicio para obtener la oferta más barata (con descuentos, chollos, etc.)
+                $ofertaMasBarata = $servicioOfertas->obtener($producto);
                 
                 // Si hay oferta, usar el precio de la oferta, si no, usar el precio actual (que puede ser del historial)
-                $precioMinimo = $ofertaMasBarata ? $precioRealMasBajo : $precioActual;
+                $precioMinimo = $ofertaMasBarata ? $ofertaMasBarata->precio_unidad : $precioActual;
                 
-                // Guardar en el histórico
+                // Guardar en el histórico general (sin especificacion_interna_id)
                 HistoricoPrecioProducto::updateOrCreate(
                     [
                         'producto_id' => $producto->id,
+                        'especificacion_interna_id' => null,
                         'fecha' => now()->toDateString()
                     ],
                     [
@@ -1422,6 +1414,159 @@ public function generarContenido(Request $request)
                     'precio_maximo' => $precioActual,
                     'status' => 'guardado'
                 ];
+                
+                // ===== GUARDAR HISTORIAL DE ESPECIFICACIONES INTERNAS =====
+                // Solo si el producto tiene especificaciones internas y está marcado como unidadUnica
+                if ($producto->categoria_id_especificaciones_internas && 
+                    $producto->categoria_especificaciones_internas_elegidas &&
+                    $producto->unidadDeMedida === 'unidadUnica') {
+                    
+                    $especificacionesElegidas = $producto->categoria_especificaciones_internas_elegidas;
+                    $columnasOferta = $especificacionesElegidas['_columnas'] ?? [];
+                    
+                    // Solo procesar si hay líneas marcadas como "columna oferta"
+                    if (!empty($columnasOferta) && is_array($columnasOferta)) {
+                        // Obtener TODAS las ofertas del producto una sola vez (más eficiente)
+                        $todasLasOfertas = $servicioOfertas->obtenerTodas($producto);
+                        
+                        // Obtener la categoría de especificaciones internas para acceder a los filtros
+                        $categoriaEspecificaciones = $producto->categoriaEspecificaciones;
+                        if ($categoriaEspecificaciones && $categoriaEspecificaciones->especificaciones_internas) {
+                            $especificacionesCategoria = $categoriaEspecificaciones->especificaciones_internas;
+                            $filtros = $especificacionesCategoria['filtros'] ?? [];
+                            
+                            // También obtener filtros de producto si existen
+                            $filtrosProducto = [];
+                            if (isset($especificacionesElegidas['_producto']['filtros']) && 
+                                is_array($especificacionesElegidas['_producto']['filtros'])) {
+                                $filtrosProducto = $especificacionesElegidas['_producto']['filtros'];
+                            }
+                            
+                            // Combinar filtros de categoría y producto
+                            $filtrosCombinados = array_merge($filtros, $filtrosProducto);
+                            
+                            // Procesar cada línea principal marcada como "columna oferta"
+                            foreach ($columnasOferta as $lineaId) {
+                                $lineaIdStr = strval($lineaId);
+                                
+                                // Buscar la línea principal en los filtros combinados
+                                $lineaPrincipal = null;
+                                foreach ($filtrosCombinados as $filtro) {
+                                    if (isset($filtro['id']) && strval($filtro['id']) === $lineaIdStr) {
+                                        $lineaPrincipal = $filtro;
+                                        break;
+                                    }
+                                }
+                                
+                                if (!$lineaPrincipal) {
+                                    continue;
+                                }
+                                
+                                // Obtener las sublíneas elegidas para esta línea principal
+                                $sublineasElegidas = $especificacionesElegidas[$lineaId] ?? [];
+                                if (empty($sublineasElegidas)) {
+                                    continue;
+                                }
+                                
+                                // Convertir sublíneas a array si no lo es
+                                $sublineasArray = is_array($sublineasElegidas) ? $sublineasElegidas : [$sublineasElegidas];
+                                
+                                // Procesar cada sublínea
+                                foreach ($sublineasArray as $sublineaProducto) {
+                                    // Verificar si está marcada como "mostrar"
+                                    $esMostrar = false;
+                                    $sublineaId = null;
+                                    
+                                    if (is_array($sublineaProducto)) {
+                                        $sublineaId = $sublineaProducto['id'] ?? null;
+                                        
+                                        // Verificar si está marcada como "mostrar"
+                                        $mValue = $sublineaProducto['m'] ?? null;
+                                        if ($mValue !== null) {
+                                            $esMostrar = ($mValue === 1 || $mValue === '1' || $mValue === true || $mValue === 'true');
+                                        }
+                                        
+                                        // También verificar el campo 'mostrar' como alternativa
+                                        if (!$esMostrar && isset($sublineaProducto['mostrar'])) {
+                                            $esMostrar = ($sublineaProducto['mostrar'] === true || $sublineaProducto['mostrar'] === 'true' || $sublineaProducto['mostrar'] === 1 || $sublineaProducto['mostrar'] === '1');
+                                        }
+                                    } else {
+                                        $sublineaId = strval($sublineaProducto);
+                                        $esMostrar = false; // Si no es array, no tiene flag de mostrar
+                                    }
+                                    
+                                    if (!$esMostrar || !$sublineaId) {
+                                        continue;
+                                    }
+                                    
+                                    // Filtrar ofertas que coincidan con esta especificación específica
+                                    $ofertasFiltradas = $todasLasOfertas->filter(function($oferta) use ($lineaIdStr, $sublineaId) {
+                                        $especificacionesOferta = $oferta->especificaciones_internas;
+                                        
+                                        if (!$especificacionesOferta || !is_array($especificacionesOferta)) {
+                                            return false;
+                                        }
+                                        
+                                        $ofertaLinea = $especificacionesOferta[$lineaIdStr] ?? null;
+                                        if (!$ofertaLinea) {
+                                            return false;
+                                        }
+                                        
+                                        $ofertaSublineas = is_array($ofertaLinea) ? $ofertaLinea : [$ofertaLinea];
+                                        
+                                        foreach ($ofertaSublineas as $item) {
+                                            $itemId = (is_array($item) && isset($item['id'])) ? strval($item['id']) : strval($item);
+                                            if (strval($itemId) === strval($sublineaId)) {
+                                                return true;
+                                            }
+                                        }
+                                        
+                                        return false;
+                                    });
+                                    
+                                    // Obtener precio mínimo de las ofertas filtradas
+                                    $precioMinimoEspecificacion = null;
+                                    if ($ofertasFiltradas->isNotEmpty()) {
+                                        // Las ofertas ya están ordenadas por precio_unidad (más barata primero)
+                                        $precioMinimoEspecificacion = $ofertasFiltradas->first()->precio_unidad;
+                                    } else {
+                                        // Si no hay ofertas, usar precio del producto o historial anterior de esta especificación
+                                        $historicoAnteriorEspecificacion = HistoricoPrecioProducto::where('producto_id', $producto->id)
+                                            ->where('especificacion_interna_id', $sublineaId)
+                                            ->where('fecha', '<', now()->toDateString())
+                                            ->orderBy('fecha', 'desc')
+                                            ->first();
+                                        
+                                        if ($historicoAnteriorEspecificacion) {
+                                            $precioMinimoEspecificacion = $historicoAnteriorEspecificacion->precio_minimo ?? $precioActual;
+                                        } else {
+                                            $precioMinimoEspecificacion = $precioActual;
+                                        }
+                                    }
+                                    
+                                    // Guardar histórico de esta especificación interna
+                                    if ($precioMinimoEspecificacion !== null && $precioMinimoEspecificacion > 0) {
+                                        HistoricoPrecioProducto::updateOrCreate(
+                                            [
+                                                'producto_id' => $producto->id,
+                                                'especificacion_interna_id' => $sublineaId,
+                                                'fecha' => now()->toDateString()
+                                            ],
+                                            [
+                                                'precio_minimo' => $precioMinimoEspecificacion,
+                                                'precio_maximo' => $precioMinimoEspecificacion
+                                            ]
+                                        );
+                                        
+                                        $guardados++;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                // ===== FIN GUARDAR HISTORIAL DE ESPECIFICACIONES INTERNAS =====
+                
             } catch (\Throwable $e) {
                 $errores++;
                 $log[] = [
@@ -1441,11 +1586,42 @@ public function generarContenido(Request $request)
             'log' => $log,
         ]);
 
+        // Filtrar solo los errores del log
+        $erroresDetallados = array_filter($log, function($item) {
+            return isset($item['status']) && $item['status'] === 'error';
+        });
+
+        // Agrupar errores por tipo de mensaje para identificar patrones
+        $erroresAgrupados = [];
+        foreach ($erroresDetallados as $error) {
+            $mensajeError = $error['error'] ?? 'Error desconocido';
+            if (!isset($erroresAgrupados[$mensajeError])) {
+                $erroresAgrupados[$mensajeError] = [
+                    'mensaje' => $mensajeError,
+                    'cantidad' => 0,
+                    'productos' => []
+                ];
+            }
+            $erroresAgrupados[$mensajeError]['cantidad']++;
+            $erroresAgrupados[$mensajeError]['productos'][] = [
+                'id' => $error['producto_id'] ?? null,
+                'nombre' => $error['nombre'] ?? 'Sin nombre'
+            ];
+        }
+
         return response()->json([
             'status' => 'ok',
             'guardados' => $guardados,
             'errores' => $errores,
-            'ejecucion_id' => $ejecucion->id
+            'total_productos' => count($productos),
+            'ejecucion_id' => $ejecucion->id,
+            'errores_detallados' => array_values($erroresDetallados),
+            'errores_agrupados' => array_values($erroresAgrupados),
+            'resumen' => [
+                'exitosos' => $guardados,
+                'fallidos' => $errores,
+                'porcentaje_exito' => count($productos) > 0 ? round(($guardados / count($productos)) * 100, 2) : 0
+            ]
         ]);
     }
 
@@ -2053,8 +2229,9 @@ public function generarContenido(Request $request)
         $dias = $periodos[$request->periodo];
         $desde = \Carbon\Carbon::today()->subDays($dias - 1);
 
-        // Obtener datos históricos
-        $historico = \App\Models\HistoricoPrecioProducto::where('producto_id', $productoId)
+        // Obtener datos históricos generales (sin especificación)
+        $historicoGeneral = \App\Models\HistoricoPrecioProducto::where('producto_id', $productoId)
+            ->whereNull('especificacion_interna_id')
             ->where('fecha', '>=', $desde)
             ->orderBy('fecha')
             ->get()
@@ -2062,22 +2239,143 @@ public function generarContenido(Request $request)
                 \Carbon\Carbon::parse($item->fecha)->toDateString() => (float) $item->precio_minimo
             ]);
 
-        // Generar array de precios
+        // Obtener datos históricos de especificaciones internas
+        $historicoEspecificaciones = \App\Models\HistoricoPrecioProducto::where('producto_id', $productoId)
+            ->whereNotNull('especificacion_interna_id')
+            ->where('fecha', '>=', $desde)
+            ->orderBy('fecha')
+            ->get()
+            ->groupBy('especificacion_interna_id')
+            ->map(function($items) {
+                return $items->mapWithKeys(fn($item) => [
+                    \Carbon\Carbon::parse($item->fecha)->toDateString() => (float) $item->precio_minimo
+                ]);
+            });
+
+        // Obtener información de las especificaciones internas del producto
+        $especificacionesInfo = [];
+        if ($producto->categoria_id_especificaciones_internas && 
+            $producto->categoria_especificaciones_internas_elegidas) {
+            
+            $especificacionesElegidas = $producto->categoria_especificaciones_internas_elegidas;
+            $categoriaEspecificaciones = $producto->categoriaEspecificaciones;
+            
+            if ($categoriaEspecificaciones && $categoriaEspecificaciones->especificaciones_internas) {
+                $especificacionesCategoria = $categoriaEspecificaciones->especificaciones_internas;
+                $filtros = $especificacionesCategoria['filtros'] ?? [];
+                
+                // También obtener filtros de producto si existen
+                $filtrosProducto = [];
+                if (isset($especificacionesElegidas['_producto']['filtros']) && 
+                    is_array($especificacionesElegidas['_producto']['filtros'])) {
+                    $filtrosProducto = $especificacionesElegidas['_producto']['filtros'];
+                }
+                
+                // Combinar filtros de categoría y producto
+                $filtrosCombinados = array_merge($filtros, $filtrosProducto);
+                
+                // Obtener todas las especificaciones que tienen historial
+                foreach ($historicoEspecificaciones->keys() as $sublineaId) {
+                    // Buscar la sublínea en las especificaciones elegidas
+                    foreach ($especificacionesElegidas as $lineaId => $sublineasProducto) {
+                        // Saltar claves especiales
+                        if (strpos($lineaId, '_') === 0) {
+                            continue;
+                        }
+                        
+                        // Buscar la línea principal en los filtros
+                        $lineaPrincipal = null;
+                        foreach ($filtrosCombinados as $filtro) {
+                            if (isset($filtro['id']) && strval($filtro['id']) === strval($lineaId)) {
+                                $lineaPrincipal = $filtro;
+                                break;
+                            }
+                        }
+                        
+                        if (!$lineaPrincipal) {
+                            continue;
+                        }
+                        
+                        // Convertir sublíneas a array
+                        $sublineasArray = is_array($sublineasProducto) ? $sublineasProducto : [$sublineasProducto];
+                        
+                        // Buscar la sublínea específica
+                        foreach ($sublineasArray as $sublineaProducto) {
+                            $sublineaIdProducto = is_array($sublineaProducto) ? ($sublineaProducto['id'] ?? null) : strval($sublineaProducto);
+                            
+                            if (strval($sublineaIdProducto) === strval($sublineaId)) {
+                                // Buscar el texto de la sublínea en la línea principal
+                                $subprincipales = $lineaPrincipal['subprincipales'] ?? [];
+                                foreach ($subprincipales as $subprincipal) {
+                                    $subprincipalId = is_array($subprincipal) ? ($subprincipal['id'] ?? null) : strval($subprincipal);
+                                    if (strval($subprincipalId) === strval($sublineaId)) {
+                                        // Obtener el texto de la sublínea
+                                        $sublineaTexto = null;
+                                        if (is_array($subprincipal)) {
+                                            $sublineaTexto = $subprincipal['texto'] ?? $subprincipal['slug'] ?? null;
+                                            
+                                            // Si no tiene texto ni slug, generar slug desde el texto si existe
+                                            if (!$sublineaTexto && isset($subprincipal['texto'])) {
+                                                $sublineaTexto = \Illuminate\Support\Str::slug($subprincipal['texto']);
+                                            }
+                                            
+                                            // Si aún no tiene, usar el ID como último recurso
+                                            if (!$sublineaTexto) {
+                                                $sublineaTexto = strval($subprincipalId);
+                                            }
+                                        } else {
+                                            $sublineaTexto = strval($subprincipal);
+                                        }
+                                        
+                                        // Verificar si tiene texto alternativo
+                                        if (is_array($sublineaProducto) && isset($sublineaProducto['textoAlternativo']) && !empty($sublineaProducto['textoAlternativo'])) {
+                                            $sublineaTexto = $sublineaProducto['textoAlternativo'];
+                                        }
+                                        
+                                        $especificacionesInfo[strval($sublineaId)] = [
+                                            'id' => strval($sublineaId),
+                                            'texto' => $sublineaTexto,
+                                            'linea_principal_id' => strval($lineaId)
+                                        ];
+                                        break 2;
+                                    }
+                                }
+                                break 2;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Generar array de precios con datos generales y de especificaciones
         $precios = [];
         $datosConPrecio = 0;
         for ($i = 0; $i < $dias; $i++) {
             $fechaObj = \Carbon\Carbon::today()->subDays($dias - 1 - $i);
             $fechaYMD = $fechaObj->toDateString();
             $fechaDM = $fechaObj->format('d/m');
-            $precio = isset($historico[$fechaYMD]) ? (float) $historico[$fechaYMD] : 0;
             
-            if ($precio > 0) {
+            // Precio general
+            $precio = isset($historicoGeneral[$fechaYMD]) ? (float) $historicoGeneral[$fechaYMD] : 0;
+            
+            // Precios de especificaciones
+            $preciosEspecificaciones = [];
+            foreach ($historicoEspecificaciones as $sublineaId => $historicoEspecificacion) {
+                $precioEspecificacion = isset($historicoEspecificacion[$fechaYMD]) ? (float) $historicoEspecificacion[$fechaYMD] : null;
+                if ($precioEspecificacion !== null && $precioEspecificacion > 0) {
+                    $preciosEspecificaciones[strval($sublineaId)] = $precioEspecificacion;
+                }
+            }
+            
+            if ($precio > 0 || !empty($preciosEspecificaciones)) {
                 $datosConPrecio++;
             }
 
             $precios[] = [
                 'fecha' => $fechaDM,
                 'precio' => $precio,
+                'especificaciones' => $preciosEspecificaciones,
             ];
         }
 
@@ -2086,6 +2384,7 @@ public function generarContenido(Request $request)
 
         return response()->json([
             'precios' => $precios,
+            'especificaciones_info' => $especificacionesInfo,
             'periodo' => $request->periodo,
             'dias' => $dias,
             'datosConPrecio' => $datosConPrecio,

@@ -10,6 +10,7 @@ class HistoricoPrecioProducto extends Model
 
     protected $fillable = [
         'producto_id',
+        'especificacion_interna_id',
         'fecha',
         'precio_minimo',
     ];

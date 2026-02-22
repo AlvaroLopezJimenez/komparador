@@ -36,3 +36,5 @@ class HistoricoTiempoActualizacionPrecioOferta extends Model
 
 
 
+
+

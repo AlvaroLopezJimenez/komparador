@@ -2219,10 +2219,16 @@
                   $subprincipales[] = $sub;
                 }
                 
+                // Verificar si esta línea está marcada como "columna oferta"
+                $esColumnaOferta = isset($especificacionesElegidas['_columnas']) && 
+                                  is_array($especificacionesElegidas['_columnas']) && 
+                                  in_array($filtro['id'], $especificacionesElegidas['_columnas']);
+                
                 $columnasData[] = [
                   'id' => $filtro['id'],
                   'texto' => $filtro['texto'],
-                  'subprincipales' => $subprincipales
+                  'subprincipales' => $subprincipales,
+                  'esColumnaOferta' => $esColumnaOferta
                 ];
               }
             }
@@ -2466,11 +2472,22 @@
           let ofertas = [];
           const unidadMedida = '{{ $producto->unidadDeMedida }}';
           const esUnidadUnica = unidadMedida === 'unidadUnica';
-          let columnasData = @json($columnasData ?? null);
+          {{-- v14: columnasData - Datos de las columnas/especificaciones internas del producto --}}
+          window.v14 = @json($columnasData ?? null);
+          {{-- v20: columnasDataLocal - Referencia local a los datos de columnas/especificaciones internas --}}
+          let v20 = window.v14;
+          
           let gruposDeOfertas = @json($producto->grupos_de_ofertas ?? null);
           
           {{-- Hacer productoId disponible globalmente ANTES de que se carguen los scripts --}}
           window.productoId = {{ $producto->id }};
+          
+          {{-- v15: datosHistoricosCompletos - Datos históricos completos de precios del producto --}}
+          window.v15 = null;
+          {{-- v16: especificacionesInfo - Información de las especificaciones internas para la gráfica --}}
+          window.v16 = {};
+          {{-- v17: especificacionesSeleccionadasGrafica - Set con los IDs de especificaciones seleccionadas para mostrar en la gráfica --}}
+          window.v17 = new Set();
           
           {{-- Indicar si el usuario está autenticado (para bypass del sistema anti-scraping) --}}
           window.usuarioAutenticado = {{ auth()->check() ? 'true' : 'false' }};
@@ -2506,9 +2523,10 @@
             {{-- Escuchar evento de especificaciones cargadas --}}
             window.addEventListener('especificaciones-cargadas', function(event) {
               gruposDeOfertas = event.detail.grupos_de_ofertas || null;
-              {{-- Actualizar columnasData desde columnas_data (procesado en el backend) --}}
+              {{-- Actualizar v14 desde columnas_data (procesado en el backend) --}}
               if (event.detail.columnas_data) {
-                columnasData = event.detail.columnas_data;
+                window.v14 = event.detail.columnas_data;
+                v20 = window.v14; {{-- Mantener referencia local también --}}
               }
             });
           })();
@@ -2520,19 +2538,22 @@
           
           {{-- Filtros de especificaciones internas --}}
           {{-- Inicializar con filtros recibidos desde la URL (si existen) --}}
-          {{-- v13: especificacionesSeleccionadas - Objeto con las especificaciones seleccionadas por el usuario --}}
+          {{-- v13: especificacionesSeleccionadas - Objeto con las especificaciones seleccionadas por el usuario desde la URL --}}
           window.v13 = @json($filtrosAplicadosDesdeUrl ?? []);
+          
+          {{-- v18: especificacionesElegidasProducto - Especificaciones internas elegidas del producto para verificar "mostrar" --}}
+          window.v18 = @json($producto->categoria_especificaciones_internas_elegidas ?? null);
           {{-- Eliminar precio_min y precio_max de especificacionesSeleccionadas si existen --}}
-          if (v13.precio_min !== undefined) {
-            delete v13.precio_min;
+          if (window.v13.precio_min !== undefined) {
+            delete window.v13.precio_min;
           }
-          if (v13.precio_max !== undefined) {
-            delete v13.precio_max;
+          if (window.v13.precio_max !== undefined) {
+            delete window.v13.precio_max;
           }
           {{-- Convertir arrays de IDs a strings para consistencia --}}
-          Object.keys(v13).forEach(lineaId => {
-            if (Array.isArray(v13[lineaId])) {
-              v13[lineaId] = v13[lineaId].map(id => String(id));
+          Object.keys(window.v13).forEach(lineaId => {
+            if (Array.isArray(window.v13[lineaId])) {
+              window.v13[lineaId] = window.v13[lineaId].map(id => String(id));
             }
           });
           let primeraLineaSeleccionada = null; {{-- ID de la primera línea principal que tiene una sublínea seleccionada --}}
@@ -3500,8 +3521,8 @@
               const lineaId = boton.dataset.lineaId;
               const sublineaId = String(boton.dataset.sublineaId);
               {{-- Convertir a string para comparación consistente --}}
-              const estaSeleccionado = v13[lineaId] && 
-                                       v13[lineaId].some(id => String(id) === sublineaId);
+              const estaSeleccionado = window.v13[lineaId] && 
+                                       window.v13[lineaId].some(id => String(id) === sublineaId);
               
               {{-- Si es la primera línea seleccionada, verificar si tiene ofertas disponibles --}}
               if (primeraLineaSeleccionada === lineaId) {
@@ -3705,8 +3726,8 @@
                 const sublineaId = this.dataset.sublineaId;
                 
                 {{-- Inicializar array si no existe --}}
-                if (!v13[lineaId]) {
-                  v13[lineaId] = [];
+                if (!window.v13[lineaId]) {
+                  window.v13[lineaId] = [];
                 }
                 
                 {{-- Si es la primera selección, marcar esta línea como primera --}}
@@ -3725,17 +3746,17 @@
                 {{-- Toggle: si ya está seleccionada, deseleccionar --}}
                 {{-- Convertir a string para comparación consistente --}}
                 const sublineaIdStr = String(sublineaId);
-                const index = v13[lineaId].findIndex(id => String(id) === sublineaIdStr);
+                const index = window.v13[lineaId] ? window.v13[lineaId].findIndex(id => String(id) === sublineaIdStr) : -1;
                 if (index > -1) {
-                  v13[lineaId].splice(index, 1);
+                  window.v13[lineaId].splice(index, 1);
                   {{-- Si se vacía la línea, eliminar la entrada --}}
-                  if (v13[lineaId].length === 0) {
-                    delete v13[lineaId];
+                  if (window.v13[lineaId].length === 0) {
+                    delete window.v13[lineaId];
                     {{-- Si era la primera línea, resetear --}}
                     if (primeraLineaSeleccionada === lineaId) {
                       primeraLineaSeleccionada = null;
                       {{-- Si hay otras líneas seleccionadas, la primera de ellas será la nueva primera --}}
-                      const otrasLineas = Object.keys(v13);
+                      const otrasLineas = Object.keys(window.v13);
                       if (otrasLineas.length > 0) {
                         primeraLineaSeleccionada = otrasLineas[0];
                       }
@@ -3745,7 +3766,10 @@
                   {{-- Restaurar imágenes: buscar si hay otra sublínea seleccionada con imágenes --}}
                   _rio1();
                 } else {
-                  v13[lineaId].push(sublineaIdStr);
+                  if (!window.v13[lineaId]) {
+                    window.v13[lineaId] = [];
+                  }
+                  window.v13[lineaId].push(sublineaIdStr);
                   {{-- Si es la primera selección de cualquier línea, marcar como primera línea --}}
                   if (primeraLineaSeleccionada === null) {
                     primeraLineaSeleccionada = lineaId;
@@ -3775,6 +3799,26 @@
                     _rod1();
                   }
                 }
+                
+                {{-- Actualizar gráfica cuando se hace click en una especificación interna --}}
+                {{-- Si el usuario puede hacer click, significa que está visible y debería tener histórico --}}
+                {{-- sublineaIdStr ya está declarado arriba, reutilizarlo --}}
+                if (index > -1) {
+                  {{-- Se deseleccionó --}}
+                  if (window.v17) {
+                    window.v17.delete(sublineaIdStr);
+                  }
+                } else {
+                  {{-- Se seleccionó --}}
+                  if (window.v17) {
+                    window.v17.add(sublineaIdStr);
+                  }
+                }
+                
+                {{-- Actualizar gráfica --}}
+                if (typeof window._aug1 === 'function') {
+                  window._aug1();
+                }
               });
             });
           }
@@ -3782,8 +3826,8 @@
           {{-- Función para obtener el texto de una sublínea por su ID --}}
           {{-- _ots1: obtenerTextoSublinea - Obtiene el texto descriptivo de una sublínea por su ID --}}
           function _ots1(principalId, sublineaId) {
-            if (!columnasData || !Array.isArray(columnasData)) return '-';
-            const lineaPrincipal = columnasData.find(l => l.id === principalId);
+            if (!window.v14 || !Array.isArray(window.v14)) return '-';
+            const lineaPrincipal = window.v14.find(l => l.id === principalId);
             if (!lineaPrincipal || !lineaPrincipal.subprincipales) return '-';
             const sublinea = lineaPrincipal.subprincipales.find(s => s.id === sublineaId);
             return sublinea ? sublinea.texto : '-';
@@ -3792,11 +3836,11 @@
           {{-- Función para renderizar columnas dinámicas para unidadUnica --}}
           {{-- _ots1: obtenerTextoSublinea (sobrecarga) - Obtiene el texto descriptivo de una sublínea por su ID (versión alternativa) --}}
           function _ots1(lineaId, sublineaId) {
-            if (!columnasData || !Array.isArray(columnasData)) {
+            if (!window.v14 || !Array.isArray(window.v14)) {
               return '-';
             }
             
-            const linea = columnasData.find(l => l.id === lineaId);
+            const linea = window.v14.find(l => l.id === lineaId);
             if (!linea || !linea.subprincipales || !Array.isArray(linea.subprincipales)) {
               return '-';
             }
@@ -3807,11 +3851,11 @@
           
           {{-- _rcuu1: renderizarColumnasUnidadUnica - Renderiza las columnas dinámicas para productos de unidad única --}}
           function _rcuu1(oferta) {
-            if (!esUnidadUnica || !columnasData || !Array.isArray(columnasData) || columnasData.length === 0) {
+            if (!esUnidadUnica || !window.v14 || !Array.isArray(window.v14) || window.v14.length === 0) {
               return '';
             }
             
-            const numColumnas = columnasData.length;
+            const numColumnas = window.v14.length;
             const especificacionesOferta = oferta.especificaciones_internas || {};
             const columnasOferta = especificacionesOferta._c || {}; // _c = ofuscado de _columnas
             
@@ -3821,14 +3865,14 @@
             {{-- En desktop: sin order (orden natural) --}}
             if (numColumnas === 1) {
               {{-- 1 línea: 1 columna normal (estilo como cantidad) --}}
-              const linea = columnasData[0];
+              const linea = window.v14[0];
               const sublineaId = columnasOferta[linea.id];
               const textoSublinea = sublineaId ? _ots1(linea.id, sublineaId) : '-';
               
               html += `<div class="columna-dinamica text-gray-700 divider text-center min-w-0 overflow-hidden order-4 sm:!order-[0]"><div class="font-semibold">${linea.texto}</div><div class="text-sm text-gray-500 leading-tight">${textoSublinea}</div></div>`;
             } else if (numColumnas === 2) {
               {{-- 2 líneas: 2 columnas normales (estilo como cantidad) --}}
-              columnasData.forEach((linea, index) => {
+              window.v14.forEach((linea, index) => {
                 const sublineaId = columnasOferta[linea.id];
                 const textoSublinea = sublineaId ? _ots1(linea.id, sublineaId) : '-';
                 const ordenMovil = index === 0 ? 'order-4' : 'order-5';
@@ -3837,7 +3881,7 @@
               });
             } else if (numColumnas === 3) {
               {{-- 3 líneas: 1 columna normal (estilo como cantidad) + 1 columna dividida en 2 filas (nombre y opción en misma línea) --}}
-              const linea1 = columnasData[0];
+              const linea1 = window.v14[0];
               const sublineaId1 = columnasOferta[linea1.id];
               const textoSublinea1 = sublineaId1 ? _ots1(linea1.id, sublineaId1) : '-';
               
@@ -3846,7 +3890,7 @@
               {{-- Segunda columna dividida en 2 filas (estilo como envío - nombre y opción en misma línea) --}}
               html += `<div class="columna-dinamica text-gray-700 divider text-center min-w-0 overflow-hidden order-5 sm:!order-[0]">`;
               for (let i = 1; i < 3; i++) {
-                const linea = columnasData[i];
+                const linea = window.v14[i];
                 const sublineaId = columnasOferta[linea.id];
                 const textoSublinea = sublineaId ? _ots1(linea.id, sublineaId) : '-';
                 
@@ -3861,7 +3905,7 @@
                 html += `<div class="columna-dinamica text-gray-700 divider text-center min-w-0 overflow-hidden ${ordenMovil} sm:!order-[0]">`;
                 for (let fila = 0; fila < 2; fila++) {
                   const index = col * 2 + fila;
-                  const linea = columnasData[index];
+                  const linea = window.v14[index];
                   const sublineaId = columnasOferta[linea.id];
                   const textoSublinea = sublineaId ? _ots1(linea.id, sublineaId) : '-';
                   
@@ -3962,17 +4006,17 @@
           {{-- Función para renderizar columnas de un grupo unificado (muestra todas las variantes) --}}
           {{-- _rcgu1: renderizarColumnasGrupoUnificado - Renderiza las columnas dinámicas para un grupo unificado de ofertas --}}
           function _rcgu1(ofertasGrupo) {
-            if (!esUnidadUnica || !columnasData || !Array.isArray(columnasData) || columnasData.length === 0) {
+            if (!esUnidadUnica || !window.v14 || !Array.isArray(window.v14) || window.v14.length === 0) {
               return '';
             }
             
-            const numColumnas = columnasData.length;
+            const numColumnas = window.v14.length;
             let html = '';
             
             {{-- Obtener todas las variantes únicas por columna --}}
             const variantesPorColumna = {};
             
-            columnasData.forEach(linea => {
+            window.v14.forEach(linea => {
               const variantes = new Set();
               
               ofertasGrupo.forEach(oferta => {
@@ -3993,13 +4037,13 @@
             
             {{-- Renderizar según número de columnas --}}
             if (numColumnas === 1) {
-              const linea = columnasData[0];
+              const linea = window.v14[0];
               const variantes = variantesPorColumna[linea.id] || [];
               const textoVariantes = variantes.length > 0 ? variantes.join(', ') : '-';
               
               html += `<div class="columna-dinamica text-gray-700 divider text-center min-w-0 overflow-hidden order-4 sm:!order-[0]"><div class="font-semibold">${linea.texto}</div><div class="text-sm text-gray-500 leading-tight">${textoVariantes}</div></div>`;
             } else if (numColumnas === 2) {
-              columnasData.forEach((linea, index) => {
+              window.v14.forEach((linea, index) => {
                 const variantes = variantesPorColumna[linea.id] || [];
                 const textoVariantes = variantes.length > 0 ? variantes.join(', ') : '-';
                 const ordenMovil = index === 0 ? 'order-4' : 'order-5';
@@ -4007,7 +4051,7 @@
                 html += `<div class="columna-dinamica text-gray-700 divider text-center min-w-0 overflow-hidden ${ordenMovil} sm:!order-[0]"><div class="font-semibold">${linea.texto}</div><div class="text-sm text-gray-500 leading-tight">${textoVariantes}</div></div>`;
               });
             } else if (numColumnas === 3) {
-              const linea1 = columnasData[0];
+              const linea1 = window.v14[0];
               const variantes1 = variantesPorColumna[linea1.id] || [];
               const textoVariantes1 = variantes1.length > 0 ? variantes1.join(', ') : '-';
               
@@ -4015,7 +4059,7 @@
               
               html += `<div class="columna-dinamica text-gray-700 divider text-center min-w-0 overflow-hidden order-5 sm:!order-[0]">`;
               for (let i = 1; i < 3; i++) {
-                const linea = columnasData[i];
+                const linea = v20[i];
                 const variantes = variantesPorColumna[linea.id] || [];
                 const textoVariantes = variantes.length > 0 ? variantes.join(', ') : '-';
                 
@@ -4029,7 +4073,7 @@
                 html += `<div class="columna-dinamica text-gray-700 divider text-center min-w-0 overflow-hidden ${ordenMovil} sm:!order-[0]">`;
                 for (let fila = 0; fila < 2; fila++) {
                   const index = col * 2 + fila;
-                  const linea = columnasData[index];
+                  const linea = v20[index];
                   const variantes = variantesPorColumna[linea.id] || [];
                   const textoVariantes = variantes.length > 0 ? variantes.join(', ') : '-';
                   
@@ -4242,7 +4286,7 @@
                 let esUnidadUnicaSinColumnas = false;
                 
                 {{-- Caso 1: Unidad única CON columnas marcadas --}}
-                if (esUnidadUnica && columnasData && columnasData.length > 0) {
+                if (esUnidadUnica && v20 && v20.length > 0) {
                   mostrarCantidad = false;
                   mostrarPrecioTotal = false;
                   mostrarPrecioUnidad = false;
@@ -4250,7 +4294,7 @@
                   esUnidadUnicaConColumnas = true;
                   
                   {{-- Para móvil/tablet: grid dinámico según número de columnas --}}
-                  const numColumnas = columnasData.length;
+                  const numColumnas = v20.length;
                   if (numColumnas === 1) {
                     gridColsMovil = 'grid-cols-2';
                   } else {
@@ -4267,7 +4311,7 @@
                   }
                 }
                 {{-- Caso 2: Unidad única SIN columnas marcadas --}}
-                else if (esUnidadUnica && (!columnasData || columnasData.length === 0)) {
+                else if (esUnidadUnica && (!v20 || v20.length === 0)) {
                   mostrarCantidad = false;
                   mostrarPrecioTotal = true;
                   mostrarPrecioUnidad = false;
@@ -4284,7 +4328,7 @@
                 const ordenPrecio = esUnidadUnicaConColumnas ? 'order-2 sm:!order-[0]' : (esUnidadUnicaSinColumnas ? 'order-3 sm:!order-[0]' : '');
                 
                 {{-- Botón: después de las columnas dinámicas en móvil (con columnas) o en segunda fila (sin columnas) --}}
-                const numColumnas = esUnidadUnicaConColumnas ? columnasData.length : 0;
+                const numColumnas = esUnidadUnicaConColumnas ? v20.length : 0;
                 let colSpanBoton = '';
                 let ordenBoton = '';
                 
@@ -4494,7 +4538,7 @@
                   let esUnidadUnicaSinColumnas = false;
                   
                   {{-- Caso 1: Unidad única CON columnas marcadas --}}
-                  if (esUnidadUnica && columnasData && columnasData.length > 0) {
+                  if (esUnidadUnica && v20 && v20.length > 0) {
                     mostrarCantidad = false;
                     mostrarPrecioTotal = false;
                     mostrarPrecioUnidad = false;
@@ -4504,7 +4548,7 @@
                     {{-- Para móvil/tablet: grid dinámico según número de columnas --}}
                     {{-- Primera fila: logo 50% + precio 50% (2 columnas) --}}
                     {{-- Segunda fila: envío + columnas dinámicas --}}
-                    const numColumnas = columnasData.length;
+                    const numColumnas = v20.length;
                     if (numColumnas === 1) {
                       {{-- 1 columna: envío 50% + columna 50% (2 columnas en segunda fila) --}}
                       gridColsMovil = 'grid-cols-2';
@@ -4523,7 +4567,7 @@
                     }
                   }
                   {{-- Caso 2: Unidad única SIN columnas marcadas --}}
-                  else if (esUnidadUnica && (!columnasData || columnasData.length === 0)) {
+                  else if (esUnidadUnica && (!v20 || v20.length === 0)) {
                     mostrarCantidad = false;
                     mostrarPrecioTotal = true; {{-- Mostrar precio total --}}
                     mostrarPrecioUnidad = false;
@@ -4547,7 +4591,7 @@
                   const ordenPrecio = esUnidadUnicaConColumnas ? 'order-2 sm:!order-[0]' : (esUnidadUnicaSinColumnas ? 'order-3 sm:!order-[0]' : '');
                   
                   {{-- Botón: después de las columnas dinámicas en móvil (con columnas) o en segunda fila (sin columnas) --}}
-                  const numColumnas = esUnidadUnicaConColumnas ? columnasData.length : 0;
+                  const numColumnas = esUnidadUnicaConColumnas ? v20.length : 0;
                   let colSpanBoton = '';
                   let ordenBoton = '';
                   
@@ -4699,14 +4743,14 @@
                 let esUnidadUnicaConColumnas = false;
                 let esUnidadUnicaSinColumnas = false;
                 
-                if (esUnidadUnica && columnasData && columnasData.length > 0) {
+                if (esUnidadUnica && v20 && v20.length > 0) {
                   mostrarCantidad = false;
                   mostrarPrecioTotal = false;
                   mostrarPrecioUnidad = false;
                   columnasDinamicas = _rcuu1(item);
                   esUnidadUnicaConColumnas = true;
                   
-                  const numColumnas = columnasData.length;
+                  const numColumnas = v20.length;
                   if (numColumnas === 1) {
                     gridColsMovil = 'grid-cols-2';
                   } else {
@@ -4734,7 +4778,7 @@
                 const ordenEnvio = esUnidadUnicaConColumnas ? 'order-3 sm:!order-[0]' : (esUnidadUnicaSinColumnas ? 'order-2 sm:!order-[0]' : '');
                 const ordenPrecio = esUnidadUnicaConColumnas ? 'order-2 sm:!order-[0]' : (esUnidadUnicaSinColumnas ? 'order-3 sm:!order-[0]' : '');
                 
-                const numColumnas = esUnidadUnicaConColumnas ? columnasData.length : 0;
+                const numColumnas = esUnidadUnicaConColumnas ? v20.length : 0;
                 let colSpanBoton = '';
                 let ordenBoton = '';
                 
@@ -5576,7 +5620,8 @@
     {{-- v8: chartMovil - Instancia del gráfico de precios móvil --}}
     let v8 = null;
     {{-- v9: periodoActual - Período actual del gráfico (3m, 6m, 1a, etc.) --}}
-    let v9 = '3m';
+    {{-- Inicializar como null para forzar la primera carga --}}
+    let v9 = null;
     {{-- v10: productoId - ID del producto actual --}}
     const v10 = {{ $producto->id }};
     {{-- v11: tokenSeguridad - Token HMAC seguro generado en el servidor (no expuesto en código fuente) --}}
@@ -5631,30 +5676,143 @@
     
     document.addEventListener('DOMContentLoaded', function() {
       const ctx = document.getElementById('graficoPrecios').getContext('2d');
-      const precios = @json($precios);
-      const labels = precios.map(p => p.fecha);
-      const datos = precios.map(p => p.precio);
+      {{-- v19: precios - Array de precios históricos iniciales del producto --}}
+      const v19 = @json($precios ?? []);
+      const labels = v19.map(p => p.fecha);
+      const datos = v19.map(p => p.precio);
+      
+      {{-- Usar variables globales ya definidas arriba --}}
+      const datosHistoricosCompletos = window.v15;
+      const especificacionesInfo = window.v16;
+      const especificacionesSeleccionadasGrafica = window.v17;
 
-      {{-- Función para crear/actualizar gráfico --}}
-      {{-- _cg1: crearGrafico - Crea o actualiza un gráfico de precios históricos --}}
-      function _cg1(ctx, labels, datos, isMovil = false) {
+      {{-- Función para crear/actualizar gráfico con múltiples líneas --}}
+      {{-- _cg1: crearGrafico - Crea o actualiza un gráfico de precios históricos con soporte para múltiples líneas --}}
+      window._cg1 = function _cg1(ctx, labels, datos, isMovil = false, datosEspecificaciones = null, especificacionesInfoData = {}) {
+        
+        const datasets = [];
+        
+        {{-- Línea principal (precio general del producto) --}}
+        {{-- Solo mostrar si NO hay especificaciones seleccionadas --}}
+        const tieneEspecificacionesSeleccionadas = window.v17 && window.v17.size > 0;
+        
+        if (!tieneEspecificacionesSeleccionadas) {
+          datasets.push({
+            label: 'Precio general',
+            data: datos,
+            fill: true,
+            borderColor: 'rgb(125, 210, 170)',
+            backgroundColor: 'rgba(125, 210, 170, 0.25)',
+            tension: 0.3,
+            borderWidth: 3, {{-- Grosor explícito igual al valor por defecto de Chart.js --}}
+            pointRadius: 0,
+            pointHoverRadius: 4,
+            pointHoverBackgroundColor: 'rgb(125, 210, 170)',
+            pointHoverBorderColor: '#fff',
+            pointHoverBorderWidth: 2
+          });
+        }
+        
+        {{-- Colores para las líneas de especificaciones - Colores visualmente distintos --}}
+        const coloresEspecificaciones = [
+          'rgb(233, 123, 17)', {{-- Naranja --}}
+          'rgb(59, 130, 246)', {{-- Azul --}}
+          'rgb(168, 85, 247)', {{-- Púrpura --}}
+          'rgb(236, 72, 153)', {{-- Rosa --}}
+          'rgb(34, 197, 94)', {{-- Verde --}}
+          'rgb(239, 68, 68)', {{-- Rojo --}}
+          'rgb(251, 191, 36)', {{-- Amarillo --}}
+          'rgb(20, 184, 166)', {{-- Turquesa --}}
+          'rgb(249, 115, 22)', {{-- Naranja oscuro --}}
+          'rgb(139, 92, 246)', {{-- Violeta --}}
+        ];
+        
+        {{-- Función para asignar un color fijo y único a cada especificación basado en su ID --}}
+        {{-- Usa un hash del ID para determinar un orden consistente, luego asigna colores secuencialmente --}}
+        const obtenerColorFijo = (sublineaId, todasLasEspecificaciones) => {
+          {{-- Convertir el ID a un número para obtener un índice consistente --}}
+          let hash = 0;
+          for (let i = 0; i < sublineaId.length; i++) {
+            hash = sublineaId.charCodeAt(i) + ((hash << 5) - hash);
+          }
+          
+          {{-- Ordenar todas las especificaciones por su hash para mantener consistencia --}}
+          const especificacionesOrdenadas = Array.from(todasLasEspecificaciones).sort((a, b) => {
+            let hashA = 0, hashB = 0;
+            for (let i = 0; i < a.length; i++) {
+              hashA = a.charCodeAt(i) + ((hashA << 5) - hashA);
+            }
+            for (let i = 0; i < b.length; i++) {
+              hashB = b.charCodeAt(i) + ((hashB << 5) - hashB);
+            }
+            return Math.abs(hashA) - Math.abs(hashB);
+          });
+          
+          {{-- Encontrar la posición de esta especificación en el orden --}}
+          const index = especificacionesOrdenadas.indexOf(sublineaId);
+          
+          {{-- Asignar color secuencialmente, asegurando que no se repita --}}
+          return coloresEspecificaciones[index % coloresEspecificaciones.length];
+        };
+        
+        {{-- Añadir líneas para cada especificación seleccionada --}}
+        if (datosEspecificaciones && window.v17 && window.v17.size > 0) {
+          
+          {{-- Obtener todas las especificaciones disponibles para mantener colores consistentes (una sola vez) --}}
+          const todasLasEspecificacionesDisponibles = new Set();
+          {{-- Añadir todas las especificaciones que tienen datos históricos --}}
+          if (window.v15 && window.v15.precios) {
+            window.v15.precios.forEach(p => {
+              if (p.especificaciones) {
+                Object.keys(p.especificaciones).forEach(key => todasLasEspecificacionesDisponibles.add(key));
+              }
+            });
+          }
+          {{-- Si no hay datos históricos, usar las especificaciones de la info --}}
+          if (todasLasEspecificacionesDisponibles.size === 0 && especificacionesInfoData) {
+            Object.keys(especificacionesInfoData).forEach(key => todasLasEspecificacionesDisponibles.add(key));
+          }
+          
+          {{-- Convertir a array y ordenar para mantener consistencia --}}
+          const especificacionesArray = Array.from(window.v17).sort();
+          especificacionesArray.forEach((sublineaId, index) => {
+            const especificacionInfo = especificacionesInfoData[sublineaId];
+            const textoEspecificacion = especificacionInfo ? especificacionInfo.texto : `Especificación ${sublineaId}`;
+            {{-- Usar un valor muy pequeño (0.01) en lugar de 0 para evitar que Chart.js lo renderice más grueso --}}
+            const datosEspecificacion = datosEspecificaciones[sublineaId] || labels.map(() => 0.01);
+            {{-- Usar color fijo basado en el ID de la especificación, usando todas las disponibles para mantener consistencia --}}
+            const color = obtenerColorFijo(sublineaId, todasLasEspecificacionesDisponibles);
+            
+            const datosValidos = datosEspecificacion.filter(d => d !== null && d !== undefined && d > 0).length;
+            
+            {{-- Siempre añadir el dataset, incluso si hay pocos datos, para mostrar la línea continua --}}
+            {{-- Si hay pocos datos, mostrar puntos más grandes --}}
+            const mostrarPuntos = datosValidos <= 10;
+            
+            datasets.push({
+              label: textoEspecificacion,
+              data: datosEspecificacion,
+              fill: false,
+              borderColor: color,
+              backgroundColor: color,
+              tension: 0.3,
+              borderWidth: 3, {{-- Grosor explícito igual al valor por defecto de Chart.js --}}
+              pointRadius: mostrarPuntos ? 4 : 0,
+              pointHoverRadius: 6,
+              pointHoverBackgroundColor: color,
+              pointHoverBorderColor: '#fff',
+              pointHoverBorderWidth: 2,
+              borderDash: index > 0 ? [5, 5] : [], {{-- Líneas punteadas para diferenciar (solo después de la primera) --}}
+              spanGaps: true {{-- Conectar puntos aunque haya 0 entre ellos para crear línea continua --}}
+            });
+          });
+        }
+        
         const config = {
           type: 'line',
           data: {
             labels: labels,
-            datasets: [{
-              label: 'Precio (€)',
-              data: datos,
-              fill: true,
-              borderColor: 'rgb(125, 210, 170)',
-              backgroundColor: 'rgba(125, 210, 170, 0.25)',
-              tension: 0.3,
-              pointRadius: 0, {{-- Quitar los puntos --}}
-              pointHoverRadius: 4, {{-- Solo mostrar punto al hacer hover --}}
-              pointHoverBackgroundColor: 'rgb(125, 210, 170)',
-              pointHoverBorderColor: '#fff',
-              pointHoverBorderWidth: 2
-            }]
+            datasets: datasets
           },
           options: {
             responsive: true,
@@ -5668,20 +5826,45 @@
                 mode: 'index',
                 intersect: false,
                 callbacks: {
-                  label: context => `Precio: ${context.parsed.y.toFixed(2)} €`
+                  label: function(context) {
+                    const dataset = context.dataset;
+                    const value = context.parsed.y;
+                    if (value === null || value === undefined) {
+                      return null;
+                    }
+                    {{-- Si el valor es muy pequeño (0.01 o menos), mostrarlo como 0 --}}
+                    const displayValue = value <= 0.01 ? 0 : value;
+                    const label = dataset.label || 'Precio';
+                    return `${label}: ${displayValue.toFixed(2)} €`;
+                  },
+                  afterBody: function(contexts) {
+                    {{-- Mostrar todas las especificaciones activas en el tooltip --}}
+                    if (!window.v17 || window.v17.size === 0) {
+                      return null;
+                    }
+                    return '';
+                  }
                 }
               },
               legend: {
-                display: false
+                display: window.v17 && window.v17.size > 0,
+                position: 'bottom',
+                labels: {
+                  boxWidth: 12,
+                  padding: 8,
+                  font: {
+                    size: 11
+                  }
+                }
               }
             },
             scales: {
               x: {
                 ticks: {
-                  maxTicksLimit: 6, {{-- Reducir a 6 fechas máximo --}}
+                  maxTicksLimit: 6,
                   maxRotation: 0,
                   autoSkip: true,
-                  autoSkipPadding: 20 {{-- Espacio entre etiquetas --}}
+                  autoSkipPadding: 20
                 },
                 grid: {
                   display: false
@@ -5710,17 +5893,22 @@
         };
 
         if (isMovil) {
-          if (v8) v8.destroy();
+          if (v8) {
+            v8.destroy();
+          }
           v8 = new Chart(ctx, config);
         } else {
-          if (v7) v7.destroy();
+          if (v7) {
+            v7.destroy();
+          }
           v7 = new Chart(ctx, config);
         }
       }
 
       {{-- Función para actualizar gráficos con nuevos datos --}}
       {{-- _ag1: actualizarGraficos - Actualiza los gráficos de precios con nuevos datos --}}
-      function _ag1(labels, datos) {
+      window._ag1 = function _ag1(labels, datos, datosEspecificaciones = null, especificacionesInfoData = {}) {
+        
         {{-- Añadir efecto de fade out --}}
         const contenedores = [
           document.getElementById('graficoPrecios').parentElement,
@@ -5732,14 +5920,31 @@
           contenedor.style.transition = 'opacity 0.2s ease-in-out';
         });
         
+        {{-- Preparar datos de especificaciones para las líneas seleccionadas --}}
+        let datosEspecificacionesFiltrados = null;
+        if (datosEspecificaciones && window.v17 && window.v17.size > 0) {
+          datosEspecificacionesFiltrados = {};
+          window.v17.forEach(sublineaId => {
+            if (datosEspecificaciones[sublineaId]) {
+              datosEspecificacionesFiltrados[sublineaId] = datosEspecificaciones[sublineaId];
+            }
+          });
+        }
+        
         {{-- Crear nuevos gráficos --}}
-        const ctx = document.getElementById('graficoPrecios').getContext('2d');
-        _cg1(ctx, labels, datos, false);
+        const ctx = document.getElementById('graficoPrecios');
+        if (!ctx) {
+          return;
+        }
+        
+        if (typeof window._cg1 === 'function') {
+          window._cg1(ctx.getContext('2d'), labels, datos, false, datosEspecificacionesFiltrados, especificacionesInfoData);
+        }
 
         const canvasMovil = document.getElementById('graficoPreciosMovil');
-        if (canvasMovil) {
+        if (canvasMovil && typeof window._cg1 === 'function') {
           const ctxMovil = canvasMovil.getContext('2d');
-          _cg1(ctxMovil, labels, datos, true);
+          window._cg1(ctxMovil, labels, datos, true, datosEspecificacionesFiltrados, especificacionesInfoData);
         }
         
         {{-- Forzar redibujado después de un pequeño delay --}}
@@ -5760,16 +5965,49 @@
             contenedor.style.opacity = '1';
           });
         }, 200);
-      }
+      };
+      
+      {{-- Función para actualizar gráfica cuando se seleccione/deseleccione una especificación --}}
+      {{-- _aug1: actualizarGraficaEspecificaciones - Actualiza la gráfica cuando cambian las especificaciones seleccionadas --}}
+      window._aug1 = function _aug1() {
+        if (!window.v15) {
+          return; {{-- No cargar datos aquí para evitar bucles infinitos --}}
+        }
+        
+        const labels = window.v15.precios.map(p => p.fecha);
+        const datos = window.v15.precios.map(p => p.precio);
+        
+        {{-- Preparar datos de especificaciones --}}
+        const datosEspecificaciones = {};
+        if (window.v15.precios && window.v15.precios.length > 0 && window.v17 && window.v17.size > 0) {
+          window.v17.forEach(sublineaId => {
+            {{-- Mapear los datos, usando un valor muy pequeño en lugar de 0 para evitar que Chart.js lo renderice más grueso --}}
+            const datosEspecificacion = window.v15.precios.map(p => {
+              {{-- Intentar con string y sin conversión --}}
+              const valor = p.especificaciones && (p.especificaciones[sublineaId] !== undefined || p.especificaciones[String(sublineaId)] !== undefined)
+                ? (p.especificaciones[sublineaId] || p.especificaciones[String(sublineaId)])
+                : null;
+              {{-- Si no hay valor, usar un valor muy pequeño (0.01) en lugar de 0 para evitar renderizado más grueso --}}
+              return valor !== null && valor !== undefined ? valor : 0.01;
+            });
+            datosEspecificaciones[sublineaId] = datosEspecificacion;
+          });
+        }
+        
+        if (typeof window._ag1 === 'function') {
+          window._ag1(labels, datos, datosEspecificaciones, window.v16);
+        }
+      };
 
       {{-- Función para cambiar período --}}
       {{-- _cp1: cambiarPeriodo - Cambia el período del gráfico de precios (1m, 3m, 6m, 1a) --}}
       async function _cp1(periodo) {
-        if (periodo === v9) return;
+        if (periodo === v9) {
+          return Promise.resolve();
+        }
         
         {{-- Validar que el token esté disponible --}}
         if (!v11) {
-          console.error('Token de seguridad no disponible. Por favor, recarga la página.');
           return;
         }
         
@@ -5797,10 +6035,29 @@
           
           const data = await response.json();
           
+          {{-- Guardar datos completos para uso posterior --}}
+          window.v15 = data;
+          if (data.especificaciones_info) {
+            window.v16 = data.especificaciones_info;
+          }
+          
           {{-- Actualizar gráficos --}}
           const labels = data.precios.map(p => p.fecha);
           const datos = data.precios.map(p => p.precio);
-          _ag1(labels, datos);
+          
+          {{-- Preparar datos de especificaciones --}}
+          const datosEspecificaciones = {};
+          if (data.precios && data.precios.length > 0 && window.v17) {
+            window.v17.forEach(sublineaId => {
+              datosEspecificaciones[sublineaId] = data.precios.map(p => {
+                return p.especificaciones && p.especificaciones[sublineaId] ? p.especificaciones[sublineaId] : null;
+              });
+            });
+          }
+          
+          if (typeof window._ag1 === 'function') {
+            window._ag1(labels, datos, datosEspecificaciones, window.v16);
+          }
           
           {{-- Actualizar estado de botones --}}
           v9 = periodo;
@@ -5851,14 +6108,73 @@
         });
       }
 
-      {{-- Crear gráficos iniciales con los datos de 3 meses que vienen del servidor --}}
-      _cg1(ctx, labels, datos, false);
-
-      const canvasMovil = document.getElementById('graficoPreciosMovil');
-      if (canvasMovil) {
-        const ctxMovil = canvasMovil.getContext('2d');
-        _cg1(ctxMovil, labels, datos, true);
+      {{-- Inicializar especificaciones seleccionadas para la gráfica desde v13 (si vienen de URL) --}}
+      {{-- Solo incluir las que están marcadas como "columna oferta" --}}
+      if (v13 && v20 && Array.isArray(v20) && window.v17) {
+        Object.keys(v13).forEach(lineaId => {
+          const lineaEncontrada = v20.find(l => String(l.id) === String(lineaId));
+          if (lineaEncontrada && lineaEncontrada.esColumnaOferta) {
+            const sublineasSeleccionadas = window.v13[lineaId];
+            if (Array.isArray(sublineasSeleccionadas)) {
+              sublineasSeleccionadas.forEach(sublineaId => {
+                window.v17.add(String(sublineaId));
+              });
+            }
+          }
+        });
       }
+      
+      {{-- Cargar datos iniciales de 3 meses --}}
+      window._cp1 = _cp1;
+      _cp1('3m').then(() => {
+        {{-- Después de cargar, crear gráficos iniciales --}}
+        if (window.v15) {
+          const labels = window.v15.precios.map(p => p.fecha);
+          const datos = window.v15.precios.map(p => p.precio);
+          
+          {{-- Preparar datos de especificaciones --}}
+          const datosEspecificaciones = {};
+          if (window.v15.precios && window.v15.precios.length > 0 && window.v17) {
+            window.v17.forEach(sublineaId => {
+              datosEspecificaciones[sublineaId] = window.v15.precios.map(p => {
+                return p.especificaciones && p.especificaciones[sublineaId] ? p.especificaciones[sublineaId] : null;
+              });
+            });
+          }
+          
+          if (typeof window._cg1 === 'function') {
+            window._cg1(ctx, labels, datos, false, Object.keys(datosEspecificaciones).length > 0 ? datosEspecificaciones : null, window.v16);
+          }
+
+          const canvasMovil = document.getElementById('graficoPreciosMovil');
+          if (canvasMovil && typeof window._cg1 === 'function') {
+            const ctxMovil = canvasMovil.getContext('2d');
+            window._cg1(ctxMovil, labels, datos, true, Object.keys(datosEspecificaciones).length > 0 ? datosEspecificaciones : null, window.v16);
+          }
+        } else {
+          {{-- Fallback si no se cargaron datos --}}
+          if (typeof window._cg1 === 'function') {
+            window._cg1(ctx, labels, datos, false);
+          }
+
+          const canvasMovil = document.getElementById('graficoPreciosMovil');
+          if (canvasMovil && typeof window._cg1 === 'function') {
+            const ctxMovil = canvasMovil.getContext('2d');
+            window._cg1(ctxMovil, labels, datos, true);
+          }
+        }
+      }).catch((error) => {
+        {{-- Si falla la carga, usar datos iniciales --}}
+        if (typeof window._cg1 === 'function') {
+          window._cg1(ctx, labels, datos, false);
+        }
+
+        const canvasMovil = document.getElementById('graficoPreciosMovil');
+        if (canvasMovil && typeof window._cg1 === 'function') {
+          const ctxMovil = canvasMovil.getContext('2d');
+          window._cg1(ctxMovil, labels, datos, true);
+        }
+      });
       
       {{-- Actualizar estado de botones para mostrar 3M como activo --}}
       _ab1('3m');
@@ -5881,6 +6197,7 @@
       });
       resizeObserver.observe(container);
 
+      const canvasMovil = document.getElementById('graficoPreciosMovil');
       if (canvasMovil) {
         const containerMovil = canvasMovil.parentElement;
         const resizeObserverMovil = new ResizeObserver(() => {

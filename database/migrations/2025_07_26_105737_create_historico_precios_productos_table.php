@@ -10,11 +10,16 @@ return new class extends Migration {
         Schema::create('historico_precios_productos', function (Blueprint $table) {
             $table->id();
             $table->foreignId('producto_id')->constrained()->onDelete('cascade');
+            $table->string('especificacion_interna_id')->nullable();
             $table->date('fecha');
             $table->decimal('precio_minimo', 8, 3);
             $table->timestamps();
 
-            $table->unique(['producto_id', 'fecha']);
+            // Índice único que incluye especificacion_interna_id para permitir múltiples registros por producto (general + especificaciones)
+            $table->unique(['producto_id', 'especificacion_interna_id', 'fecha'], 'historico_precios_productos_unique');
+            
+            // Índice para consultas rápidas por producto y especificación
+            $table->index(['producto_id', 'especificacion_interna_id'], 'historico_precios_productos_producto_especificacion_idx');
         });
     }
 

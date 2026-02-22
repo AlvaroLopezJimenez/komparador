@@ -402,6 +402,21 @@
                                                 <div class="flex flex-wrap items-center gap-1 text-xs">
                                                     <span class="font-medium">{{ $ofertaMasBarata->tienda->nombre ?? 'Tienda ID: ' . $ofertaMasBarata->tienda_id }}</span>
                                                     <span>•</span>
+                                                    <span class="flex items-center gap-1 text-orange-500">
+                                                        <img src="{{ asset('images/van.png') }}" loading="lazy" alt="Van" class="w-4 h-4">
+                                                        <input type="number" 
+                                                               step="0.01" 
+                                                               min="0" 
+                                                               value="{{ $ofertaMasBarata->envio ? number_format($ofertaMasBarata->envio, 2, '.', '') : '' }}" 
+                                                               data-oferta-id="{{ $ofertaMasBarata->id }}"
+                                                               data-envio-original="{{ $ofertaMasBarata->envio ? number_format($ofertaMasBarata->envio, 2, '.', '') : '' }}"
+                                                               class="envio-oferta-mas-barata w-16 px-1 py-0.5 bg-gray-600 text-gray-200 border border-gray-500 rounded text-xs focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                                               onclick="event.stopPropagation(); this.select();"
+                                                               onfocus="this.select();"
+                                                               placeholder="0.00">
+                                                        <span>€</span>
+                                                    </span>
+                                                    <span>•</span>
                                                     <span>{{ formatearUnidades($ofertaMasBarata->unidades, $productoOferta->unidadDeMedida ?? 'unidades') }} uds</span>
                                                     <span>•</span>
                                                     <input type="number" 
@@ -434,13 +449,21 @@
                                         <div class="mt-0 p-1 bg-gray-700 rounded text-xs text-gray-300">
                                             <div class="flex flex-wrap items-center gap-1 text-xs">
                                                 <span class="font-medium">{{ $aviso->avisoable->tienda->nombre ?? 'Tienda ID: ' . $aviso->avisoable->tienda_id }}</span>
-                                                @if($aviso->avisoable->envio && $aviso->avisoable->envio > 0)
-                                                    <span>•</span>
-                                                    <span class="flex items-center gap-1 text-orange-500">
-                                                        <img src="{{ asset('images/van.png') }}" loading="lazy" alt="Van" class="w-4 h-4">
-                                                        <span>{{ number_format($aviso->avisoable->envio, 2, ',', '') }} €</span>
-                                                    </span>
-                                                @endif
+                                                <span>•</span>
+                                                <span class="flex items-center gap-1 text-orange-500">
+                                                    <img src="{{ asset('images/van.png') }}" loading="lazy" alt="Van" class="w-4 h-4">
+                                                    <input type="number" 
+                                                           step="0.01" 
+                                                           min="0" 
+                                                           value="{{ $aviso->avisoable->envio ? number_format($aviso->avisoable->envio, 2, '.', '') : '' }}" 
+                                                           data-oferta-id="{{ $aviso->avisoable_id }}"
+                                                           data-envio-original="{{ $aviso->avisoable->envio ? number_format($aviso->avisoable->envio, 2, '.', '') : '' }}"
+                                                           class="envio-oferta-input w-16 px-1 py-0.5 bg-gray-600 text-gray-200 border border-gray-500 rounded text-xs focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                                           onclick="event.stopPropagation(); this.select();"
+                                                           onfocus="this.select();"
+                                                           placeholder="0.00">
+                                                    <span>€</span>
+                                                </span>
                                                 <span>•</span>
                                                 <span>{{ formatearUnidades($aviso->avisoable->unidades, $aviso->avisoable->producto->unidadDeMedida ?? 'unidades') }} uds</span>
                                                 <span>•</span>
@@ -704,6 +727,21 @@
                                                 <div class="flex flex-wrap items-center gap-1 text-xs">
                                                     <span class="font-medium">{{ $ofertaMasBarata->tienda->nombre ?? 'Tienda ID: ' . $ofertaMasBarata->tienda_id }}</span>
                                                     <span>•</span>
+                                                    <span class="flex items-center gap-1 text-orange-500">
+                                                        <img src="{{ asset('images/van.png') }}" loading="lazy" alt="Van" class="w-4 h-4">
+                                                        <input type="number" 
+                                                               step="0.01" 
+                                                               min="0" 
+                                                               value="{{ $ofertaMasBarata->envio ? number_format($ofertaMasBarata->envio, 2, '.', '') : '' }}" 
+                                                               data-oferta-id="{{ $ofertaMasBarata->id }}"
+                                                               data-envio-original="{{ $ofertaMasBarata->envio ? number_format($ofertaMasBarata->envio, 2, '.', '') : '' }}"
+                                                               class="envio-oferta-mas-barata w-16 px-1 py-0.5 bg-gray-600 text-gray-200 border border-gray-500 rounded text-xs focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                                               onclick="event.stopPropagation(); this.select();"
+                                                               onfocus="this.select();"
+                                                               placeholder="0.00">
+                                                        <span>€</span>
+                                                    </span>
+                                                    <span>•</span>
                                                     <span>{{ formatearUnidades($ofertaMasBarata->unidades, $productoOferta->unidadDeMedida ?? 'unidades') }} uds</span>
                                                     <span>•</span>
                                                     <input type="number" 
@@ -736,13 +774,21 @@
                                         <div class="mt-1 p-1.5 bg-gray-700 rounded text-xs text-gray-300">
                                             <div class="flex flex-wrap items-center gap-2 text-xs">
                                                 <span class="font-medium">{{ $aviso->avisoable->tienda->nombre ?? 'Tienda ID: ' . $aviso->avisoable->tienda_id }}</span>
-                                                @if($aviso->avisoable->envio && $aviso->avisoable->envio > 0)
-                                                    <span>•</span>
-                                                    <span class="flex items-center gap-1 text-orange-500">
-                                                        <img src="{{ asset('images/van.png') }}" loading="lazy" alt="Van" class="w-4 h-4">
-                                                        <span>{{ number_format($aviso->avisoable->envio, 2, ',', '') }} €</span>
-                                                    </span>
-                                                @endif
+                                                <span>•</span>
+                                                <span class="flex items-center gap-1 text-orange-500">
+                                                    <img src="{{ asset('images/van.png') }}" loading="lazy" alt="Van" class="w-4 h-4">
+                                                    <input type="number" 
+                                                           step="0.01" 
+                                                           min="0" 
+                                                           value="{{ $aviso->avisoable->envio ? number_format($aviso->avisoable->envio, 2, '.', '') : '' }}" 
+                                                           data-oferta-id="{{ $aviso->avisoable_id }}"
+                                                           data-envio-original="{{ $aviso->avisoable->envio ? number_format($aviso->avisoable->envio, 2, '.', '') : '' }}"
+                                                           class="envio-oferta-input w-16 px-1 py-0.5 bg-gray-600 text-gray-200 border border-gray-500 rounded text-xs focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                                           onclick="event.stopPropagation(); this.select();"
+                                                           onfocus="this.select();"
+                                                           placeholder="0.00">
+                                                    <span>€</span>
+                                                </span>
                                                 <span>•</span>
                                                 <span>{{ formatearUnidades($aviso->avisoable->unidades, $aviso->avisoable->producto->unidadDeMedida ?? 'unidades') }} uds</span>
                                                 <span>•</span>
@@ -959,6 +1005,21 @@
                                                 <div class="flex flex-wrap items-center gap-1 text-xs">
                                                     <span class="font-medium">{{ $ofertaMasBarata->tienda->nombre ?? 'Tienda ID: ' . $ofertaMasBarata->tienda_id }}</span>
                                                     <span>•</span>
+                                                    <span class="flex items-center gap-1 text-orange-500">
+                                                        <img src="{{ asset('images/van.png') }}" loading="lazy" alt="Van" class="w-4 h-4">
+                                                        <input type="number" 
+                                                               step="0.01" 
+                                                               min="0" 
+                                                               value="{{ $ofertaMasBarata->envio ? number_format($ofertaMasBarata->envio, 2, '.', '') : '' }}" 
+                                                               data-oferta-id="{{ $ofertaMasBarata->id }}"
+                                                               data-envio-original="{{ $ofertaMasBarata->envio ? number_format($ofertaMasBarata->envio, 2, '.', '') : '' }}"
+                                                               class="envio-oferta-mas-barata w-16 px-1 py-0.5 bg-gray-600 text-gray-200 border border-gray-500 rounded text-xs focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                                               onclick="event.stopPropagation(); this.select();"
+                                                               onfocus="this.select();"
+                                                               placeholder="0.00">
+                                                        <span>€</span>
+                                                    </span>
+                                                    <span>•</span>
                                                     <span>{{ formatearUnidades($ofertaMasBarata->unidades, $productoOferta->unidadDeMedida ?? 'unidades') }} uds</span>
                                                     <span>•</span>
                                                     <input type="number" 
@@ -991,13 +1052,21 @@
                                         <div class="mt-1 p-1.5 bg-gray-700 rounded text-xs text-gray-300">
                                             <div class="flex flex-wrap items-center gap-2 text-xs">
                                                 <span class="font-medium">{{ $aviso->avisoable->tienda->nombre ?? 'Tienda ID: ' . $aviso->avisoable->tienda_id }}</span>
-                                                @if($aviso->avisoable->envio && $aviso->avisoable->envio > 0)
-                                                    <span>•</span>
-                                                    <span class="flex items-center gap-1 text-orange-500">
-                                                        <img src="{{ asset('images/van.png') }}" loading="lazy" alt="Van" class="w-4 h-4">
-                                                        <span>{{ number_format($aviso->avisoable->envio, 2, ',', '') }} €</span>
-                                                    </span>
-                                                @endif
+                                                <span>•</span>
+                                                <span class="flex items-center gap-1 text-orange-500">
+                                                    <img src="{{ asset('images/van.png') }}" loading="lazy" alt="Van" class="w-4 h-4">
+                                                    <input type="number" 
+                                                           step="0.01" 
+                                                           min="0" 
+                                                           value="{{ $aviso->avisoable->envio ? number_format($aviso->avisoable->envio, 2, '.', '') : '' }}" 
+                                                           data-oferta-id="{{ $aviso->avisoable_id }}"
+                                                           data-envio-original="{{ $aviso->avisoable->envio ? number_format($aviso->avisoable->envio, 2, '.', '') : '' }}"
+                                                           class="envio-oferta-input w-16 px-1 py-0.5 bg-gray-600 text-gray-200 border border-gray-500 rounded text-xs focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                                           onclick="event.stopPropagation(); this.select();"
+                                                           onfocus="this.select();"
+                                                           placeholder="0.00">
+                                                    <span>€</span>
+                                                </span>
                                                 <span>•</span>
                                                 <span>{{ formatearUnidades($aviso->avisoable->unidades, $aviso->avisoable->producto->unidadDeMedida ?? 'unidades') }} uds</span>
                                                 <span>•</span>
@@ -1898,6 +1967,7 @@
             // Obtener el precio_total del input si existe
             const precioTotalInput = document.querySelector(`.precio-total-input[data-oferta-id="${ofertaId}"]`);
             const precioUnidadDisplay = document.querySelector(`.precio-unidad-display[data-oferta-id="${ofertaId}"]`);
+            const envioInput = document.querySelector(`.envio-oferta-input[data-oferta-id="${ofertaId}"]`);
             
             // Preparar el body de la petición
             const bodyData = {
@@ -1921,6 +1991,17 @@
                     if (!isNaN(precioUnidad) && precioUnidad >= 0) {
                         bodyData.precio_unidad = precioUnidad;
                     }
+                }
+            }
+            
+            // Obtener el envío del input si existe
+            if (envioInput) {
+                const envio = envioInput.value === '' ? null : parseFloat(envioInput.value);
+                if (envio !== null && !isNaN(envio) && envio >= 0) {
+                    bodyData.envio = envio;
+                } else if (envioInput.value === '') {
+                    // Si el campo está vacío, enviar null para limpiar el envío
+                    bodyData.envio = null;
                 }
             }
             
@@ -2305,6 +2386,7 @@
         async function guardarPrecioOfertaMasBarata(ofertaId) {
             const input = document.querySelector(`.precio-total-oferta-mas-barata[data-oferta-id="${ofertaId}"]`);
             const precioUnidadDisplay = document.querySelector(`.precio-unidad-oferta-mas-barata[data-oferta-id="${ofertaId}"]`);
+            const envioInput = document.querySelector(`.envio-oferta-mas-barata[data-oferta-id="${ofertaId}"]`);
             
             if (!input || !precioUnidadDisplay) {
                 alert('Error: No se encontró el campo de precio');
@@ -2314,10 +2396,19 @@
             const precioTotal = parseFloat(input.value);
             const unidades = parseFloat(input.dataset.unidades) || 1;
             const productoId = input.dataset.productoId;
+            const envio = envioInput ? (envioInput.value === '' ? null : parseFloat(envioInput.value)) : null;
 
             if (isNaN(precioTotal) || precioTotal < 0) {
                 alert('Por favor, introduce un precio válido');
                 input.value = input.dataset.precioOriginal;
+                return;
+            }
+
+            if (envio !== null && (isNaN(envio) || envio < 0)) {
+                alert('Por favor, introduce un envío válido');
+                if (envioInput) {
+                    envioInput.value = envioInput.dataset.envioOriginal;
+                }
                 return;
             }
 
@@ -2327,16 +2418,22 @@
             }
 
             try {
+                const bodyData = {
+                    mostrar: 'si',
+                    precio_total: precioTotal
+                };
+                
+                if (envio !== null) {
+                    bodyData.envio = envio;
+                }
+                
                 const response = await fetch(`/panel-privado/ofertas/${ofertaId}/mostrar`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                     },
-                    body: JSON.stringify({
-                        mostrar: 'si',
-                        precio_total: precioTotal
-                    })
+                    body: JSON.stringify(bodyData)
                 });
 
                 const data = await response.json();
@@ -2350,6 +2447,11 @@
                     
                     // Actualizar el precio original guardado
                     input.dataset.precioOriginal = precioTotal.toFixed(2);
+                    
+                    // Actualizar el envío original guardado
+                    if (envioInput) {
+                        envioInput.dataset.envioOriginal = envio !== null ? envio.toFixed(2) : '';
+                    }
                     
                     // Mostrar mensaje de éxito
                     const button = input.nextElementSibling.nextElementSibling; // El botón Guardar

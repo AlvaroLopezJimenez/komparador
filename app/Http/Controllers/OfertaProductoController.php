@@ -537,7 +537,8 @@ class OfertaProductoController extends Controller
         $validated = $request->validate([
             'mostrar' => 'required|in:si,no',
             'precio_total' => 'nullable|numeric|min:0',
-            'precio_unidad' => 'nullable|numeric|min:0'
+            'precio_unidad' => 'nullable|numeric|min:0',
+            'envio' => 'nullable|numeric|min:0'
         ]);
 
         // Guardar precio anterior antes de actualizar
@@ -561,6 +562,11 @@ class OfertaProductoController extends Controller
                     $validated['precio_unidad'] = $precioUnidad;
                 }
             }
+        }
+
+        // Manejar el envío explícitamente si se envía null (para limpiar el campo)
+        if ($request->has('envio') && $request->input('envio') === null) {
+            $validated['envio'] = null;
         }
 
         $oferta->update($validated);
