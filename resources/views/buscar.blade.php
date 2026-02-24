@@ -204,6 +204,9 @@ if (!function_exists('oCV6X')) {
                 $precioOferta = $p5X8['precio_oferta'] ?? 0;
                 $unidadMedida = $p5X8['unidad_medida'] ?? $producto->unidadDeMedida;
                 $urlProducto = $p5X8['url_producto'] ?? ($producto->categoria ? $producto->categoria->construirUrlCategorias($producto->slug) : '#');
+                // Usar imagen y nombre de precios hot si están disponibles, sino del producto
+                $imagenPreciosHot = $p5X8['img_producto'] ?? null;
+                $nombrePreciosHot = $p5X8['producto_nombre'] ?? null;
                 $variante = null;
                 $esVariante = false;
               } elseif (isset($p5X8['producto']) && isset($p5X8['es_variante'])) {
@@ -214,6 +217,8 @@ if (!function_exists('oCV6X')) {
                 $porcentajeDescuento = null;
                 $precioOferta = $precioVariante;
                 $unidadMedida = $producto->unidadDeMedida;
+                $imagenPreciosHot = null;
+                $nombrePreciosHot = null;
                 $esVariante = true;
                 
                 // Construir URL con variante
@@ -231,14 +236,16 @@ if (!function_exists('oCV6X')) {
                 $precioOferta = null;
                 $unidadMedida = $producto->unidadDeMedida;
                 $urlProducto = $producto->categoria ? $producto->categoria->construirUrlCategorias($producto->slug) : '#';
+                $imagenPreciosHot = null;
+                $nombrePreciosHot = null;
                 $variante = null;
                 $esVariante = false;
               }
               
-              // Obtener imagen
-              $imagen = is_array($producto->imagen_pequena) 
+              // Obtener imagen: priorizar imagen de precios hot si existe
+              $imagen = $imagenPreciosHot ?? (is_array($producto->imagen_pequena) 
                 ? ($producto->imagen_pequena[0] ?? '') 
-                : ($producto->imagen_pequena ?? '');
+                : ($producto->imagen_pequena ?? ''));
               
               // Formatear precio
               $precio = $precioOferta ?: $producto->precio;
@@ -266,8 +273,8 @@ if (!function_exists('oCV6X')) {
                 @endif
               </div>
               @php
-                // Construir nombre para variantes: marca + modelo + variante
-                $nombreMostrar = $producto->nombre;
+                // Construir nombre: priorizar nombre de precios hot si existe
+                $nombreMostrar = $nombrePreciosHot ?? $producto->nombre;
                 if ($esVariante && $variante) {
                   $partesNombre = [];
                   if (!empty($producto->marca)) {
@@ -279,7 +286,7 @@ if (!function_exists('oCV6X')) {
                   if (!empty($variante)) {
                     $partesNombre[] = $variante;
                   }
-                  $nombreMostrar = !empty($partesNombre) ? implode(' ', $partesNombre) : $producto->nombre;
+                  $nombreMostrar = !empty($partesNombre) ? implode(' ', $partesNombre) : ($nombrePreciosHot ?? $producto->nombre);
                 }
               @endphp
               <p class="font-semibold text-gray-700 text-center text-sm mb-1 line-clamp-2">{{ $nombreMostrar }}</p>

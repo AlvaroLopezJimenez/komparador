@@ -21,7 +21,7 @@ return new class extends Migration
             $table->decimal('envio', 4, 2)->nullable();
             $table->dateTime('fecha_actualizacion_envio')->nullable();
             $table->unsignedInteger('frecuencia_actualizar_precio_minutos')->default(1440);
-            $table->decimal('precio_unidad', 7, 3);
+            $table->decimal('precio_unidad', 8, 3);
             $table->string('url'); // URL de la oferta concreta
             $table->string('variante')->nullable(); // Variante de la oferta (número, texto, etc.)
             $table->string('mostrar');

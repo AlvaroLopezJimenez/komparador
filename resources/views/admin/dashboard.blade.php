@@ -1092,7 +1092,7 @@ async function ejecutarActualizacionCompleta() {
         }
         
         // ÉXITO TOTAL
-        const totalInserciones = resultadoPreciosHot.total_inserciones || 0;
+        const totalInserciones = resultadoPreciosHot.inserciones || 0;
         mostrarNotificacion('✅ Paso 2/2 completado: ' + totalInserciones + ' inserciones realizadas', 'success');
         
         // Mostrar resumen final

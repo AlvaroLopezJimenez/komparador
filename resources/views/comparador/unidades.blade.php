@@ -4764,7 +4764,7 @@
                   } else if (numColumnas === 3 || numColumnas === 4) {
                     gridCols = 'sm:grid-cols-[100px_1fr_1fr_1fr_1fr_auto]';
                   }
-                } else if (esUnidadUnica && (!columnasData || columnasData.length === 0)) {
+                } else if (esUnidadUnica && (!v20 || v20.length === 0)) {
                   mostrarCantidad = false;
                   mostrarPrecioTotal = true;
                   mostrarPrecioUnidad = false;
@@ -6049,8 +6049,14 @@
           const datosEspecificaciones = {};
           if (data.precios && data.precios.length > 0 && window.v17) {
             window.v17.forEach(sublineaId => {
+              {{-- Mapear los datos, usando un valor muy pequeño en lugar de 0 para evitar que Chart.js lo renderice más grueso --}}
               datosEspecificaciones[sublineaId] = data.precios.map(p => {
-                return p.especificaciones && p.especificaciones[sublineaId] ? p.especificaciones[sublineaId] : null;
+                {{-- Intentar con string y sin conversión --}}
+                const valor = p.especificaciones && (p.especificaciones[sublineaId] !== undefined || p.especificaciones[String(sublineaId)] !== undefined)
+                  ? (p.especificaciones[sublineaId] || p.especificaciones[String(sublineaId)])
+                  : null;
+                {{-- Si no hay valor, usar un valor muy pequeño (0.01) en lugar de 0 para evitar renderizado más grueso --}}
+                return valor !== null && valor !== undefined ? valor : 0.01;
               });
             });
           }
@@ -6136,8 +6142,14 @@
           const datosEspecificaciones = {};
           if (window.v15.precios && window.v15.precios.length > 0 && window.v17) {
             window.v17.forEach(sublineaId => {
+              {{-- Mapear los datos, usando un valor muy pequeño en lugar de 0 para evitar que Chart.js lo renderice más grueso --}}
               datosEspecificaciones[sublineaId] = window.v15.precios.map(p => {
-                return p.especificaciones && p.especificaciones[sublineaId] ? p.especificaciones[sublineaId] : null;
+                {{-- Intentar con string y sin conversión --}}
+                const valor = p.especificaciones && (p.especificaciones[sublineaId] !== undefined || p.especificaciones[String(sublineaId)] !== undefined)
+                  ? (p.especificaciones[sublineaId] || p.especificaciones[String(sublineaId)])
+                  : null;
+                {{-- Si no hay valor, usar un valor muy pequeño (0.01) en lugar de 0 para evitar renderizado más grueso --}}
+                return valor !== null && valor !== undefined ? valor : 0.01;
               });
             });
           }
@@ -7251,35 +7263,55 @@ document.addEventListener('DOMContentLoaded', function() {
   
   {{-- Si hay filtros iniciales desde la URL, buscar si alguno tiene imágenes y cambiar la imagen del producto --}}
   {{-- Esto debe ejecutarse después de que se inicialicen las imágenes del producto --}}
-  if (typeof window.v13 !== 'undefined' && window.v13 && Object.keys(window.v13).length > 0) {
-    {{-- Buscar la última sublínea seleccionada con imágenes --}}
-    let ultimaSublineaConImagenes = null;
-    const botones = document.querySelectorAll('.filtro-sublinea-btn');
-    
-    {{-- Recorrer en orden inverso para encontrar la última seleccionada --}}
-    const botonesArray = Array.from(botones).reverse();
-    
-    botonesArray.forEach(boton => {
-      const lineaId = boton.dataset.lineaId;
-      const sublineaId = boton.dataset.sublineaId;
-      const imagenesSublinea = boton.dataset.imagenes ? JSON.parse(boton.dataset.imagenes) : null;
+  {{-- Función para cambiar imágenes desde URL cuando todo esté listo --}}
+  function cambiarImagenesDesdeUrl() {
+    if (typeof window.v13 !== 'undefined' && window.v13 && Object.keys(window.v13).length > 0) {
+      {{-- Buscar la última sublínea seleccionada con imágenes --}}
+      let ultimaSublineaConImagenes = null;
+      const botones = document.querySelectorAll('.filtro-sublinea-btn');
       
-      {{-- Verificar si esta sublínea está seleccionada y tiene imágenes --}}
-      if (imagenesSublinea && imagenesSublinea.length > 0 && 
-          window.v13[lineaId] && 
-          window.v13[lineaId].includes(String(sublineaId))) {
-        {{-- Si encontramos una, usarla (como estamos en orden inverso, será la última) --}}
-        if (!ultimaSublineaConImagenes) {
-          ultimaSublineaConImagenes = imagenesSublinea;
+      {{-- Recorrer en orden inverso para encontrar la última seleccionada --}}
+      const botonesArray = Array.from(botones).reverse();
+      
+      botonesArray.forEach(boton => {
+        const lineaId = boton.dataset.lineaId;
+        const sublineaId = boton.dataset.sublineaId;
+        const imagenesSublinea = boton.dataset.imagenes ? JSON.parse(boton.dataset.imagenes) : null;
+        
+        {{-- Verificar si esta sublínea está seleccionada y tiene imágenes --}}
+        if (imagenesSublinea && imagenesSublinea.length > 0 && 
+            window.v13[lineaId] && 
+            window.v13[lineaId].includes(String(sublineaId))) {
+          {{-- Si encontramos una, usarla (como estamos en orden inverso, será la última) --}}
+          if (!ultimaSublineaConImagenes) {
+            ultimaSublineaConImagenes = imagenesSublinea;
+          }
         }
+      });
+      
+      {{-- Si hay una sublínea con imágenes seleccionada, cambiar a sus imágenes --}}
+      if (ultimaSublineaConImagenes && typeof _cip1 === 'function') {
+        _cip1(ultimaSublineaConImagenes);
       }
-    });
-    
-    {{-- Si hay una sublínea con imágenes seleccionada, cambiar a sus imágenes --}}
-    if (ultimaSublineaConImagenes && typeof cambiarImagenesProducto === 'function') {
-      _cip1(ultimaSublineaConImagenes);
     }
   }
+  
+  {{-- Intentar cambiar imágenes inmediatamente si los botones ya están en el DOM --}}
+  cambiarImagenesDesdeUrl();
+  
+  {{-- También intentar después de que se carguen las ofertas --}}
+  window.addEventListener('ofertas-cargadas', function(event) {
+    {{-- Pequeño delay para asegurar que los botones estén completamente renderizados --}}
+    setTimeout(() => {
+      cambiarImagenesDesdeUrl();
+    }, 100);
+  });
+  
+  {{-- También intentar después de que se actualice el estado de los botones --}}
+  {{-- Usar un timeout para ejecutar después de _aeb1 --}}
+  setTimeout(() => {
+    cambiarImagenesDesdeUrl();
+  }, 500);
   
   {{-- Cerrar modal al hacer clic fuera --}}
   {{-- x18: Modal de imágenes --}}

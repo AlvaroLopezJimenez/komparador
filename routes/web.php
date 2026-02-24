@@ -248,12 +248,7 @@ Route::prefix('admin')->group(function () {
     // Calcula tambien precio producto
     // Calcula tambien cada sublinea de cada producto marcada como mostrar, busca las ofertas que convan con cada sublinea
     // y guarda en el campo especificaciones_busqueda el precio de la oferta más barata..
-    Route::get('precios-hot/calcular', function (Request $request) {
-        if ($request->get('token') !== env('TOKEN_ACTUALIZAR_PRECIOS')) {
-            abort(403, 'Token inválido');
-        }
-        return app(\App\Http\Controllers\ProductoController::class)->calcularPreciosHot();
-    });
+    Route::get('precios-hot/calcular', [App\Http\Controllers\PrecioHotController::class, 'ejecutarSegundoPlano']);
 
     // Actualizar clicks de categorías
     Route::get('categorias/actualizar-clicks/procesar', function (Request $request) {

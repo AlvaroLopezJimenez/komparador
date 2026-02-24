@@ -37,7 +37,10 @@ class PrecioHotController extends Controller
         ]);
 
         try {
-            $this->procesarPreciosHotCompleto($ejecucion);
+            // Array para debug del producto 79
+            $debugProducto79 = [];
+            
+            $this->procesarPreciosHotCompleto($ejecucion, $debugProducto79);
             
             $ejecucion->update([
                 'fin' => now()
@@ -46,14 +49,19 @@ class PrecioHotController extends Controller
             // Recargar la ejecución para obtener los logs actualizados
             $ejecucion->refresh();
 
-            return response()->json([
+            $response = [
                 'status' => 'ok',
-                'message' => 'Proceso completado',
-                'total_categorias' => $ejecucion->total,
-                'total_inserciones' => $ejecucion->total_guardado,
-                'total_errores' => $ejecucion->total_errores,
-                'log' => $ejecucion->log // Añadir los logs a la respuesta
-            ]);
+                'inserciones' => $ejecucion->total_guardado,
+                'errores' => $ejecucion->total_errores,
+                'ejecucion_id' => $ejecucion->id
+            ];
+            
+            // Agregar debug del producto 79 si existe
+            if (!empty($debugProducto79)) {
+                $response['debug_producto_79'] = $debugProducto79;
+            }
+            
+            return response()->json($response);
         } catch (\Exception $e) {
             $ejecucion->update([
                 'fin' => now(),
@@ -82,7 +90,7 @@ class PrecioHotController extends Controller
     }
 
     // Método principal que procesa todos los precios hot (usado por ambas ejecuciones)
-    private function procesarPreciosHotCompleto($ejecucion)
+    public function procesarPreciosHotCompleto($ejecucion, &$debugProducto79 = [])
     {
         $log = [];
         $totalCategorias = 0;
@@ -124,7 +132,7 @@ class PrecioHotController extends Controller
             foreach ($categorias as $categoria) {
                 try {
                     $log[] = "🔄 Procesando categoría: {$categoria->nombre}";
-                    $productosHot = $this->obtenerProductosHotPorCategoria($categoria, 20, $log);
+                    $productosHot = $this->obtenerProductosHotPorCategoria($categoria, 20, $log, $debugProducto79);
                     
                     if (!empty($productosHot)) {
                         // Guardar o actualizar en la tabla precios_hot
@@ -147,7 +155,7 @@ class PrecioHotController extends Controller
             // Procesar categoría global "Precios Hot"
             try {
                 $log[] = "🔄 Procesando categoría global: Precios Hot";
-                $productosHotGlobal = $this->obtenerProductosHotGlobal(60, $log);
+                $productosHotGlobal = $this->obtenerProductosHotGlobal(60, $log, $debugProducto79);
                 
                 if (!empty($productosHotGlobal)) {
                     PrecioHot::updateOrCreate(
@@ -181,44 +189,45 @@ class PrecioHotController extends Controller
         ]);
     }
 
-    private function obtenerProductosHotPorCategoria($categoria, $limite = 20, &$log = [])
+    private function obtenerProductosHotPorCategoria($categoria, $limite = 20, &$log = [], &$debugProducto79 = [])
     {
         // Obtener todas las categorías hijas (incluyendo la actual)
         $categoriaIds = $this->obtenerCategoriaIdsIncluyendoHijas($categoria->id);
         
         // Obtener productos de estas categorías con sus relaciones
-        $productos = Producto::with('categoria')
-            ->select('id', 'nombre', 'imagen_pequena', 'categoria_id', 'slug', 'precio', 'unidadDeMedida')
+        $productos = Producto::with(['categoria', 'categoriaEspecificaciones'])
+            ->select('id', 'nombre', 'imagen_pequena', 'categoria_id', 'slug', 'precio', 'unidadDeMedida', 'rebajado', 'categoria_id_especificaciones_internas', 'categoria_especificaciones_internas_elegidas', 'especificaciones_busqueda')
             ->where('obsoleto', 'no')
             ->whereIn('categoria_id', $categoriaIds)
             ->whereNotNull('precio')
             ->where('precio', '>', 0)
             ->get();
         
-        return $this->calcularProductosHot($productos, $limite, $log);
+        return $this->calcularProductosHot($productos, $limite, $log, $debugProducto79);
     }
 
-    private function obtenerProductosHotGlobal($limite = 60, &$log = [])
+    private function obtenerProductosHotGlobal($limite = 60, &$log = [], &$debugProducto79 = [])
     {
         // Obtener todos los productos con sus relaciones
-        $productos = Producto::with('categoria')
-            ->select('id', 'nombre', 'imagen_pequena', 'categoria_id', 'slug', 'precio', 'unidadDeMedida')
+        $productos = Producto::with(['categoria', 'categoriaEspecificaciones'])
+            ->select('id', 'nombre', 'imagen_pequena', 'categoria_id', 'slug', 'precio', 'unidadDeMedida', 'rebajado', 'categoria_id_especificaciones_internas', 'categoria_especificaciones_internas_elegidas', 'especificaciones_busqueda')
             ->whereNotNull('precio')
             ->where('precio', '>', 0)
             ->get();
         
-        return $this->calcularProductosHot($productos, $limite, $log);
+        return $this->calcularProductosHot($productos, $limite, $log, $debugProducto79);
     }
 
-    private function calcularProductosHot($productos, $limite, &$log = [])
+    private function calcularProductosHot($productos, $limite, &$log = [], &$debugProducto79 = [])
     {
         $productosHot = [];
         $haceUnMes = Carbon::now()->subMonth();
         $servicioOfertas = new SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos();
 
         foreach ($productos as $producto) {
-            // Calcular precio medio del último mes, excluyendo valores 0 y NULL
+            // Calcular precio medio del último mes para el producto general (sin especificacion_interna_id)
             $precioMedio = HistoricoPrecioProducto::where('producto_id', $producto->id)
+                ->whereNull('especificacion_interna_id')
                 ->where('fecha', '>=', $haceUnMes)
                 ->where('precio_minimo', '>', 0)
                 ->whereNotNull('precio_minimo')
@@ -316,6 +325,10 @@ class PrecioHotController extends Controller
                 // Si la diferencia es menor al 5%, limpiar rebajado (poner a null)
                 Producto::where('id', $producto->id)->update(['rebajado' => null]);
             }
+            
+            // Calcular precios hot de especificaciones internas si el producto las tiene
+            $productosHotEspecificaciones = $this->calcularPreciosHotEspecificacionesInternas($producto, $haceUnMes, $debugProducto79);
+            $productosHot = array_merge($productosHot, $productosHotEspecificaciones);
         }
 
         // Ordenar por porcentaje de diferencia (mayor a menor) y tomar los primeros
@@ -410,6 +423,15 @@ class PrecioHotController extends Controller
         // Obtener todas las ofertas del producto usando el servicio
         $servicioOfertas = new SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos();
         $todasLasOfertas = $servicioOfertas->obtenerTodas($producto);
+
+        // IMPORTANTE: Preservar los valores de rebajado existentes antes de regenerar
+        $rebajadosExistentes = [];
+        $especificacionesBusquedaActuales = $producto->especificaciones_busqueda ?? [];
+        foreach ($especificacionesBusquedaActuales as $clave => $especificacion) {
+            if (isset($especificacion['id']) && isset($especificacion['rebajado'])) {
+                $rebajadosExistentes[strval($especificacion['id'])] = $especificacion['rebajado'];
+            }
+        }
 
         $especificacionesBusqueda = [];
         $textosBusqueda = [];
@@ -560,6 +582,11 @@ class PrecioHotController extends Controller
                             'texto' => $sublineaTexto  // Texto original para mostrar (sin guiones)
                         ];
                         
+                        // Preservar el campo rebajado si existe
+                        if (isset($rebajadosExistentes[strval($sublineaId)])) {
+                            $datosEspecificacion['rebajado'] = $rebajadosExistentes[strval($sublineaId)];
+                        }
+                        
                         // Añadir la primera imagen si está disponible
                         // Añadir "-thumbnail" antes de la extensión para usar la versión pequeña
                         if ($primeraImagen) {
@@ -589,5 +616,590 @@ class PrecioHotController extends Controller
         $producto->especificaciones_busqueda = !empty($especificacionesBusqueda) ? $especificacionesBusqueda : null;
         $producto->especificaciones_busqueda_texto = !empty($textosBusqueda) ? implode(' ', $textosBusqueda) : null;
         $producto->save();
+    }
+
+    /**
+     * Calcula precios hot para las especificaciones internas de un producto
+     */
+    private function calcularPreciosHotEspecificacionesInternas($producto, $haceUnMes, &$debugProducto79 = [])
+    {
+        $productosHot = [];
+        $esDebugProducto79 = ($producto->id == 79);
+        
+        // Solo procesar si el producto tiene especificaciones internas y está marcado como unidadUnica
+        if (!$producto->categoria_id_especificaciones_internas || 
+            !$producto->categoria_especificaciones_internas_elegidas ||
+            $producto->unidadDeMedida !== 'unidadUnica') {
+            if ($esDebugProducto79) {
+                $debugProducto79[] = [
+                    'accion' => 'producto_no_cumple_requisitos',
+                    'categoria_id_especificaciones_internas' => $producto->categoria_id_especificaciones_internas,
+                    'tiene_especificaciones_elegidas' => !empty($producto->categoria_especificaciones_internas_elegidas),
+                    'unidadDeMedida' => $producto->unidadDeMedida
+                ];
+            }
+            return $productosHot;
+        }
+        
+        $especificacionesElegidas = $producto->categoria_especificaciones_internas_elegidas;
+        
+        if ($esDebugProducto79) {
+            $debugProducto79[] = [
+                'accion' => 'inicio_procesamiento',
+                'especificaciones_busqueda_antes' => $producto->especificaciones_busqueda ?? []
+            ];
+        }
+        $servicioOfertas = new SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos();
+        
+        // Obtener TODAS las ofertas del producto una sola vez (más eficiente)
+        $todasLasOfertas = $servicioOfertas->obtenerTodas($producto);
+        
+        // Obtener la categoría de especificaciones internas para acceder a los filtros
+        $categoriaEspecificaciones = $producto->categoriaEspecificaciones;
+        if (!$categoriaEspecificaciones || !$categoriaEspecificaciones->especificaciones_internas) {
+            return $productosHot;
+        }
+        
+        $especificacionesCategoria = $categoriaEspecificaciones->especificaciones_internas;
+        $filtros = $especificacionesCategoria['filtros'] ?? [];
+        
+        // También obtener filtros de producto si existen
+        $filtrosProducto = [];
+        if (isset($especificacionesElegidas['_producto']['filtros']) && 
+            is_array($especificacionesElegidas['_producto']['filtros'])) {
+            $filtrosProducto = $especificacionesElegidas['_producto']['filtros'];
+        }
+        
+        // Combinar filtros de categoría y producto
+        $filtrosCombinados = array_merge($filtros, $filtrosProducto);
+        
+        // Cargar especificaciones_busqueda del producto para actualizarlo
+        $especificacionesBusqueda = $producto->especificaciones_busqueda ?? [];
+        $necesitaActualizarEspecificacionesBusqueda = false;
+        
+        // Iterar sobre cada línea principal en las especificaciones elegidas
+        foreach ($especificacionesElegidas as $lineaId => $sublineasProducto) {
+            // Saltar claves especiales como '_producto', '_formatos', '_columnas', etc.
+            if (strpos($lineaId, '_') === 0) {
+                continue;
+            }
+            
+            // Buscar la línea principal en los filtros combinados
+            $lineaPrincipal = null;
+            foreach ($filtrosCombinados as $filtro) {
+                if (isset($filtro['id']) && strval($filtro['id']) === strval($lineaId)) {
+                    $lineaPrincipal = $filtro;
+                    break;
+                }
+            }
+            
+            if (!$lineaPrincipal) {
+                continue;
+            }
+            
+            // Convertir sublíneas del producto a array si no lo es
+            $sublineasArray = is_array($sublineasProducto) ? $sublineasProducto : [$sublineasProducto];
+            
+            // Iterar sobre cada sublínea del producto
+            foreach ($sublineasArray as $sublineaProducto) {
+                // Verificar si está marcada como "mostrar"
+                $esMostrar = false;
+                $sublineaId = null;
+                
+                if (is_array($sublineaProducto)) {
+                    $sublineaId = $sublineaProducto['id'] ?? null;
+                    
+                    // Verificar si está marcada como "mostrar"
+                    $mValue = $sublineaProducto['m'] ?? null;
+                    if ($mValue !== null) {
+                        $esMostrar = ($mValue === 1 || $mValue === '1' || $mValue === true || $mValue === 'true');
+                    }
+                    
+                    // También verificar el campo 'mostrar' como alternativa
+                    if (!$esMostrar && isset($sublineaProducto['mostrar'])) {
+                        $esMostrar = ($sublineaProducto['mostrar'] === true || $sublineaProducto['mostrar'] === 'true' || $sublineaProducto['mostrar'] === 1 || $sublineaProducto['mostrar'] === '1');
+                    }
+                } else {
+                    $sublineaId = strval($sublineaProducto);
+                    $esMostrar = false; // Si no es array, no tiene flag de mostrar
+                }
+                
+                if (!$esMostrar || !$sublineaId) {
+                    continue;
+                }
+                
+                // Obtener la primera imagen de la sublínea si tiene imágenes
+                $primeraImagen = null;
+                if (is_array($sublineaProducto)) {
+                    // Verificar si tiene imágenes y no está usando imágenes del producto
+                    $usarImagenesProducto = $sublineaProducto['usarImagenesProducto'] ?? false;
+                    if (!$usarImagenesProducto && isset($sublineaProducto['img']) && is_array($sublineaProducto['img']) && !empty($sublineaProducto['img'])) {
+                        $primeraImagen = $sublineaProducto['img'][0] ?? null;
+                    }
+                }
+                
+                // Buscar el texto de la sublínea en la línea principal
+                $sublineaTexto = null;
+                $subprincipales = $lineaPrincipal['subprincipales'] ?? [];
+                foreach ($subprincipales as $subprincipal) {
+                    $subprincipalId = is_array($subprincipal) ? ($subprincipal['id'] ?? null) : strval($subprincipal);
+                    if (strval($subprincipalId) === strval($sublineaId)) {
+                        // Obtener el texto de la sublínea
+                        if (is_array($subprincipal)) {
+                            // Buscar primero en 'texto', luego en 'slug'
+                            $sublineaTexto = $subprincipal['texto'] ?? $subprincipal['slug'] ?? null;
+                            
+                            // Si no tiene texto ni slug, generar slug desde el texto si existe
+                            if (!$sublineaTexto && isset($subprincipal['texto'])) {
+                                $sublineaTexto = \Illuminate\Support\Str::slug($subprincipal['texto']);
+                            }
+                            
+                            // Si aún no tiene, usar el ID como último recurso
+                            if (!$sublineaTexto) {
+                                $sublineaTexto = strval($subprincipalId);
+                            }
+                        } else {
+                            $sublineaTexto = strval($subprincipal);
+                        }
+                        
+                        // Verificar si hay texto alternativo
+                        if (is_array($sublineaProducto) && isset($sublineaProducto['textoAlternativo']) && !empty($sublineaProducto['textoAlternativo'])) {
+                            $sublineaTexto = $sublineaProducto['textoAlternativo'];
+                        }
+                        break;
+                    }
+                }
+                
+                if (!$sublineaTexto) {
+                    continue;
+                }
+                
+                // Convertir el texto a slug para usarlo en la URL
+                $sublineaTextoSlug = \Illuminate\Support\Str::slug($sublineaTexto);
+                
+                // Calcular precio medio del histórico de esta especificación interna
+                $precioMedioEspecificacion = HistoricoPrecioProducto::where('producto_id', $producto->id)
+                    ->where('especificacion_interna_id', $sublineaId)
+                    ->where('fecha', '>=', $haceUnMes)
+                    ->where('precio_minimo', '>', 0)
+                    ->whereNotNull('precio_minimo')
+                    ->avg('precio_minimo');
+                
+                // Si no hay precio medio válido, continuar con la siguiente especificación
+                if (!$precioMedioEspecificacion || $precioMedioEspecificacion <= 0) {
+                    continue;
+                }
+                
+                // Filtrar ofertas que coincidan con esta especificación específica
+                $ofertasFiltradas = $todasLasOfertas->filter(function($oferta) use ($lineaId, $sublineaId) {
+                    $especificacionesOferta = $oferta->especificaciones_internas;
+                    
+                    if (!$especificacionesOferta || !is_array($especificacionesOferta)) {
+                        return false;
+                    }
+                    
+                    $ofertaLinea = $especificacionesOferta[$lineaId] ?? null;
+                    if (!$ofertaLinea) {
+                        return false;
+                    }
+                    
+                    $ofertaSublineas = is_array($ofertaLinea) ? $ofertaLinea : [$ofertaLinea];
+                    
+                    foreach ($ofertaSublineas as $item) {
+                        $itemId = (is_array($item) && isset($item['id'])) ? strval($item['id']) : strval($item);
+                        if (strval($itemId) === strval($sublineaId)) {
+                            return true;
+                        }
+                    }
+                    
+                    return false;
+                });
+                
+                // Obtener la oferta más barata de las filtradas
+                $mejorOfertaEspecificacion = null;
+                if ($ofertasFiltradas->isNotEmpty()) {
+                    // Las ofertas ya están ordenadas por precio_unidad (más barata primero)
+                    $mejorOfertaEspecificacion = $ofertasFiltradas->first();
+                }
+                
+                if (!$mejorOfertaEspecificacion || $mejorOfertaEspecificacion->precio_unidad <= 0) {
+                    continue;
+                }
+                
+                $precioOfertaEspecificacion = $mejorOfertaEspecificacion->precio_unidad;
+                
+                // Validar que el precio de la oferta no sea mayor que el precio medio
+                if ($precioOfertaEspecificacion > $precioMedioEspecificacion) {
+                    continue;
+                }
+                
+                // Calcular porcentaje de diferencia
+                $diferencia = (($precioMedioEspecificacion - $precioOfertaEspecificacion) / $precioMedioEspecificacion) * 100;
+                
+                // Actualizar campo rebajado en especificaciones_busqueda
+                // Si la diferencia es >= 5%, guardar el porcentaje redondeado a entero
+                // Si la diferencia está entre 0.1% y 4.99%, guardar 0
+                // Si no hay rebaja o el precio es mayor que la media, guardar 0
+                $rebajado = 0;
+                if ($diferencia >= 5) {
+                    $rebajado = (int) round($diferencia);
+                } elseif ($diferencia > 0 && $diferencia < 5) {
+                    $rebajado = 0; // Rebajas menores al 5% se guardan como 0
+                }
+                
+                // Actualizar especificaciones_busqueda si existe esta especificación
+                // Buscar por ID primero (más confiable), luego por slug como fallback
+                // El ID que buscamos es $sublineaId (ya disponible en este punto)
+                $claveEncontrada = null;
+                foreach ($especificacionesBusqueda as $clave => $especificacion) {
+                    if (isset($especificacion['id']) && strval($especificacion['id']) === strval($sublineaId)) {
+                        $claveEncontrada = $clave;
+                        break;
+                    }
+                }
+                
+                // Si no se encontró por ID, intentar por slug como fallback
+                if (!$claveEncontrada && isset($especificacionesBusqueda[$sublineaTextoSlug])) {
+                    $claveEncontrada = $sublineaTextoSlug;
+                }
+                
+                // Debug para producto 79
+                if ($esDebugProducto79) {
+                    $debugProducto79[] = [
+                        'accion' => 'buscando_especificacion',
+                        'sublineaId' => strval($sublineaId),
+                        'sublineaTexto' => $sublineaTexto,
+                        'sublineaTextoSlug' => $sublineaTextoSlug,
+                        'precio_medio' => $precioMedioEspecificacion,
+                        'precio_oferta' => $precioOfertaEspecificacion,
+                        'diferencia' => $diferencia,
+                        'rebajado_calculado' => $rebajado,
+                        'clave_encontrada' => $claveEncontrada,
+                        'especificaciones_busqueda_keys' => array_keys($especificacionesBusqueda)
+                    ];
+                }
+                
+                // Actualizar especificaciones_busqueda si existe esta especificación
+                if ($claveEncontrada) {
+                    $especificacionActual = $especificacionesBusqueda[$claveEncontrada];
+                    $rebajadoAnterior = $especificacionActual['rebajado'] ?? 0;
+                    
+                    // Solo actualizar si ha cambiado
+                    if ($rebajadoAnterior != $rebajado) {
+                        $especificacionesBusqueda[$claveEncontrada]['rebajado'] = $rebajado;
+                        $necesitaActualizarEspecificacionesBusqueda = true;
+                        
+                        if ($esDebugProducto79) {
+                            $debugProducto79[] = [
+                                'accion' => 'actualizando_rebajado',
+                                'clave' => $claveEncontrada,
+                                'rebajado_anterior' => $rebajadoAnterior,
+                                'rebajado_nuevo' => $rebajado,
+                                'especificacion_actualizada' => $especificacionesBusqueda[$claveEncontrada]
+                            ];
+                        }
+                    } else if ($esDebugProducto79) {
+                        $debugProducto79[] = [
+                            'accion' => 'rebajado_sin_cambios',
+                            'clave' => $claveEncontrada,
+                            'rebajado_actual' => $rebajadoAnterior,
+                            'rebajado_calculado' => $rebajado
+                        ];
+                    }
+                } else if ($esDebugProducto79) {
+                    $debugProducto79[] = [
+                        'accion' => 'especificacion_no_encontrada',
+                        'sublineaId' => strval($sublineaId),
+                        'sublineaTextoSlug' => $sublineaTextoSlug,
+                        'especificaciones_busqueda_disponibles' => array_map(function($esp) {
+                            return ['id' => $esp['id'] ?? null, 'texto' => $esp['texto'] ?? null];
+                        }, $especificacionesBusqueda)
+                    ];
+                }
+                
+                // Solo incluir en precios hot si la diferencia es del 5% o más
+                if ($diferencia >= 5) {
+                    $tienda = $mejorOfertaEspecificacion->tienda;
+                    if (!$tienda) {
+                        continue;
+                    }
+                    
+                    // Obtener unidad de medida del producto
+                    $unidadMedida = $producto->unidadDeMedida ?? 'unidadUnica';
+                    
+                    // Formatear precio según la unidad de medida
+                    $decimalesPrecio = ($unidadMedida === 'unidadMilesima') ? 3 : 2;
+                    $precioFormateado = number_format($precioOfertaEspecificacion, $decimalesPrecio, ',', '.') . ' €';
+                    
+                    // Generar URL del producto con el slug de la especificación
+                    $urlProducto = $this->generarUrlProducto($producto) . '/' . $sublineaTextoSlug;
+                    
+                    // Preparar imagen del producto (usar imagen de especificación si existe, sino la del producto)
+                    $imagenProducto = $primeraImagen ?? (is_array($producto->imagen_pequena) ? ($producto->imagen_pequena[0] ?? null) : $producto->imagen_pequena) ?? null;
+                    
+                    // Nombre del producto con la especificación
+                    $nombreCompleto = $producto->nombre . ' ' . $sublineaTexto;
+                    
+                    $productosHot[] = [
+                        'producto_id' => $producto->id,
+                        'oferta_id' => $mejorOfertaEspecificacion->id,
+                        'tienda_id' => $mejorOfertaEspecificacion->tienda_id,
+                        'img_tienda' => $tienda->url_imagen ?? null,
+                        'img_producto' => $imagenProducto,
+                        'precio_oferta' => $precioOfertaEspecificacion,
+                        'precio_formateado' => $precioFormateado,
+                        'porcentaje_diferencia' => round($diferencia, 2),
+                        'url_oferta' => route('click.redirigir', ['ofertaId' => $mejorOfertaEspecificacion->id]),
+                        'url_producto' => $urlProducto,
+                        'producto_nombre' => $nombreCompleto,
+                        'tienda_nombre' => $tienda->nombre ?? 'Tienda desconocida',
+                        'unidades' => $mejorOfertaEspecificacion->unidades ?? 1,
+                        'unidad_medida' => $unidadMedida
+                    ];
+                }
+            }
+        }
+        
+        // Procesar solo las especificaciones marcadas como "mostrar" para actualizar rebajado
+        // Iterar sobre las especificaciones elegidas que están marcadas como "mostrar"
+        foreach ($especificacionesElegidas as $lineaId => $sublineasProducto) {
+            // Saltar claves especiales como '_producto', '_formatos', '_columnas', etc.
+            if (strpos($lineaId, '_') === 0) {
+                continue;
+            }
+            
+            // Buscar la línea principal en los filtros combinados
+            $lineaPrincipal = null;
+            foreach ($filtrosCombinados as $filtro) {
+                if (isset($filtro['id']) && strval($filtro['id']) === strval($lineaId)) {
+                    $lineaPrincipal = $filtro;
+                    break;
+                }
+            }
+            
+            if (!$lineaPrincipal) {
+                continue;
+            }
+            
+            // Convertir sublíneas del producto a array si no lo es
+            $sublineasArray = is_array($sublineasProducto) ? $sublineasProducto : [$sublineasProducto];
+            
+            // Iterar sobre cada sublínea del producto
+            foreach ($sublineasArray as $sublineaProducto) {
+                // Verificar si está marcada como "mostrar"
+                $esMostrar = false;
+                $sublineaId = null;
+                
+                if (is_array($sublineaProducto)) {
+                    $sublineaId = $sublineaProducto['id'] ?? null;
+                    
+                    // Verificar si está marcada como "mostrar"
+                    $mValue = $sublineaProducto['m'] ?? null;
+                    if ($mValue !== null) {
+                        $esMostrar = ($mValue === 1 || $mValue === '1' || $mValue === true || $mValue === 'true');
+                    }
+                    
+                    // También verificar el campo 'mostrar' como alternativa
+                    if (!$esMostrar && isset($sublineaProducto['mostrar'])) {
+                        $esMostrar = ($sublineaProducto['mostrar'] === true || $sublineaProducto['mostrar'] === 'true' || $sublineaProducto['mostrar'] === 1 || $sublineaProducto['mostrar'] === '1');
+                    }
+                } else {
+                    $sublineaId = strval($sublineaProducto);
+                    $esMostrar = false; // Si no es array, no tiene flag de mostrar
+                }
+                
+                // Solo procesar si está marcada como "mostrar"
+                if (!$esMostrar || !$sublineaId) {
+                    continue;
+                }
+                
+                // Buscar el texto de la sublínea para obtener el slug
+                $sublineaTexto = null;
+                $subprincipales = $lineaPrincipal['subprincipales'] ?? [];
+                foreach ($subprincipales as $subprincipal) {
+                    $subprincipalId = is_array($subprincipal) ? ($subprincipal['id'] ?? null) : strval($subprincipal);
+                    if (strval($subprincipalId) === strval($sublineaId)) {
+                        // Obtener el texto de la sublínea
+                        if (is_array($subprincipal)) {
+                            $sublineaTexto = $subprincipal['texto'] ?? $subprincipal['slug'] ?? null;
+                            
+                            if (!$sublineaTexto && isset($subprincipal['texto'])) {
+                                $sublineaTexto = \Illuminate\Support\Str::slug($subprincipal['texto']);
+                            }
+                            
+                            if (!$sublineaTexto) {
+                                $sublineaTexto = strval($subprincipalId);
+                            }
+                        } else {
+                            $sublineaTexto = strval($subprincipal);
+                        }
+                        
+                        // Verificar si hay texto alternativo
+                        if (is_array($sublineaProducto) && isset($sublineaProducto['textoAlternativo']) && !empty($sublineaProducto['textoAlternativo'])) {
+                            $sublineaTexto = $sublineaProducto['textoAlternativo'];
+                        }
+                        break;
+                    }
+                }
+                
+                if (!$sublineaTexto) {
+                    continue;
+                }
+                
+                // Convertir el texto a slug para buscar en especificaciones_busqueda
+                $sublineaTextoSlug = \Illuminate\Support\Str::slug($sublineaTexto);
+                
+                // Verificar si esta especificación existe en especificaciones_busqueda
+                if (!isset($especificacionesBusqueda[$sublineaTextoSlug])) {
+                    continue;
+                }
+                
+                $especificacionId = $sublineaId;
+            
+                // Calcular precio medio del histórico de esta especificación interna
+                $precioMedioEspecificacion = HistoricoPrecioProducto::where('producto_id', $producto->id)
+                    ->where('especificacion_interna_id', $especificacionId)
+                    ->where('fecha', '>=', $haceUnMes)
+                    ->where('precio_minimo', '>', 0)
+                    ->whereNotNull('precio_minimo')
+                    ->avg('precio_minimo');
+                
+                // Si no hay precio medio válido, poner rebajado a 0
+                if (!$precioMedioEspecificacion || $precioMedioEspecificacion <= 0) {
+                    if (isset($especificacionesBusqueda[$sublineaTextoSlug]['rebajado']) && 
+                        $especificacionesBusqueda[$sublineaTextoSlug]['rebajado'] != 0) {
+                        $especificacionesBusqueda[$sublineaTextoSlug]['rebajado'] = 0;
+                        $necesitaActualizarEspecificacionesBusqueda = true;
+                    }
+                    continue;
+                }
+                
+                // Filtrar ofertas que coincidan con esta especificación específica
+                $ofertasFiltradas = $todasLasOfertas->filter(function($oferta) use ($lineaId, $especificacionId) {
+                    $especificacionesOferta = $oferta->especificaciones_internas;
+                    
+                    if (!$especificacionesOferta || !is_array($especificacionesOferta)) {
+                        return false;
+                    }
+                    
+                    $ofertaLinea = $especificacionesOferta[$lineaId] ?? null;
+                    if (!$ofertaLinea) {
+                        return false;
+                    }
+                    
+                    $ofertaSublineas = is_array($ofertaLinea) ? $ofertaLinea : [$ofertaLinea];
+                    
+                    foreach ($ofertaSublineas as $item) {
+                        $itemId = (is_array($item) && isset($item['id'])) ? strval($item['id']) : strval($item);
+                        if (strval($itemId) === strval($especificacionId)) {
+                            return true;
+                        }
+                    }
+                    
+                    return false;
+                });
+                
+                // Obtener la oferta más barata de las filtradas
+                $mejorOfertaEspecificacion = null;
+                if ($ofertasFiltradas->isNotEmpty()) {
+                    $mejorOfertaEspecificacion = $ofertasFiltradas->first();
+                }
+                
+                // Calcular diferencia y actualizar rebajado
+                $rebajado = 0;
+                if ($mejorOfertaEspecificacion && $mejorOfertaEspecificacion->precio_unidad > 0) {
+                    $precioOfertaEspecificacion = $mejorOfertaEspecificacion->precio_unidad;
+                    
+                    if ($precioOfertaEspecificacion <= $precioMedioEspecificacion) {
+                        $diferencia = (($precioMedioEspecificacion - $precioOfertaEspecificacion) / $precioMedioEspecificacion) * 100;
+                        
+                        // Si la diferencia es >= 5%, guardar el porcentaje redondeado a entero
+                        // Si la diferencia está entre 0.1% y 4.99%, guardar 0
+                        if ($diferencia >= 5) {
+                            $rebajado = (int) round($diferencia);
+                        } else {
+                            $rebajado = 0; // Rebajas menores al 5% se guardan como 0
+                        }
+                    }
+                }
+                
+                // Actualizar rebajado si ha cambiado
+                // Buscar por ID primero (más confiable), luego por slug como fallback
+                // El ID que buscamos es $especificacionId (que es $sublineaId)
+                $claveEncontrada = null;
+                foreach ($especificacionesBusqueda as $clave => $especificacion) {
+                    if (isset($especificacion['id']) && strval($especificacion['id']) === strval($especificacionId)) {
+                        $claveEncontrada = $clave;
+                        break;
+                    }
+                }
+                
+                // Si no se encontró por ID, intentar por slug como fallback
+                if (!$claveEncontrada && isset($especificacionesBusqueda[$sublineaTextoSlug])) {
+                    $claveEncontrada = $sublineaTextoSlug;
+                }
+                
+                // Debug para producto 79 (segundo bucle)
+                if ($esDebugProducto79) {
+                    $debugProducto79[] = [
+                        'accion' => 'segundo_bucle_buscando_especificacion',
+                        'especificacionId' => strval($especificacionId),
+                        'sublineaTexto' => $sublineaTexto,
+                        'sublineaTextoSlug' => $sublineaTextoSlug,
+                        'precio_medio' => $precioMedioEspecificacion ?? null,
+                        'precio_oferta' => $precioOfertaEspecificacion ?? null,
+                        'diferencia' => $diferencia ?? null,
+                        'rebajado_calculado' => $rebajado,
+                        'clave_encontrada' => $claveEncontrada
+                    ];
+                }
+                
+                if ($claveEncontrada) {
+                    $rebajadoAnterior = $especificacionesBusqueda[$claveEncontrada]['rebajado'] ?? 0;
+                    if ($rebajadoAnterior != $rebajado) {
+                        $especificacionesBusqueda[$claveEncontrada]['rebajado'] = $rebajado;
+                        $necesitaActualizarEspecificacionesBusqueda = true;
+                        
+                        if ($esDebugProducto79) {
+                            $debugProducto79[] = [
+                                'accion' => 'segundo_bucle_actualizando_rebajado',
+                                'clave' => $claveEncontrada,
+                                'rebajado_anterior' => $rebajadoAnterior,
+                                'rebajado_nuevo' => $rebajado
+                            ];
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Actualizar especificaciones_busqueda del producto si hubo cambios
+        if ($necesitaActualizarEspecificacionesBusqueda) {
+            if ($esDebugProducto79) {
+                $debugProducto79[] = [
+                    'accion' => 'guardando_especificaciones_busqueda',
+                    'especificaciones_busqueda_antes' => $producto->especificaciones_busqueda ?? [],
+                    'especificaciones_busqueda_despues' => $especificacionesBusqueda
+                ];
+            }
+            $producto->especificaciones_busqueda = $especificacionesBusqueda;
+            $producto->save();
+            
+            if ($esDebugProducto79) {
+                // Recargar el producto para verificar que se guardó correctamente
+                $producto->refresh();
+                $debugProducto79[] = [
+                    'accion' => 'verificacion_despues_guardado',
+                    'especificaciones_busqueda_guardadas' => $producto->especificaciones_busqueda ?? []
+                ];
+            }
+        } else if ($esDebugProducto79) {
+            $debugProducto79[] = [
+                'accion' => 'no_hubo_cambios',
+                'especificaciones_busqueda_actual' => $especificacionesBusqueda
+            ];
+        }
+        
+        return $productosHot;
     }
 } 

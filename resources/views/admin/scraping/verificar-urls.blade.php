@@ -116,8 +116,14 @@
                         <div class="text-sm text-gray-600 dark:text-gray-400">Total URLs</div>
                     </div>
                     <div class="text-center">
-                        <div id="urlsNuevas" class="text-2xl font-bold text-green-600 dark:text-green-400">0</div>
-                        <div class="text-sm text-gray-600 dark:text-gray-400">URLs nuevas</div>
+                        <button type="button" id="btnVerUrlsNuevas" 
+                            class="inline-flex items-center justify-center gap-2 px-4 py-2 text-2xl font-bold text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition cursor-pointer">
+                            <span id="urlsNuevas">0</span>
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                        </button>
+                        <div class="text-sm text-gray-600 dark:text-gray-400 mt-1">URLs nuevas</div>
                     </div>
                     <div class="text-center">
                         <div id="urlsExistentesOtros" class="text-2xl font-bold text-gray-600 dark:text-gray-400">0</div>
@@ -128,6 +134,24 @@
                         <div class="text-sm text-gray-600 dark:text-gray-400">Existen en este</div>
                     </div>
                 </div>
+            </div>
+            
+            <!-- Textarea para URLs nuevas (oculto inicialmente) -->
+            <div id="contenedorUrlsNuevas" class="mb-6 hidden">
+                <div class="flex justify-between items-center mb-2">
+                    <label class="block font-medium text-gray-700 dark:text-gray-200">URLs nuevas detectadas</label>
+                    <button type="button" id="btnCerrarUrlsNuevas" 
+                        class="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                <textarea id="textareaUrlsNuevas" 
+                    readonly
+                    class="w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    style="font-family: monospace; line-height: 1.5; min-height: 200px; max-height: 400px;"
+                    placeholder="Las URLs nuevas aparecerán aquí..."></textarea>
             </div>
             
             <div id="resultadosLista" class="space-y-3"></div>
@@ -395,9 +419,15 @@
              const botonesCrearOfertas = document.getElementById('botonesCrearOfertas');
              const contadorUrlsNuevas = document.getElementById('contadorUrlsNuevas');
              const indicadorProgreso = document.getElementById('indicadorProgreso');
+             const contenedorUrlsNuevas = document.getElementById('contenedorUrlsNuevas');
              
              // Resetear estado del sistema de bloques
              resetearEstadoBloques();
+             
+             // Ocultar el textarea de URLs nuevas si estaba visible
+             if (contenedorUrlsNuevas) {
+                 contenedorUrlsNuevas.classList.add('hidden');
+             }
              
              resultadosLista.innerHTML = '';
              
@@ -406,6 +436,9 @@
              const urlsNuevas = resultados.filter(r => !r.existe_mismo_producto && !r.existe_otros_productos);
              const urlsExistentesOtros = resultados.filter(r => !r.existe_mismo_producto && r.existe_otros_productos);
              const urlsExistentesMismo = resultados.filter(r => r.existe_mismo_producto);
+             
+             // Almacenar las URLs nuevas en la variable global
+             listaUrlsNuevas = urlsNuevas.map(r => r.url_normalizada);
              
              // Actualizar resumen estadístico
              document.getElementById('totalUrls').textContent = totalUrls;
@@ -686,12 +719,15 @@
              }
          }
          
-         // Variables globales para el sistema de bloques
-         let urlsNuevasGlobales = [];
-         let bloqueActual = 0;
-         let totalBloques = 0;
-         let urlsProcesadas = 0;
-         let procesoEnCurso = false;
+        // Variables globales para el sistema de bloques
+        let urlsNuevasGlobales = [];
+        let bloqueActual = 0;
+        let totalBloques = 0;
+        let urlsProcesadas = 0;
+        let procesoEnCurso = false;
+        
+        // Variable global para almacenar las URLs nuevas (para el textarea)
+        let listaUrlsNuevas = [];
 
          // Función para crear todas las ofertas
          function crearTodasOfertas() {
@@ -828,6 +864,25 @@
             textoBoton.innerHTML = `Crear todas las ofertas (<span id="contadorUrlsNuevas">0</span>)`;
         }
         
+        // Función para mostrar/ocultar el textarea de URLs nuevas
+        function toggleUrlsNuevas() {
+            const contenedor = document.getElementById('contenedorUrlsNuevas');
+            const textarea = document.getElementById('textareaUrlsNuevas');
+            
+            if (contenedor.classList.contains('hidden')) {
+                // Mostrar el textarea y llenarlo con las URLs nuevas
+                if (listaUrlsNuevas.length > 0) {
+                    textarea.value = listaUrlsNuevas.join('\n');
+                    contenedor.classList.remove('hidden');
+                } else {
+                    alert('No hay URLs nuevas para mostrar.');
+                }
+            } else {
+                // Ocultar el textarea
+                contenedor.classList.add('hidden');
+            }
+        }
+        
         // Función global para renderizar el contenido con colores
         function renderizarUrlsConColores() {
             const urlsTextarea = document.getElementById('urls');
@@ -869,9 +924,23 @@
              const productoInput = document.getElementById('producto_nombre');
              const form = document.getElementById('formVerificarUrls');
              const btnCrearTodasOfertas = document.getElementById('btnCrearTodasOfertas');
+             const btnVerUrlsNuevas = document.getElementById('btnVerUrlsNuevas');
+             const btnCerrarUrlsNuevas = document.getElementById('btnCerrarUrlsNuevas');
              
              // Event listener para el botón de crear todas las ofertas
              btnCrearTodasOfertas.addEventListener('click', crearTodasOfertas);
+             
+             // Event listener para el botón de ver URLs nuevas
+             if (btnVerUrlsNuevas) {
+                 btnVerUrlsNuevas.addEventListener('click', toggleUrlsNuevas);
+             }
+             
+             // Event listener para el botón de cerrar el textarea de URLs nuevas
+             if (btnCerrarUrlsNuevas) {
+                 btnCerrarUrlsNuevas.addEventListener('click', function() {
+                     document.getElementById('contenedorUrlsNuevas').classList.add('hidden');
+                 });
+             }
             
             // Event listener para escribir en el campo de producto
             productoInput.addEventListener('input', function(e) {

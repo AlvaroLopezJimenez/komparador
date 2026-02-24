@@ -144,7 +144,7 @@
                             <div>
                                 <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">Precio total (€) *</label>
                                 <div class="flex gap-2">
-                                    <input type="number" name="precio_total" step="0.001" max="9999.999" required
+                                    <input type="number" name="precio_total" step="0.001" max="99999.999" required
                                         value="{{ old('precio_total', $oferta->precio_total ?? '') }}"
                                         class="flex-1 px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border focus:outline-none focus:ring-2 focus:ring-blue-500">
                                     <button type="button" id="btnObtenerPrecio" onclick="obtenerPrecioAutomatico()"
@@ -160,7 +160,7 @@
                             {{-- PRECIO POR UNIDAD --}}
                             <div>
                                 <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">Precio por unidad (€) *</label>
-                                <input type="number" name="precio_unidad" step="0.001" max="9999.999" required
+                                <input type="number" name="precio_unidad" step="0.001" max="99999.999" required
                                     value="{{ old('precio_unidad', $oferta->precio_unidad ?? '') }}"
                                     class="w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 @error('precio_unidad')
@@ -2840,7 +2840,7 @@ let urlTiendaDetectionTimeout = null;
 // VALIDACIÓN MAX PRECIO
 // =======================
 // Nota: el usuario escribe "9999,999" pero el input type="number" trabaja internamente con punto.
-window.MAX_PRECIO_OFERTA = 9999.999;
+window.MAX_PRECIO_OFERTA = 99999.999;
 window.MAX_DECIMALES_PRECIO_OFERTA = 3;
 window.PRECIO_CERO_DIAS_AVISO = 4;
 

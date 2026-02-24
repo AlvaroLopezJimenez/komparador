@@ -172,6 +172,8 @@ class BuscadorController extends Controller
                     'precio_oferta' => $item['precio_oferta'] ?? 0,
                     'unidad_medida' => $item['unidad_medida'] ?? $producto->unidadDeMedida,
                     'url_producto' => $item['url_producto'] ?? ($producto->categoria ? $producto->categoria->construirUrlCategorias($producto->slug) : '#'),
+                    'img_producto' => $item['img_producto'] ?? null, // Imagen específica de precios hot
+                    'producto_nombre' => $item['producto_nombre'] ?? null, // Nombre específico de precios hot
                 ];
             })
             ->filter()
