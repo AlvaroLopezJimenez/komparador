@@ -1602,7 +1602,7 @@
             
             if (count($filtrosCombinados) > 0) {
               $filtrosImportantes = collect($filtrosCombinados)
-                ->map(function($filtro) use ($especificacionesElegidas, $ofertas, $categoriaEspecificaciones, $producto) {
+                ->map(function($filtro) use ($especificacionesElegidas, $ofertas, $categoriaEspecificaciones, $producto, $filtrosAplicadosDesdeUrl) {
                   // Filtrar solo las sublíneas que están marcadas como "Mostrar" (m === 1)
                   $sublineasElegidas = $especificacionesElegidas[$filtro['id']] ?? [];
                   // Obtener el formato de visualización de la línea principal desde _formatos
@@ -1827,6 +1827,19 @@
                     })
                     ->values()
                     ->toArray();
+                  // Poner en primera posición las especificaciones que vienen de la URL (solo las automáticas)
+                  $idsDesdeUrl = ($filtrosAplicadosDesdeUrl ?? [])[$filtro['id']] ?? [];
+                  if (!empty($idsDesdeUrl)) {
+                    $idsDesdeUrl = array_map('strval', $idsDesdeUrl);
+                    $subsArray = $filtro['subprincipales'];
+                    $desdeUrl = [];
+                    foreach ($idsDesdeUrl as $id) {
+                      $found = collect($subsArray)->first(fn($s) => (string)($s['id'] ?? '') === $id);
+                      if ($found) $desdeUrl[] = $found;
+                    }
+                    $resto = collect($subsArray)->filter(fn($s) => !in_array((string)($s['id'] ?? ''), $idsDesdeUrl))->values()->all();
+                    $filtro['subprincipales'] = array_merge($desdeUrl, $resto);
+                  }
                   return $filtro;
                 })
                 ->filter(function($filtro) {
@@ -2217,6 +2230,19 @@
                   }
                   
                   $subprincipales[] = $sub;
+                }
+                
+                // Poner en primera posición las especificaciones que vienen de la URL
+                $idsDesdeUrl = ($filtrosAplicadosDesdeUrl ?? [])[$filtro['id']] ?? [];
+                if (!empty($idsDesdeUrl)) {
+                  $idsDesdeUrl = array_map('strval', $idsDesdeUrl);
+                  $desdeUrl = [];
+                  foreach ($idsDesdeUrl as $id) {
+                    $found = collect($subprincipales)->first(fn($s) => (string)($s['id'] ?? '') === $id);
+                    if ($found) $desdeUrl[] = $found;
+                  }
+                  $resto = collect($subprincipales)->filter(fn($s) => !in_array((string)($s['id'] ?? ''), $idsDesdeUrl))->values()->all();
+                  $subprincipales = array_merge($desdeUrl, $resto);
                 }
                 
                 // Verificar si esta línea está marcada como "columna oferta"

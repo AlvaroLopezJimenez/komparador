@@ -376,7 +376,7 @@
             {{-- SIDEBAR DE FILTROS (izquierda en escritorio, oculto en móvil) --}}
             @if($fi1->count() > 0)
             <aside class="hidden lg:block lg:w-1/4 lg:flex-shrink-0">
-                <div class="bg-white rounded-lg shadow-md p-4 lg:sticky lg:top-4">
+                <div class="bg-white rounded-lg shadow-md p-4">
                     <h2 class="text-lg font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">Filtros</h2>
                     <form method="GET" action="{{ route('categoria.show', $ca1->slug) }}" id="ffs1" class="space-y-4">
                         {{-- FILTRO DE RANGO DE PRECIOS --}}
@@ -468,7 +468,6 @@
                                 <div class="filtro-titulo-header font-bold text-base text-gray-900 pb-2 border-b border-gray-300 flex items-center justify-between cursor-pointer hover:bg-gray-100 px-2 py-2 -mx-2 rounded transition-colors {{ $esColapsable ? 'mb-0' : 'mb-3' }}" style="color: #111827 !important; font-weight: bold !important;" data-linea-id="{{ $filtro['id'] }}">
                                     <span>{{ $filtro['texto'] }}</span>
                                     <div class="flex items-center gap-2">
-                                        <span class="contador-linea-principal text-sm font-normal text-gray-600" data-linea-id="{{ $filtro['id'] }}">({{ $filtro['contador'] ?? 0 }})</span>
                                         @if($esColapsable)
                                         <svg class="filtro-flecha w-5 h-5 text-gray-600 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -795,7 +794,6 @@
                             <div class="filtro-titulo-header font-bold text-base text-gray-900 pb-2 border-b border-gray-300 flex items-center justify-between cursor-pointer hover:bg-gray-100 px-2 py-2 -mx-2 rounded transition-colors {{ $esColapsable ? 'mb-0' : 'mb-3' }}" style="color: #111827 !important; font-weight: bold !important;" data-linea-id="{{ $filtro['id'] }}">
                                 <span>{{ $filtro['texto'] }}</span>
                                 <div class="flex items-center gap-2">
-                                    <span class="contador-linea-principal text-sm font-normal text-gray-600" data-linea-id="{{ $filtro['id'] }}">({{ $filtro['contador'] ?? 0 }})</span>
                                     @if($esColapsable)
                                     <svg class="filtro-flecha w-5 h-5 text-gray-600 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -1220,7 +1218,8 @@
 
         {{-- _of1() -> obtenerFiltrosYConstruirUrl() --}}
         {{-- Función para obtener filtros seleccionados y construir URL --}}
-        function _of1() {
+        {{-- incluirPrecio: si false, no añade precio a la URL (para que el rango se resetee al cambiar especificaciones) --}}
+        function _of1(incluirPrecio = true) {
             {{-- Obtener todos los checkboxes marcados (pueden estar en sidebar o modal) --}}
             {{-- Usar un Set para evitar duplicados por línea principal --}}
             const filtrosSeleccionados = {};
@@ -1242,11 +1241,14 @@
                 filtrosSeleccionados[lineaId] = Array.from(filtrosSeleccionados[lineaId]);
             });
             
-            {{-- Obtener valores de precio --}}
-            const precioMinInput = document.getElementById('pmi1');
-            const precioMaxInput = document.getElementById('pmx1');
-            const precioMin = precioMinInput ? parseFloat(precioMinInput.value) : null;
-            const precioMax = precioMaxInput ? parseFloat(precioMaxInput.value) : null;
+            {{-- Obtener valores de precio (solo si incluirPrecio=true, para no resetear rango al cambiar specs) --}}
+            let precioMin = null, precioMax = null;
+            if (incluirPrecio) {
+                const precioMinInput = document.getElementById('pmi1');
+                const precioMaxInput = document.getElementById('pmx1');
+                precioMin = precioMinInput ? parseFloat(precioMinInput.value) : null;
+                precioMax = precioMaxInput ? parseFloat(precioMaxInput.value) : null;
+            }
             
             {{-- Obtener estado del filtro de rebajado --}}
             const checkboxRebajadoSidebar = document.getElementById('crs1');
@@ -1289,7 +1291,7 @@
         {{-- _af1() -> aplicarFiltro() --}}
         {{-- Función para aplicar filtro cuando se hace clic en checkbox --}}
         function _af1(checkbox) {
-            let url = _of1();
+            let url = _of1(false); {{-- No incluir precio: el rango se resetea al rango global de los productos mostrados --}}
             
             {{-- Si estamos en móvil y el checkbox está dentro del modal, añadir parámetro m al final --}}
             if (_em1() && checkbox.closest('#mf1')) {
@@ -1313,8 +1315,8 @@
                 checkboxSidebar.checked = checkbox.checked;
             }
             
-            {{-- Aplicar filtro redirigiendo a la nueva URL --}}
-            let url = _of1();
+            {{-- Aplicar filtro redirigiendo a la nueva URL (no incluir precio para que el rango se resetee) --}}
+            let url = _of1(false);
             
             {{-- Si estamos en móvil y el checkbox está dentro del modal, añadir parámetro m al final --}}
             if (_em1() && checkbox.closest('#mf1')) {

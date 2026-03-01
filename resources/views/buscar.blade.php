@@ -242,8 +242,12 @@ if (!function_exists('oCV6X')) {
                 $esVariante = false;
               }
               
-              // Obtener imagen: priorizar imagen de precios hot si existe
-              $imagen = $imagenPreciosHot ?? (is_array($producto->imagen_pequena) 
+              // Obtener imagen: prioridad 1) precios hot, 2) variante de especificación (búsqueda normal), 3) imagen general
+              $imagenEspecifica = $imagenPreciosHot;
+              if (!$imagenEspecifica && $esVariante && !empty($p5X8['imagen_variante'] ?? null)) {
+                $imagenEspecifica = $p5X8['imagen_variante'];
+              }
+              $imagen = $imagenEspecifica ?? (is_array($producto->imagen_pequena) 
                 ? ($producto->imagen_pequena[0] ?? '') 
                 : ($producto->imagen_pequena ?? ''));
               

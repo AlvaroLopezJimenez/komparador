@@ -37,10 +37,7 @@ class PrecioHotController extends Controller
         ]);
 
         try {
-            // Array para debug del producto 79
-            $debugProducto79 = [];
-            
-            $this->procesarPreciosHotCompleto($ejecucion, $debugProducto79);
+            $this->procesarPreciosHotCompleto($ejecucion);
             
             $ejecucion->update([
                 'fin' => now()
@@ -49,19 +46,12 @@ class PrecioHotController extends Controller
             // Recargar la ejecución para obtener los logs actualizados
             $ejecucion->refresh();
 
-            $response = [
+            return response()->json([
                 'status' => 'ok',
                 'inserciones' => $ejecucion->total_guardado,
                 'errores' => $ejecucion->total_errores,
                 'ejecucion_id' => $ejecucion->id
-            ];
-            
-            // Agregar debug del producto 79 si existe
-            if (!empty($debugProducto79)) {
-                $response['debug_producto_79'] = $debugProducto79;
-            }
-            
-            return response()->json($response);
+            ]);
         } catch (\Exception $e) {
             $ejecucion->update([
                 'fin' => now(),
@@ -90,7 +80,7 @@ class PrecioHotController extends Controller
     }
 
     // Método principal que procesa todos los precios hot (usado por ambas ejecuciones)
-    public function procesarPreciosHotCompleto($ejecucion, &$debugProducto79 = [])
+    public function procesarPreciosHotCompleto($ejecucion)
     {
         $log = [];
         $totalCategorias = 0;
@@ -132,7 +122,7 @@ class PrecioHotController extends Controller
             foreach ($categorias as $categoria) {
                 try {
                     $log[] = "🔄 Procesando categoría: {$categoria->nombre}";
-                    $productosHot = $this->obtenerProductosHotPorCategoria($categoria, 20, $log, $debugProducto79);
+                    $productosHot = $this->obtenerProductosHotPorCategoria($categoria, 20, $log);
                     
                     if (!empty($productosHot)) {
                         // Guardar o actualizar en la tabla precios_hot
@@ -155,7 +145,7 @@ class PrecioHotController extends Controller
             // Procesar categoría global "Precios Hot"
             try {
                 $log[] = "🔄 Procesando categoría global: Precios Hot";
-                $productosHotGlobal = $this->obtenerProductosHotGlobal(60, $log, $debugProducto79);
+                $productosHotGlobal = $this->obtenerProductosHotGlobal(60, $log);
                 
                 if (!empty($productosHotGlobal)) {
                     PrecioHot::updateOrCreate(
@@ -189,7 +179,7 @@ class PrecioHotController extends Controller
         ]);
     }
 
-    private function obtenerProductosHotPorCategoria($categoria, $limite = 20, &$log = [], &$debugProducto79 = [])
+    private function obtenerProductosHotPorCategoria($categoria, $limite = 20, &$log = [])
     {
         // Obtener todas las categorías hijas (incluyendo la actual)
         $categoriaIds = $this->obtenerCategoriaIdsIncluyendoHijas($categoria->id);
@@ -203,10 +193,10 @@ class PrecioHotController extends Controller
             ->where('precio', '>', 0)
             ->get();
         
-        return $this->calcularProductosHot($productos, $limite, $log, $debugProducto79);
+        return $this->calcularProductosHot($productos, $limite, $log);
     }
 
-    private function obtenerProductosHotGlobal($limite = 60, &$log = [], &$debugProducto79 = [])
+    private function obtenerProductosHotGlobal($limite = 60, &$log = [])
     {
         // Obtener todos los productos con sus relaciones
         $productos = Producto::with(['categoria', 'categoriaEspecificaciones'])
@@ -215,10 +205,10 @@ class PrecioHotController extends Controller
             ->where('precio', '>', 0)
             ->get();
         
-        return $this->calcularProductosHot($productos, $limite, $log, $debugProducto79);
+        return $this->calcularProductosHot($productos, $limite, $log);
     }
 
-    private function calcularProductosHot($productos, $limite, &$log = [], &$debugProducto79 = [])
+    private function calcularProductosHot($productos, $limite, &$log = [])
     {
         $productosHot = [];
         $haceUnMes = Carbon::now()->subMonth();
@@ -317,7 +307,9 @@ class PrecioHotController extends Controller
                     'producto_nombre' => $producto->nombre,
                     'tienda_nombre' => $tienda->nombre ?? 'Tienda desconocida',
                     'unidades' => $mejorOferta->unidades ?? 1,
-                    'unidad_medida' => $unidadMedida
+                    'unidad_medida' => $unidadMedida,
+                    'num_imagenes' => 0,
+                    'orden_especificacion' => -1
                 ];
                 
                 $productosHot[] = $productoHotData;
@@ -327,9 +319,49 @@ class PrecioHotController extends Controller
             }
             
             // Calcular precios hot de especificaciones internas si el producto las tiene
-            $productosHotEspecificaciones = $this->calcularPreciosHotEspecificacionesInternas($producto, $haceUnMes, $debugProducto79);
+            $productosHotEspecificaciones = $this->calcularPreciosHotEspecificacionesInternas($producto, $haceUnMes);
             $productosHot = array_merge($productosHot, $productosHotEspecificaciones);
         }
+
+        // Desduplicar por oferta_id: una oferta solo puede aparecer una vez
+        // Prioridad: especificación > producto general; entre especificaciones: más imágenes; empate: orden de especificaciones
+        $porOferta = [];
+        foreach ($productosHot as $entry) {
+            $oid = $entry['oferta_id'];
+            $esEspecificacion = ($entry['orden_especificacion'] ?? -1) >= 0;
+            $numImagenes = $entry['num_imagenes'] ?? 0;
+            $ordenSpec = $entry['orden_especificacion'] ?? PHP_INT_MAX;
+
+            if (!isset($porOferta[$oid])) {
+                $porOferta[$oid] = $entry;
+            } else {
+                $actual = $porOferta[$oid];
+                $actualEsSpec = ($actual['orden_especificacion'] ?? -1) >= 0;
+                $actualNumImg = $actual['num_imagenes'] ?? 0;
+                $actualOrden = $actual['orden_especificacion'] ?? PHP_INT_MAX;
+
+                $reemplazar = false;
+                if ($esEspecificacion && !$actualEsSpec) {
+                    $reemplazar = true;
+                } elseif ($esEspecificacion && $actualEsSpec) {
+                    if ($numImagenes > $actualNumImg) {
+                        $reemplazar = true;
+                    } elseif ($numImagenes === $actualNumImg && $ordenSpec < $actualOrden) {
+                        $reemplazar = true;
+                    }
+                }
+                if ($reemplazar) {
+                    $porOferta[$oid] = $entry;
+                }
+            }
+        }
+        $productosHot = array_values($porOferta);
+
+        // Eliminar campos auxiliares usados solo para desduplicación
+        $productosHot = array_map(function ($entry) {
+            unset($entry['num_imagenes'], $entry['orden_especificacion']);
+            return $entry;
+        }, $productosHot);
 
         // Ordenar por porcentaje de diferencia (mayor a menor) y tomar los primeros
         usort($productosHot, function($a, $b) {
@@ -621,34 +653,20 @@ class PrecioHotController extends Controller
     /**
      * Calcula precios hot para las especificaciones internas de un producto
      */
-    private function calcularPreciosHotEspecificacionesInternas($producto, $haceUnMes, &$debugProducto79 = [])
+    private function calcularPreciosHotEspecificacionesInternas($producto, $haceUnMes)
     {
         $productosHot = [];
-        $esDebugProducto79 = ($producto->id == 79);
         
         // Solo procesar si el producto tiene especificaciones internas y está marcado como unidadUnica
-        if (!$producto->categoria_id_especificaciones_internas || 
+        if (
+            !$producto->categoria_id_especificaciones_internas || 
             !$producto->categoria_especificaciones_internas_elegidas ||
-            $producto->unidadDeMedida !== 'unidadUnica') {
-            if ($esDebugProducto79) {
-                $debugProducto79[] = [
-                    'accion' => 'producto_no_cumple_requisitos',
-                    'categoria_id_especificaciones_internas' => $producto->categoria_id_especificaciones_internas,
-                    'tiene_especificaciones_elegidas' => !empty($producto->categoria_especificaciones_internas_elegidas),
-                    'unidadDeMedida' => $producto->unidadDeMedida
-                ];
-            }
+            $producto->unidadDeMedida !== 'unidadUnica'
+        ) {
             return $productosHot;
         }
         
         $especificacionesElegidas = $producto->categoria_especificaciones_internas_elegidas;
-        
-        if ($esDebugProducto79) {
-            $debugProducto79[] = [
-                'accion' => 'inicio_procesamiento',
-                'especificaciones_busqueda_antes' => $producto->especificaciones_busqueda ?? []
-            ];
-        }
         $servicioOfertas = new SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos();
         
         // Obtener TODAS las ofertas del producto una sola vez (más eficiente)
@@ -672,7 +690,9 @@ class PrecioHotController extends Controller
         
         // Combinar filtros de categoría y producto
         $filtrosCombinados = array_merge($filtros, $filtrosProducto);
-        
+
+        $ordenEspecificacion = 0;
+
         // Cargar especificaciones_busqueda del producto para actualizarlo
         $especificacionesBusqueda = $producto->especificaciones_busqueda ?? [];
         $necesitaActualizarEspecificacionesBusqueda = false;
@@ -863,22 +883,6 @@ class PrecioHotController extends Controller
                     $claveEncontrada = $sublineaTextoSlug;
                 }
                 
-                // Debug para producto 79
-                if ($esDebugProducto79) {
-                    $debugProducto79[] = [
-                        'accion' => 'buscando_especificacion',
-                        'sublineaId' => strval($sublineaId),
-                        'sublineaTexto' => $sublineaTexto,
-                        'sublineaTextoSlug' => $sublineaTextoSlug,
-                        'precio_medio' => $precioMedioEspecificacion,
-                        'precio_oferta' => $precioOfertaEspecificacion,
-                        'diferencia' => $diferencia,
-                        'rebajado_calculado' => $rebajado,
-                        'clave_encontrada' => $claveEncontrada,
-                        'especificaciones_busqueda_keys' => array_keys($especificacionesBusqueda)
-                    ];
-                }
-                
                 // Actualizar especificaciones_busqueda si existe esta especificación
                 if ($claveEncontrada) {
                     $especificacionActual = $especificacionesBusqueda[$claveEncontrada];
@@ -888,33 +892,7 @@ class PrecioHotController extends Controller
                     if ($rebajadoAnterior != $rebajado) {
                         $especificacionesBusqueda[$claveEncontrada]['rebajado'] = $rebajado;
                         $necesitaActualizarEspecificacionesBusqueda = true;
-                        
-                        if ($esDebugProducto79) {
-                            $debugProducto79[] = [
-                                'accion' => 'actualizando_rebajado',
-                                'clave' => $claveEncontrada,
-                                'rebajado_anterior' => $rebajadoAnterior,
-                                'rebajado_nuevo' => $rebajado,
-                                'especificacion_actualizada' => $especificacionesBusqueda[$claveEncontrada]
-                            ];
-                        }
-                    } else if ($esDebugProducto79) {
-                        $debugProducto79[] = [
-                            'accion' => 'rebajado_sin_cambios',
-                            'clave' => $claveEncontrada,
-                            'rebajado_actual' => $rebajadoAnterior,
-                            'rebajado_calculado' => $rebajado
-                        ];
                     }
-                } else if ($esDebugProducto79) {
-                    $debugProducto79[] = [
-                        'accion' => 'especificacion_no_encontrada',
-                        'sublineaId' => strval($sublineaId),
-                        'sublineaTextoSlug' => $sublineaTextoSlug,
-                        'especificaciones_busqueda_disponibles' => array_map(function($esp) {
-                            return ['id' => $esp['id'] ?? null, 'texto' => $esp['texto'] ?? null];
-                        }, $especificacionesBusqueda)
-                    ];
                 }
                 
                 // Solo incluir en precios hot si la diferencia es del 5% o más
@@ -939,6 +917,17 @@ class PrecioHotController extends Controller
                     
                     // Nombre del producto con la especificación
                     $nombreCompleto = $producto->nombre . ' ' . $sublineaTexto;
+
+                    // Contar imágenes para desduplicación: si usa imag. producto, contar las del producto
+                    $usarImagenesProducto = is_array($sublineaProducto) && ($sublineaProducto['usarImagenesProducto'] ?? false);
+                    if ($usarImagenesProducto) {
+                        $imagenesProducto = $producto->imagen_pequena ?? [];
+                        $numImagenes = is_array($imagenesProducto) ? count($imagenesProducto) : (!empty($imagenesProducto) ? 1 : 0);
+                    } else {
+                        $numImagenes = is_array($sublineaProducto) && isset($sublineaProducto['img']) && is_array($sublineaProducto['img'])
+                            ? count($sublineaProducto['img'])
+                            : 0;
+                    }
                     
                     $productosHot[] = [
                         'producto_id' => $producto->id,
@@ -954,7 +943,9 @@ class PrecioHotController extends Controller
                         'producto_nombre' => $nombreCompleto,
                         'tienda_nombre' => $tienda->nombre ?? 'Tienda desconocida',
                         'unidades' => $mejorOfertaEspecificacion->unidades ?? 1,
-                        'unidad_medida' => $unidadMedida
+                        'unidad_medida' => $unidadMedida,
+                        'num_imagenes' => $numImagenes,
+                        'orden_especificacion' => $ordenEspecificacion++
                     ];
                 }
             }
@@ -1139,35 +1130,11 @@ class PrecioHotController extends Controller
                     $claveEncontrada = $sublineaTextoSlug;
                 }
                 
-                // Debug para producto 79 (segundo bucle)
-                if ($esDebugProducto79) {
-                    $debugProducto79[] = [
-                        'accion' => 'segundo_bucle_buscando_especificacion',
-                        'especificacionId' => strval($especificacionId),
-                        'sublineaTexto' => $sublineaTexto,
-                        'sublineaTextoSlug' => $sublineaTextoSlug,
-                        'precio_medio' => $precioMedioEspecificacion ?? null,
-                        'precio_oferta' => $precioOfertaEspecificacion ?? null,
-                        'diferencia' => $diferencia ?? null,
-                        'rebajado_calculado' => $rebajado,
-                        'clave_encontrada' => $claveEncontrada
-                    ];
-                }
-                
                 if ($claveEncontrada) {
                     $rebajadoAnterior = $especificacionesBusqueda[$claveEncontrada]['rebajado'] ?? 0;
                     if ($rebajadoAnterior != $rebajado) {
                         $especificacionesBusqueda[$claveEncontrada]['rebajado'] = $rebajado;
                         $necesitaActualizarEspecificacionesBusqueda = true;
-                        
-                        if ($esDebugProducto79) {
-                            $debugProducto79[] = [
-                                'accion' => 'segundo_bucle_actualizando_rebajado',
-                                'clave' => $claveEncontrada,
-                                'rebajado_anterior' => $rebajadoAnterior,
-                                'rebajado_nuevo' => $rebajado
-                            ];
-                        }
                     }
                 }
             }
@@ -1175,29 +1142,8 @@ class PrecioHotController extends Controller
         
         // Actualizar especificaciones_busqueda del producto si hubo cambios
         if ($necesitaActualizarEspecificacionesBusqueda) {
-            if ($esDebugProducto79) {
-                $debugProducto79[] = [
-                    'accion' => 'guardando_especificaciones_busqueda',
-                    'especificaciones_busqueda_antes' => $producto->especificaciones_busqueda ?? [],
-                    'especificaciones_busqueda_despues' => $especificacionesBusqueda
-                ];
-            }
             $producto->especificaciones_busqueda = $especificacionesBusqueda;
             $producto->save();
-            
-            if ($esDebugProducto79) {
-                // Recargar el producto para verificar que se guardó correctamente
-                $producto->refresh();
-                $debugProducto79[] = [
-                    'accion' => 'verificacion_despues_guardado',
-                    'especificaciones_busqueda_guardadas' => $producto->especificaciones_busqueda ?? []
-                ];
-            }
-        } else if ($esDebugProducto79) {
-            $debugProducto79[] = [
-                'accion' => 'no_hubo_cambios',
-                'especificaciones_busqueda_actual' => $especificacionesBusqueda
-            ];
         }
         
         return $productosHot;

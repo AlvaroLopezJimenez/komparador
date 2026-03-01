@@ -322,12 +322,45 @@ public function todasCategorias()
         // Obtener todos los productos de la categoría (para calcular contadores y rango de precios)
         $productosTodos = Producto::whereIn('categoria_id', $categoriaIds)
             ->where('mostrar', 'si')
-            ->get(['id', 'precio', 'categoria_especificaciones_internas_elegidas']);
+            ->get(['id', 'precio', 'rebajado', 'categoria_especificaciones_internas_elegidas']);
         
-        // Calcular rango de precios de todos los productos de la categoría (para el slider)
-        $precios = $productosTodos->pluck('precio')->filter()->map(function($p) { return (float)$p; });
-        $pmg1 = $precios->min() ?? 0;
-        $pmg2 = $precios->max() ?? 100;
+        // Filtrar productos por especificaciones aplicadas y rebajado (para rango de precios del slider)
+        $fa1SinPrecio = is_array($fa1) ? $fa1 : [];
+        unset($fa1SinPrecio['precio_min'], $fa1SinPrecio['precio_max']);
+        $productosParaRango = $productosTodos;
+        if (!empty($fa1SinPrecio) || $r1) {
+            $productosParaRango = $productosTodos->filter(function($producto) use ($fa1SinPrecio, $r1) {
+                if ($r1 && $producto->rebajado === null) return false;
+                if (empty($fa1SinPrecio)) return true;
+                $esp = $producto->categoria_especificaciones_internas_elegidas ?? [];
+                if (!is_array($esp)) return false;
+                foreach ($fa1SinPrecio as $lineaId => $sublineasIds) {
+                    if (empty($sublineasIds) || !is_array($sublineasIds)) continue;
+                    $pl = $esp[$lineaId] ?? null;
+                    if (!$pl) return false;
+                    $ps = is_array($pl) ? $pl : [$pl];
+                    $coincide = false;
+                    foreach ($ps as $item) {
+                        $itid = (is_array($item) && isset($item['id'])) ? strval($item['id']) : strval($item);
+                        if (in_array(strval($itid), array_map('strval', $sublineasIds))) {
+                            if (is_array($item) && isset($item['c'])) {
+                                if (($item['c'] ?? 0) > 0) { $coincide = true; break; }
+                            } else { $coincide = true; break; }
+                        }
+                    }
+                    if (!$coincide) return false;
+                }
+                return true;
+            });
+        }
+        // Calcular rango de precios: min/max de productos filtrados, excluir 0 del mínimo
+        $precios = $productosParaRango->pluck('precio')->filter(function($p) {
+            return $p !== null && $p !== '' && (float)$p > 0;
+        })->map(function($p) { return (float)$p; });
+        $pmg1 = $precios->min();
+        $pmg2 = $precios->max();
+        $pmg1 = $pmg1 !== null ? $pmg1 : 0;
+        $pmg2 = $pmg2 !== null ? $pmg2 : 100;
 
         // Filtrar solo las líneas principales marcadas como importantes y calcular contadores
         // $filtrosImportantes -> $fi1

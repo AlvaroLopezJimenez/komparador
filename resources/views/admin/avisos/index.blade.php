@@ -295,12 +295,14 @@
                                     </div>
                                 @endif
                             </td>
-                            <td class="px-6 py-1 cursor-pointer hover:bg-gray-600 transition-colors" onclick="event.stopPropagation(); toggleCheckbox({{ $aviso->id }}, 'vencidos')">
+                            <td class="px-6 py-1 @if($aviso->avisoable_type !== 'App\Models\OfertaProducto') cursor-pointer hover:bg-gray-600 transition-colors @endif" @if($aviso->avisoable_type !== 'App\Models\OfertaProducto') onclick="event.stopPropagation(); toggleCheckbox({{ $aviso->id }}, 'vencidos')" @endif>
                                 <div class="flex items-center justify-center h-8">
-                                    <input type="checkbox" class="checkbox-aviso rounded border-gray-300 text-red-600 focus:ring-red-500 pointer-events-none" 
-                                           data-aviso-id="{{ $aviso->id }}" 
-                                           data-tabla="vencidos"
-                                           onchange="actualizarContadorSeleccionados()">
+                                    @if($aviso->avisoable_type !== 'App\Models\OfertaProducto')
+                                        <input type="checkbox" class="checkbox-aviso rounded border-gray-300 text-red-600 focus:ring-red-500 pointer-events-none" 
+                                               data-aviso-id="{{ $aviso->id }}" 
+                                               data-tabla="vencidos"
+                                               onchange="actualizarContadorSeleccionados()">
+                                    @endif
                                 </div>
                             </td>
                             <td class="px-6 py-1">
@@ -648,12 +650,14 @@
                                     </div>
                                 @endif
                             </td>
-                            <td class="px-6 py-1 cursor-pointer hover:bg-gray-600 transition-colors" onclick="event.stopPropagation(); toggleCheckbox({{ $aviso->id }}, 'pendientes')">
+                            <td class="px-6 py-1 @if($aviso->avisoable_type !== 'App\Models\OfertaProducto') cursor-pointer hover:bg-gray-600 transition-colors @endif" @if($aviso->avisoable_type !== 'App\Models\OfertaProducto') onclick="event.stopPropagation(); toggleCheckbox({{ $aviso->id }}, 'pendientes')" @endif>
                                 <div class="flex items-center justify-center h-8">
-                                    <input type="checkbox" class="checkbox-aviso rounded border-gray-300 text-red-600 focus:ring-red-500 pointer-events-none" 
-                                           data-aviso-id="{{ $aviso->id }}" 
-                                           data-tabla="pendientes"
-                                           onchange="actualizarContadorSeleccionados()">
+                                    @if($aviso->avisoable_type !== 'App\Models\OfertaProducto')
+                                        <input type="checkbox" class="checkbox-aviso rounded border-gray-300 text-red-600 focus:ring-red-500 pointer-events-none" 
+                                               data-aviso-id="{{ $aviso->id }}" 
+                                               data-tabla="pendientes"
+                                               onchange="actualizarContadorSeleccionados()">
+                                    @endif
                                 </div>
                             </td>
                             <td class="px-6 py-1">
@@ -926,12 +930,14 @@
                                     </div>
                                 @endif
                             </td>
-                            <td class="px-6 py-1 cursor-pointer hover:bg-gray-600 transition-colors" onclick="event.stopPropagation(); toggleCheckbox({{ $aviso->id }}, 'ocultos')">
+                            <td class="px-6 py-1 @if($aviso->avisoable_type !== 'App\Models\OfertaProducto') cursor-pointer hover:bg-gray-600 transition-colors @endif" @if($aviso->avisoable_type !== 'App\Models\OfertaProducto') onclick="event.stopPropagation(); toggleCheckbox({{ $aviso->id }}, 'ocultos')" @endif>
                                 <div class="flex items-center justify-center h-8">
-                                    <input type="checkbox" class="checkbox-aviso rounded border-gray-300 text-red-600 focus:ring-red-500 pointer-events-none" 
-                                           data-aviso-id="{{ $aviso->id }}" 
-                                           data-tabla="ocultos"
-                                           onchange="actualizarContadorSeleccionados()">
+                                    @if($aviso->avisoable_type !== 'App\Models\OfertaProducto')
+                                        <input type="checkbox" class="checkbox-aviso rounded border-gray-300 text-red-600 focus:ring-red-500 pointer-events-none" 
+                                               data-aviso-id="{{ $aviso->id }}" 
+                                               data-tabla="ocultos"
+                                               onchange="actualizarContadorSeleccionados()">
+                                    @endif
                                 </div>
                             </td>
                             <td class="px-6 py-1">
@@ -2439,29 +2445,14 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    // Actualizar el precio por unidad mostrado
-                    const precioUnidad = parseFloat(data.precio_unidad);
-                    const unidadMedida = input.dataset.unidadMedida;
-                    const decimales = (unidadMedida === 'unidadMilesima') ? 3 : 2;
-                    precioUnidadDisplay.textContent = precioUnidad.toFixed(decimales) + '€/ud';
-                    
-                    // Actualizar el precio original guardado
-                    input.dataset.precioOriginal = precioTotal.toFixed(2);
-                    
-                    // Actualizar el envío original guardado
-                    if (envioInput) {
-                        envioInput.dataset.envioOriginal = envio !== null ? envio.toFixed(2) : '';
-                    }
-                    
-                    // Mostrar mensaje de éxito
+                    // Mostrar mensaje de éxito brevemente y luego recargar la página
                     const button = input.nextElementSibling.nextElementSibling; // El botón Guardar
                     const originalText = button.textContent;
                     button.textContent = '✓ Guardado';
                     button.classList.add('bg-green-500');
                     setTimeout(() => {
-                        button.textContent = originalText;
-                        button.classList.remove('bg-green-500');
-                    }, 2000);
+                        location.reload();
+                    }, 800);
                 } else {
                     alert('Error al guardar el precio: ' + (data.error || 'Error desconocido'));
                     input.value = input.dataset.precioOriginal;

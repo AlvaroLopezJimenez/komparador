@@ -3299,6 +3299,23 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // Función para limpiar URL de coolmod (quitar ? al final)
+    function limpiarUrlCoolmod(url) {
+        try {
+            if (!url || !url.toLowerCase().includes('coolmod')) {
+                return url; // No es coolmod, devolver URL original
+            }
+            // Quitar ? al final
+            if (url.endsWith('?')) {
+                return url.slice(0, -1);
+            }
+            return url;
+        } catch (error) {
+            console.error('Error al limpiar URL de coolmod:', error);
+            return url;
+        }
+    }
+
     // Función para extraer y normalizar el dominio de una URL
     function extraerDominioNormalizado(url) {
         try {
@@ -3411,7 +3428,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Event listener para pegar URL (limpiar automáticamente URLs de Amazon y pccomponentes, y detectar tienda)
+    // Event listener para pegar URL (limpiar automáticamente URLs de Amazon, pccomponentes y coolmod, y detectar tienda)
     urlInput.addEventListener('paste', function(e) {
         // Usar setTimeout para acceder al valor después de que se pegue
         setTimeout(() => {
@@ -3426,6 +3443,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 let urlLimpia = limpiarUrlAmazon(urlPegada);
                 // Luego limpiar URL de pccomponentes (quitar # al final y ?refurbished)
                 urlLimpia = limpiarUrlPccomponentes(urlLimpia);
+                // Y limpiar URL de coolmod (quitar ? al final)
+                urlLimpia = limpiarUrlCoolmod(urlLimpia);
                 
                 // Si es pccomponentes y tiene # o ?refurbished, establecer precio total a 0
                 if (esPccomponentes && (tieneHash || tieneRefurbished)) {
@@ -3480,6 +3499,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     precioTotalInput.dispatchEvent(new Event('change', { bubbles: true }));
                 }
             }
+        }
+        
+        // Limpiar URL de coolmod (quitar ? al final) si aplica
+        const urlLimpiaCoolmod = limpiarUrlCoolmod(url);
+        if (urlLimpiaCoolmod !== url) {
+            url = urlLimpiaCoolmod;
+            urlInput.value = url;
         }
         
         // Actualizar el href del botón "Ir a la URL"

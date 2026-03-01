@@ -352,6 +352,10 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
 
     // Ruta para crear una oferta sin producto
     Route::get('ofertas/create', [OfertaProductoController::class, 'createGeneral'])->name('ofertas.create.formularioGeneral');
+    Route::get('ofertas/crear-masivo', [App\Http\Controllers\Api\OfertasController::class, 'crearMasivoVista'])->name('ofertas.crear-masivo');
+    Route::post('ofertas/crear-masivo/analizar', [App\Http\Controllers\Api\OfertasController::class, 'analizarUrls'])->name('ofertas.crear-masivo.analizar');
+    Route::post('ofertas/crear-masivo/crear', [App\Http\Controllers\Api\OfertasController::class, 'crearOfertaBulk'])->name('ofertas.crear-masivo.crear');
+    Route::get('ofertas/crear-masivo/recargar-especificaciones/{producto}', [App\Http\Controllers\Api\OfertasController::class, 'recargarEspecificaciones'])->name('ofertas.crear-masivo.recargar-especificaciones');
 
     // Ruta para ver las ofertas de un producto concreto
     Route::get('productos/{producto}/ofertas', [OfertaProductoController::class, 'index'])->name('ofertas.index');
