@@ -49,6 +49,7 @@
                                         <option value="brightData;true">Bright Data (con JavaScript)</option>
                                         <option value="scrapingAnt">ScrapingAnt</option>
                                         <option value="brightData;false" selected>Bright Data (sin JavaScript)</option>
+                                        <option value="cloudflare">Cloudflare Browser Rendering</option>
                                         <option value="miVpsHtml;1">Mi VPS;SELENIUM;0.8</option>
                                         <option value="miVpsHtml;2">Mi VPS;SELENIUM;1.2</option>
                                         <option value="miVpsHtml;3">Mi VPS;SELENIUM;1.8</option>
@@ -182,6 +183,11 @@
                 <div>
                     <h3 class="font-semibold text-gray-900 dark:text-gray-200 mb-2">Bright Data (sin JavaScript)</h3>
                     <p>Más rápido y económico. Ideal para sitios que no requieren JavaScript para mostrar precios.</p>
+                </div>
+
+                <div>
+                    <h3 class="font-semibold text-gray-900 dark:text-gray-200 mb-2">Cloudflare Browser Rendering</h3>
+                    <p>API de Cloudflare que renderiza la página con JavaScript y devuelve el HTML final. Ideal para sitios dinámicos o SPAs. Usa <code>networkidle0</code> para esperar a que termine la carga.</p>
                 </div>
 
                 <div>

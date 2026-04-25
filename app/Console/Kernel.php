@@ -25,6 +25,9 @@ class Kernel extends ConsoleKernel
         
         // Limpiar logs antiguos semanalmente
         $schedule->command('log:clear')->weekly();
+
+        // Scrapear ofertas con aviso sin stock vencido (tiendas con scrapeo automático)
+        $schedule->command('avisos:scrapear-sin-stock')->hourly();
     }
 
     /**

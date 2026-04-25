@@ -6,9 +6,31 @@ use App\Models\Categoria;
 use App\Models\Producto;
 use App\Models\PrecioHot;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class HomeController extends Controller
 {
+    /**
+     * Formatea números grandes para mostrar en hero stats.
+     */
+    private function formatearNumeroCompacto(int $valor, bool $prefijoMas = false): string
+    {
+        $resultado = '';
+        if ($valor >= 1000000) {
+            $resultado = number_format($valor / 1000000, 1, ',', '.') . 'M';
+        } elseif ($valor >= 1000) {
+            $resultado = number_format($valor / 1000, 1, ',', '.') . 'K';
+        } else {
+            $resultado = number_format($valor, 0, ',', '.');
+        }
+
+        if ($prefijoMas && $valor > 0) {
+            return '+' . $resultado;
+        }
+
+        return $resultado;
+    }
+
     /**
      * Procesa los datos de precios hot para asegurar estructura correcta
      */
@@ -83,7 +105,20 @@ class HomeController extends Controller
         $d3 = PrecioHot::where('nombre', 'Precios Hot')->first();
         $d3 = $this->procesarDatosPreciosHot($d3);
 
-        return view('index', compact('d1', 'd2', 'd3', 'd4', 'ofertasDestacadas'));
+        // Métricas del hero (calculadas en backend, no en la vista)
+        $ofertasIndexadas = \App\Models\OfertaProducto::count();
+        $productosTotales = Producto::where('mostrar', 'si')->count();
+        $tiendasComparadas = \App\Models\OfertaProducto::whereNotNull('tienda_id')
+            ->distinct('tienda_id')
+            ->count('tienda_id');
+
+        $hs1 = [
+            'ofertas_indexadas' => $this->formatearNumeroCompacto($ofertasIndexadas, true),
+            'productos' => $this->formatearNumeroCompacto($productosTotales),
+            'tiendas' => $this->formatearNumeroCompacto($tiendasComparadas),
+        ];
+
+        return view('index', compact('d1', 'd2', 'd3', 'd4', 'ofertasDestacadas', 'hs1'));
     }
 
     public function categoria($slug)
@@ -267,55 +302,91 @@ public function todasCategorias()
             $query->whereNotNull('rebajado');
         }
 
-        // Aplicar ordenación
-        // Si ordenamos por precio y hay filtros, NO ordenar por precio aquí (se ordenará después de recalcular precios)
-        if ($o1 === 'precio' && empty($fa1)) {
-            // Si no hay filtros, ordenar por precio en la query (precio base)
-            $query->orderBy('precio', 'asc');
-            $query->orderBy('nombre', 'asc');
-        } elseif ($o1 === 'rebajado') {
-            // Ordenar por rebajado de mayor a menor, considerando NULL como 0
-            $query->orderByRaw('COALESCE(rebajado, 0) DESC');
-            // Aplicar orden natural por nombre como secundario
-            $query->orderByRaw("
-                CASE
-                    WHEN SUBSTRING_INDEX(nombre, ' ', -1) REGEXP '^[0-9]+' 
-                        THEN CAST(SUBSTRING_INDEX(nombre, ' ', -1) AS UNSIGNED)
-                    ELSE 999999
-                END ASC
-            ")
-            ->orderBy('nombre', 'asc');
-        } else {
-            // Ordenar por relevancia (clicks) o por nombre si hay filtros y orden es precio
-            if ($o1 !== 'precio') {
-                $query->orderBy('clicks', 'desc');
+        // Con filtros de especificaciones + orden por precio: el precio efectivo se recalcula en PHP,
+        // así que hay que cargar todos los candidatos, recalcular, ordenar y paginar después.
+        // Si paginamos antes (por relevancia) y solo ordenamos la página actual, el orden por precio queda roto entre páginas.
+        $ordenGlobalPorPrecioConFiltros = ($o1 === 'precio' && !empty($fa1));
+
+        if ($ordenGlobalPorPrecioConFiltros) {
+            $query->orderBy('id');
+            $todosLosProductos = $query->get();
+            $porPagina = 36;
+            $paginaActual = LengthAwarePaginator::resolveCurrentPage();
+
+            if ($todosLosProductos->isEmpty()) {
+                $pr1 = new LengthAwarePaginator(
+                    collect(),
+                    0,
+                    $porPagina,
+                    1,
+                    ['path' => LengthAwarePaginator::resolveCurrentPath()]
+                );
+                $pr1->withQueryString();
+            } else {
+                $paginadorCompleto = new LengthAwarePaginator(
+                    $todosLosProductos,
+                    $todosLosProductos->count(),
+                    max($todosLosProductos->count(), 1),
+                    1,
+                    ['path' => LengthAwarePaginator::resolveCurrentPath()]
+                );
+                $pr1 = $this->recalcularPreciosConFiltros($paginadorCompleto, $fa1);
+                $ordenados = $pr1->getCollection()
+                    ->sortBy(function ($producto) {
+                        return (float) ($producto->precio ?? 999999);
+                    })
+                    ->values();
+                $total = $ordenados->count();
+                $slice = $ordenados->forPage($paginaActual, $porPagina);
+                $pr1 = new LengthAwarePaginator(
+                    $slice,
+                    $total,
+                    $porPagina,
+                    $paginaActual,
+                    ['path' => LengthAwarePaginator::resolveCurrentPath()]
+                );
+                $pr1->withQueryString();
             }
-            // Aplicar orden natural por nombre como secundario
-            $query->orderByRaw("
-                CASE
-                    WHEN SUBSTRING_INDEX(nombre, ' ', -1) REGEXP '^[0-9]+' 
-                        THEN CAST(SUBSTRING_INDEX(nombre, ' ', -1) AS UNSIGNED)
-                    ELSE 999999
-                END ASC
-            ")
-            ->orderBy('nombre', 'asc');
-        }
+        } else {
+            // Aplicar ordenación
+            // Si ordenamos por precio sin filtros de especificaciones, ordenar por precio en la query (precio base)
+            if ($o1 === 'precio' && empty($fa1)) {
+                $query->orderBy('precio', 'asc');
+                $query->orderBy('nombre', 'asc');
+            } elseif ($o1 === 'rebajado') {
+                // Ordenar por rebajado de mayor a menor, considerando NULL como 0
+                $query->orderByRaw('COALESCE(rebajado, 0) DESC');
+                // Aplicar orden natural por nombre como secundario
+                $query->orderByRaw("
+                    CASE
+                        WHEN SUBSTRING_INDEX(nombre, ' ', -1) REGEXP '^[0-9]+' 
+                            THEN CAST(SUBSTRING_INDEX(nombre, ' ', -1) AS UNSIGNED)
+                        ELSE 999999
+                    END ASC
+                ")
+                ->orderBy('nombre', 'asc');
+            } else {
+                // Ordenar por relevancia (clicks)
+                if ($o1 !== 'precio') {
+                    $query->orderBy('clicks', 'desc');
+                }
+                // Aplicar orden natural por nombre como secundario
+                $query->orderByRaw("
+                    CASE
+                        WHEN SUBSTRING_INDEX(nombre, ' ', -1) REGEXP '^[0-9]+' 
+                            THEN CAST(SUBSTRING_INDEX(nombre, ' ', -1) AS UNSIGNED)
+                        ELSE 999999
+                    END ASC
+                ")
+                ->orderBy('nombre', 'asc');
+            }
 
-        // Paginación (36 productos por página)
-        // $productos -> $pr1 (se mantiene localmente pero se pasa como pr1 a la vista)
-        $pr1 = $query->paginate(36)->withQueryString();
+            // Paginación (36 productos por página)
+            $pr1 = $query->paginate(36)->withQueryString();
 
-        // Recalcular precios de productos basándose en ofertas que coinciden con los filtros
-        if (!empty($fa1)) {
-            $pr1 = $this->recalcularPreciosConFiltros($pr1, $fa1);
-            
-            // Si el orden es por precio y hay filtros, ordenar después de recalcular precios
-            if ($o1 === 'precio') {
-                $productosCollection = $pr1->getCollection();
-                $productosOrdenados = $productosCollection->sortBy(function($producto) {
-                    return (float)($producto->precio ?? 999999);
-                })->values();
-                $pr1->setCollection($productosOrdenados);
+            // Recalcular precios de productos basándose en ofertas que coinciden con los filtros
+            if (!empty($fa1)) {
+                $pr1 = $this->recalcularPreciosConFiltros($pr1, $fa1);
             }
         }
 

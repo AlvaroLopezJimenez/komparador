@@ -16,13 +16,11 @@
      * Inicializa el sistema de carga dinámica
      */
     function init() {
-        // Si el usuario está autenticado, cargar datos directamente sin token
-
-        if (window.usuarioAutenticado === true) {
+        // Si el usuario está autenticado o CAPTCHA/fingerprint desactivado (.env), cargar datos directamente sin token
+        if (window.usuarioAutenticado === true || window.activarCaptchaFingerprint === false) {
             cargarDatos();
             return;
         }
-        
 
         fingerprint = window.generateFingerprint ? window.generateFingerprint() : generateFingerprintFallback();
         
@@ -181,7 +179,7 @@
             };
             
 
-            if (window.usuarioAutenticado !== true) {
+            if (window.usuarioAutenticado !== true && window.activarCaptchaFingerprint !== false) {
                 const token = await obtenerToken();
                 headers['X-Auth-Token'] = token;
                 headers['X-Fingerprint'] = fingerprint;
@@ -203,7 +201,7 @@
                 }
                 
 
-                if (window.usuarioAutenticado === true) {
+                if (window.usuarioAutenticado === true || window.activarCaptchaFingerprint === false) {
                     throw new Error(errorData.error || 'Error al cargar ofertas');
                 }
                 
@@ -255,15 +253,16 @@
      */
     async function cargarEspecificaciones(productoId) {
         try {
-            const token = await obtenerToken();
+            const headers = { 'Accept': 'application/json' };
+            if (window.usuarioAutenticado !== true && window.activarCaptchaFingerprint !== false) {
+                const token = await obtenerToken();
+                headers['X-Auth-Token'] = token;
+                headers['X-Fingerprint'] = fingerprint;
+            }
             
             const response = await fetch(`/api/especificaciones/${productoId}`, {
                 method: 'GET',
-                headers: {
-                    'X-Auth-Token': token,
-                    'X-Fingerprint': fingerprint,
-                    'Accept': 'application/json'
-                },
+                headers: headers,
                 credentials: 'same-origin'
             });
             
@@ -300,7 +299,7 @@
             };
             
 
-            if (window.usuarioAutenticado !== true) {
+            if (window.usuarioAutenticado !== true && window.activarCaptchaFingerprint !== false) {
                 const token = await obtenerToken();
                 headers['X-Auth-Token'] = token;
                 headers['X-Fingerprint'] = fingerprint;
@@ -474,7 +473,7 @@
                             <button type="submit" 
                                     id="btn-verificar-captcha"
                                     disabled
-                                    class="w-full disabled:bg-gray-400 disabled:cursor-not-allowed bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors">
+                                    class="w-full disabled:bg-gray-400 disabled:cursor-not-allowed bg-[#70b216] hover:bg-[#60a013] text-white font-semibold py-3 px-4 rounded-lg transition-colors">
                                 Verificar y continuar
                             </button>
                         </form>
@@ -522,7 +521,13 @@
      */
     window.onCaptchaSuccessRateLimit = function(token) {
         document.getElementById('captcha-token').value = token;
-        document.getElementById('btn-verificar-captcha').disabled = false;
+        const btn = document.getElementById('btn-verificar-captcha');
+        if (btn) {
+            btn.disabled = false;
+            btn.style.backgroundColor = '#70b216';
+            btn.onmouseover = function() { this.style.backgroundColor = '#60a013'; };
+            btn.onmouseout = function() { this.style.backgroundColor = '#70b216'; };
+        }
     };
     
     /**

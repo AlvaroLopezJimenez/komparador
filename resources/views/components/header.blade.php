@@ -22,138 +22,52 @@ if (!function_exists('_f1')) {
     }
 }
 
-// Detectar si estamos en una vista que tiene el componente listado-categorias-horizontal-head
-// (index.blade.php o comparador/unidades.blade.php)
-// Si estamos en home o en una ruta con múltiples categorías (patrón categoria/categoria/slug), ocultamos el hamburguesa
+// En home hay <x-listado-categorias-horizontal-head />: ocultamos el enlace «Categorías» del nav escritorio.
+// La hamburguesa se muestra en todas las vistas (incl. comparador/unidades).
 $rutaActual = request()->route();
 $esHome = $rutaActual && $rutaActual->getName() === 'home';
-
-// Detectar si es la vista comparador/unidades
-// Forma 1: Verificar si existe la variable $producto (solo está en comparador/unidades)
-$esComparadorUnidades = isset($producto) && is_object($producto);
-
-// Forma 2: Si la forma 1 no funciona, verificar el patrón de la URL
-if (!$esComparadorUnidades) {
-    $path = trim(request()->path(), '/');
-    $segmentos = array_filter(explode('/', $path));
-    
-    // La ruta de comparador/unidades tiene el patrón: categoria1/categoria2/.../slug (mínimo 2 segmentos)
-    $rutasExcluidas = ['buscar', 'categoria', 'categorias', 'contacto', 'politicas', 'api'];
-    $primerSegmento = $segmentos[0] ?? '';
-    
-    if (count($segmentos) >= 2 && !empty($primerSegmento) && !in_array($primerSegmento, $rutasExcluidas)) {
-        // Verificar que no sea ninguna de las rutas conocidas
-        $esComparadorUnidades = !request()->is('buscar*') && 
-                                !request()->is('categoria*') && 
-                                !request()->is('categorias*') &&
-                                !request()->is('politicas*') &&
-                                !request()->is('api*');
-    }
-}
-
-$ocultarHamburguesa = $esHome || $esComparadorUnidades;
+$ocultarEnlaceCategoriasNav = $esHome;
 @endphp
-{{-- HEADER --}}
-    <header class="bg-white shadow px-6 py-4 max-w-7xl mx-auto w-full">
-    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 w-full">
-
-{{-- LOGO + BUSCADOR (movil/tablet) + HAMBURGUESA --}}
-<div class="flex items-center w-full gap-2 lg:w-auto flex-nowrap header-mobile-container">
-    {{-- LOGO --}}
-    <div class="flex items-center flex-shrink-0 header-logo">
-        {{-- añadirCam() -> _f1() --}}
-        <a href="{{ _f1(route('home')) }}" class="flex items-center">
-        <img src="{{ asset('images/icono.webp') }}" alt="Logo móvil y tablet" class="h-8 w-auto block lg:hidden">
-        <img src="{{ asset('images/logo.webp') }}" alt="Logo escritorio" class="h-12 w-auto hidden lg:block">
-        </a>
-    </div>
-
-    {{-- BUSCADOR MÓVIL + TABLET --}}
-    <div class="flex-1 lg:hidden header-search">
-        <div class="relative w-full">
-            {{-- añadirCam() -> _f1() --}}
-            <form action="{{ _f1(route('buscar')) }}" method="GET" class="flex w-full" id="form-search-mobile">
-                <input type="text"
-                       name="q"
-                       placeholder="Buscar productos..."
-                       class="flex-1 px-2 py-2 border border-gray-300 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                       id="sim1"
-                       required>
-                <button type="submit"
-                        style="background-color: #5f8c21;"
-                        class="px-3 py-2 text-white rounded-r-lg hover:bg-[#4d7a1a] transition-colors text-sm"
-                        onmouseover="this.style.backgroundColor='#4d7a1a'"
-                        onmouseout="this.style.backgroundColor='#5f8c21'">
-                    Buscar
-                </button>
-            </form>
-            {{-- SUGERENCIAS QUE MUESTRA EL BUSCADOR--}}
-            {{-- sugerencias-mobile -> sgm1 --}}
-            <div id="sgm1" class="max-h-72 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-b-lg shadow-lg z-50 hidden">
-                {{-- Las sugerencias se cargarán aquí dinámicamente --}}
-            </div>
-        </div>
-    </div>
-
-    {{-- BOTÓN HAMBURGUESA --}}
-    {{-- btnMenu -> bm1 --}}
-    @if(!$ocultarHamburguesa)
-    <button id="bm1" class="ml-3 block lg:hidden flex-shrink-0 p-1 header-menu-btn">
-        <svg class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M4 6h16M4 12h16M4 18h16" />
-        </svg>
-    </button>
-    @endif
-</div>
-
-
-        {{-- BUSCADOR ESCRITORIO --}}
-        <div class="hidden lg:block flex-1 max-w-xl mx-auto">
-            <div class="relative">
-                {{-- añadirCam() -> _f1() --}}
-            <form action="{{ _f1(route('buscar')) }}" method="GET" class="flex w-full" id="form-search-desktop">
-                    <input type="text"
-                           name="q"
-                           placeholder="Buscar productos..."
-                           class="flex-1 px-3 py-2 border border-gray-300 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
-                           id="si1"
-                           required>
-                    <button type="submit"
-                            style="background-color: #5f8c21;"
-                            class="px-4 py-2 text-white rounded-r-lg hover:bg-[#4d7a1a] transition-colors text-base"
-                            onmouseover="this.style.backgroundColor='#4d7a1a'"
-                            onmouseout="this.style.backgroundColor='#5f8c21'">
-                        Buscar
-                    </button>
-                </form>
-
-                {{-- SUGERENCIAS --}}
-                {{-- sugerencias-desktop -> sgd1 --}}
-                <div id="sgd1" class="max-h-72 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-b-lg shadow-lg z-50 hidden">
-                    {{-- Las sugerencias se cargarán aquí dinámicamente --}}
-                </div>
-            </div>
-        </div>
-
-        {{-- NAV ESCRITORIO --}}
-        <nav class="hidden lg:flex space-x-2">
-            {{-- añadirCam() -> _f1() --}}
-            <a href="{{ _f1(route('home')) }}" class="px-4 py-2 rounded text-gray-700 font-medium hover:bg-gray-200 hover:shadow-md">Inicio</a>
-            {{-- añadirCam() -> _f1() --}}
-            <a href="{{ _f1(route('buscar', ['q' => 'precios hot'])) }}" class="px-4 py-2 rounded text-gray-700 font-medium hover:bg-gray-200 hover:shadow-md">🔥 Precios Hot</a>
-            {{-- añadirCam() -> _f1() --}}
-            <a href="{{ _f1(route('buscar', ['q' => 'más vendidos'])) }}" class="px-4 py-2 rounded text-gray-700 font-medium hover:bg-gray-200 hover:shadow-md flex items-center gap-1">
-                <svg class="w-5 h-5" style="color: #73b112;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 4v16m8-8H4"></path>
-                </svg>
-                <span>Vendidos</span>
+<header class="kk-header-wrap">
+    <div class="kk-header-inner">
+        <div class="kk-logo-zone">
+            <a href="{{ _f1(route('home')) }}" class="kk-logo-link">
+                <img src="{{ asset('images/logo.webp') }}" alt="Komparador" class="kk-logo-desktop">
+                <img src="{{ asset('images/icono.webp') }}" alt="Komparador" class="kk-logo-mobile">
             </a>
-            {{-- Mostrar Categorías solo cuando NO estemos en home ni en comparador/unidades --}}
-            @if(!$ocultarHamburguesa)
-            <a href="#" onclick="if(typeof window._ap1 === 'function') { window._ap1(); } return false;" class="px-4 py-2 rounded text-gray-700 font-medium hover:bg-gray-200 hover:shadow-md">Categorías</a>
+        </div>
+
+        <div class="kk-search-zone">
+            <div class="relative hidden lg:block">
+                <form action="{{ _f1(route('buscar')) }}" method="GET" class="kk-search" id="form-search-desktop">
+                    <input type="text" name="q" placeholder="Busca un producto, marca, modelo" id="si1" required>
+                    <button type="submit">Buscar</button>
+                </form>
+                <div id="sgd1" class="kk-suggest hidden"></div>
+            </div>
+            <div class="relative lg:hidden">
+                <form action="{{ _f1(route('buscar')) }}" method="GET" class="kk-search" id="form-search-mobile">
+                    <input type="text" name="q" placeholder="Busca un producto, marca, modelo" id="sim1" required>
+                    <button type="submit">Buscar</button>
+                </form>
+                <div id="sgm1" class="kk-suggest hidden"></div>
+            </div>
+        </div>
+
+        <nav class="kk-nav-desktop">
+            <a href="{{ _f1(route('home')) }}">Inicio</a>
+            <a href="{{ _f1(route('buscar', ['q' => 'precios hot'])) }}">🔥 Precios Hot</a>
+            <a href="{{ _f1(route('buscar', ['q' => 'más vendidos'])) }}">Vendidos</a>
+            @if(!$ocultarEnlaceCategoriasNav)
+            <a href="#" onclick="if(typeof window._ap1 === 'function') { window._ap1(); } return false;">Categorías</a>
             @endif
         </nav>
+
+        <button type="button" id="bm1" class="kk-menu-btn lg:hidden" aria-label="Abrir menú" aria-expanded="false" aria-controls="nm1">
+            <svg class="kk-menu-btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+        </button>
     </div>
 </header>
 
@@ -162,19 +76,12 @@ $ocultarHamburguesa = $esHome || $esComparadorUnidades;
 
     {{-- NAV MÓVIL --}}
     {{-- navMobile -> nm1 --}}
-    <nav id="nm1" class="hidden bg-white shadow-lg lg:hidden">
-        <div class="px-6 py-4 space-y-2">
-            {{-- añadirCam() -> _f1() --}}
-            <a href="{{ _f1(route('home')) }}" class="block px-4 py-2 rounded text-gray-700 font-medium transition-all duration-200 hover:bg-gray-200">
-                Inicio
-            </a>
-            {{-- añadirCam() -> _f1() --}}
-            <a href="{{ _f1(route('buscar', ['q' => 'precios hot'])) }}" class="block px-4 py-2 rounded text-gray-700 font-medium transition-all duration-200 hover:bg-gray-200">
-                🔥 Precios Hot
-            </a>
-            {{-- añadirCam() -> _f1() --}}
-            <a href="{{ _f1(route('buscar', ['q' => 'más vendidos'])) }}" class="block px-4 py-2 rounded text-gray-700 font-medium transition-all duration-200 hover:bg-gray-200 flex items-center gap-2">
-                <svg class="w-5 h-5" style="color: #73b112;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <nav id="nm1" class="hidden kk-mobile-nav lg:hidden">
+        <div class="kk-mobile-nav-inner">
+            <a href="{{ _f1(route('home')) }}">Inicio</a>
+            <a href="{{ _f1(route('buscar', ['q' => 'precios hot'])) }}">🔥 Precios Hot</a>
+            <a href="{{ _f1(route('buscar', ['q' => 'más vendidos'])) }}" class="kk-mobile-nav-vendidos">
+                <svg class="kk-mobile-nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 4v16m8-8H4"></path>
                 </svg>
                 <span>Vendidos</span>
@@ -183,37 +90,143 @@ $ocultarHamburguesa = $esHome || $esComparadorUnidades;
     </nav>
 
     <style>
-    {{-- Estilos específicos para el header móvil --}}
-    @media (max-width: 1024px) {
-        .header-mobile-container {
-            display: flex;
-            align-items: center;
-            width: 100%;
-            gap: 0.5rem;
-            flex-wrap: nowrap;
+    .kk-header-wrap {
+        position: sticky;
+        top: 0;
+        z-index: 110;
+        border-bottom: 1px solid #e2e8f0;
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(12px);
+    }
+    .kk-header-inner {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: .75rem 1rem;
+        display: flex;
+        flex-wrap: nowrap;
+        align-items: center;
+        gap: .5rem;
+    }
+    .kk-logo-zone { flex-shrink: 0; }
+    .kk-search-zone {
+        flex: 1 1 0;
+        min-width: 0;
+    }
+    .kk-logo-link { display: inline-flex; align-items: center; }
+    .kk-logo-desktop { height: 34px; width: auto; display: none; }
+    .kk-logo-mobile { height: 30px; width: auto; display: block; }
+    .kk-search {
+        display: flex;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        overflow: hidden;
+        background: #f1f5f9;
+    }
+    .kk-search:focus-within {
+        border-color: #e97b11;
+        box-shadow: 0 0 0 3px rgba(233, 123, 17, 0.15);
+        background: #fff;
+    }
+    .kk-search input {
+        flex: 1;
+        border: none;
+        background: transparent;
+        outline: none;
+        padding: .6rem .8rem;
+        font-size: .88rem;
+    }
+    .kk-search button {
+        border: none;
+        background: #e97b11;
+        color: #fff;
+        font-weight: 700;
+        font-size: .82rem;
+        padding: 0 .9rem;
+    }
+    .kk-search button:hover { background: #d16a0f; }
+    .kk-suggest {
+        max-height: 18rem;
+        overflow-y: auto;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-top: none;
+        border-radius: 0 0 12px 12px;
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+        z-index: 150;
+    }
+    .kk-nav-desktop { display: none; align-items: center; gap: .25rem; }
+    .kk-nav-desktop a {
+        font-size: .83rem;
+        font-weight: 600;
+        color: #475569;
+        border-radius: .62rem;
+        padding: .45rem .7rem;
+        white-space: nowrap;
+    }
+    .kk-nav-desktop a:hover { background: #fef3e7; color: #d16a0f; }
+    .kk-menu-btn {
+        flex-shrink: 0;
+        margin-left: .25rem;
+        border: 1px solid #e2e8f0;
+        border-radius: .65rem;
+        padding: .45rem;
+        color: #334155;
+        background: #fff;
+        line-height: 0;
+    }
+    .kk-menu-btn-icon { width: 1.5rem; height: 1.5rem; display: block; }
+    .kk-menu-btn:hover { background: #f8fafc; }
+    .kk-mobile-nav {
+        border-bottom: 1px solid #e2e8f0;
+        background: #fff;
+        box-shadow: 0 10px 15px -3px rgba(15, 23, 42, 0.08), 0 4px 6px -4px rgba(15, 23, 42, 0.06);
+    }
+    .kk-mobile-nav-vendidos {
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+    }
+    .kk-mobile-nav-icon {
+        width: 1.25rem;
+        height: 1.25rem;
+        flex-shrink: 0;
+        color: #73b112;
+    }
+    .kk-mobile-nav-inner {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: .7rem 1rem .9rem;
+        display: grid;
+        gap: .45rem;
+    }
+    .kk-mobile-nav-inner a {
+        border-radius: .55rem;
+        padding: .5rem .65rem;
+        font-size: .86rem;
+        font-weight: 600;
+        color: #334155;
+    }
+    .kk-mobile-nav-inner a:hover { background: #f8fafc; color: #d16a0f; }
+    @media (min-width: 1024px) {
+        .kk-logo-desktop { display: block; }
+        .kk-logo-mobile { display: none; }
+        .kk-nav-desktop { display: inline-flex; }
+        .kk-header-inner {
+            display: grid;
+            grid-template-columns: auto 1fr auto auto;
+            gap: .8rem;
+            padding: .85rem 1rem;
         }
-        
-        .header-logo {
-            flex-shrink: 0;
-            min-width: auto;
+        .kk-logo-zone { flex-shrink: unset; }
+        .kk-search-zone {
+            flex: unset;
+            min-width: unset;
         }
-        
-        .header-search {
-            flex: 1;
-            min-width: 0;
-        }
-        
-        .header-menu-btn {
-            flex-shrink: 0;
-            margin-left: 0.75rem;
-            padding: 0.25rem;
-        }
-        
-        {{-- Asegurar que el logo no ocupe demasiado espacio --}}
-        .header-logo img {
-            max-width: 40px;
-            height: auto;
-        }
+        .kk-menu-btn { margin-left: 0; }
     }
     </style>
 
@@ -276,14 +289,16 @@ $ocultarHamburguesa = $esHome || $esComparadorUnidades;
     const _bm1 = document.getElementById('bm1');
     if (_bm1) {
         _bm1.addEventListener('click', function() {
-            {{-- Si el panel de categorías está disponible, abrirlo --}}
-            {{-- Si no, mostrar el menú móvil tradicional --}}
+            {{-- Si el panel de categorías está disponible, abrirlo (mismo comportamiento que la copia) --}}
+            {{-- Si no, desplegar el nav móvil #nm1 --}}
             if (typeof window._ap1 === 'function') {
                 window._ap1();
             } else {
                 const _n1 = document.getElementById('nm1');
                 if (_n1) {
                     _n1.classList.toggle('hidden');
+                    const _open = !_n1.classList.contains('hidden');
+                    _bm1.setAttribute('aria-expanded', _open ? 'true' : 'false');
                 }
             }
         });

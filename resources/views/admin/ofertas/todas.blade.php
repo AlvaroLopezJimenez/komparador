@@ -12,9 +12,29 @@
 
     <div class="py-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="mb-4 flex justify-end gap-2">
-            <a href="{{ route('admin.ofertas.crear-masivo') }}"
-                class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
-                Crear ofertas en masa
+            <a href="{{ route('admin.neo.prueba-neoobjetivos') }}"
+                class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">
+                prueba neo
+            </a>
+            <a href="{{ route('admin.neo.eliminar-por-urls') }}"
+                class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">
+                eliminar neo
+            </a>
+            <a href="{{ route('admin.neo.crear-masivo') }}"
+                class="bg-pink-500 text-white px-4 py-2 rounded hover:bg-pink-600">
+                Crear masivo Neo
+            </a>
+            <a href="{{ route('admin.neo.index') }}"
+                class="bg-pink-500 text-white px-4 py-2 rounded hover:bg-pink-600">
+                Listado Neo
+            </a>
+            <a href="{{ route('admin.neo.productos-sin-neo') }}"
+                class="bg-pink-500 text-white px-4 py-2 rounded hover:bg-pink-600">
+                Productos sin Neo
+            </a>
+            <a href="{{ route('admin.neo.sin-url-completar') }}"
+                class="bg-pink-500 text-white px-4 py-2 rounded hover:bg-pink-600">
+                Sin URL
             </a>
             <a href="{{ route('admin.ofertas.create.formularioGeneral') }}"
                 class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
@@ -171,9 +191,41 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="9" class="px-6 py-4 text-center text-gray-500">No hay ofertas registradas.</td>
+                        <td colspan="9" class="px-6 py-4 text-center text-gray-500">
+                            @if(!empty($urlsDescartadasCoincidentes) && $urlsDescartadasCoincidentes->isNotEmpty())
+                                No hay ofertas que coincidan con la búsqueda.
+                            @else
+                                No hay ofertas registradas.
+                            @endif
+                        </td>
                     </tr>
                     @endforelse
+                    @if(!empty($urlsDescartadasCoincidentes) && $urlsDescartadasCoincidentes->isNotEmpty())
+                        @foreach($urlsDescartadasCoincidentes as $urlDescartada)
+                        <tr class="bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-500">
+                            <td class="px-6 py-3">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-amber-200 text-amber-900 dark:bg-amber-800 dark:text-amber-200">
+                                    URL descartada
+                                </span>
+                            </td>
+                            <td class="px-6 py-3" colspan="7">
+                                <a href="{{ $urlDescartada->url }}" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 break-all">
+                                    {{ $urlDescartada->url }}
+                                </a>
+                                @if($urlDescartada->created_at)
+                                    <span class="text-xs text-gray-500 dark:text-gray-400 ml-2">(añadida {{ $urlDescartada->created_at->format('d/m/Y') }})</span>
+                                @endif
+                            </td>
+                            <td class="px-6 py-3 text-right">
+                                <a href="{{ $urlDescartada->url }}" target="_blank" class="text-green-600 hover:text-green-800" title="Abrir URL">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 3h7m0 0v7m0-7L10 14" />
+                                    </svg>
+                                </a>
+                            </td>
+                        </tr>
+                        @endforeach
+                    @endif
                 </tbody>
             </table>
         </div>

@@ -56,10 +56,18 @@
 <meta name="csrf-token" content="{{ csrf_token() }}">
 {{-- Icono --}}
     <link rel="icon" type="image/png" href="{{ asset('images/icono.webp') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,500&display=swap" rel="stylesheet">
+  @php $activarCaptchaFingerprint = config('anti-scraping.activar_captcha_fingerprint'); @endphp
+  @if($activarCaptchaFingerprint)
+  {{-- Con límites: fingerprint + carga dinámica con token/CAPTCHA --}}
   @vite(['resources/css/app.css', 'resources/js/app.js', 'resources/js/fingerprint.js', 'resources/js/carga-datos-dinamica.js'])
-
-  {{-- Script de reCAPTCHA (igual que en redireccion.blade.php) --}}
   <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+  @else
+  {{-- Sin límites: solo carga dinámica (ofertas/histórico se piden sin token) --}}
+  @vite(['resources/css/app.css', 'resources/js/app.js', 'resources/js/carga-datos-dinamica.js'])
+  @endif
 
   {{-- SCRIPT PARA GOOGLE ANALYTICS--}}
     @if (env('GA_MEASUREMENT_ID'))
@@ -195,7 +203,7 @@
       height: 100%;
     }
 
-    {{-- Estilos para el contenedor de mejores ofertas con efecto gaming --}}
+    {{-- Mejores precios: borde animado y badge como antes (compatibilidad con JS existente) --}}
     .mejor-oferta-gaming-container {
       position: relative;
       overflow: hidden;
@@ -228,7 +236,6 @@
       z-index: 2;
     }
 
-    {{-- Contenedor interno para mantener el espaciado --}}
     .mejor-oferta-gaming-container .ofertas-grupo {
       display: flex;
       flex-direction: column;
@@ -253,7 +260,6 @@
       pointer-events: none;
     }
 
-    {{-- Mantener los estilos originales por compatibilidad --}}
     .mejor-oferta-gaming {
       position: relative;
       overflow: hidden;
@@ -336,7 +342,6 @@
       }
     }
 
-    {{-- Efecto de brillo solo en el botón --}}
     .mejor-oferta-gaming .boton,
     .mejor-oferta-gaming-container .boton {
       position: relative;
@@ -944,6 +949,33 @@
       object-fit: cover;
       border-radius: 0.375rem;
     }
+
+    {{-- Cuatro cuadrados en una fila, repartiendo el ancho (sin scroll) --}}
+    #carrusel-miniaturas-desktop {
+      display: flex;
+      flex-wrap: nowrap;
+      align-items: center;
+      justify-content: center;
+      gap: 0.35rem;
+      width: 100%;
+      max-width: 100%;
+      overflow: hidden;
+    }
+    #carrusel-miniaturas-desktop > .miniatura-pagina-desktop {
+      flex: 1 1 0;
+      min-width: 0;
+      width: auto;
+      height: auto;
+      aspect-ratio: 1;
+      align-self: center;
+    }
+    #carrusel-miniaturas-desktop .boton-mas > div {
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      min-width: 0;
+      box-sizing: border-box;
+    }
     
     #miniaturas-container-movil {
       scrollbar-width: thin;
@@ -1005,10 +1037,287 @@
         opacity: 1;
       }
     }
+
+    {{-- Rediseño ficha producto (alineado con index-producto.html) — no cambia IDs ni clases usadas por JS --}}
+    :root {
+      --kk-u-brand: #e97b11;
+      --kk-u-brand-dark: #c9680e;
+      --kk-u-brand-soft: #fef3e7;
+      --kk-u-ink: #0f172a;
+      --kk-u-muted: #475569;
+      --kk-u-line: #e2e8f0;
+      --kk-u-surface: #ffffff;
+      --kk-u-canvas: #f8fafc;
+      --kk-u-radius: 14px;
+      --kk-u-radius-sm: 10px;
+      --kk-u-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 8px 24px rgba(15, 23, 42, 0.06);
+      --kk-u-font: "Plus Jakarta Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+    }
+
+    .kk-u-body {
+      font-family: var(--kk-u-font) !important;
+      background: var(--kk-u-canvas) !important;
+      color: var(--kk-u-ink);
+      -webkit-font-smoothing: antialiased;
+      font-size: 1rem;
+    }
+
+    {{-- Mismo ancho que .kk-header-inner y .kk-catbar-inner (1200px) --}}
+    .kk-u-wrap {
+      background: transparent !important;
+      max-width: 1200px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .kk-u-wrap nav a[href]:hover {
+      color: var(--kk-u-brand) !important;
+    }
+
+    .kk-u-card {
+      background: var(--kk-u-surface) !important;
+      border: 1px solid var(--kk-u-line) !important;
+      border-radius: var(--kk-u-radius) !important;
+      box-shadow: var(--kk-u-shadow) !important;
+    }
+
+    @media (min-width: 1024px) {
+      {{-- Igual que grid-cols-4 original: misma altura de fila en las 3 tarjetas (stretch por defecto) --}}
+      .kk-u-product-top {
+        grid-template-columns: minmax(200px, 240px) minmax(0, 2fr) minmax(260px, 1fr) !important;
+        align-items: stretch;
+      }
+      .kk-u-product-top > .kk-u-gallery,
+      .kk-u-product-top > .kk-u-main-col {
+        min-height: 0;
+      }
+      .kk-u-product-top > .kk-u-chart {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        height: 100%;
+      }
+      .kk-u-product-top .kk-u-chart-inner {
+        flex: 1 1 auto;
+        min-height: 220px;
+        height: auto !important;
+      }
+      .kk-u-chart-movil {
+        display: none !important;
+      }
+    }
+
+    .kk-u-gallery {
+      padding: 1.1rem !important;
+    }
+
+    .kk-u-main-col {
+      overflow: hidden;
+    }
+
+    .kk-u-main-col .border-gray-200 {
+      border-color: var(--kk-u-line) !important;
+    }
+
+    {{-- Sin height:auto global: en desktop el gráfico debe estirarse con la fila del grid --}}
+    .kk-u-chart {
+      min-height: 0 !important;
+      padding: 1rem !important;
+    }
+
+    @media (max-width: 1023px) {
+      .kk-u-chart-movil.kk-u-chart {
+        height: auto;
+        display: flex;
+        flex-direction: column;
+      }
+    }
+
+    .kk-u-chart .kk-u-chart-inner {
+      flex: 1 1 auto;
+      min-height: 220px;
+      height: 253px;
+      position: relative;
+    }
+    {{-- Canvas en bloque evita hueco baseline y suavizado raro en etiquetas --}}
+    .kk-u-chart-inner canvas,
+    #graficoPrecios,
+    #graficoPreciosMovil {
+      display: block;
+      max-width: 100%;
+    }
+
+    @media (max-width: 1023px) {
+      .kk-u-chart-movil .kk-u-chart-inner {
+        height: 250px;
+      }
+    }
+
+    {{-- Sin !important en fondo/color: _ab1() asigna estilo en línea al período activo --}}
+    #btn-3m, #btn-6m, #btn-9m, #btn-1y,
+    #btn-3m-movil, #btn-6m-movil, #btn-9m-movil, #btn-1y-movil {
+      padding: 0.35rem 0.65rem;
+      border-radius: 8px;
+      border: 1px solid var(--kk-u-line);
+      background: var(--kk-u-surface);
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--kk-u-muted);
+    }
+
+    .kk-u-filters {
+      display: flex !important;
+      flex-wrap: nowrap !important;
+      align-items: center !important;
+      gap: 0.5rem 0.65rem !important;
+      padding: 0.5rem 0.65rem !important;
+      background: #e2e8f0 !important;
+      border: 1px solid #cbd5e1 !important;
+      border-radius: var(--kk-u-radius-sm) !important;
+      margin-bottom: 1rem !important;
+      overflow-x: auto !important;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+    }
+
+    .kk-u-filters > div {
+      flex: 0 0 auto;
+    }
+
+    .kk-u-filters label.font-semibold {
+      font-size: 0.75rem !important;
+      font-weight: 700 !important;
+      margin: 0 !important;
+      white-space: nowrap;
+    }
+
+    .kk-u-filters select {
+      padding: 0.28rem 0.45rem !important;
+      border-radius: 8px !important;
+      border: 1px solid #94a3b8 !important;
+      font-size: 0.75rem !important;
+      min-width: 0 !important;
+      width: auto !important;
+      max-width: 160px !important;
+      background: var(--kk-u-surface) !important;
+    }
+
+    @media (min-width: 900px) {
+      .kk-u-filters select {
+        max-width: 175px !important;
+      }
+    }
+
+    .kk-u-filters #x4,
+    .kk-u-filters #x5 {
+      padding: 0.28rem 0.55rem !important;
+      border-radius: 8px !important;
+      font-size: 0.75rem !important;
+      font-weight: 700 !important;
+      white-space: nowrap;
+    }
+
+    .kk-u-filters #x4 {
+      background: var(--kk-u-ink) !important;
+      color: #fff !important;
+      border-color: var(--kk-u-ink) !important;
+    }
+
+    .kk-u-filters #x5 {
+      background: var(--kk-u-surface) !important;
+      color: var(--kk-u-brand-dark) !important;
+      border: 1px solid var(--kk-u-line) !important;
+    }
+
+    .kk-u-alert {
+      background: linear-gradient(145deg, #1e293b 0%, #334155 55%, #0f172a 100%) !important;
+      border-radius: var(--kk-u-radius) !important;
+      box-shadow: var(--kk-u-shadow) !important;
+      border: none !important;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .kk-u-alert::before {
+      content: "";
+      position: absolute;
+      width: 180px;
+      height: 180px;
+      right: -60px;
+      top: -60px;
+      background: radial-gradient(circle, rgba(233, 123, 17, 0.35) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .kk-u-alert > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    .kk-u-alert label {
+      color: #94a3b8 !important;
+      font-size: 0.75rem !important;
+      font-weight: 600 !important;
+    }
+
+    .kk-u-alert input[type="email"],
+    .kk-u-alert input[type="number"] {
+      border-radius: 10px !important;
+      border: 1px solid rgba(255, 255, 255, 0.15) !important;
+      background: rgba(255, 255, 255, 0.08) !important;
+      color: #fff !important;
+    }
+
+    .kk-u-alert input::placeholder {
+      color: #64748b !important;
+    }
+
+    .kk-u-alert button[type="submit"] {
+      border-radius: 10px !important;
+      background: linear-gradient(135deg, var(--kk-u-brand) 0%, #f59e0b 100%) !important;
+      color: #fff !important;
+      font-weight: 800 !important;
+      box-shadow: 0 4px 16px rgba(233, 123, 17, 0.35);
+    }
+
+    .kk-u-side-card {
+      border-radius: var(--kk-u-radius) !important;
+      border: 1px solid var(--kk-u-line) !important;
+      box-shadow: var(--kk-u-shadow) !important;
+    }
+
+    .kk-u-side-card h3 {
+      font-weight: 800 !important;
+      color: var(--kk-u-ink) !important;
+    }
+
+    .kk-u-mobile-hero {
+      border-radius: var(--kk-u-radius) !important;
+      border: 1px solid var(--kk-u-line) !important;
+      box-shadow: var(--kk-u-shadow) !important;
+    }
+
+    .kk-u-btn-primary {
+      background: var(--kk-u-brand) !important;
+      border-radius: var(--kk-u-radius-sm) !important;
+    }
+
+    #x8 {
+      background: var(--kk-u-brand-dark) !important;
+      border-radius: var(--kk-u-radius-sm) !important;
+    }
+
+    #titulo-producto-unico {
+      font-size: clamp(0.95rem, 2.5vw, 1.12rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.3;
+      color: var(--kk-u-ink);
+    }
   </style>
 </head>
 
-<body class="bg-gray-50">
+<body class="bg-gray-50 kk-u-body">
   @php
   // Los precios se calcularán en JavaScript después de aplicar descuentos
   $precioMin = null;
@@ -1050,7 +1359,7 @@
     $todasLasOfertas = $producto->ofertas()->orderBy('id')->get();
   @endphp
   <div class="bg-black text-white py-2 px-4 sticky top-0 z-50 shadow-lg">
-    <div class="max-w-7xl mx-auto flex flex-wrap items-center gap-4 text-sm">
+    <div class="kk-u-wrap flex flex-wrap items-center gap-4 text-sm">
       {{-- Botón Modificar producto --}}
       <a href="{{ route('admin.productos.edit', $producto) }}" 
          target="_blank"
@@ -1160,10 +1469,9 @@
   </script>
   @endauth
 
-  {{-- BARRA DE CATEGORÍAS Y PANEL LATERAL --}}
-  <x-listado-categorias-horizontal-head />
-    
-  <div class="max-w-7xl mx-auto flex flex-col gap-2 py-2 px-4 bg-gray-100">
+  {{-- Panel lateral de categorías sigue disponible vía header (hamburguesa / enlace Categorías). --}}
+
+  <div class="flex flex-col gap-2 py-2 px-4 bg-gray-100 kk-u-wrap">
     {{-- BREADCRUMB --}}
 <nav class="mb-1">
     @php
@@ -1209,7 +1517,7 @@
     <h1 id="titulo-producto-unico" class="text-base font-bold mb-1 block lg:hidden">{{ $producto->nombre}}</h1>
     
     {{-- BLOQUE MÓVIL ÚNICAMENTE --}}
-    <div class="block lg:hidden bg-white rounded-lg shadow pt-2 pb-2 px-4">
+    <div class="block lg:hidden bg-white rounded-lg shadow pt-2 pb-2 px-4 kk-u-mobile-hero">
       {{-- Primera fila: Imagen del producto con miniaturas a los lados --}}
       <div class="flex flex-col items-center mb-4">
         {{-- Imagen principal --}}
@@ -1305,7 +1613,7 @@
       </div>
       
       {{-- Botón para ver todas las ofertas --}}
-      <a href="#listado-precios" class="block w-full text-center py-3 text-white rounded font-semibold mb-4 -mt-1" style="background-color: #d16a0f;" onmouseover="this.style.backgroundColor='#b85a0d'" onmouseout="this.style.backgroundColor='#d16a0f'">
+      <a href="#listado-precios" class="kk-u-btn-primary block w-full text-center py-3 text-white rounded font-semibold mb-4 -mt-1" style="background-color: #d16a0f;" onmouseover="this.style.backgroundColor='#b85a0d'" onmouseout="this.style.backgroundColor='#d16a0f'">
         Ver todas las ofertas ({{ count($ofertas) }})
       </a>
       {{-- x10: Descripción corta (móvil) --}}
@@ -1323,16 +1631,16 @@
     </div>
 
     {{-- BLOQUE DESKTOP ÚNICAMENTE --}}
-    <div class="hidden lg:grid grid-cols-4 gap-4 mb-4">
-      <div class="bg-white rounded-lg shadow p-4 flex flex-col items-center justify-center">
+    <div class="hidden lg:grid kk-u-product-top gap-4 mb-4">
+      <div class="bg-white rounded-lg shadow p-4 flex flex-col items-center justify-center kk-u-card kk-u-gallery">
         <img src="{{ asset('images/' . ($producto->imagen_pequena[0] ?? '')) }}" alt="Imagen de {{$producto->nombre}}" class="max-h-60 object-contain cursor-pointer mb-3" id="imagen-producto-desktop" onclick="_am1()">
         {{-- Carrusel de miniaturas desktop --}}
-        <div id="carrusel-miniaturas-desktop" class="flex gap-2 justify-center items-center w-full flex-wrap" style="max-width: 100%;">
+        <div id="carrusel-miniaturas-desktop" class="w-full" style="max-width: 100%;">
           {{-- Las miniaturas se insertarán aquí dinámicamente --}}
         </div>
       </div>
 
-      <div class="col-span-2 bg-white rounded-lg shadow overflow-hidden flex flex-col">
+      <div class="bg-white rounded-lg shadow overflow-hidden flex flex-col kk-u-card kk-u-main-col">
         <div class="pt-4 pb-2 px-4" id="contenedor-titulo-desktop">
           {{-- H1 único se moverá aquí en desktop mediante JavaScript --}}
           {{-- x14: Descripción corta (desktop) --}}
@@ -1410,16 +1718,16 @@
       </div>
       
       {{-- GRAFICO HISTORICO PRECIO DESKTOP--}}
-      <div class="bg-white rounded-lg shadow p-4" style="height: 325px;">
+      <div class="bg-white rounded-lg shadow kk-u-card kk-u-chart">
         <div class="flex justify-center items-center mb-4">
-          <div class="flex space-x-2">
+          <div class="flex flex-wrap justify-center gap-2">
             <button id="btn-3m" class="px-3 py-1 text-sm border rounded hover:bg-gray-100 transition-colors" data-periodo="3m">3M</button>
             <button id="btn-6m" class="px-3 py-1 text-sm border rounded hover:bg-gray-100 transition-colors" data-periodo="6m">6M</button>
             <button id="btn-9m" class="px-3 py-1 text-sm border rounded hover:bg-gray-100 transition-colors" data-periodo="9m">9M</button>
             <button id="btn-1y" class="px-3 py-1 text-sm border rounded hover:bg-gray-100 transition-colors" data-periodo="1y">1A</button>
           </div>
         </div>
-        <div class="relative" style="height: 253px;">
+        <div class="relative kk-u-chart-inner">
           <canvas id="graficoPrecios" class="w-full h-full"></canvas>
         </div>
       </div>
@@ -1430,7 +1738,7 @@
 
 
         {{-- FORMULARIO DE ALERTA DE PRECIO - DISEÑO AZUL-PÚRPURA --}}
-        <div class="bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg rounded-lg p-4 mb-6 text-white">
+        <div class="bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg rounded-lg p-4 mb-6 text-white kk-u-alert">
           <div class="flex items-center mb-3">
             <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-5 5v-5z"></path>
@@ -1480,7 +1788,7 @@
                      class="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-white/30 rounded bg-white/20">
               <label for="acepto_politicas2" class="text-sm text-blue-100">
                 Acepto las <a href="{{ route('politicas.privacidad') }}" target="_blank" class="text-yellow-300 hover:text-yellow-200 underline font-semibold">políticas de privacidad</a>. 
-                <span class="text-xs text-blue-200 block mt-1">Solo te avisaremos cuando baje el precio, nada de spam, ni publicidad👉👈.</span>
+                <span class="text-[11px] leading-snug text-blue-200 block mt-1">Solo te avisaremos cuando baje el precio, nada de spam, ni publicidad👉👈.</span>
               </label>
             </div>
             
@@ -1495,7 +1803,7 @@
           <div id="mensajeAlerta2" class="mt-3 text-sm hidden"></div>
         </div>
 
-        <div class="bg-white shadow rounded-lg p-4">
+        <div class="bg-white shadow rounded-lg p-4 kk-u-side-card">
           {{-- Productos por debajo del precio medio --}}
           @if($productosPrecioMedio->count() > 0)
           <div class="mb-6">
@@ -1559,17 +1867,17 @@
       </aside>
 
       {{-- GRÁFICO PARA MÓVIL Y TABLET --}}
-      <div class="block lg:hidden bg-white rounded-lg shadow p-4 mb-4">
-        <div class="flex justify-center items-center mb-4">
-          <h3 class="text-lg font-semibold text-gray-800 mr-4">Evolución del precio</h3>
-          <div class="flex space-x-2">
+      <div class="block lg:hidden bg-white rounded-lg shadow p-4 mb-4 kk-u-card kk-u-chart kk-u-chart-movil">
+        <div class="flex flex-col sm:flex-row sm:justify-center sm:items-center gap-3 mb-4">
+          <h3 class="text-lg font-semibold text-gray-800 text-center sm:text-left sm:mr-2 m-0">Evolución del precio</h3>
+          <div class="flex flex-wrap justify-center gap-2">
             <button id="btn-3m-movil" class="px-3 py-1 text-sm border rounded hover:bg-gray-100 transition-colors" data-periodo="3m">3M</button>
             <button id="btn-6m-movil" class="px-3 py-1 text-sm border rounded hover:bg-gray-100 transition-colors" data-periodo="6m">6M</button>
             <button id="btn-9m-movil" class="px-3 py-1 text-sm border rounded hover:bg-gray-100 transition-colors" data-periodo="9m">9M</button>
             <button id="btn-1y-movil" class="px-3 py-1 text-sm border rounded hover:bg-gray-100 transition-colors" data-periodo="1y">1A</button>
           </div>
         </div>
-        <div class="relative" style="height: 250px;">
+        <div class="relative kk-u-chart-inner">
           <canvas id="graficoPreciosMovil" class="w-full h-full"></canvas>
         </div>
       </div>
@@ -2013,7 +2321,7 @@
             ? $ofertas->where('unidades', $unidadSeleccionada)
             : $ofertas;
         @endphp
-        <div class="flex flex-wrap gap-4 mb-6 items-center bg-gray-200 border rounded">
+        <div class="kk-u-filters flex flex-wrap gap-4 mb-6 items-center bg-gray-200 border rounded">
           <div>
             {{-- x1: Filtro de tienda --}}
             <label for="x1" class="font-semibold mr-2 text-sm">Tienda:</label>
@@ -2113,7 +2421,7 @@
         </div>
         
         {{-- PRODUCTOS RELACIONADOS (DESKTOP) - Movido después del listado de ofertas --}}
-        <div class="hidden lg:block mt-6 bg-white rounded-lg shadow p-4">
+        <div class="hidden lg:block mt-6 bg-white rounded-lg shadow p-4 kk-u-card">
           <div class="flex items-center px-4 mt-2 mb-4 gap-2">
             <div class="flex-grow border-t border-gray-200"></div>
             <h2 class="text-base font-semibold text-gray-700 whitespace-nowrap">Ofertas similares a {{ $producto->marca }} {{ $producto->modelo }} {{ $producto->talla }}</h2>
@@ -2518,8 +2826,12 @@
           {{-- Indicar si el usuario está autenticado (para bypass del sistema anti-scraping) --}}
           window.usuarioAutenticado = {{ auth()->check() ? 'true' : 'false' }};
           
-          {{-- Site key de reCAPTCHA --}}
+          {{-- Si false, ofertas/históricos/especificaciones se cargan sin token ni límites (.env ACTIVAR_CAPTCHA_FINGERPRINT) --}}
+          window.activarCaptchaFingerprint = {{ $activarCaptchaFingerprint ? 'true' : 'false' }};
+          @if($activarCaptchaFingerprint)
+          {{-- Site key de reCAPTCHA (solo cuando CAPTCHA está activo) --}}
           window.recaptchaSiteKey = '{{ env("RECAPTCHA_SITE_KEY", "6LdVT0AsAAAAANV0xlEtKRr7y27sqoG1ICTAVBMV") }}';
+          @endif
           
           {{-- Configurar listeners ANTES de que se ejecute carga-datos-dinamica.js --}}
           (function() {
@@ -2761,6 +3073,10 @@
               tieneDescuento = true;
               badgeHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap; pointer-events: none; z-index: 10;">2a al 50%</span>';
               dataAttrs = `data-2a-al-50="true" data-url="${oferta.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;')}"`;
+            } else if (oferta.descuentos === '+Juego') {
+              tieneDescuento = true;
+              badgeHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #0ea5e9, #6366f1); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: 600; white-space: nowrap; pointer-events: none; z-index: 10;">+Juego</span>';
+              dataAttrs = '';
             }
             
             {{-- Si tiene descuento, usar <span> en lugar de <a> para evitar enlaces anidados --}}
@@ -4271,6 +4587,7 @@
                 const tieneDescuentosEnGrupo = grupo.ofertas.some(item => 
                   item.descuentos === 'cupon' || 
                   item.descuentos === '3x2' ||
+                  item.descuentos === '+Juego' ||
                   (item.descuentos && typeof item.descuentos === 'string' && (
                     item.descuentos.startsWith('cupon;') ||
                     item.descuentos.startsWith('SoloAliexpress;') ||
@@ -4370,6 +4687,7 @@
                 const tieneDescuento = primeraOferta.descuentos && (
                   primeraOferta.descuentos === 'cupon' || 
                   primeraOferta.descuentos === '3x2' ||
+                  primeraOferta.descuentos === '+Juego' ||
                   (typeof primeraOferta.descuentos === 'string' && (
                     primeraOferta.descuentos.startsWith('cupon;') ||
                     primeraOferta.descuentos.startsWith('SoloAliexpress;') ||
@@ -4411,6 +4729,9 @@
                 } else if (primeraOferta.descuentos === '3x2') {
                   botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #8b5cf6, #a855f7); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">3x2</span>' +
                     '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-3x2="true" target="_blank">Ir a la tienda</span></div>';
+                } else if (primeraOferta.descuentos === '+Juego') {
+                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #0ea5e9, #6366f1); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: 600; white-space: nowrap;">+Juego</span>' +
+                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'">Ir a la tienda</span></div>';
                 } else if (primeraOferta.descuentos === '2x1 - SoloCarrefour') {
                   botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #10b981, #059669); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">2x1</span>' +
                     '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2x1="true" target="_blank">Ir a la tienda</span></div>';
@@ -4526,6 +4847,7 @@
                     const tieneDescuentosEnGrupo = grupoMejoresOfertas.some(item => 
                       item.descuentos === 'cupon' || 
                       item.descuentos === '3x2' ||
+                      item.descuentos === '+Juego' ||
                       (item.descuentos && typeof item.descuentos === 'string' && (
                         item.descuentos.startsWith('cupon;') ||
                         item.descuentos.startsWith('SoloAliexpress;') ||
@@ -4726,6 +5048,9 @@
                     itemGrupo.descuentos === '2a al 50' ?
                     '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">2a al 50%</span>' +
                     '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2a-al-50="true" target="_blank">Ir a la tienda</span></div>' :
+                    itemGrupo.descuentos === '+Juego' ?
+                    '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #0ea5e9, #6366f1); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: 600; white-space: nowrap;">+Juego</span>' +
+                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'">Ir a la tienda</span></div>' :
                     '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'">Ir a la tienda</span>'
                   }
                       </div>
@@ -4862,6 +5187,9 @@
                 } else if (item.descuentos === '2a al 50') {
                   botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">2a al 50%</span>' +
                     '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2a-al-50="true" data-url="' + item.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;') + '">Ir a la tienda</span></div>';
+                } else if (item.descuentos === '+Juego') {
+                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #0ea5e9, #6366f1); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: 600; white-space: nowrap;">+Juego</span>' +
+                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'">Ir a la tienda</span></div>';
                 } else {
                   botonHtml = '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'">Ir a la tienda</span>';
                 }
@@ -5843,6 +6171,10 @@
           options: {
             responsive: true,
             maintainAspectRatio: false,
+            {{-- Nitidez en Retina / escalado: buffer del canvas alineado al DPR del dispositivo --}}
+            devicePixelRatio: (typeof window !== 'undefined' && window.devicePixelRatio)
+              ? Math.min(Math.max(window.devicePixelRatio, 1), 3)
+              : 1,
             interaction: {
               mode: 'index',
               intersect: false
@@ -5879,8 +6211,11 @@
                   boxWidth: 12,
                   padding: 8,
                   font: {
-                    size: 11
-                  }
+                    family: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+                    size: 12,
+                    weight: '500'
+                  },
+                  color: '#475569'
                 }
               }
             },
@@ -5890,7 +6225,14 @@
                   maxTicksLimit: 6,
                   maxRotation: 0,
                   autoSkip: true,
-                  autoSkipPadding: 20
+                  autoSkipPadding: 20,
+                  {{-- Tamaño entero + familia explícita evita subpíxeles y texto “borroso” frente al resto --}}
+                  font: {
+                    family: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+                    size: 12,
+                    weight: '500'
+                  },
+                  color: '#475569'
                 },
                 grid: {
                   display: false
@@ -5900,7 +6242,13 @@
                 beginAtZero: false,
                 ticks: {
                   callback: value => value.toFixed(2) + ' €',
-                  maxTicksLimit: 8
+                  maxTicksLimit: 8,
+                  font: {
+                    family: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+                    size: 12,
+                    weight: '500'
+                  },
+                  color: '#475569'
                 },
                 grid: {
                   color: 'rgba(0, 0, 0, 0.1)'
@@ -6125,14 +6473,16 @@
         botones.forEach(btn => {
           const periodo = btn.getAttribute('data-periodo');
           if (periodo === periodoActivo) {
-            btn.style.backgroundColor = '#70b216';
-            btn.style.color = 'white';
+            btn.style.backgroundColor = '#0f172a';
+            btn.style.color = '#ffffff';
+            btn.style.borderColor = '#0f172a';
             btn.classList.remove('hover:bg-gray-100');
-            btn.onmouseover = function() { this.style.backgroundColor = '#60a013'; };
-            btn.onmouseout = function() { this.style.backgroundColor = '#70b216'; };
+            btn.onmouseover = function() { this.style.backgroundColor = '#334155'; this.style.borderColor = '#334155'; };
+            btn.onmouseout = function() { this.style.backgroundColor = '#0f172a'; this.style.borderColor = '#0f172a'; };
           } else {
             btn.style.backgroundColor = '';
             btn.style.color = '';
+            btn.style.borderColor = '';
             btn.classList.add('hover:bg-gray-100');
             btn.onmouseover = null;
             btn.onmouseout = null;
@@ -7396,8 +7746,6 @@ function _rmd1() {
     const isActive = i === v4;
     const miniatura = document.createElement('div');
     miniatura.className = `miniatura-pagina-desktop ${isActive ? 'activa' : ''}`;
-    miniatura.style.width = '60px';
-    miniatura.style.height = '60px';
     miniatura.onclick = () => _cip2(i);
     miniatura.innerHTML = `<img src="${v6}/${imgPath}" alt="Miniatura ${i + 1}">`;
     container.appendChild(miniatura);
@@ -7406,8 +7754,6 @@ function _rmd1() {
   {{-- Añadir botón + como 4º cuadrado (siempre visible) --}}
   const botonMas = document.createElement('div');
   botonMas.className = 'miniatura-pagina-desktop boton-mas';
-  botonMas.style.width = '60px';
-  botonMas.style.height = '60px';
     botonMas.onclick = _am1;
   botonMas.innerHTML = `
     <div class="w-full h-full flex items-center justify-center bg-gray-100 rounded border-2 border-dashed border-gray-300 cursor-pointer hover:bg-gray-200 transition-colors">
@@ -8200,6 +8546,11 @@ function _rod1() {
     botonHtml = '<div class="relative">' +
       '<span class="cupon-badge" style="background: linear-gradient(135deg, #8b5cf6, #a855f7); font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap; position: absolute; top: -12px; right: 8px; z-index: 10;">3x2</span>' +
       '<span class="inline-block w-full py-3 px-4 text-white text-center font-semibold rounded transition-colors cursor-pointer" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-3x2="true" data-url="' + primeraOferta.url.replace(/"/g, '&quot;') + '">Ir a la tienda</span>' +
+      '</div>';
+  } else if (primeraOferta.descuentos === '+Juego') {
+    botonHtml = '<div class="relative">' +
+      '<span class="cupon-badge" style="background: linear-gradient(135deg, #0ea5e9, #6366f1); font-size: 0.7rem; padding: 2px 6px; font-weight: 600; white-space: nowrap; position: absolute; top: -12px; right: 8px; z-index: 10;">+Juego</span>' +
+      '<span class="inline-block w-full py-3 px-4 text-white text-center font-semibold rounded transition-colors cursor-pointer" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'">Ir a la tienda</span>' +
       '</div>';
   } else if (primeraOferta.descuentos === '2x1 - SoloCarrefour') {
     botonHtml = '<div class="relative">' +

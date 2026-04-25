@@ -12,45 +12,9 @@ class CategoriaController extends Controller
     public function index()
     {
         $todasCategorias = Categoria::orderBy('nombre')->get();
-
-        // Cargar toda la jerarquía de forma recursiva
-        $categoriasRaiz = Categoria::with(['subcategorias' => function ($query) {
-            $query->orderBy('nombre');
-        }])
-            ->whereNull('parent_id')
-            ->orderBy('nombre')
-            ->get();
-
-        // Función recursiva para cargar subcategorías y contar productos
-        $this->cargarSubcategoriasRecursivamente($categoriasRaiz);
+        $categoriasRaiz = Categoria::categoriasRaizConConteosAdministracion();
 
         return view('admin.categorias.index', compact('todasCategorias', 'categoriasRaiz'));
-    }
-
-    /**
-     * Carga subcategorías de forma recursiva y cuenta productos
-     */
-    private function cargarSubcategoriasRecursivamente($categorias)
-    {
-        foreach ($categorias as $categoria) {
-            // Cargar subcategorías
-            $categoria->load(['subcategorias' => function ($query) {
-                $query->orderBy('nombre');
-            }]);
-            
-            // Contar productos directos
-            $categoria->productos_count = $categoria->productos()->count();
-            
-            // Recursivamente cargar subcategorías y sumar productos
-            if ($categoria->subcategorias->count() > 0) {
-                $this->cargarSubcategoriasRecursivamente($categoria->subcategorias);
-                
-                // Sumar productos de subcategorías
-                foreach ($categoria->subcategorias as $sub) {
-                    $categoria->productos_count += $sub->productos_count;
-                }
-            }
-        }
     }
 
     public function create()

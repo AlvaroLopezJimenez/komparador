@@ -84,6 +84,11 @@ class Producto extends Model
         return $this->hasMany(CorreoAvisoPrecio::class);
     }
 
+    public function neoobjetivos()
+    {
+        return $this->hasMany(Neoobjetivo::class);
+    }
+
     // Sacamos la ruta completa de categorias de un producto con su slug
     public function getRutaCompletaAttribute()
 {

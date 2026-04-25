@@ -131,4 +131,66 @@ class Categoria extends Model
         
         return $total;
     }
+
+    /**
+     * IDs de la categoría y todas sus descendientes (para filtrar productos por rama).
+     *
+     * @return list<int>
+     */
+    public static function idsSelfAndDescendants(int $categoriaId): array
+    {
+        $ids = [$categoriaId];
+        $parents = [$categoriaId];
+        while (true) {
+            $children = static::query()->whereIn('parent_id', $parents)->pluck('id')->all();
+            if ($children === []) {
+                break;
+            }
+            $ids = array_merge($ids, $children);
+            $parents = $children;
+        }
+
+        return array_values(array_unique(array_map('intval', $ids)));
+    }
+
+    /**
+     * Mismo árbol que en admin/categorías index: raíz con subcategorías recursivas y productos_count agregado.
+     *
+     * @return \Illuminate\Support\Collection<int, Categoria>
+     */
+    public static function categoriasRaizConConteosAdministracion()
+    {
+        $categoriasRaiz = static::with(['subcategorias' => function ($query) {
+            $query->orderBy('nombre');
+        }])
+            ->whereNull('parent_id')
+            ->orderBy('nombre')
+            ->get();
+
+        static::cargarSubcategoriasYConteosAdministracionRecursivo($categoriasRaiz);
+
+        return $categoriasRaiz;
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, Categoria>|iterable<int, Categoria>  $categorias
+     */
+    private static function cargarSubcategoriasYConteosAdministracionRecursivo($categorias): void
+    {
+        foreach ($categorias as $categoria) {
+            $categoria->load(['subcategorias' => function ($query) {
+                $query->orderBy('nombre');
+            }]);
+
+            $categoria->productos_count = $categoria->productos()->count();
+
+            if ($categoria->subcategorias->count() > 0) {
+                static::cargarSubcategoriasYConteosAdministracionRecursivo($categoria->subcategorias);
+
+                foreach ($categoria->subcategorias as $sub) {
+                    $categoria->productos_count += $sub->productos_count;
+                }
+            }
+        }
+    }
 }

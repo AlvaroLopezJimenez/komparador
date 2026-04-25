@@ -3,6 +3,17 @@
 return [
     /*
     |--------------------------------------------------------------------------
+    | Activar CAPTCHA y fingerprint
+    |--------------------------------------------------------------------------
+    |
+    | Si es false, ofertas, especificaciones e históricos se cargan sin token
+    | ni límites (útil para desarrollo o entornos controlados).
+    |
+    */
+    'activar_captcha_fingerprint' => filter_var(env('ACTIVAR_CAPTCHA_FINGERPRINT', 'true'), FILTER_VALIDATE_BOOLEAN),
+
+    /*
+    |--------------------------------------------------------------------------
     | Rate Limits Configuration
     |--------------------------------------------------------------------------
     |
@@ -181,5 +192,8 @@ return [
         'expiration' => env('ANTI_SCRAPING_SIGNED_URL_EXPIRATION', 10800), // 3 horas en segundos
         'secret' => env('ANTI_SCRAPING_SIGNED_URL_SECRET', env('APP_KEY')),
     ],
+
+    // Clave para cifrar/descifrar URLs persistidas en Neoobjetivo.
+    'neoobjetivo_url_secret' => env('SIGNED_URLS_SECRET', env('APP_KEY')),
 ];
 

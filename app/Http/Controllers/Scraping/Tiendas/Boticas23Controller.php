@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Scraping\Tiendas;
 
 use App\Http\Controllers\Scraping\Tiendas\PlantillaTiendaController;
+use App\Models\OfertaProducto;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 
 class Boticas23Controller extends PlantillaTiendaController
 {
@@ -15,7 +17,7 @@ class Boticas23Controller extends PlantillaTiendaController
      * - Último recurso: itemprop="price" con texto visible.
      * - Devuelve número sin símbolo €; normaliza coma/punto y entidades (&nbsp;).
      */
-    public function obtenerPrecio($url, $variante = null, $tienda = null): JsonResponse
+    public function obtenerPrecio($url, $variante = null, $tienda = null, $oferta = null): JsonResponse
     {
         $resultado = $this->apiHTML->obtenerHTML($url, null, $tienda ? $tienda->api : null);
 
@@ -27,6 +29,23 @@ class Boticas23Controller extends PlantillaTiendaController
         }
 
         $html = html_entity_decode((string)$resultado['html'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        // Sin stock: mismo criterio que Primor (ocultar oferta + aviso), fecha aviso a 4 días.
+        if (preg_match('~<div[^>]*>\s*No hay Stock disponible\s*</div>~i', $html)) {
+            if ($oferta && $oferta instanceof OfertaProducto) {
+                $oferta->update(['mostrar' => 'no']);
+                DB::table('avisos')->insertGetId([
+                    'texto_aviso'     => 'Sin stock 1a vez - AVISO GENERADO AUTOMATICAMENTE',
+                    'fecha_aviso'     => now()->addDays(4),
+                    'user_id'         => 1,
+                    'avisoable_type'  => OfertaProducto::class,
+                    'avisoable_id'    => $oferta->id,
+                    'oculto'          => 0,
+                    'created_at'      => now(),
+                    'updated_at'      => now(),
+                ]);
+            }
+        }
 
         // 1) <span class="... precioRojo ..." itemprop="price" content="6,84">
         if (preg_match(

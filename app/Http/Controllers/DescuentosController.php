@@ -235,6 +235,7 @@ class DescuentosController extends Controller
                 case 'rebaja':
                 case 'promocion':
                 case 'oferta_especial':
+                case '+Juego':
                     // Para estos tipos: no requieren cálculos especiales
                     // Son solo informativos
                     break;

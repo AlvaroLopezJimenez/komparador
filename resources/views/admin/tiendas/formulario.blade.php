@@ -104,11 +104,19 @@
                     <div>
                         <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">
                             API de Scraping *
-                            <span class="relative group">
-                                <svg class="w-4 h-4 inline text-gray-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                </svg>
-                                <div class="absolute bottom-full left-0 mb-2 w-80 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
+                            <span class="relative inline-flex">
+                                <button
+                                    type="button"
+                                    id="api-scraping-help-btn"
+                                    aria-expanded="false"
+                                    aria-controls="api-scraping-help-tooltip"
+                                    class="inline-flex items-center justify-center text-gray-400 hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-pink-500 rounded-sm"
+                                >
+                                    <svg class="w-4 h-4 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                </button>
+                                <div id="api-scraping-help-tooltip" class="hidden absolute bottom-full left-0 mb-2 w-80 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-lg z-10">
                                     <p><strong>ScrapingAnt:</strong> API de RapidAPI. Ideal para sitios que requieren proxy español. No requiere configuración adicional.</p>
                                     <p class="mt-2"><strong>Bright Data (sin JavaScript):</strong> Más rápido y económico. Ideal para sitios que no requieren JavaScript para mostrar precios.</p>
                                     <p class="mt-2"><strong>Bright Data (con JavaScript):</strong> Más lento y costoso. Necesario para sitios que usan JavaScript para cargar precios dinámicamente.</p>
@@ -183,6 +191,16 @@
                             <option value="no" {{ old('scrapear', $tienda->scrapear ?? 'si') == 'no' ? 'selected' : '' }}>No</option>
                         </select>
                         <p class="text-xs text-gray-500 mt-1">Si está en "No", las ofertas de esta tienda no serán actualizadas por el scraper</p>
+                    </div>
+
+                    <div>
+                        <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">Avisos sin stock: scrapear automáticamente</label>
+                        <select name="avisos_sin_stock_scrapear_automatico" required
+                                class="w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border">
+                            <option value="si" {{ old('avisos_sin_stock_scrapear_automatico', $tienda->avisos_sin_stock_scrapear_automatico ?? 'si') == 'si' ? 'selected' : '' }}>Sí</option>
+                            <option value="no" {{ old('avisos_sin_stock_scrapear_automatico', $tienda->avisos_sin_stock_scrapear_automatico ?? 'si') == 'no' ? 'selected' : '' }}>No</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">Si está en "Sí", el cron intentará recuperar precio de ofertas con aviso sin stock vencido</p>
                     </div>
 
                     <div>
@@ -294,68 +312,108 @@
                 </div>
             </fieldset>
 
-            {{-- ARBOL DE LAS CATEGORIAS CON SUS RESPECTIVAS COMISIONES--}}
+            {{-- URL de listado por categoría (Neoobjetivo) --}}
             <script src="//unpkg.com/alpinejs" defer></script>
             <fieldset class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 space-y-6 border border-gray-200 dark:border-gray-700">
-    <legend class="text-lg font-semibold text-gray-700 dark:text-gray-200">Comisiones por categoría</legend>
+                <legend class="text-lg font-semibold text-gray-700 dark:text-gray-200">URL de listado por categoría</legend>
 
-    <div id="arbol-comisiones" class="space-y-3">
-        @php
-            $renderCategorias = function($categorias, $comisiones, $nivel = 0, $padreId = null) use (&$renderCategorias) {
-                foreach ($categorias as $categoria) {
-                    $valor = old("comisiones.{$categoria->id}", $comisiones[$categoria->id] ?? '');
-                    $hasChildren = $categoria->children && $categoria->children->count();
-                    $margin = $nivel * 4;
-        @endphp
+                @error('urls_categoria')
+                    <div class="p-3 rounded-lg bg-red-100 dark:bg-red-900/30 border border-red-400 text-red-700 dark:text-red-300 text-sm">
+                        {{ $message }}
+                    </div>
+                @enderror
 
-        <div class="ml-{{ $margin }}" x-data="{ open{{ $categoria->id }}: false }">
-            <div class="flex items-center gap-2">
-    @if($hasChildren)
-        <button type="button"
-            @click="open{{ $categoria->id }} = !open{{ $categoria->id }}"
-            class="w-7 h-7 flex items-center justify-center text-white bg-pink-600 hover:bg-pink-700 rounded-full transition"
-            :aria-label="open{{ $categoria->id }} ? 'Contraer' : 'Expandir'">
-            <span x-text="open{{ $categoria->id }} ? '-' : '+'"></span>
-        </button>
-    @else
-        <span class="w-7 h-7 inline-block"></span>
-    @endif
+                @if(isset($mensajeControlador) && $mensajeControlador)
+                    <div class="p-3 rounded-lg bg-amber-100 dark:bg-amber-900/30 border border-amber-400 text-amber-800 dark:text-amber-200 text-sm">
+                        {{ $mensajeControlador }}
+                    </div>
+                @endif
+                @if(isset($mensajeTipoListado) && $mensajeTipoListado)
+                    <div class="p-3 rounded-lg bg-amber-100 dark:bg-amber-900/30 border border-amber-400 text-amber-800 dark:text-amber-200 text-sm">
+                        {{ $mensajeTipoListado }}
+                    </div>
+                @endif
+                @if(isset($tipoListadoCategoria) && $tipoListadoCategoria)
+                    <p class="text-sm text-gray-600 dark:text-gray-400">
+                        Tipo de listado de categoría: <strong>{{ $tipoListadoCategoria }}</strong>
+                        @if($tipoListadoCategoria === 'sitemap')
+                            <span class="text-gray-500">(URLs desde sitemap XML)</span>
+                        @elseif($tipoListadoCategoria === 'paginacion')
+                            <span class="text-gray-500">(varias páginas con siguiente)</span>
+                        @elseif($tipoListadoCategoria === 'mostrar_mas')
+                            <span class="text-gray-500">(una petición con "ver más")</span>
+                        @endif
+                    </p>
+                @endif
 
-    <label class="flex items-center gap-2 text-sm font-medium text-gray-800 dark:text-gray-200">
-        <span>{{ $categoria->nombre }}</span>
-        <input
-            type="number"
-            step="0.01"
-            min="0"
-            max="100"
-            name="comisiones[{{ $categoria->id }}]"
-            data-id="{{ $categoria->id }}"
-            @if ($padreId)
-                data-parent-id="{{ $padreId }}"
-            @endif
-            class="comision-input px-2 py-1 w-24 bg-gray-100 dark:bg-gray-700 text-white border rounded"
-            value="{{ $valor }}"
-        >
-        <span class="text-sm text-gray-500 dark:text-gray-400">%</span>
-    </label>
-</div>
+                <div id="arbol-urls-categoria" class="space-y-3">
+                    @php
+                        $urlsCategoria = $urlsCategoria ?? collect();
+                        $visitadasCategoria = $visitadasCategoria ?? collect();
+                        $categoriasSinNeoobjetivo = $categoriasSinNeoobjetivo ?? collect();
+                        $categoriasAncestrosSinNeo = $categoriasAncestrosSinNeo ?? collect();
+                        $conteoTotalOfertas = $conteoTotalOfertas ?? [];
+                        $renderCategorias = function($categorias, $urlsCategoria, $visitadasCategoria, $categoriasSinNeoobjetivo, $categoriasAncestrosSinNeo, $conteoTotalOfertas, $nivel = 0, $padreId = null) use (&$renderCategorias) {
+                            foreach ($categorias as $categoria) {
+                                $valor = old("urls_categoria.{$categoria->id}", $urlsCategoria[$categoria->id] ?? '');
+                                $visitadaValor = old("visitada_categoria.{$categoria->id}", $visitadasCategoria[$categoria->id] ?? '');
+                                $hasChildren = $categoria->children && $categoria->children->count();
+                                $margin = $nivel * 4;
+                                $sinNeo = $categoriasSinNeoobjetivo->contains($categoria->id);
+                                $esAncestro = !$sinNeo && $categoriasAncestrosSinNeo->contains($categoria->id);
+                                $numOfertas = $conteoTotalOfertas[$categoria->id] ?? 0;
+                    @endphp
 
+                    <div
+                        class="js-categoria-row ml-{{ $margin }} {{ $sinNeo ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded p-2' : '' }}"
+                        data-sin-neo-inicial="{{ $sinNeo ? '1' : '0' }}"
+                        x-data="{ open{{ $categoria->id }}: false }"
+                    >
+                        <div class="flex items-center gap-2">
+                            @if($hasChildren)
+                                <button type="button"
+                                    @click="open{{ $categoria->id }} = !open{{ $categoria->id }}"
+                                    class="w-7 h-7 flex items-center justify-center text-white bg-pink-600 hover:bg-pink-700 rounded-full transition"
+                                    :aria-label="open{{ $categoria->id }} ? 'Contraer' : 'Expandir'">
+                                    <span x-text="open{{ $categoria->id }} ? '-' : '+'"></span>
+                                </button>
+                            @else
+                                <span class="w-7 h-7 inline-block"></span>
+                            @endif
 
-            @if ($hasChildren)
-                <div class="space-y-2 mt-2 ml-4" x-show="open{{ $categoria->id }}" x-cloak>
-                    @php $renderCategorias($categoria->children, $comisiones, $nivel + 1, $categoria->id); @endphp
+                            <label class="flex items-center gap-2 text-sm font-medium flex-1 min-w-0">
+                                <span class="js-categoria-nombre flex-shrink-0 {{ $sinNeo ? 'text-red-700 dark:text-red-300' : ($esAncestro ? 'text-red-600 dark:text-red-400' : 'text-gray-800 dark:text-gray-200') }}">{{ $categoria->nombre }} <span class="text-gray-500 dark:text-gray-400 font-normal">({{ $numOfertas }})</span></span>
+                                <input
+                                    type="url"
+                                    name="urls_categoria[{{ $categoria->id }}]"
+                                    data-id="{{ $categoria->id }}"
+                                    placeholder="https://..."
+                                    class="url-categoria-input js-url-categoria flex-1 min-w-0 px-2 py-1 bg-gray-100 dark:bg-gray-700 text-white border rounded {{ $sinNeo ? 'border-red-500' : '' }}"
+                                    value="{{ $valor }}"
+                                >
+                                <input
+                                    type="datetime-local"
+                                    name="visitada_categoria[{{ $categoria->id }}]"
+                                    class="w-52 max-w-full px-2 py-1 bg-gray-100 dark:bg-gray-700 text-white border rounded text-sm"
+                                    value="{{ $visitadaValor }}"
+                                >
+                            </label>
+                        </div>
+
+                        @if ($hasChildren)
+                            <div class="space-y-2 mt-2 ml-4" x-show="open{{ $categoria->id }}" x-cloak>
+                                @php $renderCategorias($categoria->children, $urlsCategoria, $visitadasCategoria, $categoriasSinNeoobjetivo, $categoriasAncestrosSinNeo, $conteoTotalOfertas, $nivel + 1, $categoria->id); @endphp
+                            </div>
+                        @endif
+                    </div>
+
+                    @php
+                            }
+                        };
+                        $renderCategorias($categorias, $urlsCategoria, $visitadasCategoria, $categoriasSinNeoobjetivo, $categoriasAncestrosSinNeo, $conteoTotalOfertas);
+                    @endphp
                 </div>
-            @endif
-        </div>
-
-        @php
-                }
-            };
-
-            $renderCategorias($categorias, $comisiones);
-        @endphp
-    </div>
-</fieldset>
+            </fieldset>
 
 
 
@@ -427,12 +485,104 @@
             </div>
             @endif
 
-            <div class="flex justify-end">
+            @php
+                $bloquearGuardarPorCategorias = $tienda->exists && ($categoriasSinNeoobjetivo ?? collect())->isNotEmpty();
+                $checkboxMarcado = old('sin_listado_categoria');
+            @endphp
+            <div class="flex flex-wrap items-center justify-end gap-4">
+                @if($bloquearGuardarPorCategorias)
+                    <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                        <input type="checkbox" name="sin_listado_categoria" id="sin_listado_categoria_checkbox" value="1" {{ $checkboxMarcado ? 'checked' : '' }}
+                            class="rounded border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-pink-600 focus:ring-pink-500">
+                        Esta tienda no tiene listado por categoría
+                    </label>
+                @endif
                 <button type="submit" id="btn_guardar_tienda"
-                    class="inline-flex items-center bg-pink-600 hover:bg-pink-700 text-white font-semibold text-base px-6 py-3 rounded-md shadow-md transition">
+                    @if($bloquearGuardarPorCategorias && !$checkboxMarcado) disabled @endif
+                    class="inline-flex items-center font-semibold text-base px-6 py-3 rounded-md shadow-md transition {{ ($bloquearGuardarPorCategorias && !$checkboxMarcado) ? 'bg-gray-400 dark:bg-gray-500 text-gray-200 cursor-not-allowed' : 'bg-pink-600 hover:bg-pink-700 text-white' }}">
                     {{ $tienda->exists ? 'Actualizar tienda' : 'Crear tienda' }}
                 </button>
             </div>
+            @if($bloquearGuardarPorCategorias)
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    var checkbox = document.getElementById('sin_listado_categoria_checkbox');
+                    var btn = document.getElementById('btn_guardar_tienda');
+                    if (!checkbox || !btn) return;
+
+                    var filasCategorias = document.querySelectorAll('.js-categoria-row[data-sin-neo-inicial="1"]');
+                    var hayFilasConIncidencia = filasCategorias.length > 0;
+
+                    function filaTieneUrl(fila) {
+                        var input = fila.querySelector('.js-url-categoria');
+                        return !!(input && input.value && input.value.trim() !== '');
+                    }
+
+                    function aplicarEstadoVisualFila(fila, resuelta) {
+                        var nombre = fila.querySelector('.js-categoria-nombre');
+                        var input = fila.querySelector('.js-url-categoria');
+
+                        if (resuelta) {
+                            fila.classList.remove('bg-red-50', 'dark:bg-red-900/20', 'border', 'border-red-200', 'dark:border-red-800', 'rounded', 'p-2');
+                            if (nombre) {
+                                nombre.classList.remove('text-red-700', 'dark:text-red-300');
+                                nombre.classList.add('text-gray-800', 'dark:text-gray-200');
+                            }
+                            if (input) {
+                                input.classList.remove('border-red-500');
+                            }
+                        } else {
+                            fila.classList.add('bg-red-50', 'dark:bg-red-900/20', 'border', 'border-red-200', 'dark:border-red-800', 'rounded', 'p-2');
+                            if (nombre) {
+                                nombre.classList.add('text-red-700', 'dark:text-red-300');
+                                nombre.classList.remove('text-gray-800', 'dark:text-gray-200');
+                            }
+                            if (input) {
+                                input.classList.add('border-red-500');
+                            }
+                        }
+                    }
+
+                    function quedanRojas() {
+                        if (!hayFilasConIncidencia) return false;
+                        for (var i = 0; i < filasCategorias.length; i++) {
+                            if (!filaTieneUrl(filasCategorias[i])) return true;
+                        }
+                        return false;
+                    }
+
+                    function actualizarBoton() {
+                        var hayRojas = quedanRojas();
+                        if (!hayRojas || checkbox.checked) {
+                            btn.disabled = false;
+                            btn.classList.remove('bg-gray-400', 'dark:bg-gray-500', 'text-gray-200', 'cursor-not-allowed');
+                            btn.classList.add('bg-pink-600', 'hover:bg-pink-700', 'text-white');
+                        } else {
+                            btn.disabled = true;
+                            btn.classList.remove('bg-pink-600', 'hover:bg-pink-700', 'text-white');
+                            btn.classList.add('bg-gray-400', 'dark:bg-gray-500', 'text-gray-200', 'cursor-not-allowed');
+                        }
+                    }
+
+                    filasCategorias.forEach(function(fila) {
+                        var input = fila.querySelector('.js-url-categoria');
+                        if (!input) return;
+
+                        function refrescarFila() {
+                            aplicarEstadoVisualFila(fila, filaTieneUrl(fila));
+                            actualizarBoton();
+                        }
+
+                        input.addEventListener('input', refrescarFila);
+                        input.addEventListener('change', refrescarFila);
+                        refrescarFila();
+                    });
+
+                    checkbox.addEventListener('change', actualizarBoton);
+                    actualizarBoton();
+                });
+            </script>
+            @endif
         </form>
 
             {{-- Modal para crear/editar aviso --}}
@@ -833,31 +983,47 @@
                 alert('Por favor, completa todos los campos obligatorios.');
             }
         });
-    </script>
 
-        {{-- SCRIPT PARA SINCRONIZAR LAS COMISIONES ESCRITAS DE PADRE A HIJO--}}
-    <script>
-    document.addEventListener('DOMContentLoaded', () => {
-        const inputs = document.querySelectorAll('.comision-input');
+        document.addEventListener('DOMContentLoaded', function() {
+            const helpBtn = document.getElementById('api-scraping-help-btn');
+            const helpTooltip = document.getElementById('api-scraping-help-tooltip');
 
-        // Si cambias un padre, cambia también sus hijos
-        inputs.forEach(input => {
-            input.addEventListener('input', () => {
-                const valor = input.value;
-                const id = input.dataset.id;
+            if (!helpBtn || !helpTooltip) return;
 
-                const hijos = Array.from(inputs).filter(child =>
-                    child.dataset.parentId === id
-                );
+            const cerrarTooltip = () => {
+                helpTooltip.classList.add('hidden');
+                helpBtn.setAttribute('aria-expanded', 'false');
+            };
 
-                hijos.forEach(hijo => {
-                    hijo.value = valor;
-                    hijo.dispatchEvent(new Event('input')); // propaga en cascada
-                });
+            const abrirTooltip = () => {
+                helpTooltip.classList.remove('hidden');
+                helpBtn.setAttribute('aria-expanded', 'true');
+            };
+
+            helpBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (helpTooltip.classList.contains('hidden')) {
+                    abrirTooltip();
+                } else {
+                    cerrarTooltip();
+                }
+            });
+
+            document.addEventListener('click', function(e) {
+                if (!helpTooltip.contains(e.target) && !helpBtn.contains(e.target)) {
+                    cerrarTooltip();
+                }
+            });
+
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    cerrarTooltip();
+                }
             });
         });
-    });
     </script>
+
 
 
 

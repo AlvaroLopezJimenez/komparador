@@ -17,6 +17,47 @@
     <div class="py-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         @php
         $rutaCrear = $producto ? route('admin.ofertas.create', ['producto' => $producto->id]) : null;
+        $ocultarUnidadesYPrecioUnidad = $producto && ($producto->unidadDeMedida === 'unidadUnica');
+        $columnasEspecListado = $columnasEspecListado ?? [];
+        $celdasEspecPorOfertaId = $celdasEspecPorOfertaId ?? [];
+        $filtroEspecActivo = $filtroEspecActivo ?? [];
+        $conteosOpcionesEspec = $conteosOpcionesEspec ?? [];
+        $numColEspec = count($columnasEspecListado);
+        $colspanEmpty = 5 + $numColEspec + ($ocultarUnidadesYPrecioUnidad ? 0 : 2);
+        $querySinEspecNiPage = request()->except(['e', 'page']);
+        $urlToggleEspecOpcion = function (string $pid, string $sid) use ($producto, $querySinEspecNiPage, $filtroEspecActivo) {
+            if (!$producto) {
+                return '#';
+            }
+            $next = $filtroEspecActivo;
+            $sid = (string) $sid;
+            if (!isset($next[$pid])) {
+                $next[$pid] = [];
+            }
+            if (in_array($sid, $next[$pid], true)) {
+                $next[$pid] = array_values(array_filter($next[$pid], fn ($x) => (string) $x !== $sid));
+                if ($next[$pid] === []) {
+                    unset($next[$pid]);
+                }
+            } else {
+                $next[$pid][] = $sid;
+            }
+            $q = $querySinEspecNiPage;
+            if ($next !== []) {
+                $q['e'] = $next;
+            }
+            return route('admin.ofertas.index', $producto) . (count($q) ? '?' . http_build_query($q) : '');
+        };
+        $urlLimpiarFiltroEspec = $producto
+            ? (route('admin.ofertas.index', $producto) . (count($querySinEspecNiPage) ? '?' . http_build_query($querySinEspecNiPage) : ''))
+            : '#';
+        $hayOpcionesFiltroEspec = false;
+        foreach ($columnasEspecListado as $_col) {
+            if (count($_col['opciones_oferta'] ?? []) > 0) {
+                $hayOpcionesFiltroEspec = true;
+                break;
+            }
+        }
         @endphp
 
         @if ($rutaCrear)
@@ -30,6 +71,17 @@
 
         {{-- Formulario de búsqueda --}}
 <form method="GET" class="mb-6 flex flex-wrap items-center gap-2">
+    @foreach($filtroEspecActivo as $pid => $sids)
+        @foreach($sids as $sid)
+            <input type="hidden" name="e[{{ $pid }}][]" value="{{ $sid }}">
+        @endforeach
+    @endforeach
+    @if(request()->has('perPage'))
+        <input type="hidden" name="perPage" value="{{ request('perPage') }}">
+    @endif
+    @foreach((array) request('mostrar', []) as $m)
+        <input type="hidden" name="mostrar[]" value="{{ $m }}">
+    @endforeach
     <input type="text" name="busqueda" value="{{ request('busqueda') }}"
         placeholder="Buscar por tienda, modelo, talla, URL o anotaciones"
         class="flex-1 min-w-[200px] px-4 py-2 border rounded bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-white" />
@@ -46,6 +98,14 @@
             <div class="flex items-center gap-2">
                 <label class="text-sm text-gray-700 dark:text-gray-300">Mostrar ofertas:</label>
                 <form method="GET" class="flex items-center gap-2" id="filtroMostrarForm">
+                    @foreach($filtroEspecActivo as $pid => $sids)
+                        @foreach($sids as $sid)
+                            <input type="hidden" name="e[{{ $pid }}][]" value="{{ $sid }}">
+                        @endforeach
+                    @endforeach
+                    @if(request()->has('perPage'))
+                        <input type="hidden" name="perPage" value="{{ request('perPage') }}">
+                    @endif
                     @if(request('busqueda'))
                         <input type="hidden" name="busqueda" value="{{ request('busqueda') }}">
                     @endif
@@ -80,17 +140,67 @@
             </div>
         </div>
 
+        @if($producto && $numColEspec > 0 && $hayOpcionesFiltroEspec)
+        <div class="mb-4 p-4 bg-white dark:bg-gray-800 shadow rounded-lg border border-gray-200 dark:border-gray-700">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-200">Filtrar por especificaciones (columnas)</h3>
+                @if(count($filtroEspecActivo) > 0)
+                <a href="{{ $urlLimpiarFiltroEspec }}"
+                    class="text-xs font-medium text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300">
+                    Quitar filtros
+                </a>
+                @endif
+            </div>
+            <div class="space-y-4">
+                @foreach($columnasEspecListado as $colEspec)
+                    @php $opciones = $colEspec['opciones_oferta'] ?? []; @endphp
+                    @if(count($opciones) > 0)
+                    <div>
+                        <div class="text-xs font-medium text-gray-600 dark:text-gray-300 mb-2">{{ $colEspec['texto'] }}</div>
+                        <div class="flex flex-wrap gap-2">
+                            @foreach($opciones as $opt)
+                                @php
+                                    $pid = $colEspec['id'];
+                                    $sid = (string) $opt['id'];
+                                    $activa = isset($filtroEspecActivo[$pid]) && in_array($sid, $filtroEspecActivo[$pid], true);
+                                    $cnt = (int) ($conteosOpcionesEspec[$pid][$sid] ?? 0);
+                                    $sinResultados = !$activa && $cnt === 0;
+                                @endphp
+                                <a href="{{ $urlToggleEspecOpcion($pid, $sid) }}"
+                                    class="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors border
+                                        {{ $activa
+                                            ? 'bg-emerald-100 text-emerald-900 border-emerald-500 ring-2 ring-emerald-400/80 dark:bg-emerald-900/40 dark:text-emerald-100 dark:border-emerald-500 dark:ring-emerald-500/50'
+                                            : ($sinResultados
+                                                ? 'bg-gray-100/70 text-gray-500 border-gray-200 opacity-45 grayscale cursor-not-allowed dark:bg-gray-800/60 dark:text-gray-500 dark:border-gray-600'
+                                                : 'bg-gray-100 text-gray-800 border-gray-300 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600') }}">
+                                    <span>{{ $opt['texto'] }}</span>
+                                    <span class="tabular-nums opacity-90">({{ $cnt }})</span>
+                                </a>
+                            @endforeach
+                        </div>
+                    </div>
+                    @endif
+                @endforeach
+            </div>
+        </div>
+        @endif
+
         <div class="bg-white shadow rounded-lg overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tienda</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
+                        @foreach ($columnasEspecListado as $colEspec)
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">{{ $colEspec['texto'] }}</th>
+                        @endforeach
+                        @unless($ocultarUnidadesYPrecioUnidad)
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unidades</th>
+                        @endunless
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio Total</th>
+                        @unless($ocultarUnidadesYPrecioUnidad)
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">€/Unidad</th>
+                        @endunless
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mostrar</th>
-                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-800 uppercase tracking-wider">Actualiza</th>
                         <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Última Actualización</th>
                         <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                     </tr>
@@ -99,23 +209,31 @@
                     @forelse ($ofertas as $oferta)
                     <tr class="hover:bg-gray-100 dark:hover:bg-gray-300 transition-colors {{ $oferta->mostrar === 'no' ? 'opacity-60 bg-gray-50' : '' }}">
                         <td class="px-6 py-4">{{ $oferta->tienda->nombre }}</td>
-                        <td class="px-6 py-4">{{ $oferta->producto->nombre }}</td>
+                        @foreach ($columnasEspecListado as $idx => $colEspec)
+                        <td class="px-6 py-4 text-sm text-gray-800 dark:text-gray-200 max-w-xs">{{ ($celdasEspecPorOfertaId[$oferta->id] ?? [])[$idx] ?? '—' }}</td>
+                        @endforeach
+                        @unless($ocultarUnidadesYPrecioUnidad)
                         <td class="px-6 py-4">{{ $oferta->unidades }}</td>
+                        @endunless
                         <td class="px-6 py-4">{{ number_format($oferta->precio_total, 2) }} €</td>
+                        @unless($ocultarUnidadesYPrecioUnidad)
                         <td class="px-6 py-4">{{ number_format($oferta->precio_unidad, 2) }} €</td>
-                        <td class="px-6 py-4">{{ $oferta->mostrar }}</td>
-                        @if($oferta->frecuencia_actualizar_precio_minutos > 60)
-                            @php
-                                $actualizarPrecio = $oferta->frecuencia_actualizar_precio_minutos / 60;
-                                $medidaTiempo = " Horas";
-                            @endphp
-                        @else
-                            @php
-                                $actualizarPrecio = $oferta->frecuencia_actualizar_precio_minutos;
-                                $medidaTiempo = " Min.";
-                            @endphp
-                        @endif
-                        <td class="px-6 py-4">{{ $actualizarPrecio }}{{ $medidaTiempo }}</td>
+                        @endunless
+                        <td class="px-6 py-4 text-center">
+                            @if($oferta->mostrar === 'si')
+                                <span title="Visible">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-green-600 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </span>
+                            @else
+                                <span title="Oculto">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-red-500 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </span>
+                            @endif
+                        </td>
                         <td class="px-6 py-4 text-center">
                             <div class="text-xs">
                                 <div class="font-medium text-black">
@@ -173,7 +291,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="9" class="px-6 py-4 text-center text-gray-500">
+                        <td colspan="{{ $colspanEmpty }}" class="px-6 py-4 text-center text-gray-500">
                             No hay ofertas registradas{{ $producto ? ' para este producto.' : '.' }}
                         </td>
                     </tr>

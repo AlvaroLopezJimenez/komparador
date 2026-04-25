@@ -3,61 +3,101 @@
 namespace App\Http\Controllers\Scraping;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 class PeticionApiHTMLController extends Controller
 {
     /** PROVEEDOR PREFERIDO: 'bright_unlocker' | 'scrapingant' | 'scrapestack' */
-    private $apiProveedorPreferido = 'bright_unlocker';
+    private $apiProveedorPreferido;
 
     /** FAILOVER: 'si' para intentar con otros proveedores si falla el primero; 'no' para no hacerlo */
-    private $usarFailover = 'no';
+    private $usarFailover;
 
     // ==== Mi VPS (HTML completo) ====
-    private $miVpsApiUrl = 'http://51.38.184.245/obtener-html'; // POST {url, tienda?, variante?}
+    private $miVpsApiUrl;
 
     // ==== ScrapingAnt (RapidAPI) ====
-    private $apiKeyScrapingAnt = 'e7641b483cmshcac145d48569584p1de82ejsn452206de102d';
-    private $apiUrlScrapingAnt = 'https://scrapingant.p.rapidapi.com/get';
+    private $apiKeyScrapingAnt;
+    private $apiUrlScrapingAnt;
 
     // ==== Scrapestack ====
-    private $apiKeyScrapestack = '7994ef730e6b0ee3e95f976eec49dd72';
-    private $apiUrlScrapestack = 'https://api.scrapestack.com/scrape';
+    private $apiKeyScrapestack;
+    private $apiUrlScrapestack;
 
     // ==== Bright Data Web Unlocker (REST /request) ====
-    private $brightDataApiKey = 'e118ee69-5529-45d8-b643-982af6c8f205';
-    private $brightDataZone   = 'chollopanales';
-    private $brightDataApiUrl = 'https://api.brightdata.com/request';
+    private $brightDataApiKey;
+    private $brightDataZone;
+    private $brightDataApiUrl;
 
     // ==== AliExpress Open Platform (Business/System/Affiliate) ====
-    private $aliAppKey      = '519052';
-    private $aliAppSecret   = 'D5BW9BTziNm5Ow8S8sXAc30PNHXU69yp';
-    private $aliAccessToken = ''; // NO se usa en Affiliate
-    private $aliBaseSync    = 'https://api-sg.aliexpress.com/sync';
-    private $aliBaseRest    = 'https://api-sg.aliexpress.com/rest';
+    private $aliAppKey;
+    private $aliAppSecret;
+    private $aliBaseSync;
+    private $aliBaseRest;
 
-    // ==== Amazon Product Advertising API (PA-API 5.0) ====
-    private $amazonAccessKey = 'AKPAT0P1HX1759785609';
-    private $amazonSecretKey = 'VGfXEBBUH/FSsv2jENSilcOsRljI7aMgf7hb94gl';
-    private $amazonAssociateTag = 'srto-21'; // Necesitarás configurar tu Associate Tag
-    private $amazonEndpoint = 'webservices.amazon.es'; // Para España
-    private $amazonRegion = 'eu-west-1'; // Región para España
-    private $amazonService = 'ProductAdvertisingAPI';
+    // ==== Amazon Creators API (sustituye PA-API 5.0; OAuth 2.0, v3.2 EU) ====
+    /** Segundos de espera antes de cada petición a la API (límite típico 1 petición/segundo). 0 = no esperar. */
+    private $amazonCreatorsEsperaSegundos = 1;
+    private $amazonCreatorsCredentialId;
+    private $amazonCreatorsCredentialSecret;
+    private $amazonCreatorsPartnerTag;
+    private $amazonCreatorsMarketplace;
+    private $amazonCreatorsTokenUrl;
+    private $amazonCreatorsApiUrl;
+    private const AMAZON_CREATORS_CACHE_KEY = 'amazon_creators_api_token';
+    private const AMAZON_CREATORS_TOKEN_TTL_SECONDS = 3500; // Renovar antes de 3600
 
     // ==== Amazon Product Info API (RapidAPI) ====
-    private $amazonProductInfoApiKey = 'e7641b483cmshcac145d48569584p1de82ejsn452206de102d';
-    private $amazonProductInfoApiUrl = 'https://amazon-product-info2.p.rapidapi.com/Amazon/details';
+    private $amazonProductInfoApiKey;
+    private $amazonProductInfoApiUrl;
 
     // ==== Amazon Pricing And Product Info API (RapidAPI) ====
-    private $amazonPricingApiKey = 'e7641b483cmshcac145d48569584p1de82ejsn452206de102d';
-    private $amazonPricingApiUrl = 'https://amazon-pricing-and-product-info.p.rapidapi.com/';
+    private $amazonPricingApiKey;
+    private $amazonPricingApiUrl;
+
+    // ==== Cloudflare Browser Rendering (HTML renderizado con JS) ====
+    private $cloudflareAccountId;
+    private $cloudflareApiToken;
+
+    public function __construct()
+    {
+        $this->apiProveedorPreferido = env('SCRAPING_PROVEEDOR_PREFERIDO', 'bright_unlocker');
+        $this->usarFailover = env('SCRAPING_USAR_FAILOVER', 'no');
+        $this->miVpsApiUrl = env('SCRAPING_MI_VPS_API_URL', 'http://51.38.184.245/obtener-html');
+        $this->apiKeyScrapingAnt = env('SCRAPING_SCRAPINGANT_API_KEY');
+        $this->apiUrlScrapingAnt = env('SCRAPING_SCRAPINGANT_API_URL', 'https://scrapingant.p.rapidapi.com/get');
+        $this->apiKeyScrapestack = env('SCRAPING_SCRAPESTACK_API_KEY');
+        $this->apiUrlScrapestack = env('SCRAPING_SCRAPESTACK_API_URL', 'https://api.scrapestack.com/scrape');
+        $this->brightDataApiKey = env('SCRAPING_BRIGHTDATA_API_KEY');
+        $this->brightDataZone = env('SCRAPING_BRIGHTDATA_ZONE', 'chollopanales');
+        $this->brightDataApiUrl = env('SCRAPING_BRIGHTDATA_API_URL', 'https://api.brightdata.com/request');
+        $this->aliAppKey = env('SCRAPING_ALI_APP_KEY');
+        $this->aliAppSecret = env('SCRAPING_ALI_APP_SECRET');
+        $this->aliBaseSync = env('SCRAPING_ALI_BASE_SYNC', 'https://api-sg.aliexpress.com/sync');
+        $this->aliBaseRest = env('SCRAPING_ALI_BASE_REST', 'https://api-sg.aliexpress.com/rest');
+        $this->amazonCreatorsCredentialId = env('SCRAPING_AMAZON_CREATORS_CREDENTIAL_ID');
+        $this->amazonCreatorsCredentialSecret = env('SCRAPING_AMAZON_CREATORS_CREDENTIAL_SECRET');
+        $this->amazonCreatorsPartnerTag = env('SCRAPING_AMAZON_CREATORS_PARTNER_TAG', 'srto-21');
+        $this->amazonCreatorsMarketplace = env('SCRAPING_AMAZON_CREATORS_MARKETPLACE', 'www.amazon.es');
+        $this->amazonCreatorsTokenUrl = env('SCRAPING_AMAZON_CREATORS_TOKEN_URL', 'https://api.amazon.co.uk/auth/o2/token');
+        $this->amazonCreatorsApiUrl = env('SCRAPING_AMAZON_CREATORS_API_URL', 'https://creatorsapi.amazon/catalog/v1/getItems');
+        $this->amazonProductInfoApiKey = env('SCRAPING_AMAZON_PRODUCT_INFO_API_KEY');
+        $this->amazonProductInfoApiUrl = env('SCRAPING_AMAZON_PRODUCT_INFO_API_URL', 'https://amazon-product-info2.p.rapidapi.com/Amazon/details');
+        $this->amazonPricingApiKey = env('SCRAPING_AMAZON_PRICING_API_KEY');
+        $this->amazonPricingApiUrl = env('SCRAPING_AMAZON_PRICING_API_URL', 'https://amazon-pricing-and-product-info.p.rapidapi.com/');
+        $this->cloudflareAccountId = env('SCRAPING_CLOUDFLARE_ACCOUNT_ID');
+        $this->cloudflareApiToken = env('SCRAPING_CLOUDFLARE_API_TOKEN');
+    }
 
     /**
      * Intenta con el proveedor preferido y, si $usarFailover === 'si' y falla, prueba con los otros.
      * Puedes forzar proveedor con $forzarProveedor ('bright_unlocker'|'scrapingant'|'scrapestack'|'aliexpress_open'|'vps_html').
      * Si se proporciona $apiTienda, se usará esa API específica.
+     *
+     * @param  string|null  $vpsCargarMasSelector  Selector CSS opcional (p. ej. #yith-infs-button); solo se envía al VPS.
      */
-    public function obtenerHTML(string $url, ?string $forzarProveedor = null, ?string $apiTienda = null): array
+    public function obtenerHTML(string $url, ?string $forzarProveedor = null, ?string $apiTienda = null, ?string $vpsCargarMasSelector = null): array
     {
         $host = strtolower(parse_url($url, PHP_URL_HOST) ?: '');
 
@@ -66,7 +106,7 @@ class PeticionApiHTMLController extends Controller
         }
 
         $prefer = $forzarProveedor ?: $this->apiProveedorPreferido;
-        $todos = ['bright_unlocker', 'scrapingant', 'scrapestack', 'aliexpress_open', 'vps_html', 'amazon_api', 'amazon_product_info', 'amazon_pricing'];
+        $todos = ['bright_unlocker', 'scrapingant', 'scrapestack', 'cloudflare', 'aliexpress_open', 'vps_html', 'amazon_api', 'amazon_product_info', 'amazon_pricing'];
         $proveedores = array_values(array_unique(array_merge([$prefer], $todos)));
 
         if ($this->usarFailover !== 'si') {
@@ -75,11 +115,14 @@ class PeticionApiHTMLController extends Controller
 
         $errores = [];
         foreach ($proveedores as $prov) {
-            $resultado = $this->llamarProveedor($prov, $url, $apiTienda);
+            $resultado = $this->llamarProveedor($prov, $url, $apiTienda, $vpsCargarMasSelector);
+            if ($prov === 'vps_html' && empty($resultado['vps_log'])) {
+                $resultado['vps_log'] = $this->construirVpsHtmlLogFallbackDesdeResultado($resultado);
+            }
 
             if (!empty($resultado['success'])) {
                 // Proveedores HTML -> validamos 'html' y anotamos proveedor
-                if (in_array($prov, ['bright_unlocker', 'scrapingant', 'scrapestack', 'vps_html'], true)) {
+                if (in_array($prov, ['bright_unlocker', 'scrapingant', 'scrapestack', 'cloudflare', 'vps_html'], true)) {
                     if (!isset($resultado['html']) || $resultado['html'] === '') {
                         return ['success' => false, 'error' => 'Respuesta vacia de ' . $prov];
                     }
@@ -96,19 +139,20 @@ class PeticionApiHTMLController extends Controller
         return ['success' => false, 'error' => $this->formatearErrores($errores)];
     }
 
-    private function llamarProveedor(string $proveedor, string $url, ?string $apiTienda = null): array
+    private function llamarProveedor(string $proveedor, string $url, ?string $apiTienda = null, ?string $vpsCargarMasSelector = null): array
     {
         try {
             if ($proveedor === 'bright_unlocker') return $this->callBrightDataUnlocker($url, $apiTienda);
             if ($proveedor === 'scrapingant')     return $this->callScrapingAnt($url);
             if ($proveedor === 'scrapestack')     return $this->callScrapestack($url);
-            if ($proveedor === 'vps_html')        return $this->callMiVpsHtml($url, $apiTienda);
+            if ($proveedor === 'cloudflare')      return $this->callCloudflareContent($url, $apiTienda);
+            if ($proveedor === 'vps_html')        return $this->callMiVpsHtml($url, $apiTienda, $vpsCargarMasSelector);
             if ($proveedor === 'aliexpress_open') return $this->callAliExpressOpen($url, $apiTienda);
             if ($proveedor === 'amazon_api')      return $this->callAmazonAPI($url, $apiTienda);
             if ($proveedor === 'amazon_product_info') return $this->callAmazonProductInfo($url, $apiTienda);
             if ($proveedor === 'amazon_pricing')  return $this->callAmazonPricing($url, $apiTienda);
 
-            return ['success' => false, 'error' => 'Proveedor no valido. Usa "bright_unlocker", "scrapingant", "scrapestack", "aliexpress_open", "vps_html", "amazon_api", "amazon_product_info" o "amazon_pricing".'];
+            return ['success' => false, 'error' => 'Proveedor no valido. Usa "bright_unlocker", "scrapingant", "scrapestack", "cloudflare", "aliexpress_open", "vps_html", "amazon_api", "amazon_product_info" o "amazon_pricing".'];
         } catch (\Throwable $e) {
             return ['success' => false, 'error' => 'Excepcion en ' . $proveedor . ': ' . $e->getMessage()];
         }
@@ -281,9 +325,54 @@ class PeticionApiHTMLController extends Controller
         return ['success' => false, 'error' => $ultimoError ?: 'Error desconocido'];
     }
 
+    /* =================== CLOUDFLARE BROWSER RENDERING =================== */
+
+    private function callCloudflareContent(string $url, ?string $apiTienda = null): array
+    {
+        if (!$this->cloudflareAccountId || !$this->cloudflareApiToken) {
+            return ['success' => false, 'error' => 'Cloudflare Browser Rendering: faltan account_id o api_token'];
+        }
+
+        $apiUrl = 'https://api.cloudflare.com/client/v4/accounts/' . $this->cloudflareAccountId . '/browser-rendering/content';
+
+        $body = [
+            'url' => $url,
+            'gotoOptions' => ['waitUntil' => 'networkidle0'],
+        ];
+
+        try {
+            $resp = Http::timeout(90)
+                ->withHeaders([
+                    'Authorization' => 'Bearer ' . $this->cloudflareApiToken,
+                    'Content-Type'  => 'application/json',
+                ])
+                ->post($apiUrl, $body);
+
+            if (!$resp->successful()) {
+                return ['success' => false, 'error' => 'Cloudflare Browser Rendering HTTP ' . $resp->status() . ' - ' . mb_substr($resp->body(), 0, 500)];
+            }
+
+            $json = $resp->json();
+            if (!is_array($json)) {
+                return ['success' => false, 'error' => 'Cloudflare Browser Rendering: respuesta no JSON'];
+            }
+            if (!empty($json['success']) && isset($json['result']) && $json['result'] !== '') {
+                return [
+                    'success'   => true,
+                    'html'      => "<!-- PROVEEDOR: CLOUDFLARE -->\n" . (string) $json['result'],
+                    'proveedor' => 'cloudflare',
+                ];
+            }
+            $msg = isset($json['errors'][0]['message']) ? $json['errors'][0]['message'] : ($resp->body() ?: 'Sin contenido');
+            return ['success' => false, 'error' => 'Cloudflare Browser Rendering: ' . $msg];
+        } catch (\Throwable $e) {
+            return ['success' => false, 'error' => 'Cloudflare Browser Rendering Exception: ' . $e->getMessage()];
+        }
+    }
+
     /* =================== MI VPS =================== */
 
-    private function callMiVpsHtml(string $url, ?string $apiTienda = null): array
+    private function callMiVpsHtml(string $url, ?string $apiTienda = null, ?string $vpsCargarMasSelector = null): array
     {
         try {
             $mode = 'auto';
@@ -309,6 +398,11 @@ class PeticionApiHTMLController extends Controller
                 'use_proxy'        => $useProxy,
             ];
 
+            $sel = $vpsCargarMasSelector !== null ? trim($vpsCargarMasSelector) : '';
+            if ($sel !== '') {
+                $payload['cargar_mas_selector'] = $sel;
+            }
+
             $resp = Http::timeout(90)
                 ->withHeaders([
                     'Content-Type' => 'application/json',
@@ -317,27 +411,143 @@ class PeticionApiHTMLController extends Controller
                 ->post($this->miVpsApiUrl, $payload);
 
             if (!$resp->successful()) {
-                return ['success' => false, 'error' => 'VPS_HTML HTTP ' . $resp->status() . ' - ' . mb_substr($resp->body(), 0, 600)];
+                return [
+                    'success' => false,
+                    'error' => 'VPS_HTML HTTP ' . $resp->status() . ' - ' . mb_substr($resp->body(), 0, 600),
+                    'vps_log' => $this->construirVpsHtmlLog($payload, $resp->status(), null, (string) $resp->body()),
+                ];
             }
 
             $json = $resp->json();
-            if (!is_array($json))                 return ['success' => false, 'error' => 'VPS_HTML: respuesta no JSON'];
-            if (!empty($json['error']))           return ['success' => false, 'error' => 'VPS_HTML: ' . (is_string($json['error']) ? $json['error'] : json_encode($json['error']))];
+            if (!is_array($json)) {
+                return [
+                    'success' => false,
+                    'error' => 'VPS_HTML: respuesta no JSON',
+                    'vps_log' => $this->construirVpsHtmlLog($payload, $resp->status(), null, (string) $resp->body()),
+                ];
+            }
+            if (!empty($json['error'])) {
+                return [
+                    'success' => false,
+                    'error' => 'VPS_HTML: ' . (is_string($json['error']) ? $json['error'] : json_encode($json['error'])),
+                    'vps_log' => $this->construirVpsHtmlLog($payload, $resp->status(), $json, null),
+                ];
+            }
             if (!empty($json['html_b64'])) {
                 $raw = base64_decode($json['html_b64'], true);
-                if ($raw === false)               return ['success' => false, 'error' => 'VPS_HTML: html_b64 invalido'];
+                if ($raw === false) {
+                    return [
+                        'success' => false,
+                        'error' => 'VPS_HTML: html_b64 invalido',
+                        'vps_log' => $this->construirVpsHtmlLog($payload, $resp->status(), $json, null),
+                    ];
+                }
                 $provider = $useProxy ? 'VPS_HTML_PROXY' : 'VPS_HTML';
-                return ['success' => true, 'html' => "<!-- PROVEEDOR: {$provider} -->\n" . $raw];
+
+                return [
+                    'success' => true,
+                    'html' => "<!-- PROVEEDOR: {$provider} -->\n" . $raw,
+                    'vps_log' => $this->construirVpsHtmlLog($payload, $resp->status(), $json, null),
+                ];
             }
             if (!empty($json['html'])) {
                 $provider = $useProxy ? 'VPS_HTML_PROXY' : 'VPS_HTML';
-                return ['success' => true, 'html' => "<!-- PROVEEDOR: {$provider} -->\n" . (string)$json['html']];
+
+                return [
+                    'success' => true,
+                    'html' => "<!-- PROVEEDOR: {$provider} -->\n" . (string) $json['html'],
+                    'vps_log' => $this->construirVpsHtmlLog($payload, $resp->status(), $json, null),
+                ];
             }
 
-            return ['success' => false, 'error' => 'VPS_HTML: respuesta sin html_b64 ni html'];
+            return [
+                'success' => false,
+                'error' => 'VPS_HTML: respuesta sin html_b64 ni html',
+                'vps_log' => $this->construirVpsHtmlLog($payload, $resp->status(), $json, null),
+            ];
         } catch (\Throwable $e) {
-            return ['success' => false, 'error' => 'VPS_HTML Exception: ' . $e->getMessage()];
+            return [
+                'success' => false,
+                'error' => 'VPS_HTML Exception: ' . $e->getMessage(),
+                'vps_log' => [
+                    'tipo' => 'vps_html',
+                    'endpoint' => $this->miVpsApiUrl ?? null,
+                    'http_status' => null,
+                    'request_payload' => [
+                        'url' => $url,
+                        'nota' => 'Excepción antes de recibir respuesta HTTP del VPS',
+                    ],
+                    'exception' => [
+                        'class' => get_class($e),
+                        'message' => $e->getMessage(),
+                    ],
+                ],
+            ];
         }
+    }
+
+    /**
+     * Cuando callMiVpsHtml no devolvió vps_log (despliegue antiguo u otro fallo), la prueba Neoobjetivos
+     * puede seguir mostrando un bloque con longitud de HTML y aviso.
+     *
+     * @param  array<string, mixed>  $resultado
+     * @return array<string, mixed>
+     */
+    private function construirVpsHtmlLogFallbackDesdeResultado(array $resultado): array
+    {
+        return [
+            'tipo' => 'vps_html',
+            'aviso' => 'No se recibió vps_log desde callMiVpsHtml. Despliega la última versión de PeticionApiHTMLController (método callMiVpsHtml con vps_log) o revisa logs del servidor.',
+            'html_length' => strlen($resultado['html'] ?? ''),
+            'success' => $resultado['success'] ?? null,
+            'error' => $resultado['error'] ?? null,
+        ];
+    }
+
+    /**
+     * Log legible para vistas de prueba / diagnóstico (sin volcar HTML gigante).
+     *
+     * @param  array<string, mixed>|null  $json
+     */
+    private function construirVpsHtmlLog(array $payload, int $httpStatus, ?array $json, ?string $rawBodyFallback): array
+    {
+        $log = [
+            'tipo' => 'vps_html',
+            'endpoint' => $this->miVpsApiUrl,
+            'http_status' => $httpStatus,
+            'request_payload' => $payload,
+        ];
+        if (is_array($json)) {
+            $log['response_json'] = $this->sanearJsonRespuestaVpsHtmlParaLog($json);
+        }
+        if ($rawBodyFallback !== null && $rawBodyFallback !== '') {
+            $max = 14000;
+            $log['raw_body'] = strlen($rawBodyFallback) > $max
+                ? mb_substr($rawBodyFallback, 0, $max) . "\n...[recortado, longitud_original=" . strlen($rawBodyFallback) . "]"
+                : $rawBodyFallback;
+        }
+
+        return $log;
+    }
+
+    /**
+     * @param  array<string, mixed>  $json
+     * @return array<string, mixed>
+     */
+    private function sanearJsonRespuestaVpsHtmlParaLog(array $json): array
+    {
+        $out = $json;
+        if (isset($out['html_b64']) && is_string($out['html_b64'])) {
+            $len = strlen($out['html_b64']);
+            $decoded = base64_decode($out['html_b64'], true);
+            $htmlLen = is_string($decoded) ? strlen($decoded) : 0;
+            $out['html_b64'] = '[omitido en log: base64 de ' . $len . ' caracteres → HTML ~' . $htmlLen . ' bytes]';
+        }
+        if (isset($out['html']) && is_string($out['html']) && strlen($out['html']) > 4000) {
+            $out['html'] = mb_substr($out['html'], 0, 4000) . "\n...[recortado, longitud_original=" . strlen($out['html']) . "]";
+        }
+
+        return $out;
     }
 
     /* =================== ALIEXPRESS OPEN PLATFORM =================== */
@@ -578,18 +788,57 @@ class PeticionApiHTMLController extends Controller
         }
     }
 
-    /* =================== AMAZON PRODUCT ADVERTISING API =================== */
+    /* =================== AMAZON CREATORS API (OAuth 2.0, v3.2 EU) =================== */
 
     /**
-     * Llama a la Amazon API, NO SE PUEDE SABER SI UN PRODUCTO NO TIENE OFERTAS DESTACADAS.
+     * Obtiene un access token OAuth 2.0 para Creators API (v3.x).
+     * El token se cachea y se reutiliza hasta que expire (1h); se renueva antes.
+     */
+    private function getAmazonCreatorsAccessToken(): ?string
+    {
+        if (!$this->amazonCreatorsCredentialId || !$this->amazonCreatorsCredentialSecret) {
+            return null;
+        }
+
+        $cached = Cache::get(self::AMAZON_CREATORS_CACHE_KEY);
+        if ($cached) {
+            return $cached;
+        }
+
+        if ($this->amazonCreatorsEsperaSegundos > 0) {
+            sleep($this->amazonCreatorsEsperaSegundos);
+        }
+        $resp = Http::timeout(15)
+            ->acceptJson()
+            ->asJson()
+            ->post($this->amazonCreatorsTokenUrl, [
+                'grant_type'    => 'client_credentials',
+                'client_id'     => $this->amazonCreatorsCredentialId,
+                'client_secret' => $this->amazonCreatorsCredentialSecret,
+                'scope'         => 'creatorsapi::default',
+            ]);
+
+        if (!$resp->successful()) {
+            return null;
+        }
+
+        $data = $resp->json();
+        $token = $data['access_token'] ?? null;
+        if ($token) {
+            Cache::put(self::AMAZON_CREATORS_CACHE_KEY, $token, self::AMAZON_CREATORS_TOKEN_TTL_SECONDS);
+        }
+        return $token;
+    }
+
+    /**
+     * Llama a la Amazon Creators API (GetItems). Respuesta en camelCase; ofertas solo OffersV2.
      */
     private function callAmazonAPI(string $url, ?string $apiTienda = null): array
     {
-        if (!$this->amazonAccessKey || !$this->amazonSecretKey) {
-            return ['success' => false, 'error' => 'Amazon API: faltan access_key/secret_key', 'proveedor' => 'AMAZON_API'];
+        if (!$this->amazonCreatorsCredentialId || !$this->amazonCreatorsCredentialSecret) {
+            return ['success' => false, 'error' => 'Amazon Creators API: faltan credential_id o credential_secret', 'proveedor' => 'AMAZON_API'];
         }
 
-        // Extraer ASIN de la URL
         $asin = $this->amazonExtractASIN($url);
         if (!$asin) {
             return [
@@ -598,73 +847,146 @@ class PeticionApiHTMLController extends Controller
                 'proveedor' => 'AMAZON_API',
             ];
         }
-        
-        // Debug: mostrar ASIN extraído
-        $debug = [
-            'url_original' => $url,
-            'asin_extraido' => $asin
-        ];
+
+        $debug = ['url_original' => $url, 'asin_extraido' => $asin];
 
         try {
-            // PA-API 5.0 GetItems - estructura correcta para obtener información específica del producto
+            $token = $this->getAmazonCreatorsAccessToken();
+            if (!$token) {
+                return [
+                    'success'   => false,
+                    'error'     => 'Amazon Creators API: no se pudo obtener access token (revisa credential_id/secret y token endpoint)',
+                    'proveedor' => 'AMAZON_API',
+                ];
+            }
+
+            // Creators API: camelCase, solo recursos soportados (OffersV2, no Offers)
             $payload = [
-                'ItemIds' => [$asin], // Array de ASINs
-                'ItemIdType' => 'ASIN',
-                'Marketplace' => 'www.amazon.es', // España
-                'PartnerType' => 'Associates',
-                'PartnerTag' => $this->amazonAssociateTag,
-                'LanguagesOfPreference' => ['es_ES'], // Español de España
-                'CurrencyOfPreference' => 'EUR', // Euros
-                'Resources' => ["ItemInfo.Title",
-                    "Offers.Summaries.OfferCount",
-                    "Offers.Listings.Price",
-                    "Offers.Listings.Availability.Type",
-                    "Offers.Listings.Availability.Message",
-                    "Offers.Listings.IsBuyBoxWinner",
-                    "Offers.Listings.MerchantInfo",
-                    "OffersV2.Listings.Price",
-                    "OffersV2.Listings.Type",
-                    "OffersV2.Listings.IsBuyBoxWinner",
-                    "Offers.Listings.MerchantInfo"
-                    ]
+                'itemIds'                 => [$asin],
+                'itemIdType'              => 'ASIN',
+                'marketplace'             => $this->amazonCreatorsMarketplace,
+                'partnerTag'              => $this->amazonCreatorsPartnerTag,
+                'languagesOfPreference'   => ['es_ES'],
+                'currencyOfPreference'    => 'EUR',
+                'resources'               => [
+                    'itemInfo.title',
+                    'itemInfo.features',
+                    'images.primary.small',
+                    'parentASIN',
+                    'offersV2.listings.price',
+                    'offersV2.listings.availability',
+                    'offersV2.listings.isBuyBoxWinner',
+                    'offersV2.listings.merchantInfo',
+                    'offersV2.listings.condition',
+                    'offersV2.listings.type',
+                ],
             ];
 
-            $apiUrl = 'https://webservices.amazon.es/paapi5/getitems'; // Endpoint para España
-            $payloadJson = json_encode($payload);
-            $headers = $this->amazonCreateHeaders($apiUrl, $payloadJson);
-
+            if ($this->amazonCreatorsEsperaSegundos > 0) {
+                sleep($this->amazonCreatorsEsperaSegundos);
+            }
             $resp = Http::timeout(30)
-                ->withHeaders($headers)
-                ->withBody($payloadJson, 'application/json')
-                ->post($apiUrl);
+                ->withHeaders([
+                    'Authorization'   => 'Bearer ' . $token,
+                    'Content-Type'    => 'application/json',
+                    'x-marketplace'  => $this->amazonCreatorsMarketplace,
+                ])
+                ->post($this->amazonCreatorsApiUrl, $payload);
 
             if (!$resp->successful()) {
                 return [
                     'success'   => false,
-                    'error'     => 'Amazon API HTTP ' . $resp->status() . ': ' . $resp->body(),
+                    'error'     => 'Amazon Creators API HTTP ' . $resp->status() . ': ' . $resp->body(),
                     'raw'       => $resp->body(),
                     'proveedor' => 'AMAZON_API',
-                    'debug'     => [
-                        'url' => $apiUrl,
-                        'payload' => $payload,
-                        'headers' => $headers
-                    ]
+                    'debug'     => $debug,
                 ];
             }
 
             $json = $resp->json();
-            
-            // Devolver la respuesta cruda de Amazon sin procesar
             return [
                 'success'   => true,
                 'proveedor' => 'AMAZON_API',
-                'raw'       => $json,  // Respuesta completa de Amazon
+                'raw'       => $json,
                 'asin'      => $asin,
                 'debug'     => $debug,
             ];
-
         } catch (\Throwable $e) {
             return ['success' => false, 'error' => 'Amazon API Exception: ' . $e->getMessage(), 'proveedor' => 'AMAZON_API'];
+        }
+    }
+
+    /**
+     * Obtiene datos de un producto de Amazon (solo imágenes) vía Creators API GetItems.
+     * Para uso en modal de imágenes (admin productos). Devuelve raw para procesar en el controlador.
+     *
+     * @return array{success: bool, raw?: array, asin?: string, error?: string}
+     */
+    public function obtenerItemAmazonParaImagenes(string $url): array
+    {
+        if (!$this->amazonCreatorsCredentialId || !$this->amazonCreatorsCredentialSecret) {
+            return ['success' => false, 'error' => 'Amazon Creators API: faltan credenciales'];
+        }
+
+        $asin = $this->amazonExtractASIN($url);
+        if (!$asin) {
+            return ['success' => false, 'error' => 'No se pudo extraer el ASIN de la URL de Amazon'];
+        }
+
+        try {
+            $token = $this->getAmazonCreatorsAccessToken();
+            if (!$token) {
+                return ['success' => false, 'error' => 'Amazon Creators API: no se pudo obtener access token'];
+            }
+
+            $payload = [
+                'itemIds'               => [$asin],
+                'itemIdType'             => 'ASIN',
+                'marketplace'            => $this->amazonCreatorsMarketplace,
+                'partnerTag'             => $this->amazonCreatorsPartnerTag,
+                'languagesOfPreference'  => ['es_ES'],
+                'resources'              => [
+                    'images.primary.small',
+                    'images.primary.medium',
+                    'images.primary.large',
+                    'images.variants.small',
+                    'images.variants.medium',
+                    'images.variants.large',
+                ],
+            ];
+
+            if ($this->amazonCreatorsEsperaSegundos > 0) {
+                sleep($this->amazonCreatorsEsperaSegundos);
+            }
+            $resp = Http::timeout(30)
+                ->withHeaders([
+                    'Authorization'   => 'Bearer ' . $token,
+                    'Content-Type'    => 'application/json',
+                    'x-marketplace'   => $this->amazonCreatorsMarketplace,
+                ])
+                ->post($this->amazonCreatorsApiUrl, $payload);
+
+            if (!$resp->successful()) {
+                return [
+                    'success' => false,
+                    'error'   => 'Error al consultar la API de Amazon: ' . $resp->status(),
+                ];
+            }
+
+            $json = $resp->json();
+
+            if (isset($json['errors']) && !empty($json['errors'])) {
+                $msg = $json['errors'][0]['message'] ?? 'Error desconocido';
+                return ['success' => false, 'error' => $msg];
+            }
+
+            return [
+                'success' => true,
+                'raw'     => $json,
+                'asin'    => $asin,
+            ];
+        } catch (\Throwable $e) {
+            return ['success' => false, 'error' => 'Amazon API: ' . $e->getMessage()];
         }
     }
 
@@ -692,140 +1014,65 @@ class PeticionApiHTMLController extends Controller
         return null;
     }
 
-    private function amazonCreateHeaders(string $url, string $payload): array
-    {
-        $timestamp = gmdate('Ymd\THis\Z');
-        $date = gmdate('Ymd');
-        
-        // Parsear la URL
-        $parsedUrl = parse_url($url);
-        $host = $parsedUrl['host'];
-        $path = $parsedUrl['path'];
-        
-        // Headers adicionales requeridos por la nueva API
-        $xAmzTarget = 'com.amazon.paapi5.v1.ProductAdvertisingAPIv1.GetItems';
-        $contentEncoding = 'amz-1.0';
-        
-        // Crear el string para firmar (AWS Signature Version 4)
-        $algorithm = 'AWS4-HMAC-SHA256';
-        $credentialScope = $date . '/eu-west-1/ProductAdvertisingAPI/aws4_request';
-        
-        // Headers que se incluyen en la firma
-        $canonicalHeaders = "content-encoding:" . $contentEncoding . "\n" .
-                           "host:" . $host . "\n" .
-                           "x-amz-date:" . $timestamp . "\n" .
-                           "x-amz-target:" . $xAmzTarget . "\n";
-        
-        $signedHeaders = "content-encoding;host;x-amz-date;x-amz-target";
-        
-        $canonicalRequest = "POST\n" . 
-                           $path . "\n" . 
-                           "\n" . 
-                           $canonicalHeaders . 
-                           "\n" . 
-                           $signedHeaders . "\n" . 
-                           hash('sha256', $payload);
-        
-        $stringToSign = $algorithm . "\n" . 
-                       $timestamp . "\n" . 
-                       $credentialScope . "\n" . 
-                       hash('sha256', $canonicalRequest);
-        
-        // Crear la firma
-        $signingKey = $this->amazonGetSigningKey($date, 'eu-west-1');
-        $signature = hash_hmac('sha256', $stringToSign, $signingKey);
-        
-        $authorization = $algorithm . ' ' . 
-                        'Credential=' . $this->amazonAccessKey . '/' . $credentialScope . ', ' . 
-                        'SignedHeaders=' . $signedHeaders . ', ' . 
-                        'Signature=' . $signature;
-        
-        return [
-            'Host' => $host,
-            'Content-Type' => 'application/json; charset=UTF-8',
-            'X-Amz-Date' => $timestamp,
-            'X-Amz-Target' => $xAmzTarget,
-            'Content-Encoding' => $contentEncoding,
-            'User-Agent' => 'paapi-docs-curl/1.0.0',
-            'Authorization' => $authorization
-        ];
-    }
-    
-    private function amazonGetSigningKey(string $date, string $region = null): string
-    {
-        $region = $region ?: $this->amazonRegion;
-        $kDate = hash_hmac('sha256', $date, 'AWS4' . $this->amazonSecretKey, true);
-        $kRegion = hash_hmac('sha256', $region, $kDate, true);
-        $kService = hash_hmac('sha256', 'ProductAdvertisingAPI', $kRegion, true);
-        $kSigning = hash_hmac('sha256', 'aws4_request', $kService, true);
-        
-        return $kSigning;
-    }
-
+    /**
+     * Parsea la respuesta de GetItems (compatible con PA-API 5.0 y Creators API).
+     * Creators API devuelve itemsResult.items con claves en camelCase.
+     */
     private function amazonParseGetItemsResponse(array $json): array
     {
         try {
             $result = [];
 
-            // Verificar errores
-            if (isset($json['Errors'])) {
-                $error = $json['Errors'][0]['Message'] ?? 'Error desconocido';
-                return ['error' => $error];
+            // Errores (PA-API: Errors; Creators: errors)
+            if (isset($json['Errors'][0])) {
+                $result['error'] = $json['Errors'][0]['Message'] ?? 'Error desconocido';
+                return $result;
+            }
+            if (isset($json['errors'][0])) {
+                $result['error'] = $json['errors'][0]['message'] ?? 'Error desconocido';
+                return $result;
             }
 
-            // Debug: verificar estructura de respuesta
-            $result['debug'] = [
-                'has_item_results' => isset($json['ItemResults']),
-                'has_items_result' => isset($json['ItemsResult']),
-                'has_items_in_result' => isset($json['ItemsResult']['Items']),
-                'has_items_in_results' => isset($json['ItemResults']['Items']),
-                'items_count_result' => isset($json['ItemsResult']['Items']) ? count($json['ItemsResult']['Items']) : 0,
-                'items_count_results' => isset($json['ItemResults']['Items']) ? count($json['ItemResults']['Items']) : 0,
-                'response_keys' => array_keys($json)
-            ];
+            // Obtener lista de items: Creators API (itemsResult.items) o PA-API (ItemsResult.Items / ItemResults.Items)
+            $items = $json['itemsResult']['items'] ?? $json['itemResults']['items'] ?? $json['ItemsResult']['Items'] ?? $json['ItemResults']['Items'] ?? null;
 
-            // Extraer información del producto de GetItems
-            // Intentar con ItemsResult primero, luego ItemResults
-            $items = null;
-            if (isset($json['ItemsResult']['Items'][0])) {
-                $items = $json['ItemsResult']['Items'];
-            } elseif (isset($json['ItemResults']['Items'][0])) {
-                $items = $json['ItemResults']['Items'];
+            if (!$items || !isset($items[0])) {
+                return array_merge($result, ['error' => 'No se encontraron items en la respuesta']);
             }
-            
-            if ($items && isset($items[0])) {
-                $item = $items[0];
-                
-                // Información básica
-                $result['asin'] = $item['ASIN'] ?? null;
-                $result['title'] = $item['ItemInfo']['Title']['DisplayValue'] ?? null;
-                $result['detail_page_url'] = $item['DetailPageURL'] ?? null;
-                
-                // Imagen pequeña
-                if (isset($item['Images']['Primary']['Small']['URL'])) {
-                    $result['imagen'] = $item['Images']['Primary']['Small']['URL'];
-                }
-                
-                // Características del producto
-                if (isset($item['ItemInfo']['Features']['DisplayValues'])) {
-                    $result['features'] = $item['ItemInfo']['Features']['DisplayValues'];
-                }
-                
-                // Precio más alto de resúmenes
-                if (isset($item['Offers']['Summaries'][0]['HighestPrice']['Amount'])) {
-                    $result['precio_maximo'] = $this->num($item['Offers']['Summaries'][0]['HighestPrice']['Amount']);
-                }
-                
-                // Parent ASIN
-                if (isset($item['ParentASIN'])) {
-                    $result['parent_asin'] = $item['ParentASIN'];
-                }
-            } else {
-                $result['debug']['reason'] = 'No se encontraron items en la respuesta';
+
+            $item = $items[0];
+
+            // Claves en camelCase (Creators) o PascalCase (PA-API)
+            $result['asin'] = $item['asin'] ?? $item['ASIN'] ?? null;
+            $result['title'] = $item['itemInfo']['title']['displayValue'] ?? $item['ItemInfo']['Title']['DisplayValue'] ?? null;
+            $result['detail_page_url'] = $item['detailPageURL'] ?? $item['DetailPageURL'] ?? null;
+            $result['parent_asin'] = $item['parentASIN'] ?? $item['ParentASIN'] ?? null;
+
+            if (isset($item['images']['primary']['small']['url'])) {
+                $result['imagen'] = $item['images']['primary']['small']['url'];
+            } elseif (isset($item['Images']['Primary']['Small']['URL'])) {
+                $result['imagen'] = $item['Images']['Primary']['Small']['URL'];
+            }
+
+            if (isset($item['itemInfo']['features']['displayValues'])) {
+                $result['features'] = $item['itemInfo']['features']['displayValues'];
+            } elseif (isset($item['ItemInfo']['Features']['DisplayValues'])) {
+                $result['features'] = $item['ItemInfo']['Features']['DisplayValues'];
+            }
+
+            // Precio: Creators usa offersV2.listings[].price; PA-API Offers.Summaries o Listings
+            if (!empty($item['offersV2']['listings'][0]['price']['amount'])) {
+                $result['precio'] = $this->num($item['offersV2']['listings'][0]['price']['amount']);
+            } elseif (!empty($item['OffersV2']['Listings'][0]['Price']['Amount'])) {
+                $result['precio'] = $this->num($item['OffersV2']['Listings'][0]['Price']['Amount']);
+            } elseif (!empty($item['Offers']['Listings'][0]['Price']['Amount'])) {
+                $result['precio'] = $this->num($item['Offers']['Listings'][0]['Price']['Amount']);
+            }
+            if (isset($item['Offers']['Summaries'][0]['HighestPrice']['Amount'])) {
+                $result['precio_maximo'] = $this->num($item['Offers']['Summaries'][0]['HighestPrice']['Amount']);
             }
 
             return $result;
-
         } catch (\Throwable $e) {
             return ['error' => 'Error parseando respuesta: ' . $e->getMessage()];
         }
@@ -940,6 +1187,7 @@ class PeticionApiHTMLController extends Controller
         $k = strtolower($apiTienda);
 
         if ($k === 'aliexpressopen') return 'aliexpress_open';
+        if ($k === 'cloudflare') return 'cloudflare';
         if ($k === 'amazonapi') return 'amazon_api';
         if ($k === 'amazonproductinfo') return 'amazon_product_info';
         if ($k === 'amazonpricing') return 'amazon_pricing';

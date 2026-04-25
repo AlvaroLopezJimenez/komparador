@@ -57,7 +57,7 @@ class AmazonController extends PlantillaTiendaController
 
         // Determinar qué API se está usando y extraer el precio según corresponda
         if ($apiTienda === 'amazonApi' || ($resultado['proveedor'] ?? '') === 'AMAZON_API') {
-            // Amazon Product Advertising API - extraer precio del JSON crudo
+            // Amazon Creators API (o PA-API legacy) - extraer precio del Buy Box del JSON crudo
             $precio = $this->extraerPrecioAmazonApi($resultado['raw'] ?? []);
         } elseif ($apiTienda === 'amazonProductInfo' || ($resultado['proveedor'] ?? '') === 'AMAZON_PRODUCT_INFO') {
             // Amazon Product Info API - el precio ya viene extraído en $resultado['precio']
@@ -73,6 +73,25 @@ class AmazonController extends PlantillaTiendaController
 
         // Verificar si tenemos precio en la respuesta
         if ($precio !== null) {
+            // Amazon API: si el Buy Box es "Amazon Segunda mano", no mostrar oferta y generar aviso
+            $raw = $resultado['raw'] ?? [];
+            if (($apiTienda === 'amazonApi' || ($resultado['proveedor'] ?? '') === 'AMAZON_API') && $this->esBuyBoxSegundaMano($raw)) {
+                if ($oferta && $oferta instanceof OfertaProducto) {
+                    $oferta->update(['mostrar' => 'no']);
+                    DB::table('avisos')->insertGetId([
+                        'texto_aviso'     => 'Segunda mano - 1a vez GENERADO AUTOMATICAMENTE',
+                        'fecha_aviso'     => now()->addDays(4),
+                        'user_id'         => 1,
+                        'avisoable_type'  => \App\Models\OfertaProducto::class,
+                        'avisoable_id'    => $oferta->id,
+                        'oculto'          => 0,
+                        'created_at'      => now(),
+                        'updated_at'      => now(),
+                    ]);
+                }
+                return response()->json(['success' => false, 'error' => 'Buy Box es Segunda mano; oferta ocultada y aviso generado']);
+            }
+
             Log::info('AmazonController - Precio encontrado:', [
                 'precio' => $precio,
                 'oferta_id' => $oferta ? $oferta->id : 'null',
@@ -115,65 +134,119 @@ class AmazonController extends PlantillaTiendaController
     }
 
     /**
-     * Extrae el precio de la respuesta de Amazon Product Advertising API 
-     * Busca en Offers.Listings[0].Price.Amount o OffersV2.Listings[0].Price.Money.Amount
-     * 
+     * Extrae el precio de la respuesta de Amazon API (Creators API o PA-API legacy).
+     * Soporta formato camelCase (Creators) y PascalCase (PA-API).
+     * Usa el precio del listing con isBuyBoxWinner (oferta destacada en la ficha); si no hay, el primer listing.
+     *
      * @param array $raw Respuesta JSON de la API
-     * @return float|null Precio encontrado o null
+     * @return float|null Precio del Buy Box o del primer listing, o null
      */
     private function extraerPrecioAmazonApi(array $raw): ?float
     {
         try {
-            // Verificar que existe ItemsResult e Items
-            if (!isset($raw['ItemsResult']['Items']) || !is_array($raw['ItemsResult']['Items']) || empty($raw['ItemsResult']['Items'])) {
-                Log::warning('AmazonController - No se encontraron Items en la respuesta:', [
+            $items = $raw['itemsResult']['items'] ?? $raw['ItemsResult']['Items'] ?? null;
+            if (!is_array($items) || empty($items)) {
+                Log::warning('AmazonController - No se encontraron items en la respuesta:', [
                     'raw_keys' => array_keys($raw),
-                    'has_items_result' => isset($raw['ItemsResult']),
-                    'has_items' => isset($raw['ItemsResult']['Items'])
                 ]);
                 return null;
             }
 
-            $item = $raw['ItemsResult']['Items'][0];
-            $precio = null;
+            $item = $items[0];
 
-            // Intentar obtener el precio desde Offers.Listings[0].Price.Amount
-            if (isset($item['Offers']['Listings'][0]['Price']['Amount'])) {
-                $precio = $item['Offers']['Listings'][0]['Price']['Amount'];
-            }
-            
-            // Si no está ahí, intentar desde OffersV2.Listings[0].Price.Money.Amount
-            if ($precio === null && isset($item['OffersV2']['Listings'][0]['Price']['Money']['Amount'])) {
-                $precio = $item['OffersV2']['Listings'][0]['Price']['Money']['Amount'];
+            // Creators API (camelCase): offersV2.listings
+            $listings = $item['offersV2']['listings'] ?? null;
+            $isCamel = is_array($listings);
+
+            if (!$isCamel) {
+                $listings = $item['OffersV2']['Listings'] ?? $item['Offers']['Listings'] ?? null;
             }
 
-            // Convertir a float y asegurar formato numérico (sin símbolos de euro, punto como separador decimal)
-            if ($precio !== null) {
-                // Convertir a string, limpiar cualquier carácter no numérico excepto punto y guion
-                $precioStr = (string) $precio;
-                // Reemplazar comas por puntos si las hay
-                $precioStr = str_replace(',', '.', $precioStr);
-                // Extraer solo números, punto y guion (para negativos)
-                $precioStr = preg_replace('/[^0-9.-]/', '', $precioStr);
-                
-                $precioFloat = (float) $precioStr;
-                
-                return $precioFloat > 0 ? $precioFloat : null;
+            if (!is_array($listings) || empty($listings)) {
+                Log::warning('AmazonController - No se encontró precio en la respuesta de amazonApi:', [
+                    'has_offersV2' => isset($item['offersV2']) || isset($item['OffersV2']),
+                    'item_keys' => array_keys($item),
+                ]);
+                return null;
             }
 
-            Log::warning('AmazonController - No se encontró precio en la respuesta de amazonApi:', [
-                'has_offers' => isset($item['Offers']),
-                'has_offers_v2' => isset($item['OffersV2']),
-                'item_keys' => array_keys($item)
-            ]);
+            $buyBoxListing = null;
+            foreach ($listings as $listing) {
+                $isWinner = $listing['isBuyBoxWinner'] ?? $listing['IsBuyBoxWinner'] ?? false;
+                if ($isWinner === true) {
+                    $buyBoxListing = $listing;
+                    break;
+                }
+            }
+            if ($buyBoxListing === null) {
+                $buyBoxListing = $listings[0];
+            }
+
+            $amount = null;
+            if ($isCamel) {
+                $amount = $buyBoxListing['price']['money']['amount'] ?? null;
+            } else {
+                $amount = $buyBoxListing['Price']['Money']['Amount'] ?? $buyBoxListing['Price']['Amount'] ?? null;
+            }
+
+            if ($amount === null || $amount === '') {
+                return null;
+            }
+
+            $precio = $this->normalizarPrecioAmazon($amount);
+            return $precio !== null && $precio > 0 ? (float) $precio : null;
         } catch (\Throwable $e) {
             Log::error('AmazonController - Error al extraer precio de amazonApi:', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
         }
 
         return null;
+    }
+
+    /**
+     * Indica si el listing que gana el Buy Box es "Amazon Segunda mano" (u otro vendedor de segunda mano).
+     * Soporta respuesta camelCase (Creators API) y PascalCase (PA-API).
+     */
+    private function esBuyBoxSegundaMano(array $raw): bool
+    {
+        $items = $raw['itemsResult']['items'] ?? $raw['ItemsResult']['Items'] ?? null;
+        if (!is_array($items) || empty($items)) {
+            return false;
+        }
+        $item = $items[0];
+        $listings = $item['offersV2']['listings'] ?? $item['OffersV2']['Listings'] ?? $item['Offers']['Listings'] ?? null;
+        if (!is_array($listings)) {
+            return false;
+        }
+        foreach ($listings as $listing) {
+            $isWinner = $listing['isBuyBoxWinner'] ?? $listing['IsBuyBoxWinner'] ?? false;
+            if ($isWinner !== true) {
+                continue;
+            }
+            $name = $listing['merchantInfo']['name'] ?? $listing['MerchantInfo']['Name'] ?? '';
+            $name = is_string($name) ? $name : '';
+            return stripos($name, 'segunda mano') !== false;
+        }
+        return false;
+    }
+
+    /**
+     * Normaliza un valor de precio de la API de Amazon a float (limpia comas, símbolos, etc.).
+     */
+    private function normalizarPrecioAmazon($valor): ?float
+    {
+        if ($valor === null || $valor === '') {
+            return null;
+        }
+        $s = str_replace(',', '.', trim((string) $valor));
+        $s = preg_replace('/[^0-9.-]/', '', $s);
+        if ($s === '' || !is_numeric($s)) {
+            return null;
+        }
+        $f = (float) $s;
+        return $f > 0 ? $f : null;
     }
 
     /**

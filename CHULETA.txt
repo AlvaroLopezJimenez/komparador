@@ -3,7 +3,7 @@
 php artisan migrate:fresh
 php artisan db:seed
 
-docker-compose exec app php artisan migrate:fresh --seed
+
 
 //Levantar docker
 
@@ -24,6 +24,8 @@ git push
 /////////ACTUALIZAR TAILWIND - HAY QUE METERLO EN AMBAS CARPETAS PUBLIC/BUILD
 
 npm run build
+
+En Docker ---- docker compose run --rm node npm run build
 
 
 ////////OFERTAS CON AVISOS CON MENSAJE "GENERADO AUTOMATICAMENTE"

@@ -38,6 +38,11 @@ class AntiScrapingMiddleware
      */
     public function handle(Request $request, Closure $next, string $type = 'ofertas')
     {
+        // ✅ Bypass total si CAPTCHA/fingerprint está desactivado (.env ACTIVAR_CAPTCHA_FINGERPRINT=false)
+        if (!config('anti-scraping.activar_captcha_fingerprint')) {
+            return $next($request);
+        }
+
         // ✅ ORDEN 0: Usuarios autenticados (bypass con monitoreo)
         // Usar guard 'web' explícitamente para asegurar que detecta la sesión web
         $isAuthenticated = Auth::guard('web')->check();

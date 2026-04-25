@@ -25,20 +25,31 @@
         </div>
         <div class="flex gap-2 items-center">
             <span class="text-sm text-gray-600 dark:text-gray-400">{{ $categoria->productos_count }} productos</span>
-            <a href="{{ route('admin.categorias.edit', $categoria) }}"
-                class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs font-medium"
-                title="Editar categoría: {{ $categoria->nombre }}"
-                onmouseover="document.getElementById('categoria-nombre-{{ $categoria->id }}').style.color='#1d4ed8';"
-                onmouseout="document.getElementById('categoria-nombre-{{ $categoria->id }}').style.color='';">
-                ✏️ Editar
-            </a>
+            @if (!empty($esPickerCrearMasivo ?? false))
+                <button type="button"
+                    class="btn-elegir-categoria-arbol-crear-masivo bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded text-xs font-medium"
+                    title="Acotar búsqueda a esta categoría (y subcategorías)"
+                    data-categoria-id="{{ $categoria->id }}"
+                    data-categoria-nombre="{{ $categoria->nombre }}"
+                    @click.stop>
+                    Elegir
+                </button>
+            @else
+                <a href="{{ route('admin.categorias.edit', $categoria) }}"
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs font-medium"
+                    title="Editar categoría: {{ $categoria->nombre }}"
+                    onmouseover="document.getElementById('categoria-nombre-{{ $categoria->id }}').style.color='#1d4ed8';"
+                    onmouseout="document.getElementById('categoria-nombre-{{ $categoria->id }}').style.color='';">
+                    ✏️ Editar
+                </a>
+            @endif
         </div>
     </div>
 
     @if($categoria->subcategorias->count() > 0)
         <div x-show="isOpen({{ $categoria->id }})" class="ml-6 mt-1 space-y-1 border-l-4 border-{{ $color }} pl-3">
             @foreach ($categoria->subcategorias as $subcategoria)
-                @include('admin.categorias.partial-categoria', ['categoria' => $subcategoria, 'nivel' => $nivel + 1])
+                @include('admin.categorias.partial-categoria', ['categoria' => $subcategoria, 'nivel' => $nivel + 1, 'esPickerCrearMasivo' => $esPickerCrearMasivo ?? false])
             @endforeach
         </div>
     @endif

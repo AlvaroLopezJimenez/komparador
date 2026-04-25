@@ -17,6 +17,7 @@ class Tienda extends Model
         'url_opiniones',
         'anotaciones_internas',
         'aviso',
+        'avisos_sin_stock_scrapear_automatico',
         'api',
         'mostrar_tienda',
         'scrapear',

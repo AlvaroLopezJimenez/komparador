@@ -57,6 +57,11 @@
 
                 $frecuenciaCholloValor = $frecuenciaCholloValorOld ?? $frecuenciaCholloValorDefault;
                 $frecuenciaCholloUnidad = $frecuenciaCholloUnidadOld ?? $frecuenciaCholloUnidadDefault;
+
+                $urlProductoPublicoInicial = null;
+                if (isset($producto) && $producto->categoria) {
+                    $urlProductoPublicoInicial = $producto->categoria->construirUrlCategorias($producto->slug);
+                }
             @endphp
 
             {{-- INFORMACIÓN GENERAL --}}
@@ -67,14 +72,44 @@
                     {{-- PRODUCTO --}}
                     <div class="col-span-1 md:col-span-2">
                         <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">Producto *</label>
-                        <div class="relative">
-                            <input type="hidden" name="producto_id" id="producto_id" value="{{ old('producto_id', $producto->id ?? '') }}" required>
-                            <input type="text" id="producto_nombre"
-                                value="{{ old('producto_nombre', isset($producto) ? $producto->nombre . ' - ' . $producto->marca . ' - ' . $producto->modelo . ' - ' . $producto->talla : '') }}"
-                                class="w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border {{ isset($producto) ? 'border-green-500' : '' }} focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="Escribe para buscar productos..."
-                                autocomplete="off">
-                            <div id="producto_sugerencias" class="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg hidden max-h-60 overflow-y-auto"></div>
+                        <div class="flex gap-2">
+                            <div class="relative flex-1 min-w-0">
+                                <input type="hidden" name="producto_id" id="producto_id" value="{{ old('producto_id', $producto?->id ?? '') }}" required>
+                                <input type="text" id="producto_nombre"
+                                    value="{{ old('producto_nombre', isset($producto) ? $producto->nombre . ' - ' . $producto->marca . ' - ' . $producto->modelo . ' - ' . $producto->talla : '') }}"
+                                    class="w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border {{ isset($producto) ? 'border-green-500' : '' }} focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="Escribe para buscar productos..."
+                                    autocomplete="off">
+                                <div id="producto_sugerencias" class="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg hidden max-h-60 overflow-y-auto"></div>
+                            </div>
+                            @if($oferta)
+                            <a href="{{ route('admin.ofertas.estadisticas', $oferta) }}"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded transition flex items-center justify-center shrink-0"
+                                title="Estadísticas de la oferta">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3v18M6 8v13M16 13v8M21 17v4" />
+                                </svg>
+                            </a>
+                            @else
+                            <span class="px-3 py-2 bg-gray-400 dark:bg-gray-600 text-white rounded flex items-center justify-center shrink-0 cursor-not-allowed opacity-70"
+                                title="Disponible al editar una oferta ya guardada">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3v18M6 8v13M16 13v8M21 17v4" />
+                                </svg>
+                            </span>
+                            @endif
+                            <a href="{{ $urlProductoPublicoInicial ?: '#' }}"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                id="btn_ir_producto_publico"
+                                class="px-3 py-2 bg-green-500 hover:bg-green-600 text-white rounded transition flex items-center justify-center shrink-0 {{ $urlProductoPublicoInicial ? '' : 'opacity-40 pointer-events-none' }}"
+                                title="Ver producto en la web">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 3h7m0 0v7m0-7L10 14" />
+                                </svg>
+                            </a>
                         </div>
                         @error('producto_id')
                         <p class="text-sm text-red-500 mt-1">{{ $message }}</p>
@@ -432,6 +467,7 @@
                                 <option value="">Sin descuento</option>
                                 <option value="cupon" {{ $descuentoParaSelect === 'cupon' ? 'selected' : '' }}>Cupón</option>
                                 <option value="3x2" {{ $descuentoParaSelect === '3x2' ? 'selected' : '' }}>3x2</option>
+                                <option value="+Juego" {{ $descuentoParaSelect === '+Juego' ? 'selected' : '' }}>+Juego</option>
                                 <option value="2x1 - SoloCarrefour" {{ $descuentoParaSelect === '2x1 - SoloCarrefour' ? 'selected' : '' }}>2x1 - SoloCarrefour</option>
                                 <option value="2a al 70" {{ $descuentoParaSelect === '2a al 70' ? 'selected' : '' }}>2ª al 70%</option>
                                 <option value="2a al 50" {{ $descuentoParaSelect === '2a al 50' ? 'selected' : '' }}>2ª al 50%</option>
@@ -743,6 +779,10 @@
                                 <button type="button" onclick="rellenarTextoAviso('404 - 1a vez')" 
                                     class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs md:text-sm rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 transition">
                                     404
+                                </button>
+                                <button type="button" onclick="rellenarTextoAviso('Segunda mano 1a vez')" 
+                                    class="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white text-xs md:text-sm rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 transition">
+                                    Segunda mano
                                 </button>
                             </div>
                             <textarea id="texto-aviso" name="texto_aviso" rows="3" 
@@ -1443,6 +1483,21 @@
              indiceSeleccionadoTienda = -1;
          }
 
+         function actualizarBtnIrProductoPublicoDesdeApi(productoCompleto) {
+             const btn = document.getElementById('btn_ir_producto_publico');
+             if (!btn) return;
+             const u = productoCompleto && !productoCompleto.error && productoCompleto.url_publica
+                 ? String(productoCompleto.url_publica).trim()
+                 : '';
+             if (u) {
+                 btn.href = u;
+                 btn.classList.remove('opacity-40', 'pointer-events-none');
+             } else {
+                 btn.href = '#';
+                 btn.classList.add('opacity-40', 'pointer-events-none');
+             }
+         }
+
                  // Función para seleccionar un producto
          async function seleccionarProducto(producto) {
              const productoIdInput = document.getElementById('producto_id');
@@ -1459,9 +1514,10 @@
              console.log('✅ Producto seleccionado:', producto.id, producto.texto_completo);
              
              // Obtener información completa del producto para verificar unidad de medida
+             let productoCompleto = null;
              try {
                  const response = await fetch(`/panel-privado/productos/${producto.id}`);
-                 const productoCompleto = await response.json();
+                 productoCompleto = await response.json();
                  
                  // Verificar si el producto tiene unidad de medida única
                  if (productoCompleto && productoCompleto.unidadDeMedida === 'unidadUnica') {
@@ -1486,6 +1542,7 @@
                  }
              } catch (error) {
                  console.error('Error al obtener información del producto:', error);
+                 productoCompleto = null;
                  // En caso de error, habilitar el campo por defecto
                  if (unidadesInput) {
                      unidadesInput.readOnly = false;
@@ -1493,6 +1550,7 @@
                      unidadesInput.classList.add('opacity-100');
                  }
              }
+             actualizarBtnIrProductoPublicoDesdeApi(productoCompleto);
              
              // Cargar especificaciones internas del producto
              cargarEspecificacionesInternas(producto.id);
@@ -3122,6 +3180,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     urlIsValid = true; // Permite guardar sin confirmación
                     break;
                     
+                case 'descartada':
+                    mostrarMensajeUrl('descartada', data.mensaje);
+                    urlIsValid = false;
+                    break;
+                    
+                case 'en_neo':
+                    mostrarMensajeUrl('en_neo', data.mensaje);
+                    urlIsValid = true;
+                    break;
+                    
                 case 'vacia':
                     mostrarMensajeUrl('', '');
                     urlIsValid = false;
@@ -3158,8 +3226,12 @@ document.addEventListener('DOMContentLoaded', function() {
         if (tipo === 'error') {
             validationMessage.classList.add('text-red-500');
             validationMessage.classList.remove('text-green-500', 'text-blue-500', 'hidden');
-            // Mostrar checkbox para URL duplicada en mismo producto
+            // Mostrar checkbox para URL duplicada en mismo producto (no para URL descartada)
             checkboxContainer.classList.remove('hidden');
+        } else if (tipo === 'descartada') {
+            validationMessage.classList.add('text-red-500');
+            validationMessage.classList.remove('text-green-500', 'text-blue-500', 'hidden');
+            // No mostrar checkbox: la URL descartada no se puede guardar de ninguna forma
         } else if (tipo === 'success') {
             validationMessage.classList.add('text-green-500');
             validationMessage.classList.remove('text-red-500', 'text-blue-500', 'hidden');
@@ -3168,6 +3240,10 @@ document.addEventListener('DOMContentLoaded', function() {
             validationMessage.classList.remove('text-red-500', 'text-green-500', 'hidden');
             // Mostrar lista de productos existentes
             otherProductsContainer.classList.remove('hidden');
+        } else if (tipo === 'en_neo') {
+            validationMessage.classList.add('text-blue-500');
+            validationMessage.classList.remove('text-red-500', 'text-green-500', 'hidden');
+            // No mostrar lista de productos; solo el mensaje de Neo
         } else {
             validationMessage.classList.add('hidden');
         }
@@ -3227,92 +3303,38 @@ document.addEventListener('DOMContentLoaded', function() {
     // Exponer para que otros validadores (p.ej. precios) puedan recalcular el estado del botón
     window.actualizarEstadoBotonUrl = actualizarEstadoBoton;
     
-    // Función para limpiar URL de Amazon
-    function limpiarUrlAmazon(url) {
+    // Llamada al servicio LimpiarUrlDeTiendas (único punto de actualización de reglas por tienda)
+    async function limpiarUrlViaApi(url) {
+        if (!url || !url.trim()) {
+            return { url_limpia: url || '', es_pccomponentes_precio_cero: false };
+        }
         try {
-            // Detectar URLs de Amazon (diferentes dominios: .es, .com, .co.uk, etc.)
-            const amazonRegex = /^https?:\/\/(www\.)?amazon\.(es|com|co\.uk|de|fr|it|ca|com\.au|co\.jp|in|com\.mx|com\.br|nl|se|pl|com\.tr|ae|sa|sg|com\.tw|com\.hk)\//i;
-            
-            if (!amazonRegex.test(url)) {
-                return url; // No es Amazon, devolver URL original
-            }
-            
-            // Extraer el dominio de Amazon (es, com, etc.)
-            const dominioMatch = url.match(/amazon\.([a-z.]+)/i);
-            if (!dominioMatch) {
-                return url;
-            }
-            const dominio = dominioMatch[1];
-            
-            // Buscar el código del producto después de /dp/ o /gp/product/
-            const dpMatch = url.match(/\/dp\/([A-Z0-9]+)/i) || url.match(/\/gp\/product\/([A-Z0-9]+)/i);
-            
-            if (dpMatch && dpMatch[1]) {
-                const codigoProducto = dpMatch[1];
-                // Construir URL limpia: https://www.amazon.{dominio}/dp/CODIGO
-                return `https://www.amazon.${dominio}/dp/${codigoProducto}`;
-            }
-            
-            // Si no se encuentra el código, devolver URL original
-            return url;
-        } catch (error) {
-            console.error('Error al limpiar URL de Amazon:', error);
-            return url; // En caso de error, devolver URL original
+            const res = await fetch('{{ route("admin.ofertas.limpiar.url") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                },
+                body: JSON.stringify({ url: url.trim() })
+            });
+            if (!res.ok) return { url_limpia: url.trim(), es_pccomponentes_precio_cero: false };
+            const data = await res.json();
+            return {
+                url_limpia: data.url_limpia ?? url.trim(),
+                es_pccomponentes_precio_cero: !!data.es_pccomponentes_precio_cero
+            };
+        } catch (e) {
+            return { url_limpia: url.trim(), es_pccomponentes_precio_cero: false };
         }
     }
 
-    // Función para limpiar URL de pccomponentes (quitar # al final y ?refurbished)
-    function limpiarUrlPccomponentes(url) {
-        try {
-            // Verificar si la URL contiene "pccomponentes"
-            if (!url || !url.toLowerCase().includes('pccomponentes')) {
-                return url; // No es pccomponentes, devolver URL original
-            }
-            
-            let urlLimpia = url;
-            
-            // Si la URL termina con #, quitarlo
-            if (urlLimpia.endsWith('#')) {
-                urlLimpia = urlLimpia.slice(0, -1);
-            }
-            
-            // Quitar el parámetro ?refurbished o &refurbished (con o sin valor)
-            // Caso 1: ?refurbished al inicio de la query string
-            urlLimpia = urlLimpia.replace(/\?refurbished(=[^&]*)?(&|$)/gi, function(match, p1, p2) {
-                // Si hay más parámetros después (p2 === '&'), reemplazar con ?
-                return p2 === '&' ? '?' : '';
-            });
-            
-            // Caso 2: &refurbished como parámetro intermedio o final
-            urlLimpia = urlLimpia.replace(/&refurbished(=[^&]*)?(&|$)/gi, function(match, p1, p2) {
-                // Si hay más parámetros después (p2 === '&'), mantener &
-                return p2 === '&' ? '&' : '';
-            });
-            
-            // Limpiar ? o & al final si quedaron solos
-            urlLimpia = urlLimpia.replace(/[?&]$/, '');
-            
-            return urlLimpia;
-        } catch (error) {
-            console.error('Error al limpiar URL de pccomponentes:', error);
-            return url; // En caso de error, devolver URL original
-        }
-    }
-
-    // Función para limpiar URL de coolmod (quitar ? al final)
-    function limpiarUrlCoolmod(url) {
-        try {
-            if (!url || !url.toLowerCase().includes('coolmod')) {
-                return url; // No es coolmod, devolver URL original
-            }
-            // Quitar ? al final
-            if (url.endsWith('?')) {
-                return url.slice(0, -1);
-            }
-            return url;
-        } catch (error) {
-            console.error('Error al limpiar URL de coolmod:', error);
-            return url;
+    function aplicarPccomponentesPrecioCero() {
+        const precioTotalInput = document.querySelector('[name="precio_total"]');
+        if (precioTotalInput) {
+            precioTotalInput.value = '0';
+            precioTotalInput.dispatchEvent(new Event('input', { bubbles: true }));
+            precioTotalInput.dispatchEvent(new Event('change', { bubbles: true }));
         }
     }
 
@@ -3428,85 +3450,41 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Event listener para pegar URL (limpiar automáticamente URLs de Amazon, pccomponentes y coolmod, y detectar tienda)
+    // Event listener para pegar URL (limpieza vía servicio LimpiarUrlDeTiendas)
     urlInput.addEventListener('paste', function(e) {
-        // Usar setTimeout para acceder al valor después de que se pegue
-        setTimeout(() => {
+        setTimeout(async () => {
             const urlPegada = urlInput.value.trim();
-            if (urlPegada) {
-                // Verificar si es URL de pccomponentes y si tiene # o ?refurbished
-                const esPccomponentes = urlPegada.toLowerCase().includes('pccomponentes');
-                const tieneHash = urlPegada.includes('#');
-                const tieneRefurbished = /[?&]refurbished/i.test(urlPegada);
-                
-                // Limpiar URL de Amazon primero
-                let urlLimpia = limpiarUrlAmazon(urlPegada);
-                // Luego limpiar URL de pccomponentes (quitar # al final y ?refurbished)
-                urlLimpia = limpiarUrlPccomponentes(urlLimpia);
-                // Y limpiar URL de coolmod (quitar ? al final)
-                urlLimpia = limpiarUrlCoolmod(urlLimpia);
-                
-                // Si es pccomponentes y tiene # o ?refurbished, establecer precio total a 0
-                if (esPccomponentes && (tieneHash || tieneRefurbished)) {
-                    const precioTotalInput = document.querySelector('[name="precio_total"]');
-                    if (precioTotalInput) {
-                        precioTotalInput.value = '0';
-                        // Disparar evento input para que se recalcule el precio por unidad
-                        precioTotalInput.dispatchEvent(new Event('input', { bubbles: true }));
-                        // Disparar evento change para que se ejecute la lógica de precio 0 (poner "no mostrar" y aviso)
-                        precioTotalInput.dispatchEvent(new Event('change', { bubbles: true }));
-                    }
-                }
-                
-                if (urlLimpia !== urlPegada) {
-                    urlInput.value = urlLimpia;
-                    // Disparar evento input para que se ejecute la validación
-                    urlInput.dispatchEvent(new Event('input', { bubbles: true }));
-                }
-                
-                // Detectar tienda automáticamente después de limpiar la URL
-                // Usar un pequeño delay adicional para asegurar que el valor esté disponible
-                setTimeout(() => {
-                    detectarTiendaPorUrl(urlLimpia || urlPegada);
-                }, 50);
+            if (!urlPegada) return;
+            const { url_limpia, es_pccomponentes_precio_cero } = await limpiarUrlViaApi(urlPegada);
+            if (es_pccomponentes_precio_cero) {
+                aplicarPccomponentesPrecioCero();
             }
+            if (url_limpia !== urlPegada) {
+                urlInput.value = url_limpia;
+                urlInput.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            setTimeout(() => detectarTiendaPorUrl(url_limpia || urlPegada), 50);
         }, 50);
     });
     
+    let urlCleanTimeout = null;
     // Event listener para cambios en el campo URL
     urlInput.addEventListener('input', function(e) {
         let url = e.target.value.trim();
         
-        // Verificar si es URL de pccomponentes y si tiene # o ?refurbished antes de limpiar
-        const esPccomponentes = url.toLowerCase().includes('pccomponentes');
-        const tieneHash = url.includes('#');
-        const tieneRefurbished = /[?&]refurbished/i.test(url);
-        
-        // Limpiar URL de pccomponentes (quitar # al final y ?refurbished) si aplica
-        const urlLimpiaPccomponentes = limpiarUrlPccomponentes(url);
-        if (urlLimpiaPccomponentes !== url) {
-            url = urlLimpiaPccomponentes;
-            urlInput.value = url;
-            
-            // Si es pccomponentes y tenía # o ?refurbished, establecer precio total a 0
-            if (esPccomponentes && (tieneHash || tieneRefurbished)) {
-                const precioTotalInput = document.querySelector('[name="precio_total"]');
-                if (precioTotalInput) {
-                    precioTotalInput.value = '0';
-                    // Disparar evento input para que se recalcule el precio por unidad
-                    precioTotalInput.dispatchEvent(new Event('input', { bubbles: true }));
-                    // Disparar evento change para que se ejecute la lógica de precio 0 (poner "no mostrar" y aviso)
-                    precioTotalInput.dispatchEvent(new Event('change', { bubbles: true }));
-                }
+        // Limpieza vía API (debounced) para no duplicar lógica
+        if (urlCleanTimeout) clearTimeout(urlCleanTimeout);
+        urlCleanTimeout = setTimeout(async () => {
+            urlCleanTimeout = null;
+            if (!url) return;
+            const { url_limpia, es_pccomponentes_precio_cero } = await limpiarUrlViaApi(urlInput.value.trim());
+            if (es_pccomponentes_precio_cero) aplicarPccomponentesPrecioCero();
+            if (url_limpia !== urlInput.value.trim()) {
+                urlInput.value = url_limpia;
+                url = url_limpia;
+                urlInput.dispatchEvent(new Event('input', { bubbles: true }));
             }
-        }
-        
-        // Limpiar URL de coolmod (quitar ? al final) si aplica
-        const urlLimpiaCoolmod = limpiarUrlCoolmod(url);
-        if (urlLimpiaCoolmod !== url) {
-            url = urlLimpiaCoolmod;
-            urlInput.value = url;
-        }
+        }, 500);
         
         // Actualizar el href del botón "Ir a la URL"
         const btnIrUrl = document.getElementById('btn_ir_url');
@@ -3521,15 +3499,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // Limpiar timeouts anteriores
-        if (urlValidationTimeout) {
-            clearTimeout(urlValidationTimeout);
-        }
-        if (urlTiendaDetectionTimeout) {
-            clearTimeout(urlTiendaDetectionTimeout);
-        }
+        if (urlValidationTimeout) clearTimeout(urlValidationTimeout);
+        if (urlTiendaDetectionTimeout) clearTimeout(urlTiendaDetectionTimeout);
         
         // Si la URL está vacía, ocultar mensaje y habilitar botón
         if (!url) {
+            if (urlCleanTimeout) clearTimeout(urlCleanTimeout);
+            urlCleanTimeout = null;
             mostrarMensajeUrl('', '');
             urlIsValid = false;
             urlDuplicateConfirmed = false;
@@ -3546,17 +3522,15 @@ document.addEventListener('DOMContentLoaded', function() {
             validarUrl(url);
         }, 1000);
         
-        // Detectar tienda automáticamente después de limpiar la URL y un pequeño delay
-        // Solo si no hay tienda seleccionada
+        // Detectar tienda automáticamente después de un delay (usando URL actual; la limpieza puede venir del debounce de la API)
         const tiendaIdActual = document.getElementById('tienda_id')?.value;
         if (!tiendaIdActual || tiendaIdActual.trim() === '') {
-            // Primero limpiar la URL (por si es Amazon u otra tienda con limpieza especial)
-            const urlLimpia = limpiarUrlAmazon(url);
-            urlTiendaDetectionTimeout = setTimeout(() => {
-                // Asegurarse de usar la URL actual del input por si cambió
+            urlTiendaDetectionTimeout = setTimeout(async () => {
                 const urlActual = urlInput.value.trim();
-                detectarTiendaPorUrl(urlLimpia || urlActual);
-            }, 500); // Delay para evitar demasiadas peticiones mientras se escribe
+                if (!urlActual) return;
+                const { url_limpia } = await limpiarUrlViaApi(urlActual);
+                detectarTiendaPorUrl(url_limpia || urlActual);
+            }, 500);
         }
     });
     

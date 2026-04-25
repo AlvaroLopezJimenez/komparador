@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Chollo;
 use Illuminate\Http\Request;
 use App\Models\Producto;
+use App\Models\Categoria;
 use App\Models\OfertaProducto;
 use App\Models\Aviso;
 use App\Models\HistoricoPrecioOferta;
@@ -17,8 +18,12 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
 use App\Services\CalcularPrecioUnidad;
+use App\Services\LimpiarUrlDeTiendas;
 use App\Services\SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos;
 use App\Models\ProductoOfertaMasBarataPorProducto;
+use App\Models\UrlDescartada;
+use App\Models\Neo;
+use App\Support\UrlOfertaValidacion;
 
 class OfertaProductoController extends Controller
 {
@@ -86,30 +91,22 @@ class OfertaProductoController extends Controller
         // Crear variable para las vistas que refleje el estado real de los checkboxes
         $mostrarParaVista = $mostrar;
 
-        $ofertas = OfertaProducto::with(['tienda', 'producto'])
-            ->where('producto_id', $producto->id)
-            ->when($busqueda, function ($query, $busqueda) {
-                $busqueda = strtolower($busqueda);
-                $query->where(function ($q) use ($busqueda) {
-                    $q->whereRaw('LOWER(url) LIKE ?', ["%{$busqueda}%"])
-                    ->orWhereRaw('LOWER(anotaciones_internas) LIKE ?', ["%{$busqueda}%"])
-                    ->orWhereHas('tienda', function ($q2) use ($busqueda) {
-                        $q2->whereRaw('LOWER(nombre) LIKE ?', ["%{$busqueda}%"]);
-                    })
-                    ->orWhereHas('producto', function ($q3) use ($busqueda) {
-                        $q3->whereRaw('LOWER(nombre) LIKE ?', ["%{$busqueda}%"])
-                            ->orWhereRaw('LOWER(modelo) LIKE ?', ["%{$busqueda}%"])
-                            ->orWhereRaw('LOWER(talla) LIKE ?', ["%{$busqueda}%"]);
-                    });
-                });
+        $filtroEspecActivo = $this->parseFiltroEspecificacionesInternasRequest($request);
+
+        $columnasEspecListado = $this->columnasEspecificacionesInternasParaListadoOfertas($producto);
+        $conteosOpcionesEspec = $this->conteosOpcionesEspecificacionesInternasFiltro(
+            $producto->id,
+            $busqueda,
+            $mostrar,
+            $filtroEspecActivo,
+            $columnasEspecListado
+        );
+
+        $ofertas = $this->ofertasIndexQueryBase($producto->id, $busqueda, $mostrar)
+            ->when($filtroEspecActivo !== [], function ($query) use ($filtroEspecActivo) {
+                $this->aplicarFiltroEspecificacionesInternasOfertaQuery($query, $filtroEspecActivo);
             })
-            ->when($mostrar, function ($query, $mostrar) {
-                if (is_array($mostrar)) {
-                    $query->whereIn('mostrar', $mostrar);
-                } else {
-                    $query->where('mostrar', $mostrar);
-                }
-            })
+            ->with(['tienda', 'producto'])
             ->orderBy('precio_unidad', 'asc')
             ->paginate($perPage)
             ->withQueryString();
@@ -135,7 +132,26 @@ class OfertaProductoController extends Controller
             ];
         }
 
-        return view('admin.ofertas.index', compact('producto', 'ofertas', 'perPage', 'tiendasInfo', 'mostrarParaVista'));
+        $celdasEspecPorOfertaId = [];
+        foreach ($ofertas as $oferta) {
+            $celdas = [];
+            foreach ($columnasEspecListado as $col) {
+                $celdas[] = $this->etiquetasEspecificacionesInternasSeleccionadasOferta($oferta->especificaciones_internas, $col);
+            }
+            $celdasEspecPorOfertaId[$oferta->id] = $celdas;
+        }
+
+        return view('admin.ofertas.index', compact(
+            'producto',
+            'ofertas',
+            'perPage',
+            'tiendasInfo',
+            'mostrarParaVista',
+            'columnasEspecListado',
+            'celdasEspecPorOfertaId',
+            'filtroEspecActivo',
+            'conteosOpcionesEspec'
+        ));
     }
 
     public function todas(Request $request)
@@ -179,14 +195,22 @@ class OfertaProductoController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
-        return view('admin.ofertas.todas', compact('ofertas', 'perPage', 'mostrarParaVista'));
+        // Si hay búsqueda, también buscar en URLs descartadas para mostrarlas en la misma lista
+        $urlsDescartadasCoincidentes = collect();
+        if ($busqueda) {
+            $urlsDescartadasCoincidentes = UrlDescartada::whereRaw('LOWER(url) LIKE ?', ['%' . strtolower($busqueda) . '%'])
+                ->orderBy('created_at', 'desc')
+                ->get();
+        }
+
+        return view('admin.ofertas.todas', compact('ofertas', 'perPage', 'mostrarParaVista', 'urlsDescartadasCoincidentes'));
     }
 
 
 
     public function edit(OfertaProducto $oferta)
     {
-        $oferta->load(['producto', 'chollo']);
+        $oferta->load(['producto.categoria', 'chollo']);
         $producto = $oferta->producto; // relación inversa
         return view('admin.ofertas.formulario', compact('oferta', 'producto'));
     }
@@ -208,8 +232,9 @@ class OfertaProductoController extends Controller
             'precio_total' => 'required|numeric|min:0',
             'precio_unidad' => 'required|numeric|min:0',
             'envio' => 'nullable|numeric|min:0|max:99.99',
-            'url' => 'required|url',
+            'url' => UrlOfertaValidacion::rules(),
             'variante' => 'nullable|string|max:255',
+            // Incluye valores informativos como '+Juego' (sin formato cupon;)
             'descuentos' => 'nullable|string',
             'cupon_cantidad' => 'nullable|numeric|min:0',
             'mostrar' => 'required|string',
@@ -225,6 +250,12 @@ class OfertaProductoController extends Controller
             'frecuencia_chollo_valor' => 'nullable|numeric|min:0.1',
             'frecuencia_chollo_unidad' => 'nullable|in:minutos,horas,dias',
         ]);
+
+        if (UrlDescartada::where('url', $validated['url'])->exists()) {
+            throw ValidationException::withMessages([
+                'url' => 'Esta URL está descartada y no se puede utilizar para editar ofertas.',
+            ]);
+        }
 
         $esOfertaChollo = $request->boolean('es_chollo') || $request->filled('chollo_id');
 
@@ -456,6 +487,9 @@ class OfertaProductoController extends Controller
         if ($precioCero) {
             $this->crearAvisoSinStockSiNoExiste($oferta);
         }
+
+        // Si la URL está en Neo con aniadida=no, marcar como aniadida=si
+        $this->marcarNeoAniadidaSi($validated['url']);
 
         // Rehabilitar timestamps automáticos
         $oferta->timestamps = true;
@@ -709,6 +743,7 @@ class OfertaProductoController extends Controller
     public function create(Producto $producto)
     {
         $oferta = null;
+        $producto->loadMissing('categoria');
         return view('admin.ofertas.formulario', compact('producto', 'oferta'));
     }
 
@@ -742,8 +777,9 @@ class OfertaProductoController extends Controller
                 'precio_total' => 'required|numeric|min:0',
                 'precio_unidad' => 'required|numeric|min:0',
                 'envio' => 'nullable|numeric|min:0|max:99.99',
-                'url' => 'required|url',
+                'url' => UrlOfertaValidacion::rules(),
                 'variante' => 'nullable|string|max:255',
+                // Incluye valores informativos como '+Juego' (sin formato cupon;)
                 'descuentos' => 'nullable|string',
                 'cupon_cantidad' => 'nullable|numeric|min:0',
                 'mostrar' => 'required|in:si,no',
@@ -763,6 +799,12 @@ class OfertaProductoController extends Controller
         } catch (\Illuminate\Validation\ValidationException $e) {
             \Log::error('Error de validación:', $e->errors());
             throw $e;
+        }
+
+        if (UrlDescartada::where('url', $validated['url'])->exists()) {
+            throw ValidationException::withMessages([
+                'url' => 'Esta URL está descartada y no se puede utilizar para crear ofertas.',
+            ]);
         }
 
         $esOfertaChollo = $request->boolean('es_chollo') || $request->filled('chollo_id');
@@ -896,6 +938,9 @@ class OfertaProductoController extends Controller
         if ($precioCero) {
             $this->crearAvisoSinStockSiNoExiste($oferta);
         }
+
+        // Si la URL está en Neo con aniadida=no, marcar como aniadida=si
+        $this->marcarNeoAniadidaSi($validated['url']);
 
         // Recalcular la oferta más barata del producto y actualizar precio del producto
         try {
@@ -2311,7 +2356,7 @@ class OfertaProductoController extends Controller
     {
         // Validar datos de entrada
         $request->validate([
-            'url' => 'required|url',
+            'url' => UrlOfertaValidacion::rules(),
             'tienda' => 'required|string',
             'variante' => 'nullable|string'
         ]);
@@ -2537,6 +2582,24 @@ class OfertaProductoController extends Controller
     }
 
     /**
+     * Limpiar URL según reglas por tienda (Amazon, Pccomponentes, Coolmod, etc.).
+     * Usado por formularios de ofertas y productos vía AJAX.
+     */
+    public function limpiarUrl(Request $request)
+    {
+        $request->validate(['url' => 'nullable|string|max:2048']);
+        $url = $request->input('url', '');
+        $service = app(LimpiarUrlDeTiendas::class);
+        $urlLimpia = $service->limpiar($url);
+        $esPccomponentesPrecioCero = $service->esPccomponentesConHashORefurbished($url);
+
+        return response()->json([
+            'url_limpia' => $urlLimpia,
+            'es_pccomponentes_precio_cero' => $esPccomponentesPrecioCero,
+        ]);
+    }
+
+    /**
      * Buscar productos en tiempo real para el formulario
      */
     public function buscarProductos(Request $request)
@@ -2554,7 +2617,16 @@ class OfertaProductoController extends Controller
             return response()->json([]);
         }
 
+        $categoriaId = $request->input('categoria_id');
+        $idsCategorias = null;
+        if ($categoriaId !== null && $categoriaId !== '' && is_numeric($categoriaId)) {
+            $idsCategorias = \App\Models\Categoria::idsSelfAndDescendants((int) $categoriaId);
+        }
+
         $productos = \App\Models\Producto::where('obsoleto', 'no')
+            ->when($idsCategorias !== null, function ($q) use ($idsCategorias) {
+                $q->whereIn('categoria_id', $idsCategorias);
+            })
             ->where(function($q) use ($palabras) {
                 foreach ($palabras as $palabra) {
                     $q->where(function($subQ) use ($palabra) {
@@ -2658,7 +2730,7 @@ class OfertaProductoController extends Controller
     public function procesarOfertaScraper(Request $request)
     {
         $request->validate([
-            'url' => 'required|url',
+            'url' => UrlOfertaValidacion::rules(),
             'tienda' => 'required|string',
             'variante' => 'nullable|string'
         ]);
@@ -2716,6 +2788,14 @@ class OfertaProductoController extends Controller
                 'mensaje' => 'URL vacía'
             ]);
         }
+
+        // Comprobar si la URL está descartada (no se puede usar)
+        if (UrlDescartada::where('url', $url)->exists()) {
+            return response()->json([
+                'tipo' => 'descartada',
+                'mensaje' => 'Esta URL está descartada y no se puede utilizar para crear o editar ofertas.'
+            ]);
+        }
         
         $query = OfertaProducto::with('producto')->where('url', $url);
         
@@ -2727,6 +2807,20 @@ class OfertaProductoController extends Controller
         $ofertasExistentes = $query->get();
         
         if ($ofertasExistentes->isEmpty()) {
+            // Comprobar si está en Neo con aniadida=no (se marcará añadida=sí al guardar)
+            $urlTrim = trim($url);
+            $variantes = array_unique([
+                $urlTrim,
+                rtrim($urlTrim, '/'),
+                rtrim($urlTrim, '/') . '/',
+            ]);
+            $enNeoAniadidaNo = Neo::where('aniadida', 'no')->whereIn('url', $variantes)->exists();
+            if ($enNeoAniadidaNo) {
+                return response()->json([
+                    'tipo' => 'en_neo',
+                    'mensaje' => 'Esta oferta está en Neo (añadida=no) y se marcará como añadida=sí al guardar la oferta.',
+                ]);
+            }
             return response()->json([
                 'tipo' => 'disponible',
                 'mensaje' => 'Esta URL no existe y está disponible'
@@ -2763,6 +2857,38 @@ class OfertaProductoController extends Controller
                 'requiere_confirmacion' => false
             ]);
         }
+    }
+
+    /**
+     * Normaliza una URL para comparación (trim, https por defecto, sin query string).
+     */
+    private function normalizarUrlOferta(string $url): string
+    {
+        $url = trim($url);
+        if (!preg_match('/^https?:\/\//', $url)) {
+            $url = 'https://' . $url;
+        }
+        $parsed = parse_url($url);
+        if (!$parsed) {
+            return $url;
+        }
+        $host = $parsed['host'] ?? '';
+        $path = $parsed['path'] ?? '';
+        $path = preg_replace('/\?.*$/', '', $path);
+        return ($parsed['scheme'] ?? 'https') . '://' . $host . $path;
+    }
+
+    /**
+     * Marca en la tabla neo las filas con esta URL (aniadida=no) como aniadida=si.
+     * Se llama al guardar una oferta (store/update) para que Neo refleje que la oferta ya fue añadida.
+     */
+    private function marcarNeoAniadidaSi(string $url): void
+    {
+        $urlNorm = $this->normalizarUrlOferta($url);
+        $urlSinBarra = rtrim($urlNorm, '/');
+        $urlConBarra = $urlSinBarra . '/';
+        $variantes = array_unique([$url, trim($url), $urlNorm, $urlSinBarra, $urlConBarra]);
+        Neo::where('aniadida', 'no')->whereIn('url', $variantes)->update(['aniadida' => 'si']);
     }
 
     /**
@@ -3553,5 +3679,374 @@ class OfertaProductoController extends Controller
                 'message' => 'Error al comprobar gastos de envío: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Columnas de especificaciones internas (marcadas como "Columna oferta") para el listado admin.
+     *
+     * @return list<array{id: string, texto: string, subTextos: array<string, string>}>
+     */
+    private function columnasEspecificacionesInternasParaListadoOfertas(Producto $producto): array
+    {
+        if ($producto->unidadDeMedida !== 'unidadUnica') {
+            return [];
+        }
+
+        if (!$producto->categoria_id_especificaciones_internas) {
+            return [];
+        }
+
+        $elegidas = $producto->categoria_especificaciones_internas_elegidas;
+        if (!is_array($elegidas)) {
+            return [];
+        }
+
+        $columnasIds = $this->normalizarIdsEspecificacionesInternasListado($elegidas['_columnas'] ?? null);
+        if ($columnasIds === []) {
+            return [];
+        }
+
+        $categoria = Categoria::find($producto->categoria_id_especificaciones_internas);
+
+        $filtrosCombinados = [];
+        if ($categoria && is_array($categoria->especificaciones_internas ?? null)
+            && isset($categoria->especificaciones_internas['filtros'])
+            && is_array($categoria->especificaciones_internas['filtros'])) {
+            $filtrosCombinados = array_merge($filtrosCombinados, $categoria->especificaciones_internas['filtros']);
+        }
+
+        if (isset($elegidas['_producto']['filtros']) && is_array($elegidas['_producto']['filtros'])) {
+            $filtrosCombinados = array_merge($filtrosCombinados, $elegidas['_producto']['filtros']);
+        }
+
+        $porId = [];
+        foreach ($filtrosCombinados as $filtro) {
+            if (!is_array($filtro) || !isset($filtro['id'])) {
+                continue;
+            }
+            $porId[(string) $filtro['id']] = $filtro;
+        }
+
+        $columnas = [];
+        foreach ($columnasIds as $colId) {
+            $colIdStr = (string) $colId;
+            if (!isset($porId[$colIdStr])) {
+                continue;
+            }
+            $filtro = $porId[$colIdStr];
+            $subTextos = [];
+            foreach ($filtro['subprincipales'] ?? [] as $sub) {
+                if (!is_array($sub) || !isset($sub['id'])) {
+                    continue;
+                }
+                $sid = (string) $sub['id'];
+                $subTextos[$sid] = (string) ($sub['texto'] ?? $sid);
+            }
+
+            if (isset($elegidas[$colIdStr]) && is_array($elegidas[$colIdStr])) {
+                foreach ($elegidas[$colIdStr] as $item) {
+                    if (!is_array($item) || !isset($item['id'])) {
+                        continue;
+                    }
+                    $sid = (string) $item['id'];
+                    if (!empty($item['textoAlternativo'])) {
+                        $subTextos[$sid] = (string) $item['textoAlternativo'];
+                    }
+                }
+            }
+
+            $elegidasPrincipal = $elegidas[$colIdStr] ?? [];
+            $opcionesOferta = [];
+            foreach ($filtro['subprincipales'] ?? [] as $sub) {
+                if (!is_array($sub) || !isset($sub['id'])) {
+                    continue;
+                }
+                $sid = (string) $sub['id'];
+                $itemElegido = null;
+                foreach ($elegidasPrincipal as $item) {
+                    if (is_array($item) && isset($item['id']) && (string) $item['id'] === $sid) {
+                        $itemElegido = $item;
+                        break;
+                    }
+                }
+                if ($itemElegido === null) {
+                    continue;
+                }
+                $o = $itemElegido['o'] ?? null;
+                $esOferta = $o === 1 || $o === '1' || ($itemElegido['oferta'] ?? false) === true;
+                if (!$esOferta) {
+                    continue;
+                }
+                $opcionesOferta[] = [
+                    'id' => $sid,
+                    'texto' => $subTextos[$sid] ?? (string) ($sub['texto'] ?? $sid),
+                ];
+            }
+
+            $columnas[] = [
+                'id' => $colIdStr,
+                'texto' => (string) ($filtro['texto'] ?? $colIdStr),
+                'subTextos' => $subTextos,
+                'opciones_oferta' => $opcionesOferta,
+            ];
+        }
+
+        if (isset($elegidas['_orden']) && is_array($elegidas['_orden'])) {
+            $orden = $this->normalizarIdsEspecificacionesInternasListado($elegidas['_orden']);
+            usort($columnas, static function (array $a, array $b) use ($orden): int {
+                $posA = array_search($a['id'], $orden, true);
+                $posB = array_search($b['id'], $orden, true);
+                if ($posA === false) {
+                    $posA = 9999;
+                }
+                if ($posB === false) {
+                    $posB = 9999;
+                }
+
+                return $posA <=> $posB;
+            });
+        }
+
+        return $columnas;
+    }
+
+    /**
+     * Consulta base del listado admin de ofertas por producto (sin paginar ni relaciones).
+     *
+     * @param  mixed  $mostrar
+     */
+    private function ofertasIndexQueryBase(int $productoId, ?string $busqueda, $mostrar): \Illuminate\Database\Eloquent\Builder
+    {
+        return OfertaProducto::query()
+            ->where('producto_id', $productoId)
+            ->when($busqueda, function ($query, $busqueda) {
+                $busqueda = strtolower($busqueda);
+                $query->where(function ($q) use ($busqueda) {
+                    $q->whereRaw('LOWER(url) LIKE ?', ["%{$busqueda}%"])
+                        ->orWhereRaw('LOWER(anotaciones_internas) LIKE ?', ["%{$busqueda}%"])
+                        ->orWhereHas('tienda', function ($q2) use ($busqueda) {
+                            $q2->whereRaw('LOWER(nombre) LIKE ?', ["%{$busqueda}%"]);
+                        })
+                        ->orWhereHas('producto', function ($q3) use ($busqueda) {
+                            $q3->whereRaw('LOWER(nombre) LIKE ?', ["%{$busqueda}%"])
+                                ->orWhereRaw('LOWER(modelo) LIKE ?', ["%{$busqueda}%"])
+                                ->orWhereRaw('LOWER(talla) LIKE ?', ["%{$busqueda}%"]);
+                        });
+                });
+            })
+            ->when($mostrar, function ($query, $mostrar) {
+                if (is_array($mostrar)) {
+                    $query->whereIn('mostrar', $mostrar);
+                } else {
+                    $query->where('mostrar', $mostrar);
+                }
+            });
+    }
+
+    /**
+     * Cuenta ofertas por opción de especificación coherente con el resto de filtros activos:
+     * se excluye el grupo de esa opción del filtro e y se exige solo esa sublínea en ese grupo.
+     *
+     * @param  array<string, list<string>>  $filtroEspecActivo
+     * @param  list<array{opciones_oferta?: list<array{id: string}>}>  $columnasEspecListado
+     * @return array<string, array<string, int>>
+     */
+    private function conteosOpcionesEspecificacionesInternasFiltro(
+        int $productoId,
+        ?string $busqueda,
+        $mostrar,
+        array $filtroEspecActivo,
+        array $columnasEspecListado
+    ): array {
+        $conteos = [];
+        foreach ($columnasEspecListado as $col) {
+            $pid = $col['id'];
+            foreach ($col['opciones_oferta'] ?? [] as $opt) {
+                $sid = (string) $opt['id'];
+                $filtroParcial = $filtroEspecActivo;
+                unset($filtroParcial[$pid]);
+
+                $q = $this->ofertasIndexQueryBase($productoId, $busqueda, $mostrar);
+                if ($filtroParcial !== []) {
+                    $this->aplicarFiltroEspecificacionesInternasOfertaQuery($q, $filtroParcial);
+                }
+                $this->aplicarRequiereSublineaEspecificacionInterna($q, $pid, $sid);
+                $conteos[$pid][$sid] = $q->count();
+            }
+        }
+
+        return $conteos;
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
+     */
+    private function aplicarRequiereSublineaEspecificacionInterna($query, string $principalId, string $sid): void
+    {
+        $query->where(function ($q) use ($principalId, $sid) {
+            $q->where(function ($inner) use ($principalId, $sid) {
+                $inner->whereNotNull('especificaciones_internas')
+                    ->whereJsonContains('especificaciones_internas->' . $principalId, (string) $sid);
+            });
+            if (is_numeric($sid)) {
+                $n = (int) $sid;
+                if ((string) $n === (string) $sid) {
+                    $q->orWhere(function ($inner) use ($principalId, $n) {
+                        $inner->whereNotNull('especificaciones_internas')
+                            ->whereJsonContains('especificaciones_internas->' . $principalId, $n);
+                    });
+                }
+            }
+        });
+    }
+
+    /**
+     * Filtro por query string: e[principalId][]=subId (misma clave, varios valores = OR;
+     * varias claves distintas = AND).
+     *
+     * @return array<string, list<string>>
+     */
+    private function parseFiltroEspecificacionesInternasRequest(Request $request): array
+    {
+        $raw = $request->input('e');
+        if (!is_array($raw)) {
+            return [];
+        }
+        $out = [];
+        foreach ($raw as $principalId => $vals) {
+            $principalId = (string) $principalId;
+            if ($principalId === '' || str_starts_with($principalId, '_')) {
+                continue;
+            }
+            if (is_string($vals) || is_numeric($vals)) {
+                $vals = [(string) $vals];
+            } elseif (!is_array($vals)) {
+                continue;
+            }
+            $ids = [];
+            foreach ($vals as $v) {
+                if ($v === null || $v === '') {
+                    continue;
+                }
+                if (is_array($v)) {
+                    continue;
+                }
+                $ids[] = (string) $v;
+            }
+            $ids = array_values(array_unique($ids));
+            if ($ids !== []) {
+                $out[$principalId] = $ids;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder|\Illuminate\Database\Query\Builder  $query
+     * @param  array<string, list<string>>  $filtroEspec
+     */
+    private function aplicarFiltroEspecificacionesInternasOfertaQuery($query, array $filtroEspec): void
+    {
+        foreach ($filtroEspec as $principalId => $subIds) {
+            if ($subIds === []) {
+                continue;
+            }
+            $query->where(function ($q) use ($principalId, $subIds) {
+                foreach ($subIds as $sid) {
+                    $q->orWhere(function ($q2) use ($principalId, $sid) {
+                        $q2->whereNotNull('especificaciones_internas')
+                            ->whereJsonContains('especificaciones_internas->' . $principalId, (string) $sid);
+                    });
+                    if (is_numeric($sid)) {
+                        $n = (int) $sid;
+                        if ((string) $n === (string) $sid) {
+                            $q->orWhere(function ($q2) use ($principalId, $n) {
+                                $q2->whereNotNull('especificaciones_internas')
+                                    ->whereJsonContains('especificaciones_internas->' . $principalId, $n);
+                            });
+                        }
+                    }
+                }
+            });
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $especInternasOferta
+     * @param  array{id: string, texto: string, subTextos: array<string, string>, opciones_oferta?: list<array{id: string, texto: string}>}  $columna
+     */
+    private function etiquetasEspecificacionesInternasSeleccionadasOferta(?array $especInternasOferta, array $columna): string
+    {
+        if ($especInternasOferta === null || $especInternasOferta === []) {
+            return '—';
+        }
+
+        $principalId = $columna['id'];
+        if (!array_key_exists($principalId, $especInternasOferta)) {
+            return '—';
+        }
+
+        $raw = $especInternasOferta[$principalId];
+        $ids = $this->extraerIdsSublíneasEspecificacionesInternasOferta($raw);
+        if ($ids === []) {
+            return '—';
+        }
+
+        $subTextos = $columna['subTextos'];
+        $labels = [];
+        foreach ($ids as $sid) {
+            $labels[] = $subTextos[$sid] ?? ('#' . $sid);
+        }
+
+        return implode(', ', $labels);
+    }
+
+    /**
+     * @param  mixed  $raw
+     * @return list<string>
+     */
+    private function extraerIdsSublíneasEspecificacionesInternasOferta($raw): array
+    {
+        if ($raw === null || $raw === '' || $raw === []) {
+            return [];
+        }
+
+        $ids = [];
+        if (is_array($raw)) {
+            foreach ($raw as $item) {
+                if (is_array($item) && array_key_exists('id', $item)) {
+                    $ids[] = (string) $item['id'];
+                } elseif (is_string($item) || is_numeric($item)) {
+                    $ids[] = (string) $item;
+                }
+            }
+        } elseif (is_string($raw) || is_numeric($raw)) {
+            $ids[] = (string) $raw;
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    /**
+     * @param  mixed  $arr
+     * @return list<string>
+     */
+    private function normalizarIdsEspecificacionesInternasListado($arr): array
+    {
+        if (!is_array($arr)) {
+            return [];
+        }
+        $out = [];
+        foreach ($arr as $v) {
+            if (is_array($v) && isset($v['id'])) {
+                $v = $v['id'];
+            }
+            if (is_string($v) || is_numeric($v)) {
+                $out[] = (string) $v;
+            }
+        }
+
+        return $out;
     }
 }

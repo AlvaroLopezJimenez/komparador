@@ -4,9 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+use Carbon\Carbon;
 use App\Models\Tienda;
-use App\Models\ComisionCategoriaTienda;
 use App\Models\Categoria;
+use App\Models\Neoobjetivo;
+use App\Models\OfertaProducto;
 
 class TiendaController extends Controller
 {
@@ -32,14 +35,21 @@ class TiendaController extends Controller
      * Show the form for creating a new resource.
      */
     public function create()
-{
-    $categorias = Categoria::with('children.children')->whereNull('parent_id')->get();
-    return view('admin.tiendas.formulario', [
-        'tienda' => new Tienda(),
-        'categorias' => $categorias,
-        'comisiones' => collect(), // vacío porque es nueva
-    ]);
-}
+    {
+        $categorias = Categoria::with('children.children')->whereNull('parent_id')->get();
+        return view('admin.tiendas.formulario', [
+            'tienda' => new Tienda(),
+            'categorias' => $categorias,
+            'urlsCategoria' => collect(),
+            'visitadasCategoria' => collect(),
+            'tipoListadoCategoria' => null,
+            'mensajeControlador' => null,
+            'mensajeTipoListado' => null,
+            'categoriasSinNeoobjetivo' => collect(),
+            'categoriasAncestrosSinNeo' => collect(),
+            'conteoTotalOfertas' => [],
+        ]);
+    }
 
     /**
      * Store a newly created resource in storage.
@@ -60,11 +70,13 @@ class TiendaController extends Controller
             'api' => 'required|string|in:miVpsHtml;1,miVpsHtml;2,miVpsHtml;3,miVpsHtml;4,miVpsHtml;5,scrapingAnt,brightData;false,brightData;true,aliexpressOpen,amazonApi,amazonProductInfo,amazonPricing',
             'mostrar_tienda' => 'required|in:si,no',
             'scrapear' => 'required|in:si,no',
+            'avisos_sin_stock_scrapear_automatico' => 'required|in:si,no',
             'como_scrapear' => 'required|in:automatico,manual,ambos',
             'frecuencia_minima_valor' => 'required|numeric|min:0.1',
             'frecuencia_minima_unidad' => 'required|in:minutos,horas,dias',
             'frecuencia_maxima_valor' => 'required|numeric|min:0.1',
             'frecuencia_maxima_unidad' => 'required|in:minutos,horas,dias',
+            'visitada_categoria.*' => 'nullable|date',
         ]);
         
         // Convertir frecuencia mínima a minutos
@@ -102,7 +114,7 @@ class TiendaController extends Controller
 
 
         $tienda = \App\Models\Tienda::create([
-            ...$request->only(['nombre', 'envio_gratis', 'envio_normal', 'url', 'url_imagen', 'url_opiniones', 'api', 'mostrar_tienda', 'scrapear', 'como_scrapear']),
+            ...$request->only(['nombre', 'envio_gratis', 'envio_normal', 'url', 'url_imagen', 'url_opiniones', 'api', 'mostrar_tienda', 'scrapear', 'avisos_sin_stock_scrapear_automatico', 'como_scrapear']),
             'opiniones' => $request->filled('opiniones') ? $request->input('opiniones') : 0,
             'puntuacion' => $request->filled('puntuacion') ? $request->input('puntuacion') : 0,
             'anotaciones_internas' => $request->input('anotaciones_internas'),
@@ -111,17 +123,7 @@ class TiendaController extends Controller
             'frecuencia_maxima_minutos' => $frecuenciaMaximaMinutos,
         ]);
 
-if ($request->has('comisiones')) {
-    foreach ($request->input('comisiones') as $categoriaId => $comision) {
-        if ($comision !== null && $comision !== '') {
-            ComisionCategoriaTienda::create([
-                'tienda_id' => $tienda->id,
-                'categoria_id' => $categoriaId,
-                'comision' => $comision,
-            ]);
-        }
-    }
-}
+        $this->guardarUrlsCategoriaNeoobjetivo($request, $tienda);
 
         return redirect()->route('admin.tiendas.index')->with('success', 'Tienda creada correctamente.');
     }
@@ -156,16 +158,104 @@ if ($request->has('comisiones')) {
     /**
      * Show the form for editing the specified resource.
      */
-public function edit(Tienda $tienda)
-{
-    $tienda->load('comisiones'); // <-- SOLUCIÓN
-    $tienda->loadCount('ofertas'); // Cargar el conteo de ofertas
+    public function edit(Tienda $tienda)
+    {
+        $tienda->loadCount('ofertas');
+        $categorias = Categoria::with('children.children.children')->whereNull('parent_id')->get();
 
-    $categorias = Categoria::with('children.children')->whereNull('parent_id')->get();
-    $comisiones = $tienda->comisiones->pluck('comision', 'categoria_id');
+        // URLs de categoría desde Neoobjetivo (solo registros tienda+categoria, sin oferta/producto)
+        $neoobjetivosCategoria = Neoobjetivo::where('tienda_id', $tienda->id)
+            ->whereNull('oferta_id')
+            ->whereNull('producto_id')
+            ->get();
 
-    return view('admin.tiendas.formulario', compact('tienda', 'categorias', 'comisiones'));
-}
+        $urlsCategoria = $neoobjetivosCategoria->pluck('url', 'categoria_id');
+        $visitadasCategoria = $neoobjetivosCategoria
+            ->mapWithKeys(function ($neo) {
+                return [$neo->categoria_id => optional($neo->visitada)?->format('Y-m-d\TH:i')];
+            });
+
+        $mensajeControlador = null;
+        $tipoListadoCategoria = null;
+        $mensajeTipoListado = null;
+
+        $nombreControlador = $this->normalizarNombreTienda($tienda->nombre);
+        $claseControlador = "App\\Http\\Controllers\\Scraping\\Tiendas\\{$nombreControlador}Controller";
+
+        if (!class_exists($claseControlador)) {
+            $mensajeControlador = 'No se ha encontrado el controlador para esta tienda.';
+        } else {
+            $controladorTienda = new $claseControlador();
+            if (!method_exists($controladorTienda, 'tipoListadoCategoria')) {
+                $mensajeTipoListado = 'Esta tienda no tiene el método tipoListadoCategoria.';
+            } else {
+                $tipoListadoCategoria = $controladorTienda->tipoListadoCategoria();
+                if ($tipoListadoCategoria === null) {
+                    $mensajeTipoListado = 'Esta tienda no tiene tipo de listado de categoría configurado.';
+                }
+            }
+        }
+
+        // Categorías que tienen ofertas de esta tienda pero no tienen Neoobjetivo (URL) para esa categoría
+        $categoriasConOfertas = OfertaProducto::where('tienda_id', $tienda->id)
+            ->join('productos', 'ofertas_producto.producto_id', '=', 'productos.id')
+            ->whereNotNull('productos.categoria_id')
+            ->selectRaw('productos.categoria_id as cat_id')
+            ->distinct()
+            ->pluck('cat_id');
+        $categoriasConNeoobjetivo = Neoobjetivo::where('tienda_id', $tienda->id)
+            ->whereNull('oferta_id')
+            ->whereNull('producto_id')
+            ->pluck('categoria_id');
+        $categoriasSinNeoobjetivo = $categoriasConOfertas->diff($categoriasConNeoobjetivo)->values();
+
+        // IDs de categorías que son padre/abuelo de alguna con problema (solo se marcará el nombre en rojo)
+        $categoriasAncestrosSinNeo = collect();
+        foreach ($categoriasSinNeoobjetivo as $catId) {
+            $categoria = Categoria::find($catId);
+            while ($categoria && $categoria->parent_id) {
+                $categoria = $categoria->parent;
+                if ($categoria) {
+                    $categoriasAncestrosSinNeo->push($categoria->id);
+                }
+            }
+        }
+        $categoriasAncestrosSinNeo = $categoriasAncestrosSinNeo->unique()->values();
+
+        // Conteo de ofertas por categoría (esta tienda): directo por categoria_id
+        $conteoDirectoOfertas = OfertaProducto::where('tienda_id', $tienda->id)
+            ->join('productos', 'ofertas_producto.producto_id', '=', 'productos.id')
+            ->whereNotNull('productos.categoria_id')
+            ->groupBy('productos.categoria_id')
+            ->selectRaw('productos.categoria_id as cat_id, count(*) as total')
+            ->pluck('total', 'cat_id');
+
+        // Por cada categoría del árbol: total = ofertas propias + suma de ofertas de todas las hijas (recursivo)
+        $conteoTotalOfertas = [];
+        $computeTotalOfertas = function ($categoria) use (&$computeTotalOfertas, $conteoDirectoOfertas, &$conteoTotalOfertas) {
+            $id = $categoria->id;
+            $directo = $conteoDirectoOfertas->get($id, 0);
+            $sumaHijos = 0;
+            if ($categoria->relationLoaded('children') && $categoria->children->isNotEmpty()) {
+                foreach ($categoria->children as $hijo) {
+                    $computeTotalOfertas($hijo);
+                    $sumaHijos += $conteoTotalOfertas[$hijo->id] ?? 0;
+                }
+            }
+            $conteoTotalOfertas[$id] = $directo + $sumaHijos;
+        };
+        foreach ($categorias as $c) {
+            $computeTotalOfertas($c);
+        }
+
+        return view('admin.tiendas.formulario', compact(
+            'tienda', 'categorias', 'urlsCategoria',
+            'visitadasCategoria',
+            'tipoListadoCategoria', 'mensajeControlador', 'mensajeTipoListado',
+            'categoriasSinNeoobjetivo', 'categoriasAncestrosSinNeo',
+            'conteoTotalOfertas'
+        ));
+    }
 
 
 
@@ -188,11 +278,13 @@ public function edit(Tienda $tienda)
             'api' => 'required|string|in:miVpsHtml;1,miVpsHtml;2,miVpsHtml;3,miVpsHtml;4,miVpsHtml;5,scrapingAnt,brightData;false,brightData;true,aliexpressOpen,amazonApi,amazonProductInfo,amazonPricing',
             'mostrar_tienda' => 'required|in:si,no',
             'scrapear' => 'required|in:si,no',
+            'avisos_sin_stock_scrapear_automatico' => 'required|in:si,no',
             'como_scrapear' => 'required|in:automatico,manual,ambos',
             'frecuencia_minima_valor' => 'required|numeric|min:0.1',
             'frecuencia_minima_unidad' => 'required|in:minutos,horas,dias',
             'frecuencia_maxima_valor' => 'required|numeric|min:0.1',
             'frecuencia_maxima_unidad' => 'required|in:minutos,horas,dias',
+            'visitada_categoria.*' => 'nullable|date',
         ]);
         
         // Convertir frecuencia mínima a minutos
@@ -245,6 +337,7 @@ public function edit(Tienda $tienda)
                 'api',
                 'mostrar_tienda',
                 'scrapear',
+                'avisos_sin_stock_scrapear_automatico',
                 'como_scrapear',
             ]),
             'aviso' => $avisoFecha,
@@ -252,23 +345,85 @@ public function edit(Tienda $tienda)
             'frecuencia_maxima_minutos' => $frecuenciaMaximaMinutos,
         ]);
 
-        
-ComisionCategoriaTienda::where('tienda_id', $tienda->id)->delete();
+        // Validar: si hay categorías con ofertas sin URL de categoría, no permitir guardar salvo que marquen "sin listado"
+        $categoriasConOfertas = OfertaProducto::where('tienda_id', $tienda->id)
+            ->join('productos', 'ofertas_producto.producto_id', '=', 'productos.id')
+            ->whereNotNull('productos.categoria_id')
+            ->selectRaw('productos.categoria_id as cat_id')
+            ->distinct()
+            ->pluck('cat_id');
+        $urlsEnviadas = $request->has('urls_categoria') ? collect(array_keys(array_filter($request->input('urls_categoria', [])))) : collect();
+        $categoriasConNeoobjetivoActual = Neoobjetivo::where('tienda_id', $tienda->id)
+            ->whereNull('oferta_id')
+            ->whereNull('producto_id')
+            ->pluck('categoria_id');
+        $categoriasQueTendranNeo = $categoriasConNeoobjetivoActual->merge($urlsEnviadas)->unique();
+        $categoriasSiguenSinNeo = $categoriasConOfertas->diff($categoriasQueTendranNeo);
 
-if ($request->has('comisiones')) {
-    foreach ($request->input('comisiones') as $categoriaId => $comision) {
-        if ($comision !== null && $comision !== '') {
-            ComisionCategoriaTienda::create([
-                'tienda_id' => $tienda->id,
-                'categoria_id' => $categoriaId,
-                'comision' => $comision,
-            ]);
+        if ($categoriasSiguenSinNeo->isNotEmpty() && !$request->boolean('sin_listado_categoria')) {
+            return redirect()->back()
+                ->withErrors(['urls_categoria' => 'Hay categorías con ofertas de esta tienda que no tienen URL de listado. Rellena la URL para cada categoría en roja o marca "Esta tienda no tiene listado por categoría".'])
+                ->withInput();
         }
-    }
-}
 
+        $this->guardarUrlsCategoriaNeoobjetivo($request, $tienda);
 
         return redirect()->route('admin.tiendas.index')->with('success', 'Tienda actualizada correctamente.');
+    }
+
+    /**
+     * Normaliza el nombre de la tienda para resolver la clase del controlador (misma lógica que ScrapingController).
+     */
+    private function normalizarNombreTienda(string $nombre): string
+    {
+        $normalizado = strtolower($nombre);
+        $normalizado = Str::ascii($normalizado);
+        $normalizado = preg_replace('/[^a-z0-9]/', '', $normalizado);
+        return ucfirst($normalizado);
+    }
+
+    /**
+     * Guarda o actualiza en Neoobjetivo las URLs por categoría (solo tienda_id + categoria_id, resto null).
+     * visitada = 7 días antes del momento de guardar; si ya existe el registro se actualiza, no se crea uno nuevo.
+     */
+    private function guardarUrlsCategoriaNeoobjetivo(Request $request, Tienda $tienda): void
+    {
+        $urls = $request->input('urls_categoria', []);
+        $visitadas = $request->input('visitada_categoria', []);
+        if (!is_array($urls)) {
+            return;
+        }
+        foreach ($urls as $categoriaId => $url) {
+            $url = is_string($url) ? trim($url) : '';
+            if ($url === '') {
+                continue;
+            }
+
+            $visitada = now()->subDays(7);
+            $visitadaInput = $visitadas[$categoriaId] ?? null;
+            if (is_string($visitadaInput) && trim($visitadaInput) !== '') {
+                try {
+                    $visitada = Carbon::parse($visitadaInput);
+                } catch (\Throwable $e) {
+                    $visitada = now()->subDays(7);
+                }
+            }
+
+            Neoobjetivo::updateOrCreate(
+                [
+                    'tienda_id' => $tienda->id,
+                    'categoria_id' => (int) $categoriaId,
+                    'oferta_id' => null,
+                    'producto_id' => null,
+                ],
+                [
+                    'url' => $url,
+                    'visitada' => $visitada,
+                    'oferta_id' => null,
+                    'producto_id' => null,
+                ]
+            );
+        }
     }
 
     /**

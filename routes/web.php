@@ -14,6 +14,7 @@ use App\Http\Controllers\TiendaController;
 use App\Http\Controllers\CategoriaController;
 use App\Http\Controllers\AvisoController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\NeoController;
 use App\Http\Controllers\CholloController;
 use App\Http\Controllers\ClickController;
 use App\Http\Controllers\CholloPublicController;
@@ -305,7 +306,28 @@ Route::prefix('admin')->group(function () {
             'message' => 'Contador de ofertas por especificaciones actualizado correctamente'
         ]);
     });
-    
+
+    // Avisos sin stock: scrapear ofertas con aviso vencido (tiendas con avisos_sin_stock_scrapear_automatico=si)
+    Route::get('avisos/scrapear-sin-stock', function (Request $request) {
+        if ($request->get('token') !== env('TOKEN_ACTUALIZAR_PRECIOS')) {
+            abort(403, 'Token inválido');
+        }
+        $controller = app(\App\Http\Controllers\Crons\AvisosSinStockScrapearCronController::class);
+        $controller();
+        return response()->json([
+            'status' => 'ok',
+            'message' => 'Cron avisos sin stock ejecutado correctamente (ver log en panel: ejecuciones avisos sin stock)',
+        ]);
+    })->name('admin.cron.avisos-scrapear-sin-stock');
+
+    // Cron neo objetivos: neoobjetivo con visitada > 7 días y URL de rama Neo comparador → petición a VPS sacar-ofertas-idea
+    Route::get('cron-neo-objetivos', function (Request $request) {
+        if ($request->get('token') !== env('TOKEN_ACTUALIZAR_PRECIOS')) {
+            abort(403, 'Token inválido');
+        }
+        return app(\App\Http\Controllers\Crons\CronNeoObjetivosController::class)($request);
+    })->name('admin.cron-neo-objetivos');
+
 });
 
 // PARA PANEL ADMIN - NUEVO GRUPO CON MIDDLEWARE
@@ -325,7 +347,164 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
     Route::get('profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-    
+
+    // Ejecuciones: vista de resultados (neo objetivos) sin ejecutar el cron
+    Route::get('ejecuciones/neo-objetivos', function (Request $request) {
+        $nombreEjecucion = 'cron_neo_objetivos';
+        $hoy = Carbon::today();
+        $mesSeleccionado = $hoy->copy()->startOfMonth();
+        $fechaSeleccionada = $hoy->copy()->startOfDay();
+        if ($request->filled('mes') && preg_match('/^\d{4}-\d{2}$/', (string) $request->input('mes'))) {
+            try {
+                $mesSeleccionado = Carbon::createFromFormat('Y-m', (string) $request->input('mes'))->startOfMonth();
+            } catch (\Throwable $e) {
+                //
+            }
+        }
+        if ($request->filled('fecha') && preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $request->input('fecha'))) {
+            try {
+                $fechaSeleccionada = Carbon::createFromFormat('Y-m-d', (string) $request->input('fecha'))->startOfDay();
+            } catch (\Throwable $e) {
+                //
+            }
+        }
+
+        $ejecucion = null;
+        if ($request->filled('ejecucion_id')) {
+            $ejecucion = \App\Models\EjecucionGlobal::where('nombre', $nombreEjecucion)
+                ->find($request->input('ejecucion_id'));
+            if (!$ejecucion || !is_array($ejecucion->log ?? null)) {
+                abort(404, 'Ejecución no encontrada');
+            }
+            if ($ejecucion->inicio) {
+                $fechaSeleccionada = $ejecucion->inicio->copy()->startOfDay();
+                $mesSeleccionado = $ejecucion->inicio->copy()->startOfMonth();
+            }
+        }
+
+        $inicioMes = $mesSeleccionado->copy()->startOfMonth();
+        $finMes = $mesSeleccionado->copy()->endOfMonth();
+        $fechasConEjecuciones = \App\Models\EjecucionGlobal::query()
+            ->where('nombre', $nombreEjecucion)
+            ->whereBetween('inicio', [$inicioMes, $finMes])
+            ->selectRaw('DATE(inicio) as fecha, COUNT(*) as total')
+            ->groupBy('fecha')
+            ->pluck('total', 'fecha')
+            ->toArray();
+
+        $ejecuciones = \App\Models\EjecucionGlobal::query()
+            ->where('nombre', $nombreEjecucion)
+            ->whereDate('inicio', $fechaSeleccionada->toDateString())
+            ->orderByDesc('id')
+            ->get(['id', 'inicio', 'fin', 'total', 'total_guardado', 'total_errores']);
+
+        $log = is_array($ejecucion?->log ?? null) ? $ejecucion->log : [];
+        return view('admin.crons.cron_neo_objetivos_resultado', [
+            'total_filas_neo'              => $log['total_filas_neo'] ?? 0,
+            'resultados'                   => $log['resultados'] ?? [],
+            'total_filas_categoria_tienda' => $log['total_filas_categoria_tienda'] ?? 0,
+            'filas_sin_tienda_aviso'       => $log['filas_sin_tienda_aviso'] ?? 0,
+            'resultados_categoria'         => $log['resultados_categoria'] ?? [],
+            'resultados_categoria_tienda_detalle' => $log['resultados_categoria_tienda_detalle'] ?? [],
+            'resultados_categoria_tienda'  => $log['resultados_categoria_tienda'] ?? [],
+            'ejecucion_id'                 => $ejecucion?->id,
+            'ejecucion'                    => $ejecucion,
+            'ejecuciones'                  => $ejecuciones,
+            'fechaSeleccionada'            => $fechaSeleccionada,
+            'mesSeleccionado'              => $mesSeleccionado,
+            'inicioMes'                    => $inicioMes,
+            'finMes'                       => $finMes,
+            'fechasConEjecuciones'         => $fechasConEjecuciones,
+        ]);
+    })->name('ejecuciones.neo-objetivos');
+
+    // Ejecuciones: cron avisos sin stock (scrapear)
+    Route::get('ejecuciones/avisos-sin-stock-scrapear', function (Request $request) {
+        $nombreEjecucion = \App\Http\Controllers\Crons\AvisosSinStockScrapearCronController::NOMBRE_EJECUCION_GLOBAL;
+        $hoy = Carbon::today();
+        $mesSeleccionado = $hoy->copy()->startOfMonth();
+        $fechaSeleccionada = $hoy->copy()->startOfDay();
+        if ($request->filled('mes') && preg_match('/^\d{4}-\d{2}$/', (string) $request->input('mes'))) {
+            try {
+                $mesSeleccionado = Carbon::createFromFormat('Y-m', (string) $request->input('mes'))->startOfMonth();
+            } catch (\Throwable $e) {
+                //
+            }
+        }
+        if ($request->filled('fecha') && preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $request->input('fecha'))) {
+            try {
+                $fechaSeleccionada = Carbon::createFromFormat('Y-m-d', (string) $request->input('fecha'))->startOfDay();
+            } catch (\Throwable $e) {
+                //
+            }
+        }
+
+        $ejecucion = null;
+        if ($request->filled('ejecucion_id')) {
+            $ejecucion = \App\Models\EjecucionGlobal::where('nombre', $nombreEjecucion)->find($request->input('ejecucion_id'));
+            if (!$ejecucion) {
+                abort(404, 'Ejecución no encontrada');
+            }
+            if ($ejecucion->inicio) {
+                $fechaSeleccionada = $ejecucion->inicio->copy()->startOfDay();
+                $mesSeleccionado = $ejecucion->inicio->copy()->startOfMonth();
+            }
+        }
+
+        $inicioMes = $mesSeleccionado->copy()->startOfMonth();
+        $finMes = $mesSeleccionado->copy()->endOfMonth();
+
+        $fechasConEjecuciones = \App\Models\EjecucionGlobal::query()
+            ->where('nombre', $nombreEjecucion)
+            ->whereBetween('inicio', [$inicioMes, $finMes])
+            ->selectRaw('DATE(inicio) as fecha, COUNT(*) as total')
+            ->groupBy('fecha')
+            ->pluck('total', 'fecha')
+            ->toArray();
+
+        $ejecuciones = \App\Models\EjecucionGlobal::query()
+            ->where('nombre', $nombreEjecucion)
+            ->whereDate('inicio', $fechaSeleccionada->toDateString())
+            ->orderByDesc('id')
+            ->get(['id', 'inicio', 'fin', 'total', 'total_guardado', 'total_errores']);
+
+        return view('admin.crons.cron_avisos_sin_stock_resultado', [
+            'ejecucion_id' => $ejecucion?->id,
+            'ejecucion' => $ejecucion,
+            'ejecuciones' => $ejecuciones,
+            'fechaSeleccionada' => $fechaSeleccionada,
+            'mesSeleccionado' => $mesSeleccionado,
+            'inicioMes' => $inicioMes,
+            'finMes' => $finMes,
+            'fechasConEjecuciones' => $fechasConEjecuciones,
+        ]);
+    })->name('ejecuciones.avisos-sin-stock-scrapear');
+
+    Route::get('neo', [NeoController::class, 'index'])->name('neo.index');
+    Route::get('neo/prueba-neoobjetivos', [\App\Http\Controllers\Crons\CronNeoObjetivosController::class, 'pruebaNeoobjetivosForm'])->name('neo.prueba-neoobjetivos');
+    Route::post('neo/prueba-neoobjetivos', [\App\Http\Controllers\Crons\CronNeoObjetivosController::class, 'pruebaNeoobjetivosEjecutar'])->name('neo.prueba-neoobjetivos.ejecutar');
+
+    Route::get('neo/crear-masivo', [NeoController::class, 'crearMasivo'])->name('neo.crear-masivo');
+    Route::get('neo/crear-masivo/productos', [NeoController::class, 'productosConNeoAniadidaNo'])->name('neo.crear-masivo.productos');
+    Route::get('neo/crear-masivo/urls-por-producto/{productoId}', [NeoController::class, 'urlsPorProducto'])->name('neo.crear-masivo.urls-por-producto');
+    Route::get('neo/crear-masivo/categorias', [NeoController::class, 'categoriasConNeoAniadidaNo'])->name('neo.crear-masivo.categorias');
+    Route::get('neo/crear-masivo/urls-por-categoria/{categoriaId}', [NeoController::class, 'urlsPorCategoria'])->name('neo.crear-masivo.urls-por-categoria');
+    Route::get('neo/crear-masivo/tiendas-por-categoria/{categoriaId}', [NeoController::class, 'tiendasPorCategoria'])->name('neo.crear-masivo.tiendas-por-categoria');
+    Route::get('neo/crear-masivo/urls-por-categoria-tienda/{categoriaId}/{tiendaId}', [NeoController::class, 'urlsPorCategoriaTienda'])->name('neo.crear-masivo.urls-por-categoria-tienda');
+    Route::get('neo/crear-masivo/tiendas', [NeoController::class, 'tiendasConNeoAniadidaNo'])->name('neo.crear-masivo.tiendas');
+    Route::get('neo/crear-masivo/urls-por-tienda/{tiendaId}', [NeoController::class, 'urlsPorTienda'])->name('neo.crear-masivo.urls-por-tienda');
+    Route::get('neo/crear-masivo/categorias-por-tienda/{tiendaId}', [NeoController::class, 'categoriasPorTienda'])->name('neo.crear-masivo.categorias-por-tienda');
+    Route::get('neo/crear-masivo/urls-por-tienda-categoria/{tiendaId}/{categoriaId}', [NeoController::class, 'urlsPorTiendaCategoria'])->name('neo.crear-masivo.urls-por-tienda-categoria');
+    Route::post('neo/crear-masivo/descartar-url', [NeoController::class, 'descartarUrlCrearMasivo'])->name('neo.crear-masivo.descartar-url');
+    Route::post('neo/crear-masivo/actualizar-categoria-url', [NeoController::class, 'actualizarCategoriaUrlCrearMasivo'])->name('neo.crear-masivo.actualizar-categoria-url');
+    Route::get('neo/productos-sin-neo', [NeoController::class, 'productosSinNeo'])->name('neo.productos-sin-neo');
+    Route::post('neo/guardar-neoobjetivo', [NeoController::class, 'guardarNeoobjetivo'])->name('neo.guardar-neoobjetivo');
+    Route::get('neo/eliminar-por-urls', [NeoController::class, 'eliminarNeoPorUrlsForm'])->name('neo.eliminar-por-urls');
+    Route::post('neo/eliminar-por-urls/comprobar', [NeoController::class, 'eliminarNeoPorUrlsComprobar'])->name('neo.eliminar-por-urls.comprobar');
+    Route::post('neo/eliminar-por-urls/ejecutar', [NeoController::class, 'eliminarNeoPorUrlsEjecutar'])->name('neo.eliminar-por-urls.ejecutar');
+    Route::get('neo/sin-url-completar', [NeoController::class, 'neoSinUrlCompletar'])->name('neo.sin-url-completar');
+    Route::post('neo/sin-url-completar/descargar-csv', [NeoController::class, 'neoSinUrlDescargarCsv'])->name('neo.sin-url-completar.descargar-csv');
+    Route::post('neo/sin-url-completar/subir-csv', [NeoController::class, 'neoSinUrlSubirCsv'])->name('neo.sin-url-completar.subir-csv');
     //PARA LA GRAFICA DE CLICK EN PRODUCTO
     Route::get('productos/{producto}/estadisticas/clicks', [ProductoController::class, 'datosClicks'])->name('productos.estadisticas.clicks');
     //PANEL ESTADISTICAS DE CLICKS PARA PRODUCTO
@@ -352,10 +531,13 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
 
     // Ruta para crear una oferta sin producto
     Route::get('ofertas/create', [OfertaProductoController::class, 'createGeneral'])->name('ofertas.create.formularioGeneral');
-    Route::get('ofertas/crear-masivo', [App\Http\Controllers\Api\OfertasController::class, 'crearMasivoVista'])->name('ofertas.crear-masivo');
+    Route::post('ofertas/sacar-ofertas-idealo/request', [App\Http\Controllers\Api\OfertasController::class, 'sacarOfertasIdealoRequest'])->name('ofertas.sacar-ofertas-idealo.request');
     Route::post('ofertas/crear-masivo/analizar', [App\Http\Controllers\Api\OfertasController::class, 'analizarUrls'])->name('ofertas.crear-masivo.analizar');
     Route::post('ofertas/crear-masivo/crear', [App\Http\Controllers\Api\OfertasController::class, 'crearOfertaBulk'])->name('ofertas.crear-masivo.crear');
     Route::get('ofertas/crear-masivo/recargar-especificaciones/{producto}', [App\Http\Controllers\Api\OfertasController::class, 'recargarEspecificaciones'])->name('ofertas.crear-masivo.recargar-especificaciones');
+    Route::post('ofertas/crear-masivo/buscar-mismas-especificaciones', [App\Http\Controllers\Api\OfertasController::class, 'buscarOfertasMismasEspecificaciones'])->name('ofertas.crear-masivo.buscar-mismas-especificaciones');
+    Route::post('ofertas/crear-masivo/contar-opciones-especificaciones', [App\Http\Controllers\Api\OfertasController::class, 'contarOpcionesEspecificacionesProducto'])->name('ofertas.crear-masivo.contar-opciones-especificaciones');
+    Route::post('ofertas/crear-masivo/anadir-opcion-especificacion', [App\Http\Controllers\Api\OfertasController::class, 'anadirOpcionEspecificacionCrearMasivo'])->name('ofertas.crear-masivo.anadir-opcion-especificacion');
 
     // Ruta para ver las ofertas de un producto concreto
     Route::get('productos/{producto}/ofertas', [OfertaProductoController::class, 'index'])->name('ofertas.index');
@@ -570,6 +752,7 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
         Route::delete('/{aviso}', [AvisoController::class, 'destroy'])->name('destroy');
         Route::post('/{aviso}/aplazar', [AvisoController::class, 'aplazar'])->name('aplazar');
         Route::post('/marcar-envio-comprobado', [AvisoController::class, 'marcarEnvioComprobado'])->name('marcar.envio.comprobado');
+        Route::post('/{aviso}/gestionar-oferta-resucitada', [AvisoController::class, 'gestionarOfertaResucitada'])->name('gestionar.oferta.resucitada');
         Route::get('/elemento', [AvisoController::class, 'getAvisosElemento'])->name('get.elemento');
         Route::get('/oferta-mas-barata', [AvisoController::class, 'obtenerOfertaMasBarata'])->name('oferta-mas-barata');
         Route::post('/toggle-mostrar-todos', [AvisoController::class, 'toggleMostrarTodos'])->name('toggle.mostrar.todos');
@@ -611,6 +794,9 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
     
     // Verificar si una URL ya existe
     Route::post('ofertas/verificar-url', [OfertaProductoController::class, 'verificarUrlExistente'])->name('ofertas.verificar.url');
+
+    // Limpiar URL según tienda (Amazon, Pccomponentes, Coolmod, etc.)
+    Route::post('ofertas/limpiar-url', [OfertaProductoController::class, 'limpiarUrl'])->name('ofertas.limpiar.url');
     
     // Verificar si existe una oferta con chollo para el mismo producto y tienda
     Route::post('ofertas/verificar-chollo-existente', [OfertaProductoController::class, 'verificarOfertaCholloExistente'])->name('ofertas.verificar.chollo-existente');
@@ -773,19 +959,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', fn() => redirect()->route('admin.dashboard'))->name('dashboard');
 });
 
-// // RUTA DE PRUEBA CON PATRÓN IDÉNTICO AL GRUPO PROBLEMÁTICO - ELIMINAR DESPUÉS
-// Route::middleware(['auth'])->prefix('panel-privado')->group(function () {
-//     Route::get('/test-grupo', function() {
-//         return 'Grupo de rutas funcionando correctamente';
-//     })->name('test.grupo');
-// });
 
 // CATEGORÍAS PÚBLICAS (MOVIDA AL FINAL PARA EVITAR CONFLICTOS)
 Route::middleware(['security.headers', 'block.public.deletes'])->get('/categorias', [App\Http\Controllers\HomeController::class, 'todasCategorias'])->name('categorias.todas');
-
-// DASHBOARD DE CLICKS PARA INFLUENCERS (fuera del middleware de autenticación)
-Route::get('influencer/{usuario}/{password}/clicks/dashboard', [App\Http\Controllers\ClickInfluencerController::class, 'dashboard'])->middleware('throttle:10,1')->name('influencer.clicks.dashboard');
-Route::get('influencer/clicks/posiciones-tienda', [App\Http\Controllers\ClickInfluencerController::class, 'posicionesTienda'])->name('influencer.clicks.posiciones-tienda');
 
 // RUTA API PARA OBTENER PRECIOS HISTÓRICOS CON FILTROS DE TIEMPO
 Route::middleware(['security.headers', 'block.public.deletes', 'throttle:10,1'])->get('/api/precios-historicos/{productoId}', [ProductoController::class, 'obtenerPreciosHistoricos'])

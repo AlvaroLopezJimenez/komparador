@@ -98,6 +98,71 @@
     </x-slot>
 
     <div class="py-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <style>
+            /* Columna checkbox más estrecha (mitad) y espacio entre columnas reducido ~80% */
+            .avisos-tabla th,
+            .avisos-tabla td { padding-left: 4px; padding-right: 4px; }
+            .avisos-tabla th { padding-top: 6px; padding-bottom: 6px; }
+            .avisos-tabla td { padding-top: 2px; padding-bottom: 2px; }
+            .avisos-tabla { table-layout: fixed; border-collapse: separate; border-spacing: 0 12px; }
+            .avisos-tabla thead tr { border-spacing: 0; }
+            .avisos-tabla tbody tr { vertical-align: top; }
+            /* Elemento y Acciones: un poco más abajo que pegado arriba (padding-top extra) */
+            .avisos-tabla tbody tr td:first-child,
+            .avisos-tabla tbody tr td:last-child { padding-top: 10px; }
+            /* Texto del Aviso: mismo padding-top que las otras columnas; el div interior no suma espacio */
+            .avisos-tabla tbody tr td.avisos-tabla-texto-aviso { padding-top: 10px; }
+            .avisos-tabla td.avisos-tabla-texto-aviso > div { margin-top: 0; padding-top: 0; }
+            /* Checkbox dentro de la celda Elemento: ancho fijo a la izquierda */
+            .avisos-tabla .aviso-cell-elemento { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+            /* Zona del check: toda el área es clickable (label) */
+            .avisos-tabla .aviso-cell-elemento .aviso-check-wrap { flex-shrink: 0; width: 2.5rem; min-width: 2.5rem; min-height: 2rem; padding-top: 2px; display: flex; align-items: flex-start; cursor: pointer; }
+            .avisos-tabla .aviso-cell-elemento .aviso-check-wrap input[type="checkbox"] { width: 1rem; height: 1rem; margin: 0; }
+            .avisos-tabla .aviso-cell-elemento .aviso-elemento-content { min-width: 0; flex: 1; cursor: pointer; }
+            /* Espacio entre avisos y borde de color por tipo: azul producto, morado oferta, rosa chollo, gris interno */
+            .avisos-tabla tbody tr.subtab-row { border-radius: 4px; }
+            /* Borde completo por tipo: aplicado a las celdas (td) para que se vea en la tabla */
+            /* Producto: azul claro bien visible */
+            .aviso-borde-producto td { border-top: 2px solid rgb(34 120 220); border-bottom: 2px solid rgb(34 120 220); }
+            .aviso-borde-producto td:first-child { border-left: 2px solid rgb(34 120 220); }
+            .aviso-borde-producto td:last-child { border-right: 2px solid rgb(34 120 220); }
+            /* Oferta: magenta/fucsia para diferenciar claramente del azul */
+            .aviso-borde-oferta td { border-top: 2px solid rgb(200 50 180); border-bottom: 2px solid rgb(200 50 180); }
+            .aviso-borde-oferta td:first-child { border-left: 2px solid rgb(200 50 180); }
+            .aviso-borde-oferta td:last-child { border-right: 2px solid rgb(200 50 180); }
+            .aviso-borde-chollo td { border-top: 2px solid rgb(219 39 119); border-bottom: 2px solid rgb(219 39 119); }
+            .aviso-borde-chollo td:first-child { border-left: 2px solid rgb(219 39 119); }
+            .aviso-borde-chollo td:last-child { border-right: 2px solid rgb(219 39 119); }
+            .aviso-borde-interno td { border-top: 2px solid rgb(75 85 99); border-bottom: 2px solid rgb(75 85 99); }
+            .aviso-borde-interno td:first-child { border-left: 2px solid rgb(75 85 99); }
+            .aviso-borde-interno td:last-child { border-right: 2px solid rgb(75 85 99); }
+            /* Solo reducir espacios vacíos: margen entre texto del aviso y cuadro, y padding vacío del cuadro (sin tocar tamaño de texto) */
+            .avisos-tabla td.avisos-tabla-texto-aviso .avisos-oferta-block {
+                margin-top: 2px !important;
+                margin-bottom: 0 !important;
+                padding-top: 3px !important;
+                padding-bottom: 3px !important;
+                padding-left: 6px !important;
+                padding-right: 6px !important;
+            }
+            .avisos-tabla .avisos-oferta-inner { align-items: center !important; }
+            /* Sin margen debajo del texto del aviso para que el hueco hasta el cuadro sea solo margin-top del cuadro */
+            .avisos-tabla td.avisos-tabla-texto-aviso .text-base > span.block { margin-bottom: 0 !important; }
+            /* En pantalla reducida (ej. pantalla dividida) la columna Texto del Aviso y el bloque oferta mantienen legibilidad */
+            @media (max-width: 1023px) {
+                .avisos-tabla-texto-aviso { min-width: 240px; }
+                .avisos-tabla-elemento { min-width: 140px; }
+                .avisos-oferta-block { font-size: 0.875rem; }
+                .avisos-oferta-inner { flex-direction: column; align-items: flex-start; gap: 0.5rem; font-size: 0.875rem; }
+                .avisos-oferta-inner .envio-oferta-mas-barata,
+                .avisos-oferta-inner .precio-total-oferta-mas-barata,
+                .avisos-oferta-inner .envio-oferta-input,
+                .avisos-oferta-inner .precio-total-input { min-width: 5rem; font-size: 0.875rem; }
+            }
+            @media (min-width: 1024px) {
+                .avisos-oferta-inner { flex-direction: row; flex-wrap: wrap; align-items: center; font-size: 0.75rem; }
+            }
+        </style>
         <!-- Banner de advertencia para productos con precio NULL -->
         @if(($avisosProductoPrecioNullCount ?? 0) > 0)
             <div class="mb-6 bg-red-900 border-l-4 border-red-500 text-red-100 p-4 rounded">
@@ -253,16 +318,21 @@
                 </div>
             </div>
             <div class="bg-gray-800 dark:bg-gray-800 shadow rounded-lg overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-700 dark:divide-gray-600">
+                <table class="min-w-full divide-y divide-gray-700 dark:divide-gray-600 avisos-tabla" style="min-width: 900px;">
+                    <colgroup>
+                        <col>
+                        <col>
+                        <col>
+                    </colgroup>
                     <thead class="bg-gray-700 dark:bg-gray-700">
                         <tr>
-                            <th class="py-2 text-left text-xs font-medium text-gray-300 dark:text-gray-300 uppercase tracking-wider" style="width: 20px;"></th>
-                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-300 dark:text-gray-300 uppercase tracking-wider" style="width: 20px;">
-                                <input type="checkbox" id="select-all-vencidos" class="checkbox-eliminar rounded border-gray-300 text-red-600 focus:ring-red-500" onchange="toggleAllCheckboxes('vencidos')">
+                            <th class="px-6 py-4 text-left text-xs font-medium text-gray-300 dark:text-gray-300 uppercase tracking-wider w-1/4 avisos-tabla-elemento">
+                                <span class="inline-flex items-center gap-2">
+                                    <input type="checkbox" id="select-all-vencidos" class="checkbox-eliminar rounded border-gray-300 text-red-600 focus:ring-red-500" onchange="toggleAllCheckboxes('vencidos')">
+                                    <span>Elemento</span>
+                                </span>
                             </th>
-                            <th class="px-6 py-4 text-left text-xs font-medium text-gray-300 dark:text-gray-300 uppercase tracking-wider w-1/4">Elemento</th>
-                            <th class="px-6 py-4 text-left text-xs font-medium text-gray-300 dark:text-gray-300 uppercase tracking-wider w-2/5">Texto del Aviso</th>
-                            <th class="px-6 py-4 text-left text-xs font-medium text-gray-300 dark:text-gray-300 uppercase tracking-wider w-1/12">Fecha Vencimiento</th>
+                            <th class="px-6 py-4 text-left text-xs font-medium text-gray-300 dark:text-gray-300 uppercase tracking-wider w-2/5 avisos-tabla-texto-aviso w-1/2">Texto del Aviso</th>
                             <th class="px-6 py-4 text-left text-xs font-medium text-gray-300 dark:text-gray-300 uppercase tracking-wider w-1/12">Acciones</th>
                         </tr>
                     </thead>
@@ -270,42 +340,22 @@
                         @forelse ($avisosVencidos as $aviso)
                         @php
                             $tipoAviso = obtenerTipoAviso($aviso);
+                            $claseTipo = $aviso->avisoable_type === 'App\Models\Producto' ? 'producto' : ($aviso->avisoable_type === 'App\Models\OfertaProducto' ? 'oferta' : ($aviso->avisoable_type === 'App\Models\Chollo' ? 'chollo' : 'interno'));
                         @endphp
-                        <tr class="hover:bg-gray-700 dark:hover:bg-gray-700 transition-colors cursor-pointer subtab-row" data-tipo="{{ $tipoAviso }}" onclick="editarAviso({{ $aviso->id }}, {{ json_encode($aviso->texto_aviso) }}, '{{ $aviso->fecha_aviso->format('Y-m-d\TH:i') }}', {{ $aviso->oculto ? 'true' : 'false' }})">
-                            <td class="p-0" onclick="event.stopPropagation()" style="width: 20px;">
-                                @if($aviso->avisoable_type === 'App\Models\Producto')
-                                    <div class="flex items-center justify-center bg-blue-600" style="writing-mode: vertical-lr; transform: rotate(180deg); min-height: 40px;">
-                                        <span class="text-white text-sm font-bold py-8">Producto</span>
-                                    </div>
-                                @elseif($aviso->avisoable_type === 'App\Models\OfertaProducto')
-                                    <div class="flex items-center justify-center bg-purple-600" style="writing-mode: vertical-lr; transform: rotate(180deg); min-height: 40px;">
-                                        <span class="text-white text-sm font-bold py-8">Oferta</span>
-                                    </div>
-                                @elseif($aviso->avisoable_type === 'App\Models\Chollo')
-                                    <div class="flex items-center justify-center bg-pink-600" style="writing-mode: vertical-lr; transform: rotate(180deg); min-height: 40px;">
-                                        <span class="text-white text-sm font-bold py-8">Chollo</span>
-                                    </div>
-                                @elseif($aviso->avisoable_type === 'App\Models\Chollo')
-                                    <div class="flex items-center justify-center bg-pink-600" style="writing-mode: vertical-lr; transform: rotate(180deg); min-height: 40px;">
-                                        <span class="text-white text-sm font-bold py-8">Chollo</span>
-                                    </div>
-                                @else
-                                    <div class="flex items-center justify-center bg-gray-600" style="writing-mode: vertical-lr; transform: rotate(180deg); min-height: 40px;">
-                                        <span class="text-gray-200 text-sm font-bold py-8">Interno</span>
-                                    </div>
-                                @endif
-                            </td>
-                            <td class="px-6 py-1 @if($aviso->avisoable_type !== 'App\Models\OfertaProducto') cursor-pointer hover:bg-gray-600 transition-colors @endif" @if($aviso->avisoable_type !== 'App\Models\OfertaProducto') onclick="event.stopPropagation(); toggleCheckbox({{ $aviso->id }}, 'vencidos')" @endif>
-                                <div class="flex items-center justify-center h-8">
-                                    @if($aviso->avisoable_type !== 'App\Models\OfertaProducto')
-                                        <input type="checkbox" class="checkbox-aviso rounded border-gray-300 text-red-600 focus:ring-red-500 pointer-events-none" 
-                                               data-aviso-id="{{ $aviso->id }}" 
-                                               data-tabla="vencidos"
-                                               onchange="actualizarContadorSeleccionados()">
-                                    @endif
-                                </div>
-                            </td>
+                        <tr class="hover:bg-gray-700 dark:hover:bg-gray-700 transition-colors subtab-row aviso-borde-{{ $claseTipo }}" data-tipo="{{ $tipoAviso }}" data-aviso-id="{{ $aviso->id }}">
                             <td class="px-6 py-1">
+                                <div class="aviso-cell-elemento">
+                                    @if($aviso->avisoable_type !== 'App\Models\OfertaProducto')
+                                        <label class="aviso-check-wrap hover:opacity-80" for="aviso-cb-{{ $aviso->id }}-vencidos">
+                                            <input type="checkbox" id="aviso-cb-{{ $aviso->id }}-vencidos" class="checkbox-aviso rounded border-gray-300 text-red-600 focus:ring-red-500 pointer-events-none" 
+                                                   data-aviso-id="{{ $aviso->id }}" 
+                                                   data-tabla="vencidos"
+                                                   onchange="actualizarContadorSeleccionados()">
+                                        </label>
+                                    @else
+                                        <div class="aviso-check-wrap" style="width: 2.5rem; min-width: 2.5rem;"></div>
+                                    @endif
+                                    <div class="aviso-elemento-content">
                                 @if($aviso->avisoable_type === 'App\Models\Producto' && $aviso->avisoable_id && $aviso->avisoable_id !== null)
                                     <div class="flex flex-col space-y-1">
                                         <span class="text-gray-200 dark:text-gray-200 break-words text-sm">{{ $aviso->elemento_nombre }}</span>
@@ -334,12 +384,18 @@
                                                 </button>
                                             @endif
                                         </div>
+                                        <span class="text-xs text-gray-400">{{ $aviso->fecha_aviso->format('d/m/Y H:i') }}</span>
                                     </div>
                                 @elseif($aviso->avisoable_type === 'App\Models\OfertaProducto' && $aviso->avisoable_id && $aviso->avisoable_id !== null)
                                     <div class="flex flex-col space-y-1">
                                         <span class="text-gray-200 dark:text-gray-200 break-words text-sm">{{ $aviso->elemento_nombre }}</span>
                                         <div class="flex items-center space-x-1">
-                                            
+                                            @if($aviso->avisoable && $aviso->avisoable->producto && $aviso->avisoable->producto->categoria)
+                                                <button onclick="event.stopPropagation(); window.open('/{{ implode('/', $aviso->avisoable->producto->categoria->obtenerSlugsJerarquia()) }}/{{ $aviso->avisoable->producto->slug }}', '_blank')" 
+                                                    class="px-3 py-1.5 text-sm bg-teal-600 hover:bg-teal-700 text-white rounded transition-colors">
+                                                    Web
+                                                </button>
+                                            @endif
                                             <button onclick="event.stopPropagation(); window.open('{{ route('admin.ofertas.edit', $aviso->avisoable_id) }}', '_blank')" 
                                                 class="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors">
                                                 Editar
@@ -356,6 +412,7 @@
                                             @endif
                                             
                                         </div>
+                                        <span class="text-xs text-gray-400">{{ $aviso->fecha_aviso->format('d/m/Y H:i') }}</span>
                                     </div>
                                 @elseif($aviso->avisoable_type === 'App\Models\Chollo' && $aviso->avisoable)
                                     <div class="flex flex-col space-y-1">
@@ -378,20 +435,26 @@
                                                 </button>
                                             @endif
                                         </div>
+                                        <span class="text-xs text-gray-400">{{ $aviso->fecha_aviso->format('d/m/Y H:i') }}</span>
                                     </div>
                                 @else
-                                    <span class="text-gray-200 dark:text-gray-200">
-                                        @if($aviso->avisoable_type === 'Interno' && $aviso->avisoable_id === 0)
-                                            Aviso Interno
-                                        @else
-                                            {{ $aviso->elemento_nombre }}
-                                        @endif
-                                    </span>
+                                    <div class="flex flex-col space-y-0.5">
+                                        <span class="text-gray-200 dark:text-gray-200">
+                                            @if($aviso->avisoable_type === 'Interno' && $aviso->avisoable_id === 0)
+                                                Aviso Interno
+                                            @else
+                                                {{ $aviso->elemento_nombre }}
+                                            @endif
+                                        </span>
+                                        <span class="text-xs text-gray-400">{{ $aviso->fecha_aviso->format('d/m/Y H:i') }}</span>
+                                    </div>
                                 @endif
+                                    </div>
+                                </div>
                             </td>
-                            <td class="px-6 py-1 max-w-md">
-                                <div class="text-base text-gray-200 dark:text-gray-200 whitespace-pre-line break-words max-w-full" style="overflow-wrap: anywhere; word-break: break-word;">
-                                    {{ $aviso->texto_aviso }}
+                            <td class="px-6 py-1 max-w-md min-w-0 avisos-tabla-texto-aviso">
+                                <div class="text-base text-gray-200 dark:text-gray-200 whitespace-pre-line break-words max-w-full min-w-0" style="overflow-wrap: anywhere; word-break: break-word;">
+                                    <span class="block">{{ $aviso->texto_aviso }}</span>
                                     @if($aviso->avisoable_type === 'App\Models\Producto' && $aviso->avisoable_id && $aviso->avisoable_id !== null)
                                         @php
                                             $ofertaMasBarata = obtenerPrimeraOfertaProducto($aviso->avisoable_id);
@@ -400,8 +463,8 @@
                                             @php
                                                 $productoOferta = \App\Models\Producto::find($aviso->avisoable_id);
                                             @endphp
-                                            <div class="mt-0 p-1 bg-gray-700 rounded text-xs text-gray-300">
-                                                <div class="flex flex-wrap items-center gap-1 text-xs">
+                                            <div class="bg-gray-700 rounded text-gray-300 avisos-oferta-block" style="margin-top:2px;margin-bottom:0;padding:3px 6px;">
+                                                <div class="flex flex-wrap items-center gap-1 text-xs avisos-oferta-inner">
                                                     <span class="font-medium">{{ $ofertaMasBarata->tienda->nombre ?? 'Tienda ID: ' . $ofertaMasBarata->tienda_id }}</span>
                                                     <span>•</span>
                                                     <span class="flex items-center gap-1 text-orange-500">
@@ -448,8 +511,8 @@
                                             </div>
                                         @endif
                                     @elseif($aviso->avisoable_type === 'App\Models\OfertaProducto' && $aviso->avisoable_id && $aviso->avisoable_id !== null && $aviso->avisoable)
-                                        <div class="mt-0 p-1 bg-gray-700 rounded text-xs text-gray-300">
-                                            <div class="flex flex-wrap items-center gap-1 text-xs">
+                                        <div class="bg-gray-700 rounded text-gray-300 avisos-oferta-block" style="margin-top:2px;margin-bottom:0;padding:3px 6px;">
+                                            <div class="flex flex-wrap items-center gap-1 text-xs avisos-oferta-inner">
                                                 <span class="font-medium">{{ $aviso->avisoable->tienda->nombre ?? 'Tienda ID: ' . $aviso->avisoable->tienda_id }}</span>
                                                 <span>•</span>
                                                 <span class="flex items-center gap-1 text-orange-500">
@@ -488,8 +551,8 @@
                                             </div>
                                         </div>
                                     @elseif($aviso->avisoable_type === 'App\Models\Chollo' && $aviso->avisoable)
-                                        <div class="mt-0 p-1 bg-gray-700 rounded text-xs text-gray-300">
-                                            <div class="flex flex-wrap items-center gap-1 text-xs">
+                                        <div class="bg-gray-700 rounded text-gray-300 avisos-oferta-block" style="margin-top:2px;margin-bottom:0;padding:3px 6px;">
+                                            <div class="flex flex-wrap items-center gap-1 text-xs avisos-oferta-inner">
                                                 @if($aviso->avisoable->tienda)
                                                     <span class="font-medium">{{ $aviso->avisoable->tienda->nombre }}</span>
                                                     <span>•</span>
@@ -510,11 +573,8 @@
                                     @endif
                                 </div>
                             </td>
-                            <td class="px-6 py-1 text-sm text-gray-200 dark:text-gray-200">
-                                {{ $aviso->fecha_aviso->format('d/m/Y H:i') }}
-                            </td>
                             <td class="px-6 py-1" onclick="event.stopPropagation()">
-                                <div class="flex items-center space-x-2">
+                                <div class="flex flex-wrap items-center gap-2">
                                     @if($aviso->avisoable_type === 'App\Models\OfertaProducto' && $aviso->texto_aviso === 'Comprobar gastos de envio')
                                         <button onclick="marcarEnvioComprobado({{ $aviso->avisoable_id }}, {{ $aviso->id }})" 
                                             class="px-4 py-2 text-sm bg-orange-600 hover:bg-orange-700 text-white rounded-md transition-colors">
@@ -566,19 +626,35 @@
                                                 </svg>
                                             </button>
                                         @endif
+                                        @if(in_array($aviso->avisoable_type, ['App\Models\OfertaProducto', 'App\Models\Producto']))
+                                            <div class="w-full flex flex-wrap gap-1" onclick="event.stopPropagation()">
+                                                <button type="button" onclick="gestionarOfertaResucitada({{ $aviso->id }}, 'sin_stock', 'Sin stock')" class="inline-grid place-items-center h-6 px-2 text-[11px] leading-none font-bold text-center bg-gray-600 hover:bg-gray-700 text-white rounded-md transition-colors">
+                                                    Sin stock
+                                                </button>
+                                                <button type="button" onclick="gestionarOfertaResucitada({{ $aviso->id }}, 'segunda_mano', 'Segunda mano')" class="inline-grid place-items-center h-6 px-2 text-[11px] leading-none font-bold text-center bg-gray-600 hover:bg-gray-700 text-white rounded-md transition-colors">
+                                                    Segunda mano
+                                                </button>
+                                                <button type="button" onclick="gestionarOfertaResucitada({{ $aviso->id }}, 'reacondicionado', 'Reacondicionado')" class="inline-grid place-items-center h-6 px-2 text-[11px] leading-none font-bold text-center bg-gray-600 hover:bg-gray-700 text-white rounded-md transition-colors">
+                                                    Reacondicionado
+                                                </button>
+                                                <button type="button" onclick="gestionarOfertaResucitada({{ $aviso->id }}, '404', '404')" class="inline-grid place-items-center h-6 px-2 text-[11px] leading-none font-bold text-center bg-gray-600 hover:bg-gray-700 text-white rounded-md transition-colors">
+                                                    404
+                                                </button>
+                                            </div>
+                                        @endif
                                     @endif
                                 </div>
                             </td>
                         </tr>
                         @empty
                         <tr>
-                            <td colspan="6" class="px-6 py-4 text-center text-gray-400 dark:text-gray-400">
+                            <td colspan="3" class="px-6 py-4 text-center text-gray-400 dark:text-gray-400">
                                 No hay avisos vencidos.
                             </td>
                         </tr>
                         @endforelse
                         <tr class="mensaje-sin-avisos-filtrado hidden">
-                            <td colspan="6" class="px-6 py-4 text-center text-gray-400 dark:text-gray-400">
+                            <td colspan="3" class="px-6 py-4 text-center text-gray-400 dark:text-gray-400">
                                 No hay avisos en esta categoría.
                             </td>
                         </tr>
@@ -616,16 +692,21 @@
                 </div>
             </div>
             <div class="bg-gray-800 dark:bg-gray-800 shadow rounded-lg overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-700 dark:divide-gray-600">
+                <table class="min-w-full divide-y divide-gray-700 dark:divide-gray-600 avisos-tabla" style="min-width: 900px;">
+                    <colgroup>
+                        <col>
+                        <col>
+                        <col>
+                    </colgroup>
                     <thead class="bg-gray-700 dark:bg-gray-700">
                         <tr>
-                            <th class="py-2 text-left text-xs font-medium text-gray-300 dark:text-gray-300 uppercase tracking-wider" style="width: 20px;"></th>
-                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-300 dark:text-gray-300 uppercase tracking-wider" style="width: 20px;">
-                                <input type="checkbox" id="select-all-pendientes" class="checkbox-eliminar rounded border-gray-300 text-red-600 focus:ring-red-500" onchange="toggleAllCheckboxes('pendientes')">
+                            <th class="px-6 py-4 text-left text-xs font-medium text-gray-300 dark:text-gray-300 uppercase tracking-wider w-1/4 avisos-tabla-elemento">
+                                <span class="inline-flex items-center gap-2">
+                                    <input type="checkbox" id="select-all-pendientes" class="checkbox-eliminar rounded border-gray-300 text-red-600 focus:ring-red-500" onchange="toggleAllCheckboxes('pendientes')">
+                                    <span>Elemento</span>
+                                </span>
                             </th>
-                            <th class="px-6 py-4 text-left text-xs font-medium text-gray-300 dark:text-gray-300 uppercase tracking-wider w-1/4">Elemento</th>
-                            <th class="px-6 py-4 text-left text-xs font-medium text-gray-300 dark:text-gray-300 uppercase tracking-wider w-2/5">Texto del Aviso</th>
-                            <th class="px-6 py-4 text-left text-xs font-medium text-gray-300 dark:text-gray-300 uppercase tracking-wider w-1/12">Fecha Programada</th>
+                            <th class="px-6 py-4 text-left text-xs font-medium text-gray-300 dark:text-gray-300 uppercase tracking-wider w-2/5 avisos-tabla-texto-aviso w-1/2">Texto del Aviso</th>
                             <th class="px-6 py-4 text-left text-xs font-medium text-gray-300 dark:text-gray-300 uppercase tracking-wider w-1/12">Acciones</th>
                         </tr>
                     </thead>
@@ -633,34 +714,22 @@
                         @forelse ($avisosPendientes as $aviso)
                         @php
                             $tipoAviso = obtenerTipoAviso($aviso);
+                            $claseTipo = $aviso->avisoable_type === 'App\Models\Producto' ? 'producto' : ($aviso->avisoable_type === 'App\Models\OfertaProducto' ? 'oferta' : ($aviso->avisoable_type === 'App\Models\Chollo' ? 'chollo' : 'interno'));
                         @endphp
-                        <tr class="hover:bg-gray-700 dark:hover:bg-gray-700 transition-colors cursor-pointer subtab-row" data-tipo="{{ $tipoAviso }}" onclick="editarAviso({{ $aviso->id }}, {{ json_encode($aviso->texto_aviso) }}, '{{ $aviso->fecha_aviso->format('Y-m-d\TH:i') }}', {{ $aviso->oculto ? 'true' : 'false' }})">
-                            <td class="p-0" onclick="event.stopPropagation()" style="width: 20px;">
-                                @if($aviso->avisoable_type === 'App\Models\Producto')
-                                    <div class="flex items-center justify-center bg-blue-600" style="writing-mode: vertical-lr; transform: rotate(180deg); min-height: 40px;">
-                                        <span class="text-white text-sm font-bold py-8">Producto</span>
-                                    </div>
-                                @elseif($aviso->avisoable_type === 'App\Models\OfertaProducto')
-                                    <div class="flex items-center justify-center bg-purple-600" style="writing-mode: vertical-lr; transform: rotate(180deg); min-height: 40px;">
-                                        <span class="text-white text-sm font-bold py-8">Oferta</span>
-                                    </div>
-                                @else
-                                    <div class="flex items-center justify-center bg-gray-600" style="writing-mode: vertical-lr; transform: rotate(180deg); min-height: 40px;">
-                                        <span class="text-gray-200 text-sm font-bold py-8">Interno</span>
-                                    </div>
-                                @endif
-                            </td>
-                            <td class="px-6 py-1 @if($aviso->avisoable_type !== 'App\Models\OfertaProducto') cursor-pointer hover:bg-gray-600 transition-colors @endif" @if($aviso->avisoable_type !== 'App\Models\OfertaProducto') onclick="event.stopPropagation(); toggleCheckbox({{ $aviso->id }}, 'pendientes')" @endif>
-                                <div class="flex items-center justify-center h-8">
-                                    @if($aviso->avisoable_type !== 'App\Models\OfertaProducto')
-                                        <input type="checkbox" class="checkbox-aviso rounded border-gray-300 text-red-600 focus:ring-red-500 pointer-events-none" 
-                                               data-aviso-id="{{ $aviso->id }}" 
-                                               data-tabla="pendientes"
-                                               onchange="actualizarContadorSeleccionados()">
-                                    @endif
-                                </div>
-                            </td>
+                        <tr class="hover:bg-gray-700 dark:hover:bg-gray-700 transition-colors subtab-row aviso-borde-{{ $claseTipo }}" data-tipo="{{ $tipoAviso }}" data-aviso-id="{{ $aviso->id }}">
                             <td class="px-6 py-1">
+                                <div class="aviso-cell-elemento">
+                                    @if($aviso->avisoable_type !== 'App\Models\OfertaProducto')
+                                        <label class="aviso-check-wrap hover:opacity-80" for="aviso-cb-{{ $aviso->id }}-pendientes">
+                                            <input type="checkbox" id="aviso-cb-{{ $aviso->id }}-pendientes" class="checkbox-aviso rounded border-gray-300 text-red-600 focus:ring-red-500 pointer-events-none" 
+                                                   data-aviso-id="{{ $aviso->id }}" 
+                                                   data-tabla="pendientes"
+                                                   onchange="actualizarContadorSeleccionados()">
+                                        </label>
+                                    @else
+                                        <div class="aviso-check-wrap" style="width: 2.5rem; min-width: 2.5rem;"></div>
+                                    @endif
+                                    <div class="aviso-elemento-content">
                                 @if($aviso->avisoable_type === 'App\Models\Producto' && $aviso->avisoable_id && $aviso->avisoable_id !== null)
                                     <div class="flex flex-col space-y-1">
                                         <span class="text-gray-200 dark:text-gray-200 break-words text-sm">{{ $aviso->elemento_nombre }}</span>
@@ -685,11 +754,18 @@
                                                 </button>
                                             @endif
                                         </div>
+                                        <span class="text-xs text-gray-400">{{ $aviso->fecha_aviso->format('d/m/Y H:i') }}</span>
                                     </div>
                                 @elseif($aviso->avisoable_type === 'App\Models\OfertaProducto' && $aviso->avisoable_id && $aviso->avisoable_id !== null)
                                     <div class="flex flex-col space-y-1">
                                         <span class="text-gray-200 dark:text-gray-200 break-words text-sm">{{ $aviso->elemento_nombre }}</span>
                                         <div class="flex items-center space-x-1">
+                                            @if($aviso->avisoable && $aviso->avisoable->producto && $aviso->avisoable->producto->categoria)
+                                                <button onclick="event.stopPropagation(); window.open('/{{ implode('/', $aviso->avisoable->producto->categoria->obtenerSlugsJerarquia()) }}/{{ $aviso->avisoable->producto->slug }}', '_blank')" 
+                                                    class="px-3 py-1.5 text-sm bg-teal-600 hover:bg-teal-700 text-white rounded transition-colors">
+                                                    Web
+                                                </button>
+                                            @endif
                                             <button onclick="event.stopPropagation(); window.open('{{ route('admin.ofertas.edit', $aviso->avisoable_id) }}', '_blank')" 
                                                 class="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors">
                                                 Editar
@@ -705,20 +781,24 @@
                                                 Mostrar->si
                                             </button>
                                         </div>
+                                        <span class="text-xs text-gray-400">{{ $aviso->fecha_aviso->format('d/m/Y H:i') }}</span>
                                     </div>
                                 @else
-                                    <span class="text-gray-200 dark:text-gray-200">
-                                        @if($aviso->avisoable_type === 'Interno' && $aviso->avisoable_id === 0)
-                                            Aviso Interno
-                                        @else
-                                            {{ $aviso->elemento_nombre }}
-                                        @endif
-                                    </span>
+                                    <div class="flex flex-col space-y-0.5">
+                                        <span class="text-gray-200 dark:text-gray-200">
+                                            @if($aviso->avisoable_type === 'Interno' && $aviso->avisoable_id === 0)
+                                                Aviso Interno
+                                            @else
+                                                {{ $aviso->elemento_nombre }}
+                                            @endif
+                                        </span>
+                                        <span class="text-xs text-gray-400">{{ $aviso->fecha_aviso->format('d/m/Y H:i') }}</span>
+                                    </div>
                                 @endif
                             </td>
-                            <td class="px-6 py-1 max-w-md">
-                                <div class="text-base text-gray-200 dark:text-gray-200 whitespace-pre-line break-words max-w-full" style="overflow-wrap: anywhere; word-break: break-word;">
-                                    {{ $aviso->texto_aviso }}
+                            <td class="px-6 py-1 max-w-md min-w-0 avisos-tabla-texto-aviso">
+                                <div class="text-base text-gray-200 dark:text-gray-200 whitespace-pre-line break-words max-w-full min-w-0" style="overflow-wrap: anywhere; word-break: break-word;">
+                                    <span class="block">{{ $aviso->texto_aviso }}</span>
                                     @if($aviso->avisoable_type === 'App\Models\Producto' && $aviso->avisoable_id && $aviso->avisoable_id !== null)
                                         @php
                                             $ofertaMasBarata = obtenerPrimeraOfertaProducto($aviso->avisoable_id);
@@ -727,8 +807,8 @@
                                             @php
                                                 $productoOferta = \App\Models\Producto::find($aviso->avisoable_id);
                                             @endphp
-                                            <div class="mt-0 p-1 bg-gray-700 rounded text-xs text-gray-300">
-                                                <div class="flex flex-wrap items-center gap-1 text-xs">
+                                            <div class="bg-gray-700 rounded text-gray-300 avisos-oferta-block" style="margin-top:2px;margin-bottom:0;padding:3px 6px;">
+                                                <div class="flex flex-wrap items-center gap-1 text-xs avisos-oferta-inner">
                                                     <span class="font-medium">{{ $ofertaMasBarata->tienda->nombre ?? 'Tienda ID: ' . $ofertaMasBarata->tienda_id }}</span>
                                                     <span>•</span>
                                                     <span class="flex items-center gap-1 text-orange-500">
@@ -775,8 +855,8 @@
                                             </div>
                                         @endif
                                     @elseif($aviso->avisoable_type === 'App\Models\OfertaProducto' && $aviso->avisoable_id && $aviso->avisoable_id !== null && $aviso->avisoable)
-                                        <div class="mt-1 p-1.5 bg-gray-700 rounded text-xs text-gray-300">
-                                            <div class="flex flex-wrap items-center gap-2 text-xs">
+                                        <div class="bg-gray-700 rounded text-gray-300 avisos-oferta-block" style="margin-top:2px;margin-bottom:0;padding:3px 6px;">
+                                            <div class="flex flex-wrap items-center gap-2 text-xs avisos-oferta-inner">
                                                 <span class="font-medium">{{ $aviso->avisoable->tienda->nombre ?? 'Tienda ID: ' . $aviso->avisoable->tienda_id }}</span>
                                                 <span>•</span>
                                                 <span class="flex items-center gap-1 text-orange-500">
@@ -817,11 +897,8 @@
                                     @endif
                                 </div>
                             </td>
-                            <td class="px-6 py-1 text-sm text-gray-200 dark:text-gray-200">
-                                {{ $aviso->fecha_aviso->format('d/m/Y H:i') }}
-                            </td>
                             <td class="px-6 py-1" onclick="event.stopPropagation()">
-                                <div class="flex items-center space-x-2">
+                                <div class="flex flex-wrap items-center gap-2">
                                     @if($aviso->avisoable_type === 'App\Models\OfertaProducto' && $aviso->texto_aviso === 'Comprobar gastos de envio')
                                         <button onclick="marcarEnvioComprobado({{ $aviso->avisoable_id }}, {{ $aviso->id }})" 
                                             class="px-4 py-2 text-sm bg-orange-600 hover:bg-orange-700 text-white rounded-md transition-colors">
@@ -846,19 +923,35 @@
                                                 </svg>
                                             </button>
                                         @endif
+                                        @if(in_array($aviso->avisoable_type, ['App\Models\OfertaProducto', 'App\Models\Producto']))
+                                            <div class="w-full flex flex-wrap gap-1" onclick="event.stopPropagation()">
+                                                <button type="button" onclick="gestionarOfertaResucitada({{ $aviso->id }}, 'sin_stock', 'Sin stock')" class="inline-grid place-items-center h-6 px-2 text-[11px] leading-none font-bold text-center bg-gray-600 hover:bg-gray-700 text-white rounded-md transition-colors">
+                                                    Sin stock
+                                                </button>
+                                                <button type="button" onclick="gestionarOfertaResucitada({{ $aviso->id }}, 'segunda_mano', 'Segunda mano')" class="inline-grid place-items-center h-6 px-2 text-[11px] leading-none font-bold text-center bg-gray-600 hover:bg-gray-700 text-white rounded-md transition-colors">
+                                                    Segunda mano
+                                                </button>
+                                                <button type="button" onclick="gestionarOfertaResucitada({{ $aviso->id }}, 'reacondicionado', 'Reacondicionado')" class="inline-grid place-items-center h-6 px-2 text-[11px] leading-none font-bold text-center bg-gray-600 hover:bg-gray-700 text-white rounded-md transition-colors">
+                                                    Reacondicionado
+                                                </button>
+                                                <button type="button" onclick="gestionarOfertaResucitada({{ $aviso->id }}, '404', '404')" class="inline-grid place-items-center h-6 px-2 text-[11px] leading-none font-bold text-center bg-gray-600 hover:bg-gray-700 text-white rounded-md transition-colors">
+                                                    404
+                                                </button>
+                                            </div>
+                                        @endif
                                     @endif
                                 </div>
                             </td>
                         </tr>
                         @empty
                         <tr>
-                            <td colspan="6" class="px-6 py-4 text-center text-gray-400 dark:text-gray-400">
+                            <td colspan="3" class="px-6 py-4 text-center text-gray-400 dark:text-gray-400">
                                 No hay avisos pendientes.
                             </td>
                         </tr>
                         @endforelse
                         <tr class="mensaje-sin-avisos-filtrado hidden">
-                            <td colspan="6" class="px-6 py-4 text-center text-gray-400 dark:text-gray-400">
+                            <td colspan="3" class="px-6 py-4 text-center text-gray-400 dark:text-gray-400">
                                 No hay avisos en esta categoría.
                             </td>
                         </tr>
@@ -896,16 +989,21 @@
                 </div>
             </div>
             <div class="bg-gray-800 dark:bg-gray-800 shadow rounded-lg overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-700 dark:divide-gray-600">
+                <table class="min-w-full divide-y divide-gray-700 dark:divide-gray-600 avisos-tabla" style="min-width: 900px;">
+                    <colgroup>
+                        <col>
+                        <col>
+                        <col>
+                    </colgroup>
                     <thead class="bg-gray-700 dark:bg-gray-700">
                         <tr>
-                            <th class="py-3 text-left text-xs font-medium text-gray-300 dark:text-gray-300 uppercase tracking-wider" style="width: 20px;"></th>
-                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-300 dark:text-gray-300 uppercase tracking-wider" style="width: 20px;">
-                                <input type="checkbox" id="select-all-ocultos" class="checkbox-eliminar rounded border-gray-300 text-red-600 focus:ring-red-500" onchange="toggleAllCheckboxes('ocultos')">
+                            <th class="px-6 py-4 text-left text-xs font-medium text-gray-300 dark:text-gray-300 uppercase tracking-wider w-1/4 avisos-tabla-elemento">
+                                <span class="inline-flex items-center gap-2">
+                                    <input type="checkbox" id="select-all-ocultos" class="checkbox-eliminar rounded border-gray-300 text-red-600 focus:ring-red-500" onchange="toggleAllCheckboxes('ocultos')">
+                                    <span>Elemento</span>
+                                </span>
                             </th>
-                            <th class="px-6 py-4 text-left text-xs font-medium text-gray-300 dark:text-gray-300 uppercase tracking-wider w-1/4">Elemento</th>
-                            <th class="px-6 py-4 text-left text-xs font-medium text-gray-300 dark:text-gray-300 uppercase tracking-wider w-2/5">Texto del Aviso</th>
-                            <th class="px-6 py-4 text-left text-xs font-medium text-gray-300 dark:text-gray-300 uppercase tracking-wider w-1/12">Fecha</th>
+                            <th class="px-6 py-4 text-left text-xs font-medium text-gray-300 dark:text-gray-300 uppercase tracking-wider w-2/5 avisos-tabla-texto-aviso w-1/2">Texto del Aviso</th>
                             <th class="px-6 py-4 text-left text-xs font-medium text-gray-300 dark:text-gray-300 uppercase tracking-wider w-1/12">Acciones</th>
                         </tr>
                     </thead>
@@ -913,34 +1011,22 @@
                         @forelse ($avisosOcultos as $aviso)
                         @php
                             $tipoAviso = obtenerTipoAviso($aviso);
+                            $claseTipo = $aviso->avisoable_type === 'App\Models\Producto' ? 'producto' : ($aviso->avisoable_type === 'App\Models\OfertaProducto' ? 'oferta' : ($aviso->avisoable_type === 'App\Models\Chollo' ? 'chollo' : 'interno'));
                         @endphp
-                        <tr class="hover:bg-gray-700 dark:hover:bg-gray-700 transition-colors cursor-pointer subtab-row" data-tipo="{{ $tipoAviso }}" onclick="editarAviso({{ $aviso->id }}, {{ json_encode($aviso->texto_aviso) }}, '{{ $aviso->fecha_aviso->format('Y-m-d\TH:i') }}', {{ $aviso->oculto ? 'true' : 'false' }})">
-                            <td class="p-0" onclick="event.stopPropagation()" style="width: 20px;">
-                                @if($aviso->avisoable_type === 'App\Models\Producto')
-                                    <div class="flex items-center justify-center bg-blue-600" style="writing-mode: vertical-lr; transform: rotate(180deg); min-height: 40px;">
-                                        <span class="text-white text-xs font-bold py-2">Producto</span>
-                                    </div>
-                                @elseif($aviso->avisoable_type === 'App\Models\OfertaProducto')
-                                    <div class="flex items-center justify-center bg-purple-600" style="writing-mode: vertical-lr; transform: rotate(180deg); min-height: 40px;">
-                                        <span class="text-white text-xs font-bold py-2">Oferta</span>
-                                    </div>
-                                @else
-                                    <div class="flex items-center justify-center bg-gray-600" style="writing-mode: vertical-lr; transform: rotate(180deg); min-height: 40px;">
-                                        <span class="text-gray-200 text-xs font-bold py-2">Interno</span>
-                                    </div>
-                                @endif
-                            </td>
-                            <td class="px-6 py-1 @if($aviso->avisoable_type !== 'App\Models\OfertaProducto') cursor-pointer hover:bg-gray-600 transition-colors @endif" @if($aviso->avisoable_type !== 'App\Models\OfertaProducto') onclick="event.stopPropagation(); toggleCheckbox({{ $aviso->id }}, 'ocultos')" @endif>
-                                <div class="flex items-center justify-center h-8">
-                                    @if($aviso->avisoable_type !== 'App\Models\OfertaProducto')
-                                        <input type="checkbox" class="checkbox-aviso rounded border-gray-300 text-red-600 focus:ring-red-500 pointer-events-none" 
-                                               data-aviso-id="{{ $aviso->id }}" 
-                                               data-tabla="ocultos"
-                                               onchange="actualizarContadorSeleccionados()">
-                                    @endif
-                                </div>
-                            </td>
+                        <tr class="hover:bg-gray-700 dark:hover:bg-gray-700 transition-colors subtab-row aviso-borde-{{ $claseTipo }}" data-tipo="{{ $tipoAviso }}" data-aviso-id="{{ $aviso->id }}">
                             <td class="px-6 py-1">
+                                <div class="aviso-cell-elemento">
+                                    @if($aviso->avisoable_type !== 'App\Models\OfertaProducto')
+                                        <label class="aviso-check-wrap hover:opacity-80" for="aviso-cb-{{ $aviso->id }}-ocultos">
+                                            <input type="checkbox" id="aviso-cb-{{ $aviso->id }}-ocultos" class="checkbox-aviso rounded border-gray-300 text-red-600 focus:ring-red-500 pointer-events-none" 
+                                                   data-aviso-id="{{ $aviso->id }}" 
+                                                   data-tabla="ocultos"
+                                                   onchange="actualizarContadorSeleccionados()">
+                                        </label>
+                                    @else
+                                        <div class="aviso-check-wrap" style="width: 2.5rem; min-width: 2.5rem;"></div>
+                                    @endif
+                                    <div class="aviso-elemento-content">
                                 @if($aviso->avisoable_type === 'App\Models\Producto' && $aviso->avisoable_id && $aviso->avisoable_id !== null)
                                     <div class="flex flex-col space-y-1">
                                         <span class="text-gray-200 dark:text-gray-200 break-words text-sm">{{ $aviso->elemento_nombre }}</span>
@@ -965,11 +1051,18 @@
                                                 </button>
                                             @endif
                                         </div>
+                                        <span class="text-xs text-gray-400">{{ $aviso->fecha_aviso->format('d/m/Y H:i') }}</span>
                                     </div>
                                 @elseif($aviso->avisoable_type === 'App\Models\OfertaProducto' && $aviso->avisoable_id && $aviso->avisoable_id !== null)
                                     <div class="flex flex-col space-y-1">
                                         <span class="text-gray-200 dark:text-gray-200 break-words text-sm">{{ $aviso->elemento_nombre }}</span>
                                         <div class="flex items-center space-x-1">
+                                            @if($aviso->avisoable && $aviso->avisoable->producto && $aviso->avisoable->producto->categoria)
+                                                <button onclick="event.stopPropagation(); window.open('/{{ implode('/', $aviso->avisoable->producto->categoria->obtenerSlugsJerarquia()) }}/{{ $aviso->avisoable->producto->slug }}', '_blank')" 
+                                                    class="px-3 py-1.5 text-sm bg-teal-600 hover:bg-teal-700 text-white rounded transition-colors">
+                                                    Web
+                                                </button>
+                                            @endif
                                             <button onclick="event.stopPropagation(); window.open('{{ route('admin.ofertas.edit', $aviso->avisoable_id) }}', '_blank')" 
                                                 class="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors">
                                                 Editar
@@ -985,20 +1078,24 @@
                                                 Mostrar->si
                                             </button>
                                         </div>
+                                        <span class="text-xs text-gray-400">{{ $aviso->fecha_aviso->format('d/m/Y H:i') }}</span>
                                     </div>
                                 @else
-                                    <span class="text-gray-200 dark:text-gray-200">
-                                        @if($aviso->avisoable_type === 'Interno' && $aviso->avisoable_id === 0)
-                                            Aviso Interno
-                                        @else
-                                            {{ $aviso->elemento_nombre }}
-                                        @endif
-                                    </span>
+                                    <div class="flex flex-col space-y-0.5">
+                                        <span class="text-gray-200 dark:text-gray-200">
+                                            @if($aviso->avisoable_type === 'Interno' && $aviso->avisoable_id === 0)
+                                                Aviso Interno
+                                            @else
+                                                {{ $aviso->elemento_nombre }}
+                                            @endif
+                                        </span>
+                                        <span class="text-xs text-gray-400">{{ $aviso->fecha_aviso->format('d/m/Y H:i') }}</span>
+                                    </div>
                                 @endif
                             </td>
-                            <td class="px-6 py-1 max-w-md">
-                                <div class="text-base text-gray-200 dark:text-gray-200 whitespace-pre-line break-words max-w-full" style="overflow-wrap: anywhere; word-break: break-word;">
-                                    {{ $aviso->texto_aviso }}
+                            <td class="px-6 py-1 max-w-md min-w-0 avisos-tabla-texto-aviso">
+                                <div class="text-base text-gray-200 dark:text-gray-200 whitespace-pre-line break-words max-w-full min-w-0" style="overflow-wrap: anywhere; word-break: break-word;">
+                                    <span class="block">{{ $aviso->texto_aviso }}</span>
                                     @if($aviso->avisoable_type === 'App\Models\Producto' && $aviso->avisoable_id && $aviso->avisoable_id !== null)
                                         @php
                                             $ofertaMasBarata = obtenerPrimeraOfertaProducto($aviso->avisoable_id);
@@ -1007,8 +1104,8 @@
                                             @php
                                                 $productoOferta = \App\Models\Producto::find($aviso->avisoable_id);
                                             @endphp
-                                            <div class="mt-0 p-1 bg-gray-700 rounded text-xs text-gray-300">
-                                                <div class="flex flex-wrap items-center gap-1 text-xs">
+                                            <div class="bg-gray-700 rounded text-gray-300 avisos-oferta-block" style="margin-top:2px;margin-bottom:0;padding:3px 6px;">
+                                                <div class="flex flex-wrap items-center gap-1 text-xs avisos-oferta-inner">
                                                     <span class="font-medium">{{ $ofertaMasBarata->tienda->nombre ?? 'Tienda ID: ' . $ofertaMasBarata->tienda_id }}</span>
                                                     <span>•</span>
                                                     <span class="flex items-center gap-1 text-orange-500">
@@ -1055,8 +1152,8 @@
                                             </div>
                                         @endif
                                     @elseif($aviso->avisoable_type === 'App\Models\OfertaProducto' && $aviso->avisoable_id && $aviso->avisoable_id !== null && $aviso->avisoable)
-                                        <div class="mt-1 p-1.5 bg-gray-700 rounded text-xs text-gray-300">
-                                            <div class="flex flex-wrap items-center gap-2 text-xs">
+                                        <div class="bg-gray-700 rounded text-gray-300 avisos-oferta-block" style="margin-top:2px;margin-bottom:0;padding:3px 6px;">
+                                            <div class="flex flex-wrap items-center gap-2 text-xs avisos-oferta-inner">
                                                 <span class="font-medium">{{ $aviso->avisoable->tienda->nombre ?? 'Tienda ID: ' . $aviso->avisoable->tienda_id }}</span>
                                                 <span>•</span>
                                                 <span class="flex items-center gap-1 text-orange-500">
@@ -1097,11 +1194,8 @@
                                     @endif
                                 </div>
                             </td>
-                            <td class="px-6 py-1 text-sm text-gray-200 dark:text-gray-200">
-                                {{ $aviso->fecha_aviso->format('d/m/Y H:i') }}
-                            </td>
                             <td class="px-6 py-1" onclick="event.stopPropagation()">
-                                <div class="flex items-center space-x-2">
+                                <div class="flex flex-wrap items-center gap-2">
                                     @if($aviso->avisoable_type === 'App\Models\OfertaProducto' && $aviso->texto_aviso === 'Comprobar gastos de envio')
                                         <button onclick="marcarEnvioComprobado({{ $aviso->avisoable_id }}, {{ $aviso->id }})" 
                                             class="px-4 py-2 text-sm bg-orange-600 hover:bg-orange-700 text-white rounded-md transition-colors">
@@ -1126,19 +1220,35 @@
                                                 </svg>
                                             </button>
                                         @endif
+                                        @if(in_array($aviso->avisoable_type, ['App\Models\OfertaProducto', 'App\Models\Producto']))
+                                            <div class="w-full flex flex-wrap gap-1" onclick="event.stopPropagation()">
+                                                <button type="button" onclick="gestionarOfertaResucitada({{ $aviso->id }}, 'sin_stock', 'Sin stock')" class="inline-grid place-items-center h-6 px-2 text-[11px] leading-none font-bold text-center bg-gray-600 hover:bg-gray-700 text-white rounded-md transition-colors">
+                                                    Sin stock
+                                                </button>
+                                                <button type="button" onclick="gestionarOfertaResucitada({{ $aviso->id }}, 'segunda_mano', 'Segunda mano')" class="inline-grid place-items-center h-6 px-2 text-[11px] leading-none font-bold text-center bg-gray-600 hover:bg-gray-700 text-white rounded-md transition-colors">
+                                                    Segunda mano
+                                                </button>
+                                                <button type="button" onclick="gestionarOfertaResucitada({{ $aviso->id }}, 'reacondicionado', 'Reacondicionado')" class="inline-grid place-items-center h-6 px-2 text-[11px] leading-none font-bold text-center bg-gray-600 hover:bg-gray-700 text-white rounded-md transition-colors">
+                                                    Reacondicionado
+                                                </button>
+                                                <button type="button" onclick="gestionarOfertaResucitada({{ $aviso->id }}, '404', '404')" class="inline-grid place-items-center h-6 px-2 text-[11px] leading-none font-bold text-center bg-gray-600 hover:bg-gray-700 text-white rounded-md transition-colors">
+                                                    404
+                                                </button>
+                                            </div>
+                                        @endif
                                     @endif
                                 </div>
                             </td>
                         </tr>
                         @empty
                         <tr>
-                            <td colspan="6" class="px-6 py-4 text-center text-gray-400 dark:text-gray-400">
+                            <td colspan="3" class="px-6 py-4 text-center text-gray-400 dark:text-gray-400">
                                 No hay avisos ocultos.
                             </td>
                         </tr>
                         @endforelse
                         <tr class="mensaje-sin-avisos-filtrado hidden">
-                            <td colspan="6" class="px-6 py-4 text-center text-gray-400 dark:text-gray-400">
+                            <td colspan="3" class="px-6 py-4 text-center text-gray-400 dark:text-gray-400">
                                 No hay avisos en esta categoría.
                             </td>
                         </tr>
@@ -1525,7 +1635,7 @@
         // Función helper para obtener el texto del aviso desde el DOM
         function obtenerTextoAvisoDesdeDOM(avisoId) {
             // Buscar la fila que contiene el aviso
-            const fila = document.querySelector(`tr[onclick*="editarAviso(${avisoId}"]`);
+            const fila = document.querySelector(`tr[data-aviso-id="${avisoId}"]`);
             if (!fila) {
                 return null;
             }
@@ -1964,33 +2074,24 @@
             }
         }
 
-        // Función para mostrar oferta y eliminar aviso
-        function mostrarOferta(ofertaId, avisoId) {
-            if (!confirm('¿Estás seguro de que quieres mostrar esta oferta y eliminar el aviso?')) {
-                return;
+        /** Lee inputs de la fila (oferta directa o bloque 1ª oferta) para guardar precio/envío. */
+        function payloadPrecioEnvioOfertaDesdeInputs(ofertaId) {
+            const bodyData = {};
+            let precioTotalInput = document.querySelector(`.precio-total-input[data-oferta-id="${ofertaId}"]`);
+            let envioInput = document.querySelector(`.envio-oferta-input[data-oferta-id="${ofertaId}"]`);
+            let precioUnidadDisplay = document.querySelector(`.precio-unidad-display[data-oferta-id="${ofertaId}"]`);
+
+            if (!precioTotalInput) {
+                precioTotalInput = document.querySelector(`.precio-total-oferta-mas-barata[data-oferta-id="${ofertaId}"]`);
+                envioInput = envioInput || document.querySelector(`.envio-oferta-mas-barata[data-oferta-id="${ofertaId}"]`);
+                precioUnidadDisplay = precioUnidadDisplay || document.querySelector(`.precio-unidad-oferta-mas-barata[data-oferta-id="${ofertaId}"]`);
             }
-            
-            // Obtener el precio_total del input si existe
-            const precioTotalInput = document.querySelector(`.precio-total-input[data-oferta-id="${ofertaId}"]`);
-            const precioUnidadDisplay = document.querySelector(`.precio-unidad-display[data-oferta-id="${ofertaId}"]`);
-            const envioInput = document.querySelector(`.envio-oferta-input[data-oferta-id="${ofertaId}"]`);
-            
-            // Preparar el body de la petición
-            const bodyData = {
-                mostrar: 'si'
-            };
-            
-            // Si existe un input de precio_total, significa que se puede modificar
+
             if (precioTotalInput) {
                 const precioTotal = parseFloat(precioTotalInput.value);
-                
-                // Incluir precio_total si es válido
                 if (!isNaN(precioTotal) && precioTotal >= 0) {
                     bodyData.precio_total = precioTotal;
                 }
-                
-                // Obtener el precio_unidad del display (extraer el número)
-                // El precio_unidad ya fue calculado por calcularPrecioUnidad usando el servicio
                 if (precioUnidadDisplay) {
                     const precioUnidadText = precioUnidadDisplay.textContent.replace('€/ud', '').trim();
                     const precioUnidad = parseFloat(precioUnidadText);
@@ -1999,18 +2100,30 @@
                     }
                 }
             }
-            
-            // Obtener el envío del input si existe
+
             if (envioInput) {
                 const envio = envioInput.value === '' ? null : parseFloat(envioInput.value);
                 if (envio !== null && !isNaN(envio) && envio >= 0) {
                     bodyData.envio = envio;
                 } else if (envioInput.value === '') {
-                    // Si el campo está vacío, enviar null para limpiar el envío
                     bodyData.envio = null;
                 }
             }
-            
+
+            return bodyData;
+        }
+
+        // Función para mostrar oferta y eliminar aviso
+        function mostrarOferta(ofertaId, avisoId) {
+            if (!confirm('¿Estás seguro de que quieres mostrar esta oferta y eliminar el aviso?')) {
+                return;
+            }
+
+            const bodyData = {
+                mostrar: 'si',
+                ...payloadPrecioEnvioOfertaDesdeInputs(ofertaId)
+            };
+
             // Actualizar oferta a mostrar = si y opcionalmente los precios
             fetch(`/panel-privado/ofertas/${ofertaId}/mostrar`, {
                 method: 'PUT',
@@ -2327,7 +2440,7 @@
             });
         }
 
-        // Función para marcar envío como comprobado
+        // Función para marcar envío como comprobado (guarda precio/envío de los inputs y actualiza la oferta)
         async function marcarEnvioComprobado(ofertaId, avisoId) {
             try {
                 const response = await fetch(`/panel-privado/avisos/marcar-envio-comprobado`, {
@@ -2338,14 +2451,14 @@
                     },
                     body: JSON.stringify({
                         oferta_id: ofertaId,
-                        aviso_id: avisoId
+                        aviso_id: avisoId,
+                        ...payloadPrecioEnvioOfertaDesdeInputs(ofertaId)
                     })
                 });
 
                 const data = await response.json();
-                
+
                 if (data.success) {
-                    alert('Envío marcado como comprobado. La fecha de actualización ha sido actualizada.');
                     location.reload();
                 } else {
                     alert('Error al marcar como comprobado: ' + (data.message || 'Error desconocido'));
@@ -2379,6 +2492,33 @@
             });
         }
 
+        async function gestionarOfertaResucitada(avisoId, motivo, etiqueta) {
+            if (!confirm(`¿Marcar este aviso como "${etiqueta}"?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/panel-privado/avisos/${avisoId}/gestionar-oferta-resucitada`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    },
+                    body: JSON.stringify({ motivo })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('Error al gestionar la oferta: ' + (data.message || 'Error desconocido'));
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error de conexión al gestionar la oferta');
+            }
+        }
+
         // Función para alternar checkbox al hacer clic en la celda
         function toggleCheckbox(avisoId, tabla) {
             const checkbox = document.querySelector(`input[data-aviso-id="${avisoId}"][data-tabla="${tabla}"]`);
@@ -2387,6 +2527,19 @@
                 actualizarContadorSeleccionados();
             }
         }
+
+        // Al hacer clic en el cuadrado del aviso (zona Elemento, sin botones ni campos), se marca/desmarca el check
+        document.addEventListener('click', function(e) {
+            const content = e.target.closest('.aviso-elemento-content');
+            if (!content) return;
+            if (e.target.closest('button, a, input, select, textarea')) return;
+            const row = content.closest('tr');
+            if (!row) return;
+            const cb = row.querySelector('.checkbox-aviso');
+            if (!cb) return;
+            cb.checked = !cb.checked;
+            actualizarContadorSeleccionados();
+        });
 
         // Función para guardar el precio de la oferta más barata
         async function guardarPrecioOfertaMasBarata(ofertaId) {
@@ -2429,9 +2582,8 @@
                     precio_total: precioTotal
                 };
                 
-                if (envio !== null) {
-                    bodyData.envio = envio;
-                }
+                // Incluir envio siempre: número si tiene valor, null si el usuario vació el campo (para limpiar en BD)
+                bodyData.envio = envio;
                 
                 const response = await fetch(`/panel-privado/ofertas/${ofertaId}/mostrar`, {
                     method: 'PUT',

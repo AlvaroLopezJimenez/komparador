@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Scraping;
 
 use App\Http\Controllers\Controller;
+use App\Support\UrlOfertaValidacion;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -17,9 +18,9 @@ class ScrapingController extends Controller
         try {
             // Validar datos de entrada
             $request->validate([
-                'url' => 'required|url',
+                'url' => UrlOfertaValidacion::rules(),
                 'tienda' => 'required|string',
-                'variante' => 'nullable|string'
+                'variante' => 'nullable|string',
             ]);
 
             $url = $request->input('url');

@@ -381,6 +381,39 @@
                 </div>
             </fieldset>
 
+            {{-- NEO (URLs objetivo) --}}
+            <fieldset class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 space-y-6 border border-gray-200 dark:border-gray-700">
+                <legend class="text-lg font-semibold text-gray-700 dark:text-gray-200">Neo</legend>
+                <p class="text-sm text-gray-500 dark:text-gray-400 inline">URLs objetivo para este producto. Cada campo debe contener una URL válida o "No encontrado". La fecha indica cuándo se visitó.</p>
+                <button type="button" id="btn-neo-no-encontrado" class="ml-2 px-3 py-1.5 text-sm font-medium rounded bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-700 hover:bg-amber-200 dark:hover:bg-amber-800/50 transition-colors" title="Pega «No encontrado» en el campo de URL que tengas pinchado">No encontrado</button>
+                <div id="neoobjetivo-list" class="mt-3">
+                    @php
+                        $neoobjetivos = old('neoobjetivo', $producto ? $producto->neoobjetivos : []);
+                        if (empty($neoobjetivos)) {
+                            $neoobjetivos = [ (object)['id' => null, 'url' => '', 'visitada' => ''] ];
+                        }
+                    @endphp
+                    @foreach ($neoobjetivos as $index => $neo)
+                    <div class="flex items-center gap-2 mb-2 neoobjetivo-item flex-wrap">
+                        <input type="hidden" name="neoobjetivo[{{ $index }}][id]" value="{{ is_object($neo) ? ($neo->id ?? '') : ($neo['id'] ?? '') }}">
+                        <input type="text" name="neoobjetivo[{{ $index }}][url]" value="{{ is_object($neo) ? ($neo->url ?? '') : ($neo['url'] ?? '') }}"
+                            class="neoobjetivo-url flex-1 min-w-[200px] px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border border-red-500"
+                            placeholder="https://...">
+                        <input type="datetime-local" name="neoobjetivo[{{ $index }}][visitada]" value="{{ is_object($neo) && $neo->visitada ? \Carbon\Carbon::parse($neo->visitada)->format('Y-m-d\TH:i') : (is_array($neo) && !empty($neo['visitada']) ? (\Carbon\Carbon::parse($neo['visitada'])->format('Y-m-d\TH:i') ?? $neo['visitada']) : '') }}"
+                            class="neoobjetivo-visitada w-44 px-3 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border border-gray-300 dark:border-gray-600">
+                        <button type="button" class="btn-eliminar-neoobjetivo px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm transition-colors" title="Eliminar esta URL">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    @endforeach
+                </div>
+                <div class="flex gap-4">
+                    <button type="button" id="add-neoobjetivo" class="text-sm text-green-600 font-medium">+ Añadir URL Neo</button>
+                </div>
+            </fieldset>
+
             {{-- GESTIÓN DE GRUPOS DE OFERTAS --}}
             @if($producto && $producto->unidadDeMedida === 'unidadUnica')
             <fieldset class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 space-y-6 border border-gray-200 dark:border-gray-700">
@@ -2441,6 +2474,15 @@
             const btnGuardar = document.querySelector('button[type="submit"]');
             if (!btnGuardar) return;
 
+            // Si se pide habilitar, comprobar también validación Neo (al menos un campo con URL o "No encontrado", y ningún campo con valor inválido)
+            if (habilitado && typeof window.validarNeo === 'function') {
+                const r = window.validarNeo();
+                if (!r.valido) {
+                    habilitado = false;
+                    mensaje = r.mensaje;
+                }
+            }
+
             if (habilitado) {
                 btnGuardar.disabled = false;
                 btnGuardar.className = 'inline-flex items-center bg-pink-600 hover:bg-pink-700 text-white font-semibold text-base px-6 py-3 rounded-md shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500';
@@ -2493,6 +2535,18 @@
                     }
                     
                     return false;
+                }
+
+                // Validación Neo: al menos un campo con URL o "No encontrado", y ningún campo con valor inválido
+                if (typeof window.validarNeo === 'function') {
+                    const r = window.validarNeo();
+                    if (!r.valido) {
+                        e.preventDefault();
+                        alert(r.mensaje);
+                        const neoSection = document.querySelector('#neoobjetivo-list');
+                        if (neoSection) neoSection.closest('fieldset').scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        return false;
+                    }
                 }
             });
         }
@@ -2879,6 +2933,144 @@
                 .catch(() => {
                     document.getElementById('relacionados-resultado').textContent = 'Error al buscar productos.';
                 });
+        });
+    </script>
+    {{-- NEO / NEOOBJETIVO: URLs objetivo, validación, add/remove --}}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const neoList = document.getElementById('neoobjetivo-list');
+            if (!neoList) return;
+
+            function isValidUrl(str) {
+                try {
+                    const u = new URL(str);
+                    return u.protocol === 'http:' || u.protocol === 'https:';
+                } catch {
+                    return false;
+                }
+            }
+
+            function isNoEncontrado(val) {
+                return (val || '').trim().toLowerCase() === 'no encontrado';
+            }
+
+            /** Valida la sección Neo: al menos un campo con URL o "No encontrado", y ningún campo con valor inválido. */
+            function validarNeo() {
+                const inputs = neoList.querySelectorAll('.neoobjetivo-url');
+                const valores = Array.from(inputs).map(i => (i.value || '').trim());
+                const algunRelleno = valores.some(v => v !== '');
+                if (!algunRelleno) {
+                    return { valido: false, mensaje: 'Debes rellenar al menos un campo Neo con una URL válida o "No encontrado".' };
+                }
+                const algunInvalido = valores.some(v => v !== '' && !isValidUrl(v) && !isNoEncontrado(v));
+                if (algunInvalido) {
+                    return { valido: false, mensaje: 'Cada campo Neo debe contener una URL válida o "No encontrado". Revisa los campos marcados en rojo.' };
+                }
+                return { valido: true, mensaje: '' };
+            }
+            window.validarNeo = validarNeo;
+
+            function actualizarBotonGuardarSegunNeo() {
+                const r = validarNeo();
+                if (!r.valido) {
+                    if (typeof actualizarBotonGuardar === 'function') {
+                        actualizarBotonGuardar(false, r.mensaje);
+                    }
+                    return;
+                }
+                const catInput = document.getElementById('categoria-final');
+                if (catInput && catInput.value && typeof verificarCategoriaParaGuardar === 'function') {
+                    verificarCategoriaParaGuardar(catInput.value);
+                } else if (typeof actualizarBotonGuardar === 'function') {
+                    actualizarBotonGuardar(true, '');
+                }
+            }
+
+            function actualizarBordeUrl(input) {
+                const val = (input.value || '').trim();
+                if (val === '') {
+                    input.classList.add('border-red-500');
+                    input.classList.remove('border-gray-300', 'dark:border-gray-600');
+                } else if (isValidUrl(val) || isNoEncontrado(val)) {
+                    input.classList.remove('border-red-500');
+                    input.classList.add('border-gray-300', 'dark:border-gray-600');
+                } else {
+                    input.classList.add('border-red-500');
+                    input.classList.remove('border-gray-300', 'dark:border-gray-600');
+                }
+                actualizarBotonGuardarSegunNeo();
+            }
+
+            document.getElementById('btn-neo-no-encontrado').addEventListener('click', function() {
+                const active = document.activeElement;
+                if (active && active.classList && active.classList.contains('neoobjetivo-url')) {
+                    active.value = 'No encontrado';
+                    actualizarBordeUrl(active);
+                } else {
+                    const firstUrl = neoList.querySelector('.neoobjetivo-url');
+                    if (firstUrl) {
+                        firstUrl.focus();
+                        firstUrl.value = 'No encontrado';
+                        actualizarBordeUrl(firstUrl);
+                    }
+                }
+            });
+
+            function crearFilaNeoobjetivo(index, url = '', visitada = '', id = '') {
+                const div = document.createElement('div');
+                div.className = 'flex items-center gap-2 mb-2 neoobjetivo-item flex-wrap';
+                const urlClass = 'neoobjetivo-url flex-1 min-w-[200px] px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border ';
+                div.innerHTML = `
+                    <input type="hidden" name="neoobjetivo[${index}][id]" value="${id || ''}">
+                    <input type="text" name="neoobjetivo[${index}][url]" value="${url}" class="${urlClass} border-red-500" placeholder="https://...">
+                    <input type="datetime-local" name="neoobjetivo[${index}][visitada]" value="${visitada}" class="neoobjetivo-visitada w-44 px-3 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border border-gray-300 dark:border-gray-600">
+                    <button type="button" class="btn-eliminar-neoobjetivo px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm transition-colors" title="Eliminar esta URL">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                `;
+                const urlInput = div.querySelector('.neoobjetivo-url');
+                const btnEliminar = div.querySelector('.btn-eliminar-neoobjetivo');
+                urlInput.addEventListener('input', () => actualizarBordeUrl(urlInput));
+                urlInput.addEventListener('blur', () => actualizarBordeUrl(urlInput));
+                actualizarBordeUrl(urlInput);
+                btnEliminar.addEventListener('click', function() {
+                    const items = neoList.querySelectorAll('.neoobjetivo-item');
+                    if (items.length <= 1) {
+                        urlInput.value = '';
+                        div.querySelector('input[name*="[visitada]"]').value = '';
+                        div.querySelector('input[name*="[id]"]').value = '';
+                        actualizarBordeUrl(urlInput);
+                        return;
+                    }
+                    div.remove();
+                });
+                return div;
+            }
+
+            document.getElementById('add-neoobjetivo').addEventListener('click', function() {
+                const index = neoList.querySelectorAll('.neoobjetivo-item').length;
+                neoList.appendChild(crearFilaNeoobjetivo(index, '', '', ''));
+                actualizarBotonGuardarSegunNeo();
+            });
+
+            neoList.addEventListener('click', function(e) {
+                if (e.target.closest('.btn-eliminar-neoobjetivo')) {
+                    const item = e.target.closest('.neoobjetivo-item');
+                    if (item && neoList.querySelectorAll('.neoobjetivo-item').length > 1) {
+                        item.remove();
+                        actualizarBotonGuardarSegunNeo();
+                    }
+                }
+            });
+
+            neoList.querySelectorAll('.neoobjetivo-url').forEach(input => {
+                input.addEventListener('input', () => actualizarBordeUrl(input));
+                input.addEventListener('blur', () => actualizarBordeUrl(input));
+                actualizarBordeUrl(input);
+            });
+
+            // Estado inicial del botón Guardar según Neo
+            actualizarBotonGuardarSegunNeo();
         });
     </script>
     {{-- BUSCADOR DE CATEGORÍAS PARA PRODUCTOS RELACIONADOS --}}
@@ -5173,32 +5365,41 @@
         // ========== FUNCIONALIDAD AMAZON PARA MODAL SUBLÍNEA ==========
         let imagenesAmazonSeleccionadasSublinea = [];
         
+        // Limpiar URL vía servicio LimpiarUrlDeTiendas (compartido con ofertas)
+        async function limpiarUrlAmazonViaApi(url) {
+            if (!url || !url.trim()) return url || '';
+            try {
+                const res = await fetch('{{ route("admin.ofertas.limpiar.url") }}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
+                    body: JSON.stringify({ url: url.trim() })
+                });
+                if (!res.ok) return url.trim();
+                const data = await res.json();
+                return data.url_limpia ?? url.trim();
+            } catch (e) {
+                return url.trim();
+            }
+        }
+        
         // Limpiar URL de Amazon automáticamente al pegar o escribir (modal sublínea)
         const urlAmazonInputSublinea = document.getElementById('url-amazon-sublinea');
         if (urlAmazonInputSublinea) {
-            // Event listener para pegar
             urlAmazonInputSublinea.addEventListener('paste', function(e) {
-                setTimeout(() => {
+                setTimeout(async () => {
                     const urlPegada = urlAmazonInputSublinea.value.trim();
                     if (urlPegada) {
-                        const urlLimpia = limpiarUrlAmazon(urlPegada);
-                        if (urlLimpia !== urlPegada) {
-                            urlAmazonInputSublinea.value = urlLimpia;
-                        }
+                        const urlLimpia = await limpiarUrlAmazonViaApi(urlPegada);
+                        if (urlLimpia !== urlPegada) urlAmazonInputSublinea.value = urlLimpia;
                     }
                 }, 10);
             });
-            
-            // Event listener para cuando cambia el input (por si se escribe manualmente)
             urlAmazonInputSublinea.addEventListener('input', function(e) {
                 const url = e.target.value.trim();
-                if (url && url.includes('amazon')) {
-                    const urlLimpia = limpiarUrlAmazon(url);
-                    if (urlLimpia !== url && urlLimpia.length < url.length) {
-                        // Solo actualizar si la URL limpia es más corta (tiene sentido limpiarla)
-                        e.target.value = urlLimpia;
-                    }
-                }
+                if (!url || !url.includes('amazon')) return;
+                limpiarUrlAmazonViaApi(url).then(urlLimpia => {
+                    if (urlLimpia !== url && urlLimpia.length < url.length) e.target.value = urlLimpia;
+                });
             });
         }
         
@@ -5776,6 +5977,8 @@
                 canvasGrande.width = canvasOriginal.width;
                 canvasGrande.height = canvasOriginal.height;
                 const ctxGrande = canvasGrande.getContext('2d');
+                ctxGrande.fillStyle = '#ffffff';
+                ctxGrande.fillRect(0, 0, canvasGrande.width, canvasGrande.height);
                 ctxGrande.drawImage(canvasOriginal, 0, 0);
                 
                 // Pequeña: 300x250
@@ -5783,6 +5986,8 @@
                 canvasPequena.width = 300;
                 canvasPequena.height = 250;
                 const ctxPequena = canvasPequena.getContext('2d');
+                ctxPequena.fillStyle = '#ffffff';
+                ctxPequena.fillRect(0, 0, canvasPequena.width, canvasPequena.height);
                 ctxPequena.drawImage(canvasOriginal, 0, 0, 300, 250);
                 
                 // Convertir a blob webp
@@ -6937,66 +7142,24 @@ document.addEventListener('DOMContentLoaded', function() {
     // ========== FUNCIONALIDAD AMAZON PARA MODAL PRINCIPAL ==========
     let imagenesAmazonSeleccionadas = [];
     
-    // Función para limpiar URL de Amazon (copiada de formulario de ofertas)
-    function limpiarUrlAmazon(url) {
-        try {
-            // Detectar URLs de Amazon (diferentes dominios: .es, .com, .co.uk, etc.)
-            const amazonRegex = /^https?:\/\/(www\.)?amazon\.(es|com|co\.uk|de|fr|it|ca|com\.au|co\.jp|in|com\.mx|com\.br|nl|se|pl|com\.tr|ae|sa|sg|com\.tw|com\.hk)\//i;
-            
-            if (!amazonRegex.test(url)) {
-                return url; // No es Amazon, devolver URL original
-            }
-            
-            // Extraer el dominio de Amazon (es, com, etc.)
-            const dominioMatch = url.match(/amazon\.([a-z.]+)/i);
-            if (!dominioMatch) {
-                return url;
-            }
-            const dominio = dominioMatch[1];
-            
-            // Buscar el código del producto después de /dp/ o /gp/product/
-            const dpMatch = url.match(/\/dp\/([A-Z0-9]+)/i) || url.match(/\/gp\/product\/([A-Z0-9]+)/i);
-            
-            if (dpMatch && dpMatch[1]) {
-                const codigoProducto = dpMatch[1];
-                // Construir URL limpia: https://www.amazon.{dominio}/dp/CODIGO
-                return `https://www.amazon.${dominio}/dp/${codigoProducto}`;
-            }
-            
-            // Si no se encuentra el código, devolver URL original
-            return url;
-        } catch (error) {
-            console.error('Error al limpiar URL de Amazon:', error);
-            return url; // En caso de error, devolver URL original
-        }
-    }
-    
-    // Limpiar URL de Amazon automáticamente al pegar o escribir
+    // Limpiar URL de Amazon automáticamente al pegar o escribir (usa limpiarUrlAmazonViaApi definido en modal sublínea)
     const urlAmazonInputNueva = document.getElementById('url-amazon-nueva');
-    if (urlAmazonInputNueva) {
-        // Event listener para pegar
+    if (urlAmazonInputNueva && typeof limpiarUrlAmazonViaApi === 'function') {
         urlAmazonInputNueva.addEventListener('paste', function(e) {
-            setTimeout(() => {
+            setTimeout(async () => {
                 const urlPegada = urlAmazonInputNueva.value.trim();
                 if (urlPegada) {
-                    const urlLimpia = limpiarUrlAmazon(urlPegada);
-                    if (urlLimpia !== urlPegada) {
-                        urlAmazonInputNueva.value = urlLimpia;
-                    }
+                    const urlLimpia = await limpiarUrlAmazonViaApi(urlPegada);
+                    if (urlLimpia !== urlPegada) urlAmazonInputNueva.value = urlLimpia;
                 }
             }, 10);
         });
-        
-        // Event listener para cuando cambia el input (por si se escribe manualmente)
         urlAmazonInputNueva.addEventListener('input', function(e) {
             const url = e.target.value.trim();
-            if (url && url.includes('amazon')) {
-                const urlLimpia = limpiarUrlAmazon(url);
-                if (urlLimpia !== url && urlLimpia.length < url.length) {
-                    // Solo actualizar si la URL limpia es más corta (tiene sentido limpiarla)
-                    e.target.value = urlLimpia;
-                }
-            }
+            if (!url || !url.includes('amazon')) return;
+            limpiarUrlAmazonViaApi(url).then(urlLimpia => {
+                if (urlLimpia !== url && urlLimpia.length < url.length) e.target.value = urlLimpia;
+            });
         });
     }
     
@@ -7553,6 +7716,8 @@ document.addEventListener('DOMContentLoaded', function() {
             canvasGrande.width = canvasOriginal.width;
             canvasGrande.height = canvasOriginal.height;
             const ctxGrande = canvasGrande.getContext('2d');
+            ctxGrande.fillStyle = '#ffffff';
+            ctxGrande.fillRect(0, 0, canvasGrande.width, canvasGrande.height);
             ctxGrande.drawImage(canvasOriginal, 0, 0);
             
             // Pequeña: 300x250
@@ -7560,6 +7725,8 @@ document.addEventListener('DOMContentLoaded', function() {
             canvasPequena.width = 300;
             canvasPequena.height = 250;
             const ctxPequena = canvasPequena.getContext('2d');
+            ctxPequena.fillStyle = '#ffffff';
+            ctxPequena.fillRect(0, 0, canvasPequena.width, canvasPequena.height);
             ctxPequena.drawImage(canvasOriginal, 0, 0, 300, 250);
             
             // Convertir a blob webp

@@ -23,6 +23,7 @@ return new class extends Migration
             $table->string('url_opiniones')->nullable();
             $table->text('anotaciones_internas')->nullable();
             $table->dateTime('aviso')->nullable();
+            $table->enum('avisos_sin_stock_scrapear_automatico', ['si', 'no'])->default('si'); // Si las ofertas con aviso de sin stock se deben scrapear automáticamente
             $table->string('api')->nullable(); // Campo para especificar qué API usar (scrapingAnt, brightData, etc.)
             $table->enum('mostrar_tienda', ['si', 'no'])->default('si'); // Si la tienda debe mostrarse en el frontend
             $table->enum('como_scrapear', ['automatico', 'manual', 'ambos']);

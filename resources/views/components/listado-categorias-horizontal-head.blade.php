@@ -21,59 +21,24 @@ if (!function_exists('_f1')) {
         return $url . $separator . 'cam=' . urlencode($cam);
     }
 }
+
+// categoriasBarra -> cb1
+$cb1 = \App\Models\Categoria::whereNull('parent_id')
+    ->orderBy('nombre')
+    ->take(14)
+    ->get(['id', 'slug', 'nombre']);
 @endphp
 
-{{-- BARRA DE CATEGORÍAS --}}
-<div class="bg-gray-50/95 backdrop-blur-sm border-b border-gray-200/50">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-1.5 sm:py-2">
-        <div class="flex items-center justify-between">
-            <div class="flex items-center space-x-2 sm:space-x-5 overflow-x-auto pb-1 scrollbar-hide" style="-webkit-overflow-scrolling: touch;">
-                {{-- btnCategoriasBarra -> bcb1 --}}
-                <button type="button" id="bcb1" class="group flex flex-col items-center space-y-1 sm:space-y-1.5 min-w-[60px] sm:min-w-[80px] flex-shrink-0 transition-all duration-200">
-                    <div class="w-10 h-10 sm:w-14 sm:h-14 bg-purple-100 rounded-xl flex items-center justify-center transition-all duration-200 group-hover:bg-purple-200 group-hover:scale-105">
-                        <svg class="w-6 h-6 sm:w-8 sm:h-9 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                        </svg>
-                    </div>
-                    <span class="categoria-texto-movil text-[8px] sm:text-sm font-medium text-gray-700 group-hover:text-purple-600 text-center transition-colors">Categorías</span>
-                </button>
-                {{-- añadirCam() -> _f1() --}}
-                <a href="{{ _f1(route('categoria.show', 'electronica')) }}" class="group flex flex-col items-center space-y-1 sm:space-y-1.5 min-w-[60px] sm:min-w-[80px] flex-shrink-0 transition-all duration-200">
-                    <div class="w-10 h-10 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center transition-all duration-200 group-hover:scale-105" style="background-color: #d4e9b8;">
-                        <img src="{{ asset('images/categorias/electronica.webp') }}" 
-                             alt="Icono categoria Electrónica" 
-                             class="w-6 h-6 sm:w-8 sm:h-9 transition-all duration-200" />
-                    </div>
-                    <span class="categoria-texto-movil text-[8px] sm:text-sm font-medium text-gray-700 text-center transition-colors">Electrónica</span>
-                </a>
-
-
-                {{-- añadirCam() -> _f1() --}}
-                <a href="{{ _f1(route('categorias.todas')) }}"
-                   class="group flex flex-col items-center space-y-1 sm:space-y-1.5 min-w-[60px] sm:min-w-[80px] flex-shrink-0 transition-all duration-200 sm:hidden"
-                >
-                    <div class="w-10 h-10 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center transition-all duration-200 group-hover:scale-105" style="background-color: #fef3e7;">
-                        <svg class="w-6 h-6 sm:w-8 sm:h-9" style="color: #e97b11;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                        </svg>
-                    </div>
-                    <span class="categoria-texto-movil text-[8px] sm:text-sm font-medium text-gray-700 text-center transition-colors group-hover:[color:#e97b11]">Más <span style="color: #e97b11;">></span></span>
-                </a>
-            </div>
-            {{-- añadirCam() -> _f1() --}}
-            <a href="{{ _f1(route('categorias.todas')) }}"
-               style="background-color: #e97b11;"
-               class="hidden sm:flex items-center justify-center text-white rounded-lg transition-colors flex-shrink-0 ml-4
-               text-sm font-medium min-w-[100px] px-4 py-2"
-               onmouseover="this.style.backgroundColor='#d16a0f'"
-               onmouseout="this.style.backgroundColor='#e97b11'"
-            >
-                Ver todas
-                <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                </svg>
-            </a>
+<div class="kk-catbar">
+    <div class="kk-catbar-inner">
+        <button type="button" id="kkCatPrev" class="kk-cat-arrow" aria-label="Categorías anteriores">‹</button>
+        <div id="kkCatScroll" class="kk-cat-scroll">
+            @foreach($cb1 as $c1)
+                <a href="{{ _f1(route('categoria.show', $c1->slug)) }}" class="kk-chip">{{ $c1->nombre }}</a>
+            @endforeach
         </div>
+        <button type="button" id="kkCatNext" class="kk-cat-arrow" aria-label="Siguientes categorías">›</button>
+        <a href="{{ _f1(route('categorias.todas')) }}" class="kk-chip-all">Ver todas</a>
     </div>
 </div>
 
@@ -81,22 +46,81 @@ if (!function_exists('_f1')) {
 {{-- para que esté disponible en todas las vistas --}}
 
 <style>
-    .scrollbar-hide {
-        -ms-overflow-style: none;
+    .kk-catbar {
+        border-bottom: 1px solid #e2e8f0;
+        background: #fff;
+    }
+    .kk-catbar-inner {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: .5rem 1rem;
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+    }
+    .kk-cat-scroll {
+        flex: 1;
+        display: flex;
+        gap: .45rem;
+        overflow-x: auto;
         scrollbar-width: none;
+        -ms-overflow-style: none;
+        padding: .12rem 0;
     }
-    .scrollbar-hide::-webkit-scrollbar {
-        display: none;
+    .kk-cat-scroll::-webkit-scrollbar { display: none; }
+    .kk-chip {
+        flex: 0 0 auto;
+        border-radius: 999px;
+        border: 1px solid transparent;
+        background: #f1f5f9;
+        color: #475569;
+        font-size: .78rem;
+        font-weight: 600;
+        padding: .42rem .85rem;
+        white-space: nowrap;
+        transition: .2s;
     }
-    
-    {{-- Reducir tamaño de texto de categorías solo en móvil --}}
-    @media (max-width: 640px) {
-        .categoria-texto-movil {
-            font-size: 0.7rem !important;
-            line-height: 1.2;
-        }
+    .kk-chip:hover,
+    .kk-chip-active {
+        color: #d16a0f;
+        background: #fef3e7;
+        border-color: rgba(233, 123, 17, .24);
+    }
+    .kk-cat-arrow {
+        flex: 0 0 auto;
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        border: 1px solid #e2e8f0;
+        background: #fff;
+        color: #e97b11;
+        font-size: 1.1rem;
+        line-height: 1;
+    }
+    .kk-cat-arrow:hover { background: #fef3e7; }
+    .kk-chip-all {
+        flex: 0 0 auto;
+        border-radius: .62rem;
+        background: #e97b11;
+        color: #fff;
+        font-size: .78rem;
+        font-weight: 700;
+        padding: .46rem .85rem;
+        white-space: nowrap;
+    }
+    .kk-chip-all:hover { background: #d16a0f; }
+    @media (max-width: 768px) {
+        .kk-chip-all { display: none; }
     }
 </style>
+
+@push('scripts')
+<script>
+    const _kc1 = document.getElementById('kkCatScroll');
+    document.getElementById('kkCatPrev')?.addEventListener('click', () => _kc1?.scrollBy({ left: -200, behavior: 'smooth' }));
+    document.getElementById('kkCatNext')?.addEventListener('click', () => _kc1?.scrollBy({ left: 200, behavior: 'smooth' }));
+</script>
+@endpush
 
 
 

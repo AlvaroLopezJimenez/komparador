@@ -331,7 +331,7 @@
                             <div class="border-t border-gray-200 p-4">
                                 <h2 class="text-lg font-bold text-gray-900 mb-3">Descripción de la oferta</h2>
                                 <div class="prose prose-sm max-w-none text-gray-700 text-sm">
-                                    {!! $chollo->descripcion !!}
+                                    {{ $chollo->descripcion }}
                                 </div>
                             </div>
                         @endif
@@ -587,7 +587,7 @@
                             <div class="border-t border-gray-200 p-6 md:p-8">
                                 <h2 class="text-xl font-bold text-gray-900 mb-4">Descripción de la oferta</h2>
                                 <div class="prose prose-sm max-w-none text-gray-700">
-                                    {!! $chollo->descripcion !!}
+                                    {{ $chollo->descripcion }}
                                 </div>
                             </div>
                         @endif

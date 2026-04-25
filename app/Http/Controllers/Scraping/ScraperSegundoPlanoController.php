@@ -15,6 +15,49 @@ use Carbon\Carbon;
 class ScraperSegundoPlanoController extends ScraperBaseController
 {
     /**
+     * Si el proceso termina sin llegar al update final (timeout FPM/nginx, SIGTERM, OOM, etc.),
+     * deja la fila en en_progreso con fin=null. Se cierra aquí para no bloquear crons ni el histórico.
+     */
+    private static function cerrarEjecucionScraperHuérfana(int $ejecucionId): void
+    {
+        try {
+            $e = EjecucionGlobal::query()->find($ejecucionId);
+            if (!$e || $e->fin !== null) {
+                return;
+            }
+            $log = is_array($e->log) ? $e->log : [];
+            if (($log['estado'] ?? '') === 'completada') {
+                return;
+            }
+            if (!in_array($log['estado'] ?? '', ['iniciada', 'en_progreso'], true)) {
+                return;
+            }
+            $last = error_get_last();
+            if ($last !== null) {
+                $fatalMask = E_ERROR | E_PARSE | E_CORE_ERROR | E_COMPILE_ERROR | E_USER_ERROR;
+                if (($last['type'] ?? 0) & $fatalMask) {
+                    $log['error_shutdown'] = ($last['message'] ?? '') . ' @ ' . ($last['file'] ?? '') . ':' . ($last['line'] ?? '');
+                } else {
+                    $log['error_shutdown'] = $last['message'] ?? '';
+                }
+            }
+            $log['estado'] = 'fallida';
+            $procesadas = (int) ($log['procesadas'] ?? 0);
+            $actualizadas = (int) ($log['actualizadas'] ?? 0);
+            $errores = (int) ($log['errores'] ?? 0);
+            $e->update([
+                'fin'            => now(),
+                'total'          => $procesadas,
+                'total_guardado' => $actualizadas,
+                'total_errores'  => $errores,
+                'log'            => $log,
+            ]);
+        } catch (\Throwable $ignore) {
+            //
+        }
+    }
+
+    /**
      * Ejecutar scraping de ofertas en segundo plano (para cron jobs)
      */
     public function ejecutarScraperOfertasSegundoPlano(Request $request)
@@ -80,10 +123,35 @@ class ScraperSegundoPlanoController extends ScraperBaseController
                 ->orderBy('inicio', 'desc')
                 ->first();
 
-            // Solo bloquear si hay una ejecución en curso (iniciada o en_progreso) y no ha pasado más de 1 hora
-            if ($ultimaEjecucion && 
-                isset($ultimaEjecucion->log['estado']) && 
-                in_array($ultimaEjecucion->log['estado'], ['iniciada', 'en_progreso']) &&
+            // Ejecuciones zombie (sin fin tras timeout del servidor, etc.): cerrar si llevan ≥1h abiertas
+            if ($ultimaEjecucion
+                && $ultimaEjecucion->fin === null
+                && isset($ultimaEjecucion->log['estado'])
+                && in_array($ultimaEjecucion->log['estado'], ['iniciada', 'en_progreso'], true)
+                && $ultimaEjecucion->inicio->diffInHours(now()) >= 1) {
+                $logZombie = is_array($ultimaEjecucion->log) ? $ultimaEjecucion->log : [];
+                $logZombie['estado'] = 'fallida';
+                $logZombie['error_cierre'] = 'Sin fin tras 1h (timeout o proceso terminado); cerrada al lanzar un nuevo cron.';
+                $procesadasZ = (int) ($logZombie['procesadas'] ?? 0);
+                $actualizadasZ = (int) ($logZombie['actualizadas'] ?? 0);
+                $erroresZ = (int) ($logZombie['errores'] ?? 0);
+                $ultimaEjecucion->update([
+                    'fin'            => now(),
+                    'total'          => $procesadasZ,
+                    'total_guardado' => $actualizadasZ,
+                    'total_errores'  => $erroresZ,
+                    'log'            => $logZombie,
+                ]);
+                $ultimaEjecucion = EjecucionGlobal::where('nombre', 'ejecuciones_scrapear_ofertas')
+                    ->orderBy('inicio', 'desc')
+                    ->first();
+            }
+
+            // Solo bloquear si la última ejecución sigue abierta (sin fin) y hace menos de 1 hora
+            if ($ultimaEjecucion &&
+                $ultimaEjecucion->fin === null &&
+                isset($ultimaEjecucion->log['estado']) &&
+                in_array($ultimaEjecucion->log['estado'], ['iniciada', 'en_progreso'], true) &&
                 $ultimaEjecucion->inicio->diffInHours(now()) < 1) {
                 
                 return response()->json([
@@ -141,6 +209,11 @@ class ScraperSegundoPlanoController extends ScraperBaseController
                 ],
             ]);
 
+            $idEjecucion = $ejecucion->id;
+            register_shutdown_function(function () use ($idEjecucion) {
+                self::cerrarEjecucionScraperHuérfana($idEjecucion);
+            });
+
             $actualizadas = 0;
             $errores      = 0;
             $log          = [];
@@ -183,7 +256,7 @@ class ScraperSegundoPlanoController extends ScraperBaseController
 
                         $procesadas++;
 
-                    } catch (\Exception $e) {
+                    } catch (\Throwable $e) {
                         $errores++;
                         $log[] = [
                             'oferta_id'                 => $oferta->id ?? 'desconocido',
@@ -310,40 +383,62 @@ class ScraperSegundoPlanoController extends ScraperBaseController
                 'errores'        => $errores,
             ]);
 
-        } catch (\Exception $e) {
-            // Error fatal - marcar ejecución como fallida
+        } catch (\Throwable $e) {
+            // Error fatal: conservar progreso ya guardado en BD (y en memoria si hay más filas en $log)
             if ($ejecucion) {
-                $logEstructurado = [
-                    'token' => $token,
-                    'estado' => 'fallida',
-                    'tienda_id' => $tiendaId,
-                    'cantidad' => $cantidad,
-                    'total_ofertas' => 0,
-                    'ofertas' => [],
-                    'actualizadas' => 0,
-                    'errores' => 1,
-                    'procesadas' => 0,
-                    'resultados' => [
-                        [
-                            'oferta_id' => 'error_fatal',
-                            'tienda_nombre' => 'Error del sistema',
-                            'url' => 'N/A',
-                            'variante' => null,
-                            'precio_anterior' => null,
-                            'precio_nuevo' => null,
-                            'success' => false,
-                            'error' => 'Error fatal: ' . $e->getMessage(),
-                            'cambios_detectados' => false,
-                            'url_notificacion_llamada' => false,
-                        ]
-                    ]
+                $ejecucion->refresh();
+                $logPrev = is_array($ejecucion->log) ? $ejecucion->log : [];
+                if ($ejecucion->fin !== null && ($logPrev['estado'] ?? '') === 'completada') {
+                    \Log::error('Error en ScraperSegundoPlanoController tras completar ofertas (p. ej. rutas adicionales)', [
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
+                        'ejecucion_id' => $ejecucion->id,
+                    ]);
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Scraping completado pero falló un paso posterior: ' . $e->getMessage(),
+                        'total_ofertas' => $logPrev['total_ofertas'] ?? 0,
+                        'actualizadas' => $logPrev['actualizadas'] ?? 0,
+                        'errores' => $logPrev['errores'] ?? 0,
+                    ], 500);
+                }
+                $logBase = $logPrev;
+                $resDb = $logBase['resultados'] ?? [];
+                $resLocal = isset($log) && is_array($log) ? $log : [];
+                $resultados = count($resLocal) >= count($resDb) ? $resLocal : $resDb;
+                $resultados[] = [
+                    'oferta_id' => 'error_fatal',
+                    'tienda_nombre' => 'Error del sistema',
+                    'url' => 'N/A',
+                    'variante' => null,
+                    'precio_anterior' => null,
+                    'precio_nuevo' => null,
+                    'success' => false,
+                    'error' => 'Error fatal: ' . $e->getMessage(),
+                    'cambios_detectados' => false,
+                    'url_notificacion_llamada' => false,
                 ];
+                $procesadasCatch = isset($procesadas) ? (int) $procesadas : (int) ($logBase['procesadas'] ?? 0);
+                $actualizadasCatch = isset($actualizadas) ? (int) $actualizadas : (int) ($logBase['actualizadas'] ?? 0);
+                $erroresCatch = isset($errores) ? (int) $errores : (int) ($logBase['errores'] ?? 0);
+                $logEstructurado = array_merge($logBase, [
+                    'token' => $token ?? ($logBase['token'] ?? null),
+                    'estado' => 'fallida',
+                    'tienda_id' => $tiendaId ?? ($logBase['tienda_id'] ?? null),
+                    'cantidad' => $cantidad ?? ($logBase['cantidad'] ?? null),
+                    'total_ofertas' => isset($totalOfertas) ? $totalOfertas : (int) ($logBase['total_ofertas'] ?? 0),
+                    'ofertas' => isset($ofertas) ? $ofertas->pluck('id')->toArray() : ($logBase['ofertas'] ?? []),
+                    'actualizadas' => $actualizadasCatch,
+                    'errores' => $erroresCatch + 1,
+                    'procesadas' => $procesadasCatch,
+                    'resultados' => $resultados,
+                ]);
 
                 $ejecucion->update([
                     'fin'            => now(),
-                    'total'          => 0,
-                    'total_guardado' => 0,
-                    'total_errores'  => 1,
+                    'total'          => $procesadasCatch,
+                    'total_guardado' => $actualizadasCatch,
+                    'total_errores'  => $erroresCatch + 1,
                     'log'            => $logEstructurado,
                 ]);
             }

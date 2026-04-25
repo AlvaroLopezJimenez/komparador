@@ -37,6 +37,22 @@ class CarrefourController extends PlantillaTiendaController
         }
 
         $html = html_entity_decode((string)$resultado['html'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        // Sin stock: página de categoría (category-name__title) en lugar de PDP/PLP de producto
+        if (str_contains($html, 'category-name__title') && $oferta && $oferta instanceof \App\Models\OfertaProducto) {
+            $oferta->update(['mostrar' => 'no']);
+            \DB::table('avisos')->insertGetId([
+                'texto_aviso'     => 'sin stock 1a vez - GENERADO AUTOMATICAMENTE',
+                'fecha_aviso'     => now()->addDays(4),
+                'user_id'         => 1,
+                'avisoable_type'  => \App\Models\OfertaProducto::class,
+                'avisoable_id'    => $oferta->id,
+                'oculto'          => 0,
+                'created_at'      => now(),
+                'updated_at'      => now(),
+            ]);
+        }
+
         $esPdp = $this->esPdp($html, $url);
 
         if ($esPdp) {
@@ -336,6 +352,12 @@ class CarrefourController extends PlantillaTiendaController
         return (bool) preg_match('/unidad\s*-70/i', $html);
     }
 
+    /** Detecta oferta "50% que vuelve" (cheque / 2ª al 50% - SoloCarrefour) en el HTML */
+    private function detectarOferta50QueVuelve(string $html): bool
+    {
+        return (bool) preg_match('/50\s*%\s*que\s+vuelve/i', $html);
+    }
+
     /** Detecta y guarda los descuentos en la oferta sin modificar precios */
     private function detectarYGuardarDescuentos(string $html, $oferta): void
     {
@@ -346,16 +368,19 @@ class CarrefourController extends PlantillaTiendaController
         $tieneOferta3x2 = $this->detectarOferta3x2($html);
         $tieneOferta2x1 = $this->detectarOferta2x1($html);
         $tieneOferta2a70 = $this->detectarOferta2aUnidad70($html);
+        $tieneOferta50QueVuelve = $this->detectarOferta50QueVuelve($html);
         $descuentoAnterior = $oferta->descuentos;
         $descuentoNuevo = null;
 
-        // Determinar qué descuento aplicar (prioridad 3x2 > 2x1 > 2a al 70)
+        // Determinar qué descuento aplicar (prioridad 3x2 > 2x1 > 2a al 70 > 50% que vuelve)
         if ($tieneOferta3x2) {
             $descuentoNuevo = '3x2';
         } elseif ($tieneOferta2x1) {
             $descuentoNuevo = '2x1 - SoloCarrefour';
         } elseif ($tieneOferta2a70) {
             $descuentoNuevo = '2a al 70';
+        } elseif ($tieneOferta50QueVuelve) {
+            $descuentoNuevo = '2a al 50 - cheque - SoloCarrefour';
         }
 
         // Si hay descuento nuevo
@@ -375,6 +400,7 @@ class CarrefourController extends PlantillaTiendaController
                     '3x2' => 'DETECTADO DESCUENTO 3X2 - GENERADO AUTOMÁTICAMENTE',
                     '2x1 - SoloCarrefour' => 'DETECTADO DESCUENTO 2X1 ACUMULA - GENERADO AUTOMÁTICAMENTE',
                     '2a al 70' => 'DETECTADO DESCUENTO 2ª UNIDAD AL 70% - GENERADO AUTOMÁTICAMENTE',
+                    '2a al 50 - cheque - SoloCarrefour' => 'DETECTADO DESCUENTO 50% QUE VUELVE (2ª AL 50% - CHEQUE) - GENERADO AUTOMÁTICAMENTE',
                     default => 'DETECTADO DESCUENTO - GENERADO AUTOMÁTICAMENTE'
                 };
 
@@ -397,7 +423,7 @@ class CarrefourController extends PlantillaTiendaController
             }
         } else {
             // Si no hay descuentos pero la oferta tenía descuentos de Carrefour, limpiar el campo
-            if ($descuentoAnterior === '3x2' || $descuentoAnterior === '2x1 - SoloCarrefour' || $descuentoAnterior === '2a al 70') {
+            if ($descuentoAnterior === '3x2' || $descuentoAnterior === '2x1 - SoloCarrefour' || $descuentoAnterior === '2a al 70' || $descuentoAnterior === '2a al 50 - cheque - SoloCarrefour') {
                 \Log::info('CarrefourController - Descuentos ya no disponibles, limpiando campo descuentos:', [
                     'oferta_id' => $oferta->id,
                     'descuentos_anterior' => $descuentoAnterior

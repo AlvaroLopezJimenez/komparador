@@ -3,16 +3,19 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Http\Controllers\OfertaProductoController;
 use App\Models\Aviso;
 use App\Models\Tienda;
 use App\Models\Categoria;
-use App\Models\ComisionCategoriaTienda;
+use App\Models\Neoobjetivo;
 use App\Models\Producto;
 use App\Models\Chollo;
 use App\Models\OfertaProducto;
 use App\Models\ProductoOfertaMasBarataPorProducto;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class AvisoController extends Controller
 {
@@ -377,38 +380,46 @@ class AvisoController extends Controller
         $categorias = Categoria::all();
         
         foreach ($tiendas as $tienda) {
-            foreach ($categorias as $categoria) {
-                // Verificar si existe comisión para esta tienda y categoría
-                $comision = ComisionCategoriaTienda::where('tienda_id', $tienda->id)
-                    ->where('categoria_id', $categoria->id)
+            // Categorías en las que esta tienda tiene ofertas (vía producto.categoria_id)
+            $categoriasConOfertas = OfertaProducto::where('tienda_id', $tienda->id)
+                ->join('productos', 'ofertas_producto.producto_id', '=', 'productos.id')
+                ->whereNotNull('productos.categoria_id')
+                ->distinct()
+                ->pluck('productos.categoria_id');
+            // Categorías que ya tienen URL de listado en Neoobjetivo
+            $categoriasConNeo = Neoobjetivo::where('tienda_id', $tienda->id)
+                ->whereNull('oferta_id')
+                ->whereNull('producto_id')
+                ->pluck('categoria_id');
+            $categoriasSinUrl = $categoriasConOfertas->diff($categoriasConNeo);
+
+            foreach ($categoriasSinUrl as $categoriaId) {
+                $categoria = $categorias->firstWhere('id', $categoriaId);
+                if (!$categoria) {
+                    continue;
+                }
+                $avisoExistente = Aviso::where('avisoable_type', 'App\Models\Tienda')
+                    ->where('avisoable_id', $tienda->id)
+                    ->where('texto_aviso', 'like', '%URL de listado%' . $categoria->nombre . '%')
+                    ->where('user_id', $userId)
                     ->first();
 
-                if (!$comision || $comision->comision == 0) {
-                    // Verificar si ya existe un aviso para esta tienda y categoría (incluyendo ocultos)
-                    $avisoExistente = Aviso::where('avisoable_type', 'App\Models\Tienda')
-                        ->where('avisoable_id', $tienda->id)
-                        ->where('texto_aviso', 'like', '%comisión%' . $categoria->nombre . '%')
-                        ->where('user_id', $userId)
-                        ->first();
-
-                    if (!$avisoExistente) {
-                        // Crear aviso
-                        Aviso::create([
-                            'texto_aviso' => "La tienda {$tienda->nombre} tiene la comisión a 0 en la categoría {$categoria->nombre}",
-                            'fecha_aviso' => now(),
-                            'user_id' => $userId,
-                            'avisoable_type' => 'App\Models\Tienda',
-                            'avisoable_id' => $tienda->id,
-                            'oculto' => false
-                        ]);
-                    }
+                if (!$avisoExistente) {
+                    Aviso::create([
+                        'texto_aviso' => "La tienda {$tienda->nombre} tiene ofertas en la categoría {$categoria->nombre} pero no tiene URL de listado configurada.",
+                        'fecha_aviso' => now(),
+                        'user_id' => $userId,
+                        'avisoable_type' => 'App\Models\Tienda',
+                        'avisoable_id' => $tienda->id,
+                        'oculto' => false
+                    ]);
                 }
             }
         }
 
         return response()->json([
             'success' => true,
-            'message' => 'Comprobación de comisiones ejecutada correctamente'
+            'message' => 'Comprobación de URLs de listado por categoría ejecutada correctamente'
         ]);
     }
 
@@ -554,31 +565,73 @@ class AvisoController extends Controller
     }
 
     /**
-     * Marcar envío como comprobado (actualizar fecha_actualizacion_envio de la oferta)
+     * Marcar envío como comprobado (actualizar fecha_actualizacion_envio de la oferta).
+     * Opcionalmente persiste precio_total, precio_unidad y envio desde los inputs del listado.
      */
     public function marcarEnvioComprobado(Request $request)
     {
         $request->validate([
             'oferta_id' => 'required|exists:ofertas_producto,id',
-            'aviso_id' => 'required|exists:avisos,id'
+            'aviso_id' => 'required|exists:avisos,id',
+            'precio_total' => 'sometimes|nullable|numeric|min:0',
+            'precio_unidad' => 'sometimes|nullable|numeric|min:0',
+            'envio' => 'sometimes|nullable|numeric|min:0',
         ]);
 
         try {
-            $oferta = OfertaProducto::findOrFail($request->oferta_id);
-            
-            // Actualizar fecha_actualizacion_envio a la fecha actual
+            $oferta = OfertaProducto::findOrFail((int) $request->oferta_id);
+            $aviso = Aviso::findOrFail((int) $request->aviso_id);
+
+            if ($aviso->avisoable_type !== OfertaProducto::class
+                || (int) $aviso->avisoable_id !== $oferta->id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'El aviso no corresponde a esta oferta.',
+                ], 422);
+            }
+
+            $all = $request->all();
+            $tienePrecioOEnvio = array_key_exists('precio_total', $all)
+                || array_key_exists('precio_unidad', $all)
+                || array_key_exists('envio', $all);
+
+            if ($tienePrecioOEnvio) {
+                $data = ['mostrar' => $oferta->mostrar];
+                if (array_key_exists('precio_total', $all)) {
+                    $data['precio_total'] = $request->input('precio_total');
+                }
+                if (array_key_exists('precio_unidad', $all)) {
+                    $data['precio_unidad'] = $request->input('precio_unidad');
+                }
+                if (array_key_exists('envio', $all)) {
+                    $data['envio'] = $request->input('envio');
+                }
+
+                $innerRequest = Request::create('', 'PUT', $data);
+                $innerRequest->setUserResolver($request->getUserResolver());
+
+                $jsonResponse = app(OfertaProductoController::class)->actualizarMostrar($innerRequest, $oferta);
+                $decoded = $jsonResponse->getData(true);
+                if (empty($decoded['success'])) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => $decoded['message'] ?? $decoded['error'] ?? 'Error al actualizar la oferta.',
+                    ], 422);
+                }
+                $oferta->refresh();
+            }
+
             $oferta->fecha_actualizacion_envio = now();
             $oferta->save();
 
-            // Eliminar el aviso
-            $aviso = Aviso::findOrFail($request->aviso_id);
             $aviso->delete();
 
+            return response()->json(['success' => true]);
+        } catch (ValidationException $e) {
             return response()->json([
-                'success' => true,
-                'message' => 'Envío marcado como comprobado correctamente'
-            ]);
-
+                'success' => false,
+                'message' => collect($e->errors())->flatten()->first() ?? 'Datos no válidos.',
+            ], 422);
         } catch (\Exception $e) {
             \Log::error('Error al marcar envío como comprobado: ' . $e->getMessage(), [
                 'oferta_id' => $request->oferta_id,
@@ -589,6 +642,103 @@ class AvisoController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Error al marcar como comprobado: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Gestiona avisos ligados a una oferta o producto:
+     * - Oculta la oferta (mostrar=no)
+     * - Cambia texto del aviso según motivo (1a vez)
+     * - Mueve la fecha del aviso 4 días hacia adelante
+     */
+    public function gestionarOfertaResucitada(Request $request, Aviso $aviso)
+    {
+        // Verificar permisos del aviso
+        if ($aviso->user_id !== auth()->id() && auth()->id() !== 1) {
+            abort(403, 'No tienes permisos para gestionar este aviso');
+        }
+
+        $validated = $request->validate([
+            'motivo' => 'required|in:sin_stock,segunda_mano,reacondicionado,404'
+        ]);
+
+        if (!$aviso->avisoable_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'El aviso no corresponde a una oferta o producto válido'
+            ], 422);
+        }
+
+        $textosPorMotivo = [
+            'sin_stock' => 'Sin stock 1a vez',
+            'segunda_mano' => 'Segunda mano 1a vez',
+            'reacondicionado' => 'Reacondicionado 1a vez',
+            '404' => '404 1a vez',
+        ];
+
+        $ofertaId = null;
+
+        if ($aviso->avisoable_type === OfertaProducto::class) {
+            $ofertaId = (int) $aviso->avisoable_id;
+        } elseif ($aviso->avisoable_type === Producto::class) {
+            $ofertaMasBarataTabla = ProductoOfertaMasBarataPorProducto::where('producto_id', $aviso->avisoable_id)->first();
+            $ofertaId = $ofertaMasBarataTabla?->oferta_id;
+        } else {
+            return response()->json([
+                'success' => false,
+                'message' => 'Solo se puede gestionar en avisos de producto u oferta'
+            ], 422);
+        }
+
+        if (!$ofertaId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se encontró una oferta asociada para gestionar este aviso'
+            ], 422);
+        }
+
+        try {
+            DB::transaction(function () use ($aviso, $validated, $textosPorMotivo, $ofertaId) {
+                $oferta = OfertaProducto::findOrFail($ofertaId);
+
+                // Ocultar oferta para que deje de mostrarse
+                $oferta->mostrar = 'no';
+                $oferta->save();
+
+                // Reprogramar aviso con nuevo texto y +4 días
+                $aviso->texto_aviso = $textosPorMotivo[$validated['motivo']];
+                $aviso->fecha_aviso = now()->addDays(4);
+
+                // Si el aviso era de producto, pasarlo a tipo oferta (misma oferta afectada)
+                // para que coincida con el flujo de avisos ligados a OfertaProducto.
+                if ($aviso->avisoable_type === Producto::class) {
+                    $aviso->avisoable_type = OfertaProducto::class;
+                    $aviso->avisoable_id = $ofertaId;
+                }
+
+                $aviso->save();
+            });
+
+            $aviso->refresh();
+
+            if (in_array($aviso->avisoable_type, [Producto::class, OfertaProducto::class], true)) {
+                $this->eliminarAvisosDuplicadosVencidos($aviso);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Oferta gestionada correctamente'
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Error al gestionar aviso de oferta: ' . $e->getMessage(), [
+                'aviso_id' => $aviso->id,
+                'motivo' => $validated['motivo'] ?? null,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al gestionar el aviso'
             ], 500);
         }
     }

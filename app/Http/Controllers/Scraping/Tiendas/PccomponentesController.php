@@ -113,6 +113,41 @@ class PccomponentesController extends PlantillaTiendaController
         ]);
     }
 
+    // -------------------------------------------------------------------------
+    // Cron Neo Objetivos – listado de categoría por sitemap
+    // -------------------------------------------------------------------------
+
+    /**
+     * Tipo de listado de categoría: sitemap (URLs desde sitemap XML).
+     *
+     * @return string|null
+     */
+    public function tipoListadoCategoria(): ?string
+    {
+        return 'sitemap';
+    }
+
+    /**
+     * Extrae URLs de productos desde el contenido del sitemap (etiquetas <loc>).
+     * El contenido puede ser XML de sitemap estándar con <url><loc>...</loc></url>.
+     *
+     * @param string $contenidoSitemap Contenido crudo del sitemap (XML/HTML)
+     * @return string[] URLs de productos
+     */
+    public function urlsProductosDesdeSitemap(string $contenidoSitemap): array
+    {
+        $urls = [];
+        if (preg_match_all('/<loc>\s*([^<]+)\s*<\/loc>/i', $contenidoSitemap, $matches)) {
+            foreach ($matches[1] as $url) {
+                $url = trim($url);
+                if ($url !== '') {
+                    $urls[] = $url;
+                }
+            }
+        }
+        return $urls;
+    }
+
     /**
      * Verifica si el HTML contiene el mensaje de error 404 de PC Componentes
      */

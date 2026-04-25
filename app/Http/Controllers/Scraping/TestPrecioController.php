@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Scraping;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\File;
+use App\Models\Tienda;
 
 class TestPrecioController extends Controller
 {
@@ -75,28 +75,12 @@ class TestPrecioController extends Controller
      */
     private function obtenerTiendasDisponibles()
     {
-        $tiendasPath = app_path('Http/Controllers/Scraping/Tiendas');
-        $tiendas = [];
-        
-        if (File::exists($tiendasPath)) {
-            $archivos = File::files($tiendasPath);
-            
-            foreach ($archivos as $archivo) {
-                $nombreArchivo = $archivo->getFilename();
-                
-                // Solo incluir archivos PHP que no sean la plantilla o instrucciones
-                if (pathinfo($nombreArchivo, PATHINFO_EXTENSION) === 'php' && 
-                    $nombreArchivo !== 'PlantillaTiendaController.php') {
-                    
-                    $nombreTienda = str_replace('Controller.php', '', $nombreArchivo);
-                    $tiendas[] = $nombreTienda;
-                }
-            }
-        }
-        
-        // Ordenar alfabéticamente
-        sort($tiendas);
-        
-        return $tiendas;
+        // Usamos las tiendas existentes en BD para que el parámetro "tienda"
+        // coincida con Tienda::nombre (tal como hace ScrapingController).
+        return Tienda::query()
+            ->select('nombre')
+            ->orderBy('nombre', 'asc')
+            ->pluck('nombre')
+            ->toArray();
     }
 }

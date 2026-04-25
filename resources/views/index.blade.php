@@ -139,6 +139,19 @@ if (!function_exists('_f1')) {
         return $url . $separator . 'cam=' . urlencode($cam);
     }
 }
+
+if (!function_exists('_u1')) {
+    function _u1($unidadDeMedida) {
+        return match ($unidadDeMedida) {
+            'unidad', 'unidadMilesima' => '/Und.',
+            'kilos' => '/Kg.',
+            'litros' => '/L.',
+            '800gramos' => '/800gr.',
+            '100ml' => '/100ml.',
+            default => '',
+        };
+    }
+}
 @endphp
     
     {{-- HEADER DESDE LA RUTA COMPONENTS/HEADER --}}
@@ -147,378 +160,635 @@ if (!function_exists('_f1')) {
     {{-- BARRA DE CATEGORÍAS Y PANEL LATERAL --}}
     <x-listado-categorias-horizontal-head />
 
-    {{-- CONTENIDO PRINCIPAL --}}
-    <main class="max-w-7xl mx-auto px-6 py-2 rounded-xl bg-gray-100">
-
-        {{-- PRODUCTOS TOP --}}
-        {{-- $productosTop -> $d1, $producto -> $p --}}
-        @if(isset($d1) && $d1->count() > 0)
-        <section class="mb-4">
-            <h1 class="text-2xl md:text-3xl font-bold mb-4">Los más vendidos</h1>
-
-            <div class="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                @foreach($d1 as $p)
-                {{-- añadirCam() -> _f1() --}}
-                <a href="{{ _f1($p->categoria->construirUrlCategorias($p->slug)) }}"
-                   class="group flex flex-col items-center bg-white rounded-xl shadow-md transition-all duration-300 transform hover:scale-105 hover:shadow-2xl cursor-pointer p-4">
-                    <div class="w-full flex justify-center mb-3">
-                        @if(!empty($p->imagen_pequena[0] ?? ''))
-                            <img loading="lazy" src="{{ asset('images/' . ($p->imagen_pequena[0] ?? '')) }}"
-                                 alt="{{ $p->nombre }}"
-                                 class="w-32 h-32 object-contain rounded-lg shadow-sm transition-all duration-300 group-hover:shadow-lg bg-gray-100">
-                        @else
-                            <div class="w-32 h-32 flex items-center justify-center rounded-lg bg-gradient-to-br from-blue-100 to-blue-200">
-                                <svg class="w-12 h-12 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                </svg>
-                            </div>
-                        @endif
+    <main class="kk-main">
+        <section class="kk-hero">
+            <div>
+                <h1 class="kk-hero-title">El mismo producto,<span>al mejor precio.</span></h1>
+                <p class="kk-hero-copy">Comparamos entre todas las tiendas online para ayudarte a ahorrar de forma inmediata, con precios actualizados, además de detectar cupones y ofertas puntuales.</p>
+                <div class="kk-hero-cta">
+                    <a href="{{ _f1(route('buscar', ['q' => 'precios hot'])) }}" class="kk-btn kk-btn-primary">Ver mayores ofertas</a>
+                    <a href="{{ _f1(route('categorias.todas')) }}" class="kk-btn kk-btn-ghost">Explorar categorías</a>
+                </div>
+                <div class="kk-hero-stats">
+                    <div><strong>{{ $hs1['ofertas_indexadas'] ?? '+0' }}</strong><span>ofertas indexadas</span></div>
+                    <div><strong>{{ $hs1['productos'] ?? '0' }}</strong><span>Productos</span></div>
+                    <div><strong>{{ $hs1['tiendas'] ?? '0' }}</strong><span>Tiendas</span></div>
+                </div>
+            </div>
+            <div class="kk-hero-visual">
+                <div class="kk-float-card">
+                    <small>Comparación en tiempo real</small>
+                    <p class="kk-float-title">Detectamos el mejor precio entre todas las tiendas</p>
+                    <div class="kk-mini-price">
+                        <span class="kk-now">Desde 14,90€</span>
+                        <span class="kk-was">22,40€</span>
                     </div>
-                    <p class="font-semibold text-gray-700 text-center text-sm mb-1 line-clamp-2">{{ $p->nombre }}</p>
-<p class="text-center mb-1 flex items-center justify-center gap-1">
-    @if($p->precio > 0)
-        <span class="text-xl font-bold" style="color: #e97b11;">{{ $p->unidadDeMedida === 'unidadMilesima' ? number_format($p->precio, 3) : number_format($p->precio, 2) }}€</span>
-        @if($p->unidadDeMedida === 'unidad')
-            <span class="text-sm md:text-base text-gray-500">/Und.</span>
-        @elseif($p->unidadDeMedida === 'kilos')
-            <span class="text-sm md:text-base text-gray-500">/Kg.</span>
-        @elseif($p->unidadDeMedida === 'litros')
-            <span class="text-sm md:text-base text-gray-500">/L.</span>
-        @elseif($p->unidadDeMedida === 'unidadMilesima')
-            <span class="text-sm md:text-base text-gray-500">/Und.</span>
-        @elseif($p->unidadDeMedida === 'unidadUnica')
-            {{-- No mostrar sufijo para UnidadUnica --}}
-        @elseif($p->unidadDeMedida === '800gramos')
-            <span class="text-sm md:text-base text-gray-500">/800gr.</span>
-        @elseif($p->unidadDeMedida === '100ml')
-            <span class="text-sm md:text-base text-gray-500">/100ml.</span>
-        @endif
-    @else
-        <span class="text-sm font-semibold" style="color: #e97b11;">Sin Ofertas Disponibles</span>
-    @endif
-</p>
-</a>
-                @endforeach
+                    <div class="kk-badges">
+                        <span class="kk-badge">Comparador activo</span>
+                        <span class="kk-badge kk-badge-hot">−34%</span>
+                    </div>
+                </div>
+                <div class="kk-float-card">
+                    <small>Alertas de precio</small>
+                    <p class="kk-float-title">Te avisamos cuando una oferta mejore tu umbral</p>
+                    <div class="kk-badges">
+                        <span class="kk-badge">Seguimiento diario</span>
+                    </div>
+                </div>
             </div>
         </section>
+
+        @if(isset($d3) && $d3 && count($d3->datos) > 0)
+        <div id="mayores-ofertas" class="kk-deals-bg">
+            <section class="kk-section">
+                <div class="kk-head">
+                    <div>
+                        <h2>
+                            <span class="kk-deals-title-desktop">Mayores ofertas y chollos del momento</span>
+                            <span class="kk-deals-title-mobile">Mayores ofertas</span>
+                        </h2>
+                    </div>
+                    <a href="{{ _f1(route('buscar', ['q' => 'precios hot'])) }}" class="kk-link">Ver todas las ofertas →</a>
+                </div>
+                <div class="kk-deals-row-wrap">
+                    <button type="button" id="kkDealsPrev" class="kk-deals-arrow" aria-label="Ofertas anteriores">‹</button>
+                    <div id="kkDealsScroll" class="kk-deals-row">
+                        @foreach($d3->datos as $ph)
+                        @php
+                            $u1 = trim((string) ($ph['unidades_formateadas'] ?? ''));
+                            $mostrarUnidades = !in_array(mb_strtolower($u1), ['1 unidades', '1 unidad'], true);
+                        @endphp
+                        <a href="{{ _f1($ph['url_producto']) }}" class="kk-deal-card">
+                            <span class="kk-discount">−{{ (int) floatval(str_replace(',', '.', $ph['porcentaje_diferencia'])) }}%</span>
+                            <div class="kk-deal-thumb">
+                                <img loading="lazy" src="{{ asset('images/' . $ph['img_producto']) }}" alt="{{ $ph['producto_nombre'] }}">
+                            </div>
+                            <h3>{{ $ph['producto_nombre'] }}</h3>
+                            <div class="kk-deal-meta">
+                                <span class="kk-deal-store-line">
+                                    {{ $ph['tienda_nombre'] ?? 'Tienda' }}@if($mostrarUnidades && $u1 !== '')<span class="kk-deal-units"> · {{ $u1 }}</span>@endif
+                                </span>
+                                <span class="kk-deal-price">{{ $ph['precio_formateado'] }}</span>
+                            </div>
+                        </a>
+                        @endforeach
+                    </div>
+                    <button type="button" id="kkDealsNext" class="kk-deals-arrow" aria-label="Siguientes ofertas">›</button>
+                </div>
+            </section>
+        </div>
         @endif
 
-        {{-- CARRUSEL DE CATEGORÍAS TOP --}}
-        {{-- $categoriasTop -> $d2, $categoria -> $c --}}
-        {{-- carouselCategorias -> c1, flechaIzquierda -> b1, flechaDerecha -> b2 --}}
-        @if(isset($d2) && $d2->count() > 0)
-<section class="w-full py-8" style="background-color: #fef3e7;">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
-        <h2 class="text-xl md:text-2xl font-bold text-gray-800 mb-4">Categorías Más Visitadas</h2>
-
-        {{-- Flecha izquierda --}}
-        <button type="button"
-                id="b1"
-                class="absolute left-0 top-[60%] -translate-y-1/2 z-10 bg-white rounded-full p-2 shadow transition"
-                style="color: #e97b11;"
-                onmouseover="this.style.backgroundColor='#fef3e7';"
-                onmouseout="this.style.backgroundColor='white';">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-            </svg>
-        </button>
-
-        {{-- Flecha derecha --}}
-        <button type="button"
-                id="b2"
-                class="absolute right-0 top-[60%] -translate-y-1/2 z-10 bg-white rounded-full p-2 shadow transition"
-                style="color: #e97b11;"
-                onmouseover="this.style.backgroundColor='#fef3e7';"
-                onmouseout="this.style.backgroundColor='white';">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-            </svg>
-        </button>
-
-        {{-- Carrusel --}}
-        <div class="relative">
-            <div id="c1"
-                 class="flex gap-4 overflow-x-auto scrollbar-hide scroll-smooth px-1">
-                @foreach($d2 as $c)
-                {{-- añadirCam() -> _f1() --}}
-                <a href="{{ _f1('categoria/' . $c->slug) }}"
-                   class="flex-none w-28 sm:w-32 md:w-36 bg-white rounded-xl shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300 p-4 text-center">
-                    <div class="w-16 h-16 mx-auto mb-3">
-                        @if($c->imagen)
-                            <img loading="lazy" src="{{ asset('images/' . $c->imagen) }}"
-                                 alt="{{ $c->nombre }}"
-                                 class="w-full h-full object-contain rounded-md bg-gray-100">
+        @if(isset($d1) && $d1->count() > 0)
+        <section class="kk-section">
+            <div class="kk-head">
+                <div>
+                    <h2>Lo más buscado esta semana</h2>
+                </div>
+                <a href="{{ _f1(route('buscar', ['q' => 'más vendidos'])) }}" class="kk-link">Ranking completo →</a>
+            </div>
+            <div class="kk-products-grid kk-buscados-grid">
+                @foreach($d1 as $p)
+                <a href="{{ _f1($p->categoria->construirUrlCategorias($p->slug)) }}" class="kk-product-card">
+                    <div class="kk-product-img">
+                        @if(!empty($p->imagen_pequena[0] ?? ''))
+                            <img loading="lazy" src="{{ asset('images/' . ($p->imagen_pequena[0] ?? '')) }}" alt="{{ $p->nombre }}">
                         @else
-                            <div class="w-full h-full flex items-center justify-center rounded-md bg-gradient-to-br from-pink-100 to-pink-200">
-                                <svg class="w-8 h-8 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                          d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
-                                </svg>
-                            </div>
+                            <svg class="kk-fallback" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                            </svg>
                         @endif
                     </div>
-                    <span class="text-base font-semibold text-gray-800 leading-snug">{{ $c->nombre }}</span>
+                    <div class="kk-product-lower">
+                        <h3>{{ $p->nombre }}</h3>
+                        <div class="kk-price-row">
+                            @if($p->precio > 0)
+                                <strong>{{ $p->unidadDeMedida === 'unidadMilesima' ? number_format($p->precio, 3) : number_format($p->precio, 2) }}€</strong>
+                                <span>{{ _u1($p->unidadDeMedida) }}</span>
+                            @else
+                                <span class="kk-no-offer">Sin ofertas disponibles</span>
+                            @endif
+                        </div>
+                    </div>
                 </a>
                 @endforeach
             </div>
-        </div>
-    </div>
-</section>
-
-@endif
-
-{{-- SECCIÓN PRECIOS HOT --}}
-        {{-- $preciosHot -> $d3, $productoHot -> $ph --}}
-        @if(isset($d3) && $d3 && count($d3->datos) > 0)
-<section class="mb-8">
-    <h2 class="text-xl md:text-2xl font-bold text-gray-800 mb-4">🔥 Precios Hot</h2>
-    <div class="relative">
-        <div class="flex overflow-x-auto scrollbar-visible gap-4 px-1 pb-2">
-            @foreach($d3->datos as $ph)
-            <div class="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 relative min-w-[320px] md:min-w-[360px] flex-shrink-0">
-                <div class="p-4">
-                    {{-- Badge descuento --}}
-                    <span class="absolute top-2 right-2 bg-red-100 text-red-700 text-xs font-semibold px-2 py-1 rounded z-10">
-        -{{ (int) floatval(str_replace(',', '.', $ph['porcentaje_diferencia'])) }}%
-    </span>
-
-                    <div class="flex mb-3 items-start">
-                        {{-- Imagen producto --}}
-                        <img loading="lazy" src="{{ asset('images/' . $ph['img_producto']) }}"
-                             alt="{{ $ph['producto_nombre'] }}"
-                             class="w-20 h-20 object-contain rounded bg-gray-100 shadow-sm flex-shrink-0">
-
-                        {{-- Logo tienda + nombre producto --}}
-                        <div class="flex flex-col justify-between flex-grow h-full">
-                            <div class="flex justify-center w-full">
-                                <img loading="lazy" src="{{ asset('images/' . $ph['img_tienda']) }}"
-                                     alt="{{ $ph['tienda_nombre'] }}"
-                                     class="object-contain max-h-7 w-auto mb-2">
-                            </div>
-                            <h3 class="font-semibold text-gray-800 text-sm md:text-base leading-tight pl-3">
-                                {{ $ph['producto_nombre'] }}
-                            </h3>
-                        </div>
-                    </div>
-
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <div class="flex items-baseline gap-1">
-                                <p class="text-lg font-bold" style="color: #e97b11;">
-                                    {{ $ph['precio_formateado'] }}
-                                </p>
-                            </div>
-                            @if(isset($ph['unidades_formateadas']) && !empty($ph['unidades_formateadas']))
-                                <p class="text-sm text-gray-600">{{ $ph['unidades_formateadas'] }}</p>
-                            @endif
-                        </div>
-                        {{-- añadirCam() -> _f1() --}}
-                        <a href="{{ _f1($ph['url_producto']) }}" 
-                               class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded transition">
-                                Ver producto
-                        </a>
-                        {{-- añadirCam() -> _f1() --}}
-                        <a href="{{ _f1($ph['url_oferta']) }}"
-                           target="_blank"
-                           class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-                            Comprar
-                        </a>
-                    </div>
-                </div>
-            </div>
-            @endforeach
-        </div>
-    </div>
-</section>
-@endif
-
-        {{-- OFERTAS DESTACADAS --}}
-        {{-- Código comentado - no se procesa
-        @if(isset($ofertasDestacadas) && $ofertasDestacadas->count() > 0)
-        <section class="mb-12">
-            <h2 class="text-2xl font-bold text-gray-800 mb-6">Ofertas Destacadas</h2>
-            <div class="flex overflow-x-auto scrollbar-hide gap-4 px-1">
-                @foreach($ofertasDestacadas as $oferta)
-                <div class="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 relative min-w-[280px] md:min-w-[300px] flex-shrink-0">
-                    <div class="p-4">
-                        <span class="absolute top-2 right-2 bg-red-100 text-red-700 text-xs font-semibold px-2 py-0.5 rounded z-10">
-                            Oferta
-                        </span>
-
-                        <div class="flex mb-3 items-start">
-                            <img loading="lazy" src="{{ asset('images/' . ($oferta->producto->imagen_pequena[0] ?? '')) }}" alt="{{ $oferta->producto->nombre }}" class="w-16 h-16 object-contain rounded bg-gray-100 shadow-sm flex-shrink-0">
-
-                            <div class="flex flex-col justify-between flex-grow h-full">
-                                <div class="flex justify-center w-full">
-                                    <img loading="lazy" src="{{ asset('images/' . $oferta->tienda->url_imagen) }}" alt="{{ $oferta->tienda->nombre }}" class="object-contain max-h-7 w-auto mb-2">
-                                </div>
-
-                                <h3 class="font-semibold text-gray-800 text-sm md:text-base leading-tight pl-3">{{ $oferta->producto->nombre }}</h3>
-                            </div>
-                        </div>
-
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <div class="flex items-baseline gap-1">
-                                    <p class="text-lg font-bold text-green-600">
-                                        {{ number_format($oferta->precio_unidad, 2) }}€
-                                    </p>
-                                    <span class="text-sm text-gray-500">/Und.</span>
-                                </div>
-                            <p class="text-sm text-gray-600">{{ $oferta->unidades }} unidades</p>
-                        </div>
-                        <a href="{{ route('click.redirigir', $oferta->id) }}" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">Ver Oferta</a>
-                        </div>
-                    </div>
-                </div>
-                @endforeach
-            </div>
         </section>
         @endif
-        --}}
 
-        {{-- ÚLTIMOS PRODUCTOS --}}
-        {{-- $ultimosProductos -> $d4, $producto -> $p --}}
-        @if(isset($d4) && $d4->count() > 0)
-        <section class="mb-12">
-            <h2 class="text-xl md:text-2xl font-bold text-gray-800 mb-4">Últimos Productos Añadidos</h2>
-            <div class="relative">
-                <div class="flex space-x-4 lg:space-x-3 overflow-x-auto pb-4 scrollbar-visible">
-                    @foreach($d4 as $p)
-                    {{-- añadirCam() -> _f1() --}}
-                    <a href="{{ _f1($p->categoria->construirUrlCategorias($p->slug)) }}"
-                    class="group flex flex-col items-center bg-white rounded-xl shadow-md transition-all duration-300 transform hover:scale-105 hover:shadow-2xl cursor-pointer p-4 w-2/5 min-w-[160px] sm:w-1/4 sm:min-w-[200px] lg:w-1/5 lg:min-w-[220px]">
-                        <div class="w-full flex justify-center mb-3">
-                            @if(!empty($p->imagen_pequena[0] ?? ''))
-                                <img loading="lazy" src="{{ asset('images/' . ($p->imagen_pequena[0] ?? '')) }}"
-                                    alt="{{ $p->nombre }}"
-                                    class="w-32 h-32 object-contain rounded-lg shadow-sm transition-all duration-300 group-hover:shadow-lg bg-gray-100">
+        @if(isset($d2) && $d2->count() > 0)
+        <section id="categorias-principales" class="kk-section kk-cats-wrap">
+            <div class="kk-head">
+                <div>
+                    <h2>Categorías principales</h2>
+                </div>
+                <a href="{{ _f1(route('categorias.todas')) }}" class="kk-link">Ver todas</a>
+            </div>
+            <div class="kk-cats-row-wrap">
+                <button type="button" id="kkCatsPrev" class="kk-cats-arrow" aria-label="Categorías anteriores">‹</button>
+                <div id="kkCatsScroll" class="kk-cats-row">
+                    @php
+                    /** Emojis como en la maqueta index.html (.cat-tile .emoji), cuando no hay imagen en BD */
+                    $kkCatEmoji = [
+                        'electronica' => '📱',
+                        'informatica' => '🖥️',
+                        'fruta-y-verdura' => '🍎',
+                        'frutas-y-verduras' => '🍎',
+                        'bebe' => '🍼',
+                        'deporte' => '🏃',
+                        'jardin' => '🪴',
+                        'bricolaje' => '🔧',
+                    ];
+                    @endphp
+                    @foreach($d2 as $c)
+                    @php
+                        $kkEmoji1 = $kkCatEmoji[strtolower((string) $c->slug)] ?? null;
+                    @endphp
+                    <a href="{{ _f1('categoria/' . $c->slug) }}" class="kk-cat-item">
+                        <div class="kk-cat-icon">
+                            @if($c->imagen)
+                                <img loading="lazy" src="{{ asset('images/' . $c->imagen) }}" alt="{{ $c->nombre }}">
+                            @elseif($kkEmoji1)
+                                <span class="kk-cat-emoji" aria-hidden="true">{{ $kkEmoji1 }}</span>
                             @else
-                                <div class="w-32 h-32 flex items-center justify-center rounded-lg bg-gradient-to-br from-blue-100 to-blue-200">
-                                    <svg class="w-12 h-12 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                    </svg>
-                                </div>
+                                <svg class="kk-fallback" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                                </svg>
                             @endif
                         </div>
-                        <h3 class="font-semibold text-gray-700 text-center text-sm mb-1 line-clamp-2">
-                            {{ $p->nombre }}
-                        </h3>
-                        <p class="text-center mb-1 flex items-center justify-center gap-1">
-                            @if($p->precio > 0)
-                                <span class="text-xl font-bold" style="color: #e97b11;">{{ $p->unidadDeMedida === 'unidadMilesima' ? number_format($p->precio, 3) : number_format($p->precio, 2) }}€</span>
-                                @if($p->unidadDeMedida === 'unidad')
-                                    <span class="text-sm md:text-base text-gray-500">/Und.</span>
-                                @elseif($p->unidadDeMedida === 'kilos')
-                                    <span class="text-sm md:text-base text-gray-500">/Kg.</span>
-                                @elseif($p->unidadDeMedida === 'litros')
-                                    <span class="text-sm md:text-base text-gray-500">/L.</span>
-                                @elseif($p->unidadDeMedida === 'unidadMilesima')
-                                    <span class="text-sm md:text-base text-gray-500">/Und.</span>
-                                @elseif($p->unidadDeMedida === 'unidadUnica')
-                                    {{-- No mostrar sufijo para UnidadUnica --}}
-                                @elseif($p->unidadDeMedida === '800gramos')
-                                    <span class="text-sm md:text-base text-gray-500">/800gr.</span>
-                                @elseif($p->unidadDeMedida === '100ml')
-                                    <span class="text-sm md:text-base text-gray-500">/100ml.</span>
-                                @endif
-                            @else
-                                <span class="text-sm font-semibold" style="color: #e97b11;">Sin Ofertas Disponibles</span>
-                            @endif
-                        </p>
+                        <span>{{ $c->nombre }}</span>
                     </a>
                     @endforeach
                 </div>
+                <button type="button" id="kkCatsNext" class="kk-cats-arrow" aria-label="Siguientes categorías">›</button>
             </div>
         </section>
         @endif
 
-        
-
+        <section class="kk-banner">
+            <div>
+                <h3>Alertas cuando baje de precio</h3>
+                <p>Recuerda que tú decides el precio al que quieres comprar y te avisaremos justo cuando llegue a ese importe.</p>
+            </div>
+            <div class="kk-banner-actions">
+                <button type="button" id="kkRememberAlert" class="kk-btn kk-btn-primary">Recuérdalo</button>
+            </div>
+        </section>
     </main>
 {{-- FOOTER DESDE LA RUTA COMPONENTS/FOOTER --}}
     <x-footer />
     <style>
-        .scrollbar-hide {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
+        .kk-main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1.5rem 1rem 2.5rem;
         }
-        .scrollbar-hide::-webkit-scrollbar {
+        .kk-hero {
+            display: grid;
+            grid-template-columns: 1.15fr .85fr;
+            gap: 1.5rem;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding: .75rem 0 1.25rem;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .kk-hero-title {
+            margin: 0 0 .75rem;
+            font-size: clamp(1.8rem, 4vw, 2.6rem);
+            font-weight: 800;
+            line-height: 1.1;
+            letter-spacing: -.04em;
+        }
+        .kk-hero-title span {
+            display: block;
+            margin-left: 4.4ch;
+            font-size: 1.15em;
+            color: #e97b11;
+        }
+        .kk-hero-copy {
+            margin: 0 0 1rem;
+            color: #475569;
+            font-size: 1rem;
+            max-width: 48ch;
+        }
+        .kk-hero-cta {
+            display: flex;
+            gap: .75rem;
+            flex-wrap: wrap;
+            margin-bottom: 1.15rem;
+        }
+        .kk-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: .75rem;
+            padding: .7rem 1.15rem;
+            font-weight: 700;
+            font-size: .9rem;
+            transition: .2s;
+        }
+        .kk-btn-primary { background: #e97b11; color: #fff; }
+        .kk-btn-primary:hover { background: #d16a0f; }
+        .kk-btn-ghost { border: 1px solid #e2e8f0; color: #0f172a; background: #fff; }
+        .kk-btn-ghost:hover { border-color: #e97b11; color: #d16a0f; }
+        .kk-hero-stats {
+            display: flex;
+            gap: 1.25rem;
+            flex-wrap: wrap;
+            padding-top: 1rem;
+            border-top: 1px solid #e2e8f0;
+        }
+        .kk-hero-stats strong { display: block; font-size: 1.2rem; font-weight: 800; color: #0f172a; }
+        .kk-hero-stats span { font-size: .78rem; color: #64748b; }
+        .kk-hero-visual {
             display: none;
+            gap: .8rem;
+            justify-items: end;
         }
-        .line-clamp-2 {
+        @media (min-width: 1025px) {
+            .kk-hero-visual {
+                display: grid;
+            }
+        }
+        .kk-float-card {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: .9rem;
+            padding: 1rem;
+            box-shadow: 0 10px 24px rgba(15,23,42,.08);
+            max-width: 320px;
+            width: 100%;
+            animation: kkFloat 5s ease-in-out infinite;
+        }
+        .kk-float-card:nth-child(2) {
+            animation-delay: -2s;
+            max-width: 280px;
+            justify-self: start;
+        }
+        .kk-float-card small { display: block; font-size: .7rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: .04em; }
+        .kk-float-card p { margin: .35rem 0 0; font-size: .9rem; color: #334155; }
+        .kk-float-title { font-weight: 700; line-height: 1.35; }
+        .kk-mini-price {
+            display: flex;
+            align-items: baseline;
+            gap: .5rem;
+            margin-top: .55rem;
+        }
+        .kk-now { color: #e97b11; font-weight: 800; font-size: 1.1rem; }
+        .kk-was { color: #94a3b8; text-decoration: line-through; font-size: .85rem; }
+        .kk-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .35rem;
+            margin-top: .45rem;
+        }
+        .kk-badge {
+            font-size: .64rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .03em;
+            border-radius: .4rem;
+            padding: .2rem .42rem;
+            background: #ecfdf5;
+            color: #059669;
+        }
+        .kk-badge-hot {
+            background: #fef2f2;
+            color: #dc2626;
+        }
+        @keyframes kkFloat {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+        .kk-section { margin-bottom: 2rem; padding: 1.4rem 0; }
+        .kk-deals-bg {
+            background: linear-gradient(180deg, #fef3e7 0%, #fff8f0 100%);
+            border-block: 1px solid rgba(233,123,17,.14);
+            margin-bottom: .35rem;
+            width: 100vw;
+            margin-left: calc(50% - 50vw);
+            margin-right: calc(50% - 50vw);
+        }
+        .kk-deals-bg .kk-section {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+        .kk-head { display: flex; justify-content: space-between; align-items: end; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
+        .kk-head h2 { margin: 0; font-size: 1.35rem; font-weight: 800; letter-spacing: -.02em; color: #0f172a; }
+        .kk-head p { margin: .2rem 0 0; font-size: .9rem; color: #64748b; }
+        .kk-link { color: #e97b11; font-size: .88rem; font-weight: 700; }
+        .kk-link:hover { text-decoration: underline; }
+        .kk-deals-row-wrap {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: .45rem;
+        }
+        .kk-deals-row {
+            flex: 1;
+            display: flex;
+            gap: 1rem;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+            padding: .25rem 0 .55rem;
+        }
+        .kk-deals-row::-webkit-scrollbar { height: 7px; }
+        .kk-deals-row::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 999px; }
+        .kk-deals-row::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+        .kk-deals-row::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .kk-deals-arrow {
+            flex: 0 0 auto;
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            border: 1px solid #e2e8f0;
+            background: #fff;
+            color: #e97b11;
+            font-size: 1.1rem;
+            line-height: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .kk-deals-arrow:hover { background: #fef3e7; }
+        .kk-deal-card {
+            flex: 0 0 260px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            background: #fff;
+            border-radius: .85rem;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 10px 25px rgba(15,23,42,.07);
+            padding: 1rem;
+            transition: .2s;
+        }
+        .kk-deal-card:hover { transform: translateY(-2px); box-shadow: 0 14px 30px rgba(15,23,42,.1); }
+        .kk-discount {
+            position: absolute;
+            top: .7rem;
+            right: .7rem;
+            background: #dc2626;
+            color: #fff;
+            border-radius: .5rem;
+            font-size: .72rem;
+            font-weight: 800;
+            padding: .15rem .45rem;
+        }
+        .kk-deal-thumb {
+            height: 132px;
+            border-radius: .6rem;
+            background: #f1f5f9;
+            margin-bottom: .65rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .kk-deal-thumb img { max-height: 118px; width: auto; max-width: 100%; object-fit: contain; }
+        .kk-deal-card h3 {
+            margin: 0 0 .35rem;
+            font-size: .87rem;
+            line-height: 1.35;
+            color: #0f172a;
+            min-height: 2.3em;
             display: -webkit-box;
             -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
             overflow: hidden;
         }
-        
-        {{-- Estilos para barras de desplazamiento visibles --}}
-        .scrollbar-visible {
-            scrollbar-width: thin;
-            scrollbar-color: #cbd5e0 #f7fafc;
+        .kk-deal-meta {
+            display: flex;
+            flex-direction: column;
+            gap: .35rem;
+            margin-top: auto;
         }
-        
-        .scrollbar-visible::-webkit-scrollbar {
-            height: 8px;
+        .kk-deal-store-line {
+            font-size: .74rem;
+            color: #64748b;
+            line-height: 1.3;
+        }
+        .kk-deal-units { font-weight: 500; }
+        .kk-deal-price { color: #e97b11; font-size: 1.12rem; font-weight: 800; white-space: nowrap; }
+        .kk-deals-title-mobile { display: none; }
+        .kk-products-grid { display: grid; gap: 1rem; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        .kk-product-card {
+            display: flex;
+            flex-direction: column;
+            border-radius: .85rem;
+            border: 1px solid #e2e8f0;
+            background: #fff;
+            padding: .9rem;
+            transition: .2s;
+        }
+        .kk-product-card:hover { border-color: rgba(233,123,17,.3); box-shadow: 0 12px 28px rgba(15,23,42,.08); transform: translateY(-2px); }
+        .kk-product-img {
+            aspect-ratio: 1 / 1;
+            border-radius: .65rem;
+            background: #f1f5f9;
+            margin-bottom: .65rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .kk-product-img img { width: 90%; height: 90%; object-fit: contain; }
+        .kk-product-lower {
+            display: flex;
+            flex-direction: column;
+            gap: .5rem;
+            margin-top: auto;
+            flex: 1 1 auto;
+            min-height: 0;
+        }
+        .kk-product-card h3 {
+            margin: 0;
+            font-size: .87rem;
+            font-weight: 700;
+            color: #0f172a;
+            min-height: 2.4em;
+            line-height: 1.35;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .kk-price-row { display: flex; gap: .25rem; align-items: baseline; flex-wrap: wrap; }
+        .kk-buscados-grid .kk-price-row {
+            width: 100%;
+            justify-content: flex-end;
+        }
+        .kk-price-row strong { color: #e97b11; font-size: 1.06rem; font-weight: 800; }
+        .kk-price-row span { color: #64748b; font-size: .75rem; }
+        .kk-no-offer { color: #64748b; font-size: .78rem; font-weight: 600; }
+        .kk-fallback { width: 2rem; height: 2rem; color: #94a3b8; }
+        .kk-cats-wrap {
+            background: linear-gradient(180deg, rgba(241,245,249,.45), transparent);
+            border-radius: 1rem;
+            padding: 1rem;
+        }
+        .kk-cats-row-wrap {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: .45rem;
+        }
+        .kk-cats-row {
+            flex: 1;
+            display: flex;
+            gap: .7rem;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+            padding: .25rem 0 .45rem;
+        }
+        .kk-cats-row::-webkit-scrollbar { height: 7px; }
+        .kk-cats-row::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 999px; }
+        .kk-cats-row::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+        .kk-cats-row::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .kk-cats-arrow {
+            flex: 0 0 auto;
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            border: 1px solid #e2e8f0;
+            background: #fff;
+            color: #e97b11;
+            font-size: 1.1rem;
+            line-height: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .kk-cats-arrow:hover { background: #fef3e7; }
+        .kk-cat-item {
+            flex: 0 0 130px;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: .7rem;
+            padding: .8rem .45rem;
+            text-align: center;
+            transition: .2s;
+        }
+        .kk-cat-item:hover { border-color: #e97b11; background: #fef3e7; }
+        .kk-cat-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: .65rem;
+            background: #f1f5f9;
+            margin: 0 auto .45rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .kk-cat-icon img { width: 35px; height: 35px; object-fit: contain; }
+        .kk-cat-emoji {
+            font-size: 1.75rem;
+            line-height: 1;
             display: block;
         }
-        
-        .scrollbar-visible::-webkit-scrollbar-track {
-            background: #f7fafc;
-            border-radius: 4px;
+        .kk-cat-item span { font-size: .75rem; font-weight: 700; color: #0f172a; }
+        .kk-banner {
+            margin-top: .5rem;
+            background: linear-gradient(120deg, #0f172a 0%, #334155 100%);
+            border-radius: 1rem;
+            padding: 1.4rem 1.2rem;
+            color: #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
         }
-        
-        .scrollbar-visible::-webkit-scrollbar-thumb {
-            background: #cbd5e0;
-            border-radius: 4px;
+        .kk-banner h3 { margin: 0 0 .25rem; color: #fff; font-size: 1.2rem; font-weight: 800; }
+        .kk-banner p { margin: 0; font-size: .9rem; }
+        .kk-banner-actions {
+            display: inline-flex;
+            flex-wrap: wrap;
+            gap: .6rem;
+            align-items: center;
         }
-        
-        .scrollbar-visible::-webkit-scrollbar-thumb:hover {
-            background: #a0aec0;
+        .kk-btn-dark {
+            border-color: rgba(255,255,255,.28);
+            color: #e2e8f0;
+            background: rgba(255,255,255,.08);
         }
-        
-        {{-- Estilos específicos para móvil --}}
+        .kk-btn-dark:hover {
+            background: rgba(255,255,255,.16);
+            color: #fff;
+            border-color: rgba(255,255,255,.42);
+        }
+        @media (min-width: 1024px) {
+            .kk-deal-meta {
+                flex-direction: row;
+                justify-content: space-between;
+                align-items: baseline;
+                gap: .5rem;
+            }
+            .kk-deal-store-line {
+                min-width: 0;
+                flex: 1;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+            .kk-deal-price { flex-shrink: 0; }
+        }
         @media (max-width: 1024px) {
-            .scrollbar-visible {
-                scrollbar-width: thin;
-                scrollbar-color: #e2e8f0 #f7fafc;
+            .kk-hero { grid-template-columns: 1fr; }
+            .kk-hero-cta {
+                flex-wrap: nowrap;
+                gap: .45rem;
             }
-            
-            .scrollbar-visible::-webkit-scrollbar {
-                height: 6px;
+            .kk-hero-cta .kk-btn {
+                flex: 1 1 0;
+                min-width: 0;
+                padding: .62rem .5rem;
+                font-size: clamp(.72rem, 3.1vw, .85rem);
+                line-height: 1.25;
+                text-align: center;
             }
-            
-            .scrollbar-visible::-webkit-scrollbar-thumb {
-                background: #e2e8f0;
-            }
-            
-            .scrollbar-visible::-webkit-scrollbar-thumb:hover {
-                background: #cbd5e0;
-            }
+            .kk-deal-card { flex-basis: 240px; }
+            {{-- Lo más buscado: mínimo 2 por fila en tablet/móvil (en PC siguen 4 columnas / 8 ítems) --}}
+            .kk-buscados-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
-        
+        @media (max-width: 767px) {
+            {{-- Móvil: título corto en mayores ofertas --}}
+            .kk-deals-title-desktop { display: none; }
+            .kk-deals-title-mobile { display: inline; }
+            {{-- Móvil: scroll de ofertas solo con gesto, sin flechas --}}
+            .kk-deals-row-wrap .kk-deals-arrow { display: none; }
+            {{-- Móvil: mayores ofertas ≈2 tarjetas por fila; lo más buscado solo 4 productos (5.º–8.º ocultos) --}}
+            .kk-deals-row .kk-deal-card {
+                flex: 0 0 calc(50% - 0.5rem);
+                max-width: calc(50% - 0.5rem);
+            }
+            .kk-buscados-grid .kk-product-card:nth-child(n+5) { display: none; }
+        }
+        @media (max-width: 640px) {
+            .kk-main { padding: 1rem .75rem 2rem; }
+            .kk-cats-arrow { width: 30px; height: 30px; }
+            .kk-cat-item { flex-basis: 115px; }
+        }
     </style>
 
     
 {{-- JS PARA EL HEADER --}}
 @stack('scripts')
 
-{{-- MOVER EL SCROLL HORIZONTAL DE LAS CATEGORIAS --}}
-{{-- carouselCategorias -> c1, flechaIzquierda -> b1, flechaDerecha -> b2 --}}
 <script>
-    const c1 = document.getElementById('c1');
-    const b1 = document.getElementById('b1');
-    const b2 = document.getElementById('b2');
-
-    b1?.addEventListener('click', () => {
-        c1?.scrollBy({ left: -200, behavior: 'smooth' });
-    });
-
-    b2?.addEventListener('click', () => {
-        c1?.scrollBy({ left: 200, behavior: 'smooth' });
+    const _kcs1 = document.getElementById('kkCatsScroll');
+    document.getElementById('kkCatsPrev')?.addEventListener('click', () => _kcs1?.scrollBy({ left: -220, behavior: 'smooth' }));
+    document.getElementById('kkCatsNext')?.addEventListener('click', () => _kcs1?.scrollBy({ left: 220, behavior: 'smooth' }));
+    const _kds1 = document.getElementById('kkDealsScroll');
+    document.getElementById('kkDealsPrev')?.addEventListener('click', () => _kds1?.scrollBy({ left: -280, behavior: 'smooth' }));
+    document.getElementById('kkDealsNext')?.addEventListener('click', () => _kds1?.scrollBy({ left: 280, behavior: 'smooth' }));
+    document.getElementById('kkRememberAlert')?.addEventListener('click', () => {
+        window.alert('Guárdalo en mente: tú marcas el precio objetivo y Komparador te avisa cuando aparezca.');
     });
 </script>
+
 <x-cookie-consent />
 </body>
 </html> 

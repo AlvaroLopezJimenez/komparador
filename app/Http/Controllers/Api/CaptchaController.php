@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
 
 class CaptchaController extends Controller
 {
@@ -57,6 +58,13 @@ class CaptchaController extends Controller
                 if ($fingerprint) {
                     $cacheKeyFP = "fp_bloqueado_rate_limit_{$fingerprint}";
                     Cache::forget($cacheKeyFP);
+                }
+                
+                // Limpiar solo contadores por minuto del token (no hora/día) para que pueda obtener token
+                // pero siga acumulando hacia los límites de hora y día
+                RateLimiter::clear("anti_scraping:token:ip:minute:{$ip}");
+                if ($fingerprint) {
+                    RateLimiter::clear("anti_scraping:token:fingerprint:minute:{$fingerprint}");
                 }
                 
                 Log::info('IP desbloqueada después de resolver CAPTCHA', [
