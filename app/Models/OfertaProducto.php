@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\ConsultarNeoCifrado;
 use Illuminate\Database\Eloquent\Model;
 
 class OfertaProducto extends Model
@@ -21,6 +22,8 @@ class OfertaProducto extends Model
         'frecuencia_actualizar_precio_minutos',
         'precio_unidad',
         'url',
+        'url_cipher',
+        'url_lookup',
         'variante',
         'mostrar',
         'como_scrapear',
@@ -45,6 +48,33 @@ class OfertaProducto extends Model
         'comprobada' => 'datetime',
         'fecha_actualizacion_envio' => 'datetime',
     ];
+
+    public function setUrlAttribute($value): void
+    {
+        $value = is_string($value) ? trim($value) : $value;
+
+        if ($value === null || $value === '') {
+            $this->attributes['url'] = '';
+            $this->attributes['url_cipher'] = null;
+            $this->attributes['url_lookup'] = null;
+            return;
+        }
+
+        $payload = app(ConsultarNeoCifrado::class)->construirPayload((string) $value);
+        $this->attributes['url'] = '';
+        $this->attributes['url_cipher'] = $payload['neo_cipher'];
+        $this->attributes['url_lookup'] = $payload['neo_lookup'];
+    }
+
+    public function getUrlAttribute($value): ?string
+    {
+        $cipherV2 = (string) ($this->attributes['url_cipher'] ?? '');
+        if ($cipherV2 !== '') {
+            return app(ConsultarNeoCifrado::class)->descifrarGuardado($cipherV2);
+        }
+
+        return '';
+    }
 
     public function producto()
     {

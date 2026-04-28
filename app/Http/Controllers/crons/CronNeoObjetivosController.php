@@ -1046,7 +1046,8 @@ class CronNeoObjetivosController extends Controller
     {
         return Neoobjetivo::query()
             ->where('visitada', '<', now()->subDays(7))
-            ->whereNotNull('url')
+            ->whereNotNull('url_cipher')
+            ->where('url_cipher', '!=', '')
             ->orderBy('visitada')
             ->limit($limite)
             ->get()
@@ -1058,7 +1059,7 @@ class CronNeoObjetivosController extends Controller
                     'producto_id' => $neo->producto_id,
                     'categoria_id' => $neo->categoria_id,
                     'tienda_id' => $neo->tienda_id,
-                    'url_cifrada' => (string) $neo->getRawOriginal('url'),
+                    'url_cifrada' => (string) $neo->getRawOriginal('url_cipher'),
                     'url_descifrada' => $urlDescifrada,
                     'es_url_neo' => $urlDescifrada !== '' && stripos($urlDescifrada, self::neoObjetivoMarcaRamaUrl()) !== false,
                 ];
@@ -1173,7 +1174,7 @@ class CronNeoObjetivosController extends Controller
             return $url;
         }
 
-        $secret = (string) config('anti-scraping.neoobjetivo_url_secret', '');
+        $secret = (string) config('anti-scraping.neo_lookup_key', '');
         if ($secret !== '') {
             return Neo::encryptedNeoForLookup($url);
         }
@@ -1310,11 +1311,8 @@ class CronNeoObjetivosController extends Controller
         $log = [];
         $log[] = ['paso' => count($log) + 1, 'texto' => "URL limpiada (#{$numeroUrl}):", 'valor' => $urlLimpia];
 
-        $neoCifradaLookup = Neo::encryptedNeoForLookup($urlLimpia);
-        if (Neo::where(function ($q) use ($urlLimpia, $neoCifradaLookup) {
-            $q->where('neo', $urlLimpia)
-              ->orWhere('neo', $neoCifradaLookup);
-        })->exists()) {
+        $neoLookup = Neo::encryptedNeoForLookup($urlLimpia);
+        if ($neoLookup !== '' && Neo::where('neo_lookup', $neoLookup)->exists()) {
             $log[] = ['paso' => count($log) + 1, 'texto' => '¿Existe en tabla neo (campo neo)?', 'decision' => 'Sí → No se hace petición a /redireccion'];
             return [
                 'skipped'      => true,
@@ -1371,14 +1369,19 @@ class CronNeoObjetivosController extends Controller
         $finalUrl = app(LimpiarUrlDeTiendas::class)->limpiar($finalUrl);
         $log[] = ['paso' => count($log) + 1, 'texto' => 'URL final (tras LimpiarUrlDeTiendas):', 'valor' => $finalUrl];
 
-        $oferta = OfertaProducto::where('url', $finalUrl)->with('producto', 'tienda')->first();
+        $ofertaLookup = app(\App\Services\ConsultarNeoCifrado::class)->hashLookup($finalUrl);
+        $oferta = $ofertaLookup !== ''
+            ? OfertaProducto::where('url_lookup', $ofertaLookup)->with('producto', 'tienda')->first()
+            : null;
+        $finalUrlLookup = Neo::encryptedNeoForLookup($finalUrl);
+        $urlLimpiaLookup = Neo::encryptedNeoForLookup($urlLimpia);
         if ($oferta) {
             $log[] = ['paso' => count($log) + 1, 'texto' => '¿Existe en ofertas_producto.url?', 'decision' => 'Sí'];
 
-            $neoExistente = Neo::where('url', $finalUrl)->first();
+            $neoExistente = $finalUrlLookup !== '' ? Neo::where('url_lookup', $finalUrlLookup)->first() : null;
             if ($neoExistente) {
                 // Existe en neo (campo url). Comparamos neo.neo con urlLimpia (la que mandamos al VPS en la segunda petición).
-                if ((string) $neoExistente->neo === (string) $urlLimpia) {
+                if ((string) ($neoExistente->neo_lookup ?? '') === (string) $urlLimpiaLookup) {
                     // Igual: copiar a neo los campos (oferta_id, producto_id, categoria_id, tienda_id) que neoobjetivo tiene y neo no.
                     $actualizado = false;
                     if ($neoExistente->oferta_id === null && $neoobjetivo->oferta_id !== null) {
@@ -1474,7 +1477,7 @@ class CronNeoObjetivosController extends Controller
 
         $log[] = ['paso' => count($log) + 1, 'texto' => '¿Existe en urls_descartadas.url?', 'decision' => 'No'];
 
-        $neoExistente = Neo::where('url', $finalUrl)->first();
+        $neoExistente = $finalUrlLookup !== '' ? Neo::where('url_lookup', $finalUrlLookup)->first() : null;
         if ($neoExistente) {
             $actualizado = false;
             $actualizadoNeo = false;
@@ -1486,7 +1489,7 @@ class CronNeoObjetivosController extends Controller
                 $neoExistente->categoria_id = $neoobjetivo->categoria_id;
                 $actualizado = true;
             }
-            if ((string) $neoExistente->neo !== (string) $urlLimpia) {
+            if ((string) ($neoExistente->neo_lookup ?? '') !== (string) $urlLimpiaLookup) {
                 $neoExistente->neo = $urlLimpia;
                 $actualizadoNeo = true;
                 $actualizado = true;
@@ -1539,7 +1542,8 @@ class CronNeoObjetivosController extends Controller
         $finalUrl = app(LimpiarUrlDeTiendas::class)->limpiar($urlProducto);
         $log[] = ['paso' => count($log) + 1, 'texto' => 'URL final (tras LimpiarUrlDeTiendas):', 'valor' => $finalUrl];
 
-        $neoExistentePorUrl = Neo::where('url', $finalUrl)->first();
+        $finalUrlLookup = Neo::encryptedNeoForLookup($finalUrl);
+        $neoExistentePorUrl = $finalUrlLookup !== '' ? Neo::where('url_lookup', $finalUrlLookup)->first() : null;
         if ($neoExistentePorUrl) {
             $log[] = ['paso' => count($log) + 1, 'texto' => '¿Existe en tabla neo (campo url)?', 'decision' => 'Sí'];
 
@@ -1567,7 +1571,10 @@ class CronNeoObjetivosController extends Controller
 
         $log[] = ['paso' => count($log) + 1, 'texto' => '¿Existe en tabla neo (campo url)?', 'decision' => 'No'];
 
-        $oferta = OfertaProducto::where('url', $finalUrl)->with('producto', 'tienda')->first();
+        $ofertaLookup = app(\App\Services\ConsultarNeoCifrado::class)->hashLookup($finalUrl);
+        $oferta = $ofertaLookup !== ''
+            ? OfertaProducto::where('url_lookup', $ofertaLookup)->with('producto', 'tienda')->first()
+            : null;
         if ($oferta) {
             $log[] = ['paso' => count($log) + 1, 'texto' => '¿Existe en ofertas_producto.url?', 'decision' => 'Sí'];
             Neo::create([

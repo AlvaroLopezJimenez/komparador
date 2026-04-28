@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\ConsultarNeoCifrado;
 use Illuminate\Database\Eloquent\Model;
 use Throwable;
 
@@ -20,7 +21,11 @@ class Neo extends Model
         'categoria_id',
         'tienda_id',
         'url',
+        'url_cipher',
+        'url_lookup',
         'neo',
+        'neo_cipher',
+        'neo_lookup',
         'aniadida',
         'created_at',
         'updated_at',
@@ -39,11 +44,15 @@ class Neo extends Model
         $value = is_string($value) ? trim($value) : $value;
 
         if ($value === null || $value === '') {
-            $this->attributes['neo'] = $value;
+            $this->attributes['neo'] = '';
+            $this->attributes['neo_cipher'] = null;
+            $this->attributes['neo_lookup'] = null;
             return;
         }
-
-        $this->attributes['neo'] = self::encryptNeo((string) $value);
+        $payload = app(ConsultarNeoCifrado::class)->construirPayload((string) $value);
+        $this->attributes['neo'] = '';
+        $this->attributes['neo_cipher'] = $payload['neo_cipher'];
+        $this->attributes['neo_lookup'] = $payload['neo_lookup'];
     }
 
     /**
@@ -51,11 +60,45 @@ class Neo extends Model
      */
     public function getNeoAttribute($value): ?string
     {
-        if (!is_string($value) || $value === '') {
-            return $value;
+        $cipherV2 = (string) ($this->attributes['neo_cipher'] ?? '');
+        if ($cipherV2 !== '') {
+            return app(ConsultarNeoCifrado::class)->descifrarGuardado($cipherV2);
         }
 
-        return self::decryptNeo($value);
+        return '';
+    }
+
+    /**
+     * Guarda "url" en columnas v2 (url_cipher/url_lookup).
+     */
+    public function setUrlAttribute($value): void
+    {
+        $value = is_string($value) ? trim($value) : $value;
+
+        if ($value === null || $value === '') {
+            $this->attributes['url'] = '';
+            $this->attributes['url_cipher'] = null;
+            $this->attributes['url_lookup'] = null;
+            return;
+        }
+
+        $payload = app(ConsultarNeoCifrado::class)->construirPayload((string) $value);
+        $this->attributes['url'] = '';
+        $this->attributes['url_cipher'] = $payload['neo_cipher'];
+        $this->attributes['url_lookup'] = $payload['neo_lookup'];
+    }
+
+    /**
+     * Devuelve "url" desde v2; fallback legacy si no hay columnas nuevas.
+     */
+    public function getUrlAttribute($value): ?string
+    {
+        $cipherV2 = (string) ($this->attributes['url_cipher'] ?? '');
+        if ($cipherV2 !== '') {
+            return app(ConsultarNeoCifrado::class)->descifrarGuardado($cipherV2);
+        }
+
+        return '';
     }
 
     /**
@@ -63,7 +106,7 @@ class Neo extends Model
      */
     public static function encryptedNeoForLookup(string $plainText): string
     {
-        return self::encryptNeoWithSecret($plainText, (string) config('anti-scraping.neoobjetivo_url_secret', ''));
+        return self::neoLookupHashV2($plainText);
     }
 
     /**
@@ -71,7 +114,14 @@ class Neo extends Model
      */
     public static function encryptedNeoForLookupWithSecret(string $plainText, string $secret): string
     {
-        return self::encryptNeoWithSecret($plainText, $secret);
+        $plainText = trim($plainText);
+        if ($plainText === '') {
+            return '';
+        }
+        if ($secret === '') {
+            return '';
+        }
+        return hash_hmac('sha256', $plainText, $secret);
     }
 
     /**
@@ -80,6 +130,22 @@ class Neo extends Model
     public static function decryptNeoFromStoredWithSecret(string $storedValue, string $secret): string
     {
         return self::decryptNeoWithSecret($storedValue, $secret);
+    }
+
+    /**
+     * Nuevo esquema: cifrado de almacenamiento no determinista.
+     */
+    public static function encryptedNeoForStorageV2(string $plainText): string
+    {
+        return app(ConsultarNeoCifrado::class)->cifrarParaGuardar($plainText);
+    }
+
+    /**
+     * Nuevo esquema: lookup determinista para búsquedas exactas.
+     */
+    public static function neoLookupHashV2(string $plainText): string
+    {
+        return app(ConsultarNeoCifrado::class)->hashLookup($plainText);
     }
 
     private static function encryptNeo(string $plainText): string

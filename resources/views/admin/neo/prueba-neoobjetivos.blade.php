@@ -126,7 +126,7 @@
                                             </td>
                                             <td class="py-2 px-3 break-all">
                                                 @if (!empty($fila['url_descifrada']))
-                                                    <a href="{{ $fila['url_descifrada'] }}" target="_blank" rel="noopener" class="text-blue-600 dark:text-blue-400 hover:underline">{{ Str::limit($fila['url_descifrada'], 120) }}</a>
+                                                    <a href="{{ $fila['url_descifrada'] }}" target="_blank" rel="noopener" class="text-blue-600 dark:text-blue-400 hover:underline">{{ \Illuminate\Support\Str::limit($fila['url_descifrada'], 120) }}</a>
                                                 @else
                                                     <span class="text-gray-500 dark:text-gray-400">—</span>
                                                 @endif
@@ -298,7 +298,7 @@
                                                 <p class="text-sm text-red-600 dark:text-red-400"><span class="text-gray-500">Error:</span> {{ $pet['error'] }}</p>
                                             @endif
                                             @if (isset($pet['siguiente_url']) && $pet['siguiente_url'] !== null && $pet['siguiente_url'] !== '')
-                                                <p class="text-sm text-gray-600 dark:text-gray-400"><span class="text-gray-500">Siguiente página:</span> <a href="{{ $pet['siguiente_url'] }}" target="_blank" rel="noopener" class="text-blue-600 dark:text-blue-400 break-all hover:underline">{{ Str::limit($pet['siguiente_url'], 80) }}</a></p>
+                                                <p class="text-sm text-gray-600 dark:text-gray-400"><span class="text-gray-500">Siguiente página:</span> <a href="{{ $pet['siguiente_url'] }}" target="_blank" rel="noopener" class="text-blue-600 dark:text-blue-400 break-all hover:underline">{{ \Illuminate\Support\Str::limit($pet['siguiente_url'], 80) }}</a></p>
                                             @endif
                                             @if (!empty($pet['urls_extraidas']))
                                                 <div class="mt-2">
@@ -306,7 +306,7 @@
                                                     <ul class="list-disc list-inside space-y-1 text-sm max-h-60 overflow-y-auto">
                                                         @foreach ($pet['urls_extraidas'] as $u)
                                                             <li class="break-all">
-                                                                <a href="{{ $u }}" target="_blank" rel="noopener" class="text-blue-600 dark:text-blue-400 hover:underline">{{ Str::limit($u, 80) }}</a>
+                                                                <a href="{{ $u }}" target="_blank" rel="noopener" class="text-blue-600 dark:text-blue-400 hover:underline">{{ \Illuminate\Support\Str::limit($u, 80) }}</a>
                                                             </li>
                                                         @endforeach
                                                     </ul>
@@ -337,7 +337,7 @@
                                                                 @if (!empty($red['url_final'])) <p class="text-xs text-gray-500 mt-1 break-all">URL final: {{ $red['url_final'] }}</p> @endif
                                                             @else
                                                                 @if (!empty($red['url_final']))
-                                                                    <p class="mb-1 break-all"><a href="{{ $red['url_final'] }}" target="_blank" rel="noopener" class="text-blue-600 dark:text-blue-400 hover:underline">{{ Str::limit($red['url_final'], 80) }}</a></p>
+                                                                    <p class="mb-1 break-all"><a href="{{ $red['url_final'] }}" target="_blank" rel="noopener" class="text-blue-600 dark:text-blue-400 hover:underline">{{ \Illuminate\Support\Str::limit($red['url_final'], 80) }}</a></p>
                                                                 @endif
                                                                 <p class="text-gray-700 dark:text-gray-300">{{ $red['accion_final'] ?? '' }}</p>
                                                                 @if (!empty($red['error']))
@@ -351,7 +351,7 @@
                                                                         @foreach ($red['log_pasos'] as $paso)
                                                                             <li>
                                                                                 @if (!empty($paso['valor']))
-                                                                                    {{ $paso['texto'] ?? '' }}: <span class="break-all">{{ Str::limit($paso['valor'], 60) }}</span>
+                                                                                    {{ $paso['texto'] ?? '' }}: <span class="break-all">{{ \Illuminate\Support\Str::limit($paso['valor'], 60) }}</span>
                                                                                 @elseif (!empty($paso['decision']))
                                                                                     {{ $paso['texto'] ?? '' }} — {{ $paso['decision'] }}
                                                                                 @else
@@ -390,7 +390,7 @@
                                         <tr class="border-b border-gray-100 dark:border-gray-700">
                                             <td class="py-2 px-3">{{ $rc['neoobjetivo_id'] ?? '-' }}</td>
                                             <td class="py-2 px-3 break-all">
-                                                <a href="{{ $rc['url'] ?? '#' }}" target="_blank" rel="noopener" class="text-blue-600 dark:text-blue-400 hover:underline">{{ Str::limit($rc['url'] ?? '', 60) }}</a>
+                                                <a href="{{ $rc['url'] ?? '#' }}" target="_blank" rel="noopener" class="text-blue-600 dark:text-blue-400 hover:underline">{{ \Illuminate\Support\Str::limit($rc['url'] ?? '', 60) }}</a>
                                             </td>
                                             <td class="py-2 px-3">{{ $rc['tienda_nombre'] ?? $rc['tienda_id'] ?? '-' }}</td>
                                             <td class="py-2 px-3"><span class="font-medium">{{ $rc['tipo_listado'] ?? '-' }}</span></td>

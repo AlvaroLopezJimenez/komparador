@@ -193,7 +193,13 @@ return [
         'secret' => env('ANTI_SCRAPING_SIGNED_URL_SECRET', env('APP_KEY')),
     ],
 
-    // Clave para cifrar/descifrar URLs persistidas en Neoobjetivo.
+    // Clave legacy para cifrar/descifrar URLs persistidas en Neoobjetivo (esquema encv1 actual).
     'neoobjetivo_url_secret' => env('SIGNED_URLS_SECRET', env('APP_KEY')),
+
+    // Nueva clave dedicada para cifrado de almacenamiento de neo (usar valor aleatorio robusto).
+    'neo_encrypt_key' => env('NEO_ENCRYPT_KEY', ''),
+
+    // Nueva clave dedicada para lookup determinista de neo (HMAC para búsquedas exactas).
+    'neo_lookup_key' => env('NEO_LOOKUP_KEY', ''),
 ];
 

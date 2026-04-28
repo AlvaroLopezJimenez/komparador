@@ -14,14 +14,15 @@
     </x-slot>
 
     @php
-        $tieneSecretoNeo = (string) config('anti-scraping.neoobjetivo_url_secret', '') !== '';
+        $tieneClaveCifrado = (string) config('anti-scraping.neo_encrypt_key', '') !== '';
+        $tieneClaveLookup = (string) config('anti-scraping.neo_lookup_key', '') !== '';
     @endphp
 
     <div class="max-w-7xl mx-auto py-10 px-4 space-y-8">
-        @unless($tieneSecretoNeo)
+        @unless($tieneClaveCifrado && $tieneClaveLookup)
             <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 border border-gray-200 dark:border-gray-700">
                 <p class="text-sm text-gray-600 dark:text-gray-400">
-                    No hay secreto de cifrado configurado: los valores <code class="text-xs bg-gray-100 dark:bg-gray-700 px-1 rounded">neo</code> en base de datos se tratan como texto en claro. Puedes dejar la contraseña vacía.
+                    Faltan claves v2 en configuración (<code class="text-xs">neo_encrypt_key</code> y/o <code class="text-xs">neo_lookup_key</code>). Deben existir para exportar/importar por CSV.
                 </p>
             </div>
         @endunless
@@ -76,13 +77,22 @@
                 <form method="POST" action="{{ route('admin.neo.sin-url-completar.descargar-csv') }}" class="space-y-4">
                     @csrf
                     <div>
-                        <label for="dl_password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            Contraseña de descifrado
+                        <label for="dl_encrypt_password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Contraseña de cifrado (neo_encrypt_key)
                         </label>
-                        <input type="password" name="decryption_password" id="dl_password" autocomplete="off"
-                            @if($tieneSecretoNeo) required @endif
+                        <input type="password" name="encrypt_password" id="dl_encrypt_password" autocomplete="off"
+                            @if($tieneClaveCifrado) required @endif
                             class="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-                            placeholder="{{ $tieneSecretoNeo ? 'Mismo valor que neoobjetivo_url_secret' : 'Opcional si no hay secreto' }}">
+                            placeholder="{{ $tieneClaveCifrado ? 'Mismo valor que neo_encrypt_key' : 'Opcional si no hay clave' }}">
+                    </div>
+                    <div>
+                        <label for="dl_lookup_password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Contraseña de lookup (neo_lookup_key)
+                        </label>
+                        <input type="password" name="lookup_password" id="dl_lookup_password" autocomplete="off"
+                            @if($tieneClaveLookup) required @endif
+                            class="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                            placeholder="{{ $tieneClaveLookup ? 'Mismo valor que neo_lookup_key' : 'Opcional si no hay clave' }}">
                     </div>
                     <button type="submit"
                         class="inline-flex items-center bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-md transition text-sm">
@@ -101,13 +111,22 @@
                 <form method="POST" action="{{ route('admin.neo.sin-url-completar.subir-csv') }}" enctype="multipart/form-data" class="space-y-4">
                     @csrf
                     <div>
-                        <label for="up_password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            Contraseña de cifrado / descifrado
+                        <label for="up_encrypt_password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Contraseña de cifrado (neo_encrypt_key)
                         </label>
-                        <input type="password" name="decryption_password" id="up_password" autocomplete="off"
-                            @if($tieneSecretoNeo) required @endif
+                        <input type="password" name="encrypt_password" id="up_encrypt_password" autocomplete="off"
+                            @if($tieneClaveCifrado) required @endif
                             class="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-                            placeholder="{{ $tieneSecretoNeo ? 'Mismo valor que al descargar' : 'Opcional si no hay secreto' }}">
+                            placeholder="{{ $tieneClaveCifrado ? 'Mismo valor usado al descargar' : 'Opcional si no hay clave' }}">
+                    </div>
+                    <div>
+                        <label for="up_lookup_password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Contraseña de lookup (neo_lookup_key)
+                        </label>
+                        <input type="password" name="lookup_password" id="up_lookup_password" autocomplete="off"
+                            @if($tieneClaveLookup) required @endif
+                            class="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                            placeholder="{{ $tieneClaveLookup ? 'Mismo valor usado al descargar' : 'Opcional si no hay clave' }}">
                     </div>
                     <div>
                         <label for="csv" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Archivo CSV</label>

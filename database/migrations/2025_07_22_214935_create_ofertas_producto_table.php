@@ -22,7 +22,9 @@ return new class extends Migration
             $table->dateTime('fecha_actualizacion_envio')->nullable();
             $table->unsignedInteger('frecuencia_actualizar_precio_minutos')->default(1440);
             $table->decimal('precio_unidad', 8, 3);
-            $table->string('url'); // URL de la oferta concreta
+            $table->string('url'); // Legacy (texto plano o encv1)
+            $table->text('url_cipher')->nullable(); // Nuevo cifrado v2 de url
+            $table->string('url_lookup', 64)->nullable()->index(); // Nuevo lookup v2 de url
             $table->string('variante')->nullable(); // Variante de la oferta (número, texto, etc.)
             $table->string('mostrar');
             $table->string('como_scrapear');

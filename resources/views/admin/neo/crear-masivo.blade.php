@@ -1336,10 +1336,13 @@
             const tiendaNoMostrar = String((r.tienda && r.tienda.mostrar_tienda) || '').toLowerCase() === 'no';
             const tiendaNoScraping = String((r.tienda && r.tienda.scrapear) || '').toLowerCase() === 'no';
             const permitirCheckPrecioCero = !!r.tienda && !tiendaNoMostrar && !tiendaNoScraping;
+            const neoIdTagHtml = (puedeCrear && r.neo_id)
+                ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-xs font-medium">Neo ID: ' + r.neo_id + '</span>'
+                : '';
             div.innerHTML = `
                 <div class="flex justify-between items-start gap-4">
                     <div class="flex-1 min-w-0">
-                        <div class="font-medium text-gray-900 dark:text-white flex items-center gap-2 flex-wrap">${estadoText} ${btnVerPromptHtml}</div>
+                        <div class="font-medium text-gray-900 dark:text-white flex items-center gap-2 flex-wrap">${estadoText} ${neoIdTagHtml} ${btnVerPromptHtml}</div>
                         <div class="mt-1 text-sm break-all">
                             <a href="${r.url_normalizada || r.url}" target="_blank" class="url-fila-link text-blue-500 hover:underline block" title="${r.url_normalizada || r.url || ''}"><span class="url-fila-texto">${escapeHtmlCrearMasivo(r.url_normalizada || r.url || '')}</span></a>
                         </div>

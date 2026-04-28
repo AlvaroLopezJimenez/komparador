@@ -24,6 +24,7 @@ use App\Models\ProductoOfertaMasBarataPorProducto;
 use App\Models\UrlDescartada;
 use App\Models\Neo;
 use App\Support\UrlOfertaValidacion;
+use App\Services\ConsultarNeoCifrado;
 
 class OfertaProductoController extends Controller
 {
@@ -171,8 +172,11 @@ class OfertaProductoController extends Controller
         $ofertas = OfertaProducto::with(['tienda', 'producto'])
             ->when($busqueda, function ($query, $busqueda) {
                 $busqueda = strtolower($busqueda);
-                $query->where(function ($q) use ($busqueda) {
-                    $q->whereRaw('LOWER(url) LIKE ?', ["%{$busqueda}%"])
+                $urlLookup = app(ConsultarNeoCifrado::class)->hashLookup($busqueda);
+                $idsBusquedaUrl = $this->buscarIdsOfertasPorUrlParcial($busqueda);
+                $query->where(function ($q) use ($busqueda, $urlLookup, $idsBusquedaUrl) {
+                    $q->where('url_lookup', $urlLookup)
+                    ->orWhereIn('id', $idsBusquedaUrl)
                     ->orWhereRaw('LOWER(anotaciones_internas) LIKE ?', ["%{$busqueda}%"])
                     ->orWhereHas('tienda', function ($q2) use ($busqueda) {
                         $q2->whereRaw('LOWER(nombre) LIKE ?', ["%{$busqueda}%"]);
@@ -1017,7 +1021,21 @@ class OfertaProductoController extends Controller
     {
         $ofertas = OfertaProducto::where('producto_id', $productoId)
             ->with(['tienda'])
-            ->get(['id', 'producto_id', 'tienda_id', 'precio_unidad', 'url']);
+            ->get(['id', 'producto_id', 'tienda_id', 'precio_unidad', 'url_cipher', 'url_lookup']);
+
+        $ofertas = $ofertas->map(function (OfertaProducto $oferta) {
+            return [
+                'id' => $oferta->id,
+                'producto_id' => $oferta->producto_id,
+                'tienda_id' => $oferta->tienda_id,
+                'precio_unidad' => $oferta->precio_unidad,
+                'url' => (string) ($oferta->url ?? ''),
+                'tienda' => $oferta->tienda ? [
+                    'id' => $oferta->tienda->id,
+                    'nombre' => $oferta->tienda->nombre,
+                ] : null,
+            ];
+        })->values();
         
         return response()->json([
             'ofertas' => $ofertas
@@ -2797,7 +2815,8 @@ class OfertaProductoController extends Controller
             ]);
         }
         
-        $query = OfertaProducto::with('producto')->where('url', $url);
+        $lookup = app(ConsultarNeoCifrado::class)->hashLookup($url);
+        $query = OfertaProducto::with('producto')->where('url_lookup', $lookup);
         
         // Si estamos editando una oferta, excluirla de la búsqueda
         if ($ofertaId) {
@@ -2814,7 +2833,13 @@ class OfertaProductoController extends Controller
                 rtrim($urlTrim, '/'),
                 rtrim($urlTrim, '/') . '/',
             ]);
-            $enNeoAniadidaNo = Neo::where('aniadida', 'no')->whereIn('url', $variantes)->exists();
+            $lookups = array_values(array_unique(array_filter(array_map(
+                fn ($u) => app(ConsultarNeoCifrado::class)->hashLookup((string) $u),
+                $variantes
+            ))));
+            $enNeoAniadidaNo = !empty($lookups)
+                ? Neo::where('aniadida', 'no')->whereIn('url_lookup', $lookups)->exists()
+                : false;
             if ($enNeoAniadidaNo) {
                 return response()->json([
                     'tipo' => 'en_neo',
@@ -2888,7 +2913,15 @@ class OfertaProductoController extends Controller
         $urlSinBarra = rtrim($urlNorm, '/');
         $urlConBarra = $urlSinBarra . '/';
         $variantes = array_unique([$url, trim($url), $urlNorm, $urlSinBarra, $urlConBarra]);
-        Neo::where('aniadida', 'no')->whereIn('url', $variantes)->update(['aniadida' => 'si']);
+        $lookups = array_values(array_unique(array_filter(array_map(
+            fn ($u) => app(ConsultarNeoCifrado::class)->hashLookup((string) $u),
+            $variantes
+        ))));
+        if (!empty($lookups)) {
+            Neo::where('aniadida', 'no')
+                ->whereIn('url_lookup', $lookups)
+                ->update(['aniadida' => 'si']);
+        }
     }
 
     /**
@@ -3821,8 +3854,11 @@ class OfertaProductoController extends Controller
             ->where('producto_id', $productoId)
             ->when($busqueda, function ($query, $busqueda) {
                 $busqueda = strtolower($busqueda);
-                $query->where(function ($q) use ($busqueda) {
-                    $q->whereRaw('LOWER(url) LIKE ?', ["%{$busqueda}%"])
+                $urlLookup = app(ConsultarNeoCifrado::class)->hashLookup($busqueda);
+                $idsBusquedaUrl = $this->buscarIdsOfertasPorUrlParcial($busqueda);
+                $query->where(function ($q) use ($busqueda, $urlLookup, $idsBusquedaUrl) {
+                    $q->where('url_lookup', $urlLookup)
+                        ->orWhereIn('id', $idsBusquedaUrl)
                         ->orWhereRaw('LOWER(anotaciones_internas) LIKE ?', ["%{$busqueda}%"])
                         ->orWhereHas('tienda', function ($q2) use ($busqueda) {
                             $q2->whereRaw('LOWER(nombre) LIKE ?', ["%{$busqueda}%"]);
@@ -3841,6 +3877,36 @@ class OfertaProductoController extends Controller
                     $query->where('mostrar', $mostrar);
                 }
             });
+    }
+
+    private function buscarIdsOfertasPorUrlParcial(string $busqueda, int $maxResultados = 5000): array
+    {
+        $busqueda = trim(mb_strtolower($busqueda));
+        if ($busqueda === '') {
+            return [];
+        }
+
+        $ids = [];
+        OfertaProducto::query()
+            ->whereNotNull('url_cipher')
+            ->where('url_cipher', '!=', '')
+            ->select(['id', 'url_cipher'])
+            ->orderBy('id')
+            ->chunkById(300, function ($lote) use (&$ids, $busqueda, $maxResultados) {
+                foreach ($lote as $oferta) {
+                    $url = mb_strtolower(trim((string) $oferta->url));
+                    if ($url !== '' && mb_strpos($url, $busqueda) !== false) {
+                        $ids[] = (int) $oferta->id;
+                        if (count($ids) >= $maxResultados) {
+                            return false;
+                        }
+                    }
+                }
+
+                return true;
+            });
+
+        return $ids;
     }
 
     /**

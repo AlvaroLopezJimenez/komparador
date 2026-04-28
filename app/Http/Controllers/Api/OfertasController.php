@@ -15,6 +15,7 @@ use App\Services\SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos;
 use App\Services\SignedUrlService;
 use App\Services\CalcularPrecioUnidad;
 use App\Services\LimpiarUrlDeTiendas;
+use App\Services\ConsultarNeoCifrado;
 use App\Support\UrlOfertaValidacion;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\DB;
@@ -696,6 +697,7 @@ class OfertasController extends Controller
                 $resultados[] = [
                     'url' => $data['url'],
                     'url_normalizada' => $data['url'],
+                    'neo_id' => null,
                     'existe' => false,
                     'existe_mismo_producto' => false,
                     'existe_otros_productos' => false,
@@ -715,6 +717,7 @@ class OfertasController extends Controller
             $item = [
                 'url' => $urlParaMostrar,
                 'url_normalizada' => $urlParaMostrar,
+                'neo_id' => null,
                 'existe' => false,
                 'existe_mismo_producto' => false,
                 'existe_otros_productos' => false,
@@ -727,6 +730,19 @@ class OfertasController extends Controller
                 'tiene_especificaciones' => false,
                 'error' => null,
             ];
+
+            $urlLookups = array_values(array_unique(array_filter([
+                app(ConsultarNeoCifrado::class)->hashLookup($urlParaMostrar),
+                app(ConsultarNeoCifrado::class)->hashLookup($urlParaBuscar),
+            ])));
+            if (!empty($urlLookups)) {
+                $neoId = Neo::query()
+                    ->where('aniadida', 'no')
+                    ->whereIn('url_lookup', $urlLookups)
+                    ->orderBy('id')
+                    ->value('id');
+                $item['neo_id'] = $neoId ? (int) $neoId : null;
+            }
 
             if (UrlDescartada::where('url', $urlParaMostrar)->exists()) {
                 $item['existe'] = true;
@@ -1457,7 +1473,15 @@ Responde ÚNICAMENTE con el JSON.";
         $urlSinBarra = rtrim($urlNorm, '/');
         $urlConBarra = $urlSinBarra . '/';
         $variantes = array_unique([$url, trim($url), $urlNorm, $urlSinBarra, $urlConBarra]);
-        Neo::where('aniadida', 'no')->whereIn('url', $variantes)->update(['aniadida' => 'si']);
+        $lookups = array_values(array_unique(array_filter(array_map(
+            fn ($u) => app(ConsultarNeoCifrado::class)->hashLookup((string) $u),
+            $variantes
+        ))));
+        if (!empty($lookups)) {
+            Neo::where('aniadida', 'no')
+                ->whereIn('url_lookup', $lookups)
+                ->update(['aniadida' => 'si']);
+        }
 
         return response()->json([
             'success' => true,

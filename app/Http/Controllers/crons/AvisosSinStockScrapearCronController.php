@@ -172,9 +172,22 @@ class AvisosSinStockScrapearCronController extends Controller
      */
     private function procesarAviso(Aviso $aviso, OfertaProducto $oferta): array
     {
+        $urlOferta = trim((string) $oferta->url);
+        if ($urlOferta === '') {
+            // Sin URL v2 no se puede scrapear; se aplaza el aviso.
+            $this->aplazarAvisoSinStock($aviso);
+            return [
+                'accion' => 'aplazado',
+                'scraping' => [
+                    'success' => false,
+                    'error' => 'Oferta sin url v2 descifrada (url_cipher/url_lookup).',
+                ],
+            ];
+        }
+
         $scrapingController = new ScrapingController();
         $request = new Request([
-            'url' => $oferta->url,
+            'url' => $urlOferta,
             'tienda' => $oferta->tienda->nombre,
             'variante' => $oferta->variante ?? null,
         ]);

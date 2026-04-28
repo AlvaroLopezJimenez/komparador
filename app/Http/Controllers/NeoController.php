@@ -9,8 +9,10 @@ use App\Models\OfertaProducto;
 use App\Models\Producto;
 use App\Models\Tienda;
 use App\Models\UrlDescartada;
+use App\Services\ConsultarNeoCifrado;
 use App\Services\LimpiarUrlDeTiendas;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class NeoController extends Controller
 {
@@ -23,24 +25,24 @@ class NeoController extends Controller
         $totalNeoAniadidaNo = Neo::where('aniadida', 'no')->count();
         $totalNeoAniadidaNoSinUrl = Neo::where('aniadida', 'no')
             ->where(function ($q) {
-                $q->whereNull('url')->orWhere('url', '');
+                $q->whereNull('url_cipher')->orWhere('url_cipher', '');
             })
             ->count();
         $totalProductosNeoAniadidaNo = (int) Neo::where('aniadida', 'no')
-            ->whereNotNull('url')
-            ->where('url', '!=', '')
+            ->whereNotNull('url_cipher')
+            ->where('url_cipher', '!=', '')
             ->whereNotNull('producto_id')
             ->selectRaw('count(distinct producto_id) as c')
             ->value('c');
         $totalCategoriasNeoAniadidaNo = (int) Neo::where('aniadida', 'no')
-            ->whereNotNull('url')
-            ->where('url', '!=', '')
+            ->whereNotNull('url_cipher')
+            ->where('url_cipher', '!=', '')
             ->whereNotNull('categoria_id')
             ->selectRaw('count(distinct categoria_id) as c')
             ->value('c');
         $totalTiendasNeoAniadidaNo = (int) Neo::where('aniadida', 'no')
-            ->whereNotNull('url')
-            ->where('url', '!=', '')
+            ->whereNotNull('url_cipher')
+            ->where('url_cipher', '!=', '')
             ->whereNotNull('tienda_id')
             ->selectRaw('count(distinct tienda_id) as c')
             ->value('c');
@@ -64,8 +66,8 @@ class NeoController extends Controller
     public function productosConNeoAniadidaNo()
     {
         $grupos = Neo::where('aniadida', 'no')
-            ->whereNotNull('url')
-            ->where('url', '!=', '')
+            ->whereNotNull('url_cipher')
+            ->where('url_cipher', '!=', '')
             ->whereNotNull('producto_id')
             ->selectRaw('producto_id, count(*) as total')
             ->groupBy('producto_id')
@@ -98,9 +100,11 @@ class NeoController extends Controller
     {
         $urls = Neo::where('aniadida', 'no')
             ->where('producto_id', $productoId)
-            ->whereNotNull('url')
-            ->where('url', '!=', '')
-            ->pluck('url')
+            ->whereNotNull('url_cipher')
+            ->where('url_cipher', '!=', '')
+            ->get()
+            ->map(fn (Neo $neo) => trim((string) $neo->url))
+            ->filter(fn (string $url) => $url !== '')
             ->values()
             ->toArray();
 
@@ -130,8 +134,8 @@ class NeoController extends Controller
     public function categoriasConNeoAniadidaNo()
     {
         $grupos = Neo::where('aniadida', 'no')
-            ->whereNotNull('url')
-            ->where('url', '!=', '')
+            ->whereNotNull('url_cipher')
+            ->where('url_cipher', '!=', '')
             ->whereNotNull('categoria_id')
             ->selectRaw('categoria_id, count(*) as total')
             ->groupBy('categoria_id')
@@ -160,9 +164,11 @@ class NeoController extends Controller
     {
         $urls = Neo::where('aniadida', 'no')
             ->where('categoria_id', $categoriaId)
-            ->whereNotNull('url')
-            ->where('url', '!=', '')
-            ->pluck('url')
+            ->whereNotNull('url_cipher')
+            ->where('url_cipher', '!=', '')
+            ->get()
+            ->map(fn (Neo $neo) => trim((string) $neo->url))
+            ->filter(fn (string $url) => $url !== '')
             ->values()
             ->toArray();
 
@@ -176,8 +182,8 @@ class NeoController extends Controller
     {
         $grupos = Neo::where('aniadida', 'no')
             ->where('categoria_id', $categoriaId)
-            ->whereNotNull('url')
-            ->where('url', '!=', '')
+            ->whereNotNull('url_cipher')
+            ->where('url_cipher', '!=', '')
             ->whereNotNull('tienda_id')
             ->selectRaw('tienda_id, count(*) as total')
             ->groupBy('tienda_id')
@@ -207,9 +213,11 @@ class NeoController extends Controller
         $urls = Neo::where('aniadida', 'no')
             ->where('categoria_id', $categoriaId)
             ->where('tienda_id', $tiendaId)
-            ->whereNotNull('url')
-            ->where('url', '!=', '')
-            ->pluck('url')
+            ->whereNotNull('url_cipher')
+            ->where('url_cipher', '!=', '')
+            ->get()
+            ->map(fn (Neo $neo) => trim((string) $neo->url))
+            ->filter(fn (string $url) => $url !== '')
             ->values()
             ->toArray();
 
@@ -223,8 +231,8 @@ class NeoController extends Controller
     public function tiendasConNeoAniadidaNo()
     {
         $grupos = Neo::where('aniadida', 'no')
-            ->whereNotNull('url')
-            ->where('url', '!=', '')
+            ->whereNotNull('url_cipher')
+            ->where('url_cipher', '!=', '')
             ->whereNotNull('tienda_id')
             ->selectRaw('tienda_id, count(*) as total')
             ->groupBy('tienda_id')
@@ -253,9 +261,11 @@ class NeoController extends Controller
     {
         $urls = Neo::where('aniadida', 'no')
             ->where('tienda_id', $tiendaId)
-            ->whereNotNull('url')
-            ->where('url', '!=', '')
-            ->pluck('url')
+            ->whereNotNull('url_cipher')
+            ->where('url_cipher', '!=', '')
+            ->get()
+            ->map(fn (Neo $neo) => trim((string) $neo->url))
+            ->filter(fn (string $url) => $url !== '')
             ->values()
             ->toArray();
 
@@ -269,8 +279,8 @@ class NeoController extends Controller
     {
         $grupos = Neo::where('aniadida', 'no')
             ->where('tienda_id', $tiendaId)
-            ->whereNotNull('url')
-            ->where('url', '!=', '')
+            ->whereNotNull('url_cipher')
+            ->where('url_cipher', '!=', '')
             ->whereNotNull('categoria_id')
             ->selectRaw('categoria_id, count(*) as total')
             ->groupBy('categoria_id')
@@ -300,9 +310,11 @@ class NeoController extends Controller
         $urls = Neo::where('aniadida', 'no')
             ->where('tienda_id', $tiendaId)
             ->where('categoria_id', $categoriaId)
-            ->whereNotNull('url')
-            ->where('url', '!=', '')
-            ->pluck('url')
+            ->whereNotNull('url_cipher')
+            ->where('url_cipher', '!=', '')
+            ->get()
+            ->map(fn (Neo $neo) => trim((string) $neo->url))
+            ->filter(fn (string $url) => $url !== '')
             ->values()
             ->toArray();
 
@@ -329,10 +341,11 @@ class NeoController extends Controller
 
         $neos = Neo::with(['producto', 'tienda', 'categoria'])
             ->when($busqueda, function ($query, $busqueda) {
-                $busqueda = strtolower(trim($busqueda));
-                $query->where(function ($q) use ($busqueda) {
-                    $q->whereRaw('LOWER(url) LIKE ?', ["%{$busqueda}%"])
-                        ->orWhereRaw('LOWER(neo) LIKE ?', ["%{$busqueda}%"]);
+                $busqueda = trim($busqueda);
+                $lookup = app(ConsultarNeoCifrado::class)->hashLookup($busqueda);
+                $query->where(function ($q) use ($lookup) {
+                    $q->where('neo_lookup', $lookup)
+                        ->orWhere('url_lookup', $lookup);
                 });
             })
             ->when(!$busqueda && count($aniadidaParaVista) > 0, function ($query) use ($aniadidaParaVista) {
@@ -428,7 +441,8 @@ class NeoController extends Controller
 
         UrlDescartada::firstOrCreate(['url' => $url]);
 
-        $filasActualizadas = Neo::where('url', $url)
+        $urlLookup = app(ConsultarNeoCifrado::class)->hashLookup($url);
+        $filasActualizadas = Neo::where('url_lookup', $urlLookup)
             ->where('aniadida', 'no')
             ->update([
                 'aniadida' => 'si',
@@ -466,8 +480,12 @@ class NeoController extends Controller
         $variantes = $this->variantesUrlParaNeoCrearMasivo($url);
         $categoriaId = $validated['categoria_id'] ?? null;
 
+        $lookups = array_values(array_filter(array_map(
+            fn ($u) => app(ConsultarNeoCifrado::class)->hashLookup($u),
+            $variantes
+        )));
         $actualizadas = Neo::where('aniadida', 'no')
-            ->whereIn('url', $variantes)
+            ->whereIn('url_lookup', $lookups)
             ->update(['categoria_id' => $categoriaId]);
 
         return response()->json([
@@ -552,8 +570,9 @@ class NeoController extends Controller
         $encontradas = [];
 
         foreach ($unicosOrden as $url) {
+            $lookup = app(ConsultarNeoCifrado::class)->hashLookup($url);
             $filas = Neo::query()
-                ->where('url', $url)
+                ->where('url_lookup', $lookup)
                 ->orderBy('id')
                 ->get(['id', 'url', 'aniadida', 'created_at']);
 
@@ -609,14 +628,15 @@ class NeoController extends Controller
             $alcance = $accion['alcance'];
             $neoId = isset($accion['neo_id']) ? (int) $accion['neo_id'] : null;
 
-            $idsConUrl = Neo::query()->where('url', $url)->pluck('id');
+            $lookup = app(ConsultarNeoCifrado::class)->hashLookup($url);
+            $idsConUrl = Neo::query()->where('url_lookup', $lookup)->pluck('id');
             if ($idsConUrl->isEmpty()) {
                 $detalle[] = ['url' => $url, 'eliminadas' => 0, 'aviso' => 'La URL ya no existe en neo.'];
                 continue;
             }
 
             if ($alcance === 'todas') {
-                $n = Neo::query()->where('url', $url)->delete();
+                $n = Neo::query()->where('url_lookup', $lookup)->delete();
                 $totalEliminadas += $n;
                 $detalle[] = ['url' => $url, 'eliminadas' => $n, 'alcance' => 'todas'];
                 continue;
@@ -642,7 +662,7 @@ class NeoController extends Controller
                 $idBorrar = $neoId;
             }
 
-            $fila = Neo::query()->where('id', $idBorrar)->where('url', $url)->first();
+            $fila = Neo::query()->where('id', $idBorrar)->where('url_lookup', $lookup)->first();
             if (!$fila) {
                 return response()->json([
                     'success' => false,
@@ -692,10 +712,10 @@ class NeoController extends Controller
         $neos = Neo::query()
             ->with(['producto', 'tienda', 'categoria'])
             ->where(function ($q) {
-                $q->whereNull('url')->orWhere('url', '');
+                $q->whereNull('url_cipher')->orWhere('url_cipher', '');
             })
-            ->whereNotNull('neo')
-            ->where('neo', '!=', '')
+            ->whereNotNull('neo_cipher')
+            ->where('neo_cipher', '!=' , '')
             ->orderBy('id')
             ->paginate($perPage)
             ->withQueryString();
@@ -709,18 +729,21 @@ class NeoController extends Controller
     public function neoSinUrlDescargarCsv(Request $request)
     {
         $request->validate([
-            'decryption_password' => ['nullable', 'string', 'max:500'],
+            'encrypt_password' => ['nullable', 'string', 'max:500'],
+            'lookup_password' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $secretCheck = $this->validarSecretoNeoCsv($request->input('decryption_password'));
+        $secretCheck = $this->validarSecretosNeoCsv(
+            $request->input('encrypt_password'),
+            $request->input('lookup_password')
+        );
         if (!$secretCheck['ok']) {
-            return back()->withErrors(['decryption_password' => $secretCheck['error']])->withInput();
+            return back()->withErrors($secretCheck['errors'] ?? [])->withInput();
         }
-        $cryptoSecret = $secretCheck['secret'];
 
         $filename = 'neo-sin-url-' . now()->format('Y-m-d-His') . '.csv';
 
-        return response()->streamDownload(function () use ($cryptoSecret) {
+        return response()->streamDownload(function () {
             $out = fopen('php://output', 'w');
             if ($out === false) {
                 return;
@@ -730,16 +753,13 @@ class NeoController extends Controller
 
             Neo::query()
                 ->where(function ($q) {
-                    $q->whereNull('url')->orWhere('url', '');
+                    $q->whereNull('url_cipher')->orWhere('url_cipher', '');
                 })
-                ->whereNotNull('neo')
-                ->where('neo', '!=', '')
-                ->chunkById(200, function ($neos) use ($out, $cryptoSecret) {
+                ->whereNotNull('neo_cipher')
+                ->where('neo_cipher', '!=', '')
+                ->chunkById(200, function ($neos) use ($out) {
                     foreach ($neos as $neo) {
-                        $raw = $neo->getRawOriginal('neo');
-                        $plain = is_string($raw)
-                            ? Neo::decryptNeoFromStoredWithSecret($raw, $cryptoSecret)
-                            : '';
+                        $plain = trim((string) ($neo->neo ?? ''));
                         fputcsv($out, [$plain, '']);
                     }
                 });
@@ -755,17 +775,20 @@ class NeoController extends Controller
     public function neoSinUrlSubirCsv(Request $request): \Illuminate\Http\RedirectResponse
     {
         $request->validate([
-            'decryption_password' => ['nullable', 'string', 'max:500'],
+            'encrypt_password' => ['nullable', 'string', 'max:500'],
+            'lookup_password' => ['nullable', 'string', 'max:500'],
             'csv'                 => ['required', 'file', 'mimes:csv,txt', 'max:5120'],
         ], [
             'csv.required' => 'Selecciona un archivo CSV.',
         ]);
 
-        $secretCheck = $this->validarSecretoNeoCsv($request->input('decryption_password'));
+        $secretCheck = $this->validarSecretosNeoCsv(
+            $request->input('encrypt_password'),
+            $request->input('lookup_password')
+        );
         if (!$secretCheck['ok']) {
-            return back()->withErrors(['decryption_password' => $secretCheck['error']])->withInput();
+            return back()->withErrors($secretCheck['errors'] ?? [])->withInput();
         }
-        $cryptoSecret = $secretCheck['secret'];
 
         $path = $request->file('csv')->getRealPath();
         if ($path === false || !is_readable($path)) {
@@ -838,15 +861,14 @@ class NeoController extends Controller
                     continue;
                 }
 
-                $cifrado = Neo::encryptedNeoForLookupWithSecret($neoPlain, $cryptoSecret);
+                $lookup = app(ConsultarNeoCifrado::class)->hashLookup($neoPlain);
 
                 $filas = Neo::query()
-                    ->where(function ($q) use ($neoPlain, $cifrado) {
-                        $q->where('neo', $neoPlain)
-                            ->orWhere('neo', $cifrado);
+                    ->where(function ($q) use ($lookup, $neoPlain) {
+                        $q->where('neo_lookup', $lookup);
                     })
                     ->where(function ($q) {
-                        $q->whereNull('url')->orWhere('url', '');
+                        $q->whereNull('url_cipher')->orWhere('url_cipher', '');
                     })
                     ->orderBy('id')
                     ->get();
@@ -862,9 +884,10 @@ class NeoController extends Controller
                 $urlExisteEnOfertaProducto = OfertaProducto::query()
                     ->where('url', $urlNueva)
                     ->exists();
+                $urlNuevaLookup = app(ConsultarNeoCifrado::class)->hashLookup($urlNueva);
 
                 $filaDestinoExistente = Neo::query()
-                    ->where('url', $urlNueva)
+                    ->where('url_lookup', $urlNuevaLookup)
                     ->orderBy('id')
                     ->first();
 
@@ -933,26 +956,24 @@ class NeoController extends Controller
     }
 
     /**
-     * @return array{ok: bool, secret: string, error?: string}
+     * @return array{ok: bool, errors?: array<string, string>}
      */
-    private function validarSecretoNeoCsv(?string $password): array
+    private function validarSecretosNeoCsv(?string $encryptPassword, ?string $lookupPassword): array
     {
-        $appSecret = (string) config('anti-scraping.neoobjetivo_url_secret', '');
-        $password = (string) ($password ?? '');
+        $encryptSecret = (string) config('anti-scraping.neo_encrypt_key', '');
+        $lookupSecret = (string) config('anti-scraping.neo_lookup_key', '');
+        $encryptPassword = (string) ($encryptPassword ?? '');
+        $lookupPassword = (string) ($lookupPassword ?? '');
+        $errors = [];
 
-        if ($appSecret !== '') {
-            if ($password === '' || !hash_equals($appSecret, $password)) {
-                return [
-                    'ok' => false,
-                    'secret' => '',
-                    'error' => 'La contraseña no coincide con el secreto configurado (anti-scraping.neoobjetivo_url_secret).',
-                ];
-            }
-
-            return ['ok' => true, 'secret' => $appSecret];
+        if ($encryptSecret !== '' && ($encryptPassword === '' || !hash_equals($encryptSecret, $encryptPassword))) {
+            $errors['encrypt_password'] = 'La contraseña de cifrado no coincide con anti-scraping.neo_encrypt_key.';
+        }
+        if ($lookupSecret !== '' && ($lookupPassword === '' || !hash_equals($lookupSecret, $lookupPassword))) {
+            $errors['lookup_password'] = 'La contraseña de lookup no coincide con anti-scraping.neo_lookup_key.';
         }
 
-        return ['ok' => true, 'secret' => ''];
+        return empty($errors) ? ['ok' => true] : ['ok' => false, 'errors' => $errors];
     }
 
 }

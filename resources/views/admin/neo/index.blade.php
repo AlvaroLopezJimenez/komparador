@@ -11,12 +11,14 @@
     </x-slot>
 
     <div class="py-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="mb-4">
-            <a href="{{ route('admin.neo.sin-url-completar') }}"
-                class="inline-flex text-sm text-blue-600 dark:text-blue-400 hover:underline">
-                Neo sin URL — completar por CSV
-            </a>
-        </div>
+        @if (\Illuminate\Support\Facades\Route::has('admin.neo.sin-url-completar'))
+            <div class="mb-4">
+                <a href="{{ route('admin.neo.sin-url-completar') }}"
+                    class="inline-flex text-sm text-blue-600 dark:text-blue-400 hover:underline">
+                    Neo sin URL — completar por CSV
+                </a>
+            </div>
+        @endif
         {{-- Formulario de búsqueda --}}
         <div class="mb-4 text-left">
             <form method="GET" class="mb-6 flex flex-wrap items-center gap-2">

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\ConsultarNeoCifrado;
 use Illuminate\Database\Eloquent\Model;
 use Throwable;
 
@@ -20,6 +21,8 @@ class Neoobjetivo extends Model
         'categoria_id',
         'tienda_id',
         'url',
+        'url_cipher',
+        'url_lookup',
         'visitada',
         'created_at',
         'updated_at',
@@ -39,11 +42,16 @@ class Neoobjetivo extends Model
         $value = is_string($value) ? trim($value) : $value;
 
         if ($value === null || $value === '') {
-            $this->attributes['url'] = $value;
+            // Mantener columna legacy no nula.
+            $this->attributes['url'] = '';
+            $this->attributes['url_cipher'] = null;
+            $this->attributes['url_lookup'] = null;
             return;
         }
-
-        $this->attributes['url'] = self::encryptUrl((string) $value);
+        $payload = app(ConsultarNeoCifrado::class)->construirPayload((string) $value);
+        $this->attributes['url'] = '';
+        $this->attributes['url_cipher'] = $payload['neo_cipher'];
+        $this->attributes['url_lookup'] = $payload['neo_lookup'];
     }
 
     /**
@@ -51,11 +59,12 @@ class Neoobjetivo extends Model
      */
     public function getUrlAttribute($value): ?string
     {
-        if (!is_string($value) || $value === '') {
-            return $value;
+        $cipherV2 = (string) ($this->attributes['url_cipher'] ?? '');
+        if ($cipherV2 !== '') {
+            return app(ConsultarNeoCifrado::class)->descifrarGuardado($cipherV2);
         }
 
-        return self::decryptUrl($value);
+        return '';
     }
 
     private static function encryptUrl(string $plainText): string
