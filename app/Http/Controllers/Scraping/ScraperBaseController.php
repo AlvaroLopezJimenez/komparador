@@ -97,9 +97,9 @@ abstract class ScraperBaseController extends Controller
             $precioUnidadNuevo = round($precioNuevo / $oferta->unidades, 2);
         }
         
-        // ================================
-// DETECCIÓN BAJADA > 40% + AVISO
-// ================================
+// =========================================
+// DETECCIÓN CAMBIOS ANÓMALOS (+/-40%) + AVISO
+// =========================================
 
 // (Asegúrate de tener arriba del archivo:)
 /// use Illuminate\Support\Facades\DB;
@@ -107,6 +107,7 @@ abstract class ScraperBaseController extends Controller
 /// use App\Models\OfertaProducto; // si no lo tienes ya importado
 
 $umbralBajada = 0.40; // 40%
+$umbralSubida = 0.40; // 40%
 
 // Evitar divisiones/avisos si no hay precio anterior válido
 if (is_numeric($precioAnterior) && $precioAnterior > 0) {
@@ -164,8 +165,62 @@ if (is_numeric($precioAnterior) && $precioAnterior > 0) {
             // 'motivo'               => 'Bajada > 40% (no aplicado)',
         ];
     }
+
+    // % de subida respecto al precio anterior (0.00 - 1.00)
+    $subidaRelativa = ($precioNuevo - $precioAnterior) / $precioAnterior;
+
+    if ($subidaRelativa >= $umbralSubida) {
+        // Construir texto del aviso
+        $producto = Producto::find($oferta->producto_id);
+        $nombreProducto = $producto ? $producto->nombre : ('Producto ID '.$oferta->producto_id);
+
+        $subidaAbsoluta = max(0, $precioNuevo - $precioAnterior); // por claridad
+        $porcentajeStr = number_format($subidaRelativa * 100, 0); // ej: "41"
+        $textoAviso = sprintf(
+            "Subida anómala (>40%%) en '%s': de %.2f€ a %.2f€ (+%.2f€, +%s%%). Tienda: %s | Variante: %s | URL: %s",
+            $nombreProducto,
+            $precioAnterior,
+            $precioNuevo,
+            $subidaAbsoluta,
+            $porcentajeStr,
+            $oferta->tienda->nombre,
+            $oferta->variante ?? '—',
+            $oferta->url
+        );
+
+        // Guardar aviso
+        DB::table('avisos')->insert([
+            'texto_aviso'     => $textoAviso,
+            'fecha_aviso'     => now(),
+            'user_id'         => 1,
+            'avisoable_type'  => \App\Models\OfertaProducto::class,
+            'avisoable_id'    => $oferta->id,
+            'oculto'          => 0,
+            'created_at'      => now(),
+            'updated_at'      => now(),
+        ]);
+
+        // NO actualizamos precios en la oferta (posible outlier), solo tocamos updated_at
+        $oferta->touch();
+
+        // Devolvemos sin continuar con el flujo de actualización/comparación
+        return [
+            'oferta_id'               => $oferta->id,
+            'tienda_nombre'           => $oferta->tienda->nombre,
+            'url'                     => $oferta->url,
+            'variante'                => $oferta->variante,
+            'precio_anterior'         => $precioAnterior,
+            'precio_nuevo'            => $precioNuevo, // detectado pero NO aplicado
+            'success'                 => true,
+            'error'                   => null,
+            'cambios_detectados'      => false,        // no rehacemos rankings porque no aplicamos precio
+            'url_notificacion_llamada'=> false,
+            // 'aviso_creado'         => true,
+            // 'motivo'               => 'Subida > 40% (no aplicado)',
+        ];
+    }
 }
-// ===== FIN DETECCIÓN BAJADA > 40% =====
+// ===== FIN DETECCIÓN CAMBIOS ANÓMALOS (+/-40%) =====
 
 
         // Actualizar la oferta

@@ -81,6 +81,98 @@
         return $oferta;
         }
     }
+
+    if (!function_exists('obtenerNombresEspecificacionesInternasOferta')) {
+        /**
+         * @return array<int, string>
+         */
+        function obtenerNombresEspecificacionesInternasOferta($oferta, $producto = null) {
+            if (!$oferta || empty($oferta->especificaciones_internas) || !is_array($oferta->especificaciones_internas)) {
+                return [];
+            }
+
+            if (!$producto && isset($oferta->producto) && $oferta->producto) {
+                $producto = $oferta->producto;
+            }
+
+            if (!$producto && isset($oferta->producto_id) && $oferta->producto_id) {
+                $producto = \App\Models\Producto::find($oferta->producto_id);
+            }
+
+            if (!$producto || empty($producto->categoria_id_especificaciones_internas)) {
+                return [];
+            }
+
+            static $cacheCategoriasEspecificaciones = [];
+            $categoriaId = (int) $producto->categoria_id_especificaciones_internas;
+            if (!array_key_exists($categoriaId, $cacheCategoriasEspecificaciones)) {
+                $categoria = \App\Models\Categoria::query()
+                    ->select(['id', 'especificaciones_internas'])
+                    ->find($categoriaId);
+                $cacheCategoriasEspecificaciones[$categoriaId] = $categoria?->especificaciones_internas;
+            }
+
+            $especificacionesCategoria = $cacheCategoriasEspecificaciones[$categoriaId];
+            $filtros = [];
+            if (is_array($especificacionesCategoria) && isset($especificacionesCategoria['filtros']) && is_array($especificacionesCategoria['filtros'])) {
+                $filtros = array_merge($filtros, $especificacionesCategoria['filtros']);
+            }
+
+            // En algunos productos hay líneas internas adicionales guardadas en _producto.
+            $especificacionesElegidasProducto = $producto->categoria_especificaciones_internas_elegidas ?? null;
+            if (is_array($especificacionesElegidasProducto)
+                && isset($especificacionesElegidasProducto['_producto']['filtros'])
+                && is_array($especificacionesElegidasProducto['_producto']['filtros'])) {
+                $filtros = array_merge($filtros, $especificacionesElegidasProducto['_producto']['filtros']);
+            }
+
+            if ($filtros === []) {
+                return [];
+            }
+
+            $mapaTextos = [];
+            foreach ($filtros as $filtro) {
+                if (!is_array($filtro) || !isset($filtro['id']) || !isset($filtro['subprincipales']) || !is_array($filtro['subprincipales'])) {
+                    continue;
+                }
+                $principalId = (string) $filtro['id'];
+                foreach ($filtro['subprincipales'] as $sub) {
+                    if (is_array($sub) && isset($sub['id']) && isset($sub['texto'])) {
+                        $mapaTextos[$principalId][(string) $sub['id']] = (string) $sub['texto'];
+                    }
+                }
+            }
+
+            $etiquetas = [];
+            foreach ($oferta->especificaciones_internas as $principalId => $rawSeleccionadas) {
+                if ((string) $principalId === '_columnas') {
+                    continue;
+                }
+
+                $ids = [];
+                if (is_array($rawSeleccionadas)) {
+                    foreach ($rawSeleccionadas as $item) {
+                        if (is_array($item) && array_key_exists('id', $item)) {
+                            $ids[] = (string) $item['id'];
+                        } elseif (is_string($item) || is_numeric($item)) {
+                            $ids[] = (string) $item;
+                        }
+                    }
+                } elseif (is_string($rawSeleccionadas) || is_numeric($rawSeleccionadas)) {
+                    $ids[] = (string) $rawSeleccionadas;
+                }
+
+                foreach (array_unique($ids) as $subId) {
+                    $texto = $mapaTextos[(string) $principalId][(string) $subId] ?? null;
+                    if ($texto !== null && $texto !== '') {
+                        $etiquetas[] = $texto;
+                    }
+                }
+            }
+
+            return array_values(array_unique($etiquetas));
+        }
+    }
 @endphp
 
 <x-app-layout>
@@ -385,6 +477,18 @@
                                             @endif
                                         </div>
                                         <span class="text-xs text-gray-400">{{ $aviso->fecha_aviso->format('d/m/Y H:i') }}</span>
+                                        @if($ofertaMasBarata)
+                                            @php
+                                                $nombresEspecificacionesOfertaMasBarata = obtenerNombresEspecificacionesInternasOferta($ofertaMasBarata, $aviso->avisoable);
+                                                $descuentosOfertaMasBarata = is_string($ofertaMasBarata->descuentos) ? trim($ofertaMasBarata->descuentos) : '';
+                                            @endphp
+                                            @if(!empty($nombresEspecificacionesOfertaMasBarata))
+                                                <div class="text-xs text-amber-300">{{ implode(' · ', $nombresEspecificacionesOfertaMasBarata) }}</div>
+                                            @endif
+                                            @if($descuentosOfertaMasBarata !== '')
+                                                <div class="text-xs text-lime-300">Descuento: {{ $descuentosOfertaMasBarata }}</div>
+                                            @endif
+                                        @endif
                                     </div>
                                 @elseif($aviso->avisoable_type === 'App\Models\OfertaProducto' && $aviso->avisoable_id && $aviso->avisoable_id !== null)
                                     <div class="flex flex-col space-y-1">
@@ -413,6 +517,18 @@
                                             
                                         </div>
                                         <span class="text-xs text-gray-400">{{ $aviso->fecha_aviso->format('d/m/Y H:i') }}</span>
+                                        @if($aviso->avisoable)
+                                            @php
+                                                $nombresEspecificacionesOferta = obtenerNombresEspecificacionesInternasOferta($aviso->avisoable, $aviso->avisoable->producto ?? null);
+                                                $descuentosOferta = is_string($aviso->avisoable->descuentos) ? trim($aviso->avisoable->descuentos) : '';
+                                            @endphp
+                                            @if(!empty($nombresEspecificacionesOferta))
+                                                <div class="text-xs text-amber-300">{{ implode(' · ', $nombresEspecificacionesOferta) }}</div>
+                                            @endif
+                                            @if($descuentosOferta !== '')
+                                                <div class="text-xs text-lime-300">Descuento: {{ $descuentosOferta }}</div>
+                                            @endif
+                                        @endif
                                     </div>
                                 @elseif($aviso->avisoable_type === 'App\Models\Chollo' && $aviso->avisoable)
                                     <div class="flex flex-col space-y-1">

@@ -19,18 +19,28 @@
         if (!$debeIgnorar) {
             $hora = now();
             $ip = request()->ip();
-            $textoAviso = "Un visitante ha visto un error 404 - Página no encontrada. URL: {$url} - Hora: {$hora} - IP: {$ip}";
-            
-            \DB::table('avisos')->insert([
-                'texto_aviso'     => $textoAviso,
-                'fecha_aviso'     => $hora,
-                'user_id'         => 1,
-                'avisoable_type'  => 'Interno',
-                'avisoable_id'    => 0,
-                'oculto'          => 0,
-                'created_at'      => $hora,
-                'updated_at'      => $hora,
-            ]);
+            $textoAviso = "Un visitante ha visto un error 404 - Página no encontrada. URL: {$url} - IP: {$ip}";
+
+            // Evita avisos duplicados comparando con la BD.
+            $yaExiste = \DB::table('avisos')
+                ->where('texto_aviso', $textoAviso)
+                ->where('user_id', 1)
+                ->where('avisoable_type', 'Interno')
+                ->where('avisoable_id', 0)
+                ->exists();
+
+            if (!$yaExiste) {
+                \DB::table('avisos')->insert([
+                    'texto_aviso'     => $textoAviso,
+                    'fecha_aviso'     => $hora,
+                    'user_id'         => 1,
+                    'avisoable_type'  => 'Interno',
+                    'avisoable_id'    => 0,
+                    'oculto'          => 0,
+                    'created_at'      => $hora,
+                    'updated_at'      => $hora,
+                ]);
+            }
         }
     } catch (\Exception $e) {
         \Log::error('Error al generar aviso en vista 404: ' . $e->getMessage());

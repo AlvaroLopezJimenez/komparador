@@ -1539,14 +1539,29 @@ class CronNeoObjetivosController extends Controller
         $finalUrl = app(LimpiarUrlDeTiendas::class)->limpiar($urlProducto);
         $log[] = ['paso' => count($log) + 1, 'texto' => 'URL final (tras LimpiarUrlDeTiendas):', 'valor' => $finalUrl];
 
-        if (Neo::where('url', $finalUrl)->exists()) {
-            $log[] = ['paso' => count($log) + 1, 'texto' => '¿Existe en tabla neo (campo url)?', 'decision' => 'Sí → No se guarda'];
+        $neoExistentePorUrl = Neo::where('url', $finalUrl)->first();
+        if ($neoExistentePorUrl) {
+            $log[] = ['paso' => count($log) + 1, 'texto' => '¿Existe en tabla neo (campo url)?', 'decision' => 'Sí'];
+
+            if ($neoExistentePorUrl->tienda_id === null && $neoobjetivo->tienda_id !== null) {
+                $neoExistentePorUrl->tienda_id = $neoobjetivo->tienda_id;
+                $neoExistentePorUrl->save();
+                $log[] = ['paso' => count($log) + 1, 'texto' => '¿tienda_id en neo vacío y neoobjetivo tiene tienda?', 'decision' => 'Sí → Actualizado tienda_id=' . $neoobjetivo->tienda_id];
+                return [
+                    'success'      => true,
+                    'url_final'    => $finalUrl,
+                    'log_pasos'    => $log,
+                    'accion_final' => 'Actualizada fila neo existente (neo.id=' . $neoExistentePorUrl->id . '): tienda_id desde neoobjetivo',
+                ];
+            }
+
+            $log[] = ['paso' => count($log) + 1, 'texto' => '¿Duplicado sin actualización?', 'decision' => 'Sí → No se inserta fila nueva'];
             return [
                 'skipped'      => true,
                 'reason'       => 'URL ya existe en neo.url',
                 'url_final'    => $finalUrl,
                 'log_pasos'    => $log,
-                'accion_final' => 'Ninguna (URL ya estaba en neo)',
+                'accion_final' => 'Ninguna (URL ya estaba en neo' . ($neoExistentePorUrl->tienda_id === null ? '; tienda_id sigue vacío (neoobjetivo sin tienda_id)' : '') . ')',
             ];
         }
 

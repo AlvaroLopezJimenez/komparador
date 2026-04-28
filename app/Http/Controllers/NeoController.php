@@ -790,6 +790,7 @@ class NeoController extends Controller
         $noEncontradas = [];
         $errores = [];
         $omitidas = 0;
+        $omitidasRelocator = 0;
         $marcadasAniadidaSi = 0;
 
         try {
@@ -819,6 +820,10 @@ class NeoController extends Controller
                 }
                 if ($urlNueva === '') {
                     $errores[] = ['linea' => $lineNumber, 'mensaje' => 'La segunda columna (url_destino) está vacía.'];
+                    continue;
+                }
+                if (stripos($urlNueva, 'relocator/relocate') !== false) {
+                    $omitidasRelocator++;
                     continue;
                 }
 
@@ -921,6 +926,7 @@ class NeoController extends Controller
                 'filas_actualizadas' => $actualizadas,
                 'filas_marcadas_aniadida_si' => $marcadasAniadidaSi,
                 'lineas_omitidas_vacias' => $omitidas,
+                'lineas_omitidas_relocator' => $omitidasRelocator,
                 'no_encontradas' => $noEncontradas,
                 'errores' => $errores,
             ]);

@@ -4,7 +4,7 @@
         $url = request()->fullUrl();
         $hora = now();
         $ip = request()->ip();
-        $textoAviso = "Un visitante ha visto un error 403 - Acceso denegado. URL: {$url} - IP: {$ip}";
+        $textoAviso = "Un visitante ha visto un error 429 - Demasiadas solicitudes. URL: {$url} - IP: {$ip}";
 
         // Evita avisos duplicados comparando con la BD.
         $yaExiste = \DB::table('avisos')
@@ -27,7 +27,7 @@
             ]);
         }
     } catch (\Exception $e) {
-        \Log::error('Error al generar aviso en vista 403: ' . $e->getMessage());
+        \Log::error('Error al generar aviso en vista 429: ' . $e->getMessage());
     }
 @endphp
 
@@ -44,13 +44,14 @@
   <x-header />
 
   <main class="flex-grow flex flex-col justify-center items-center px-4 text-center">
-    <div class="text-6xl mb-4">🙅‍♂️</div>
-<h1 class="text-3xl font-bold text-red-600 mb-2">403 - Acceso denegado</h1>
-<p class="text-gray-700 mb-4 max-w-md">
-  No tienes permiso para entrar aquí. Este rincón está protegido con llave y candado.
-</p>
-
-
+    <div class="text-6xl mb-4">🚦</div>
+    <h1 class="text-3xl font-bold text-orange-600 mb-2">429 - Demasiadas solicitudes</h1>
+    <p class="text-gray-700 mb-4 max-w-md">
+      Has realizado demasiadas peticiones en poco tiempo. Espera unos segundos y vuelve a intentarlo.
+    </p>
+    <a href="{{ route('home') }}" class="px-6 py-2 bg-pink-500 text-white font-semibold rounded hover:bg-pink-600 transition">
+      Volver al inicio
+    </a>
   </main>
 
   <x-footer />

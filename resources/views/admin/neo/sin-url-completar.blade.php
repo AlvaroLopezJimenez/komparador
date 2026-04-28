@@ -45,6 +45,7 @@
                     <li>Filas <strong>neo</strong> actualizadas (guardados): <strong>{{ $res['filas_actualizadas'] ?? 0 }}</strong></li>
                     <li>Filas con <strong>aniadida = si</strong> (URL ya existía en <code class="text-xs">ofertas_producto.url</code>): <strong>{{ $res['filas_marcadas_aniadida_si'] ?? 0 }}</strong></li>
                     <li>Líneas omitidas (vacías): <strong>{{ $res['lineas_omitidas_vacias'] ?? 0 }}</strong></li>
+                    <li>Líneas omitidas por <code class="text-xs">relocator/relocate</code>: <strong>{{ $res['lineas_omitidas_relocator'] ?? 0 }}</strong></li>
                 </ul>
                 @if (!empty($res['no_encontradas']))
                     <div>
