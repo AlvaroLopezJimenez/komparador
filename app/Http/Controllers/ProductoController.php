@@ -705,6 +705,8 @@ class ProductoController extends Controller
             $dias = $fechaDesde->diffInDays($fechaHasta) + 1;
         }
 
+        $historialEspecificacionesModal = $this->listadoEspecificacionesConHistorialParaModal($producto);
+
         return view('admin.productos.estadisticas', compact(
             'producto',
             'desde',
@@ -716,6 +718,7 @@ class ProductoController extends Controller
             'clicsPaginados',
             'filtroRapido',
             'dias',
+            'historialEspecificacionesModal',
         ));
     }
 
@@ -771,9 +774,19 @@ class ProductoController extends Controller
         $desde = Carbon::createFromDate($anio, $mes, 1);
         $hasta = $desde->copy()->endOfMonth();
 
-        $registros = HistoricoPrecioProducto::where('producto_id', $producto->id)
-            ->whereBetween('fecha', [$desde->toDateString(), $hasta->toDateString()])
-            ->get();
+        $especificacionId = $request->query('especificacion_interna_id');
+        $especificacionId = ($especificacionId === null || $especificacionId === '') ? null : (string) $especificacionId;
+
+        $query = HistoricoPrecioProducto::where('producto_id', $producto->id)
+            ->whereBetween('fecha', [$desde->toDateString(), $hasta->toDateString()]);
+
+        if ($especificacionId === null) {
+            $query->whereNull('especificacion_interna_id');
+        } else {
+            $query->where('especificacion_interna_id', $especificacionId);
+        }
+
+        $registros = $query->get();
 
         $resultado = [];
         foreach ($registros as $registro) {
@@ -788,16 +801,155 @@ class ProductoController extends Controller
     {
         $cambios = $request->input('cambios', []);
 
+        $especificacionId = $request->input('especificacion_interna_id');
+        $especificacionId = ($especificacionId === null || $especificacionId === '') ? null : (string) $especificacionId;
+
         foreach ($cambios as $fecha => $precio) {
-            if ($precio === null || $precio === '') continue;
+            if ($precio === null || $precio === '') {
+                continue;
+            }
 
             HistoricoPrecioProducto::updateOrCreate(
-                ['producto_id' => $producto->id, 'fecha' => $fecha],
+                [
+                    'producto_id' => $producto->id,
+                    'especificacion_interna_id' => $especificacionId,
+                    'fecha' => $fecha,
+                ],
                 ['precio_minimo' => $precio]
             );
         }
 
         return response()->json(['success' => true]);
+    }
+
+    /**
+     * Especificaciones internas que ya tienen filas en historico_precios_productos, con grupo y etiqueta para el modal admin.
+     *
+     * @return list<array{id: string, grupo: string, etiqueta: string}>
+     */
+    protected function listadoEspecificacionesConHistorialParaModal(Producto $producto): array
+    {
+        $ids = HistoricoPrecioProducto::query()
+            ->where('producto_id', $producto->id)
+            ->whereNotNull('especificacion_interna_id')
+            ->distinct()
+            ->pluck('especificacion_interna_id')
+            ->filter()
+            ->map(fn ($id) => (string) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($ids === []) {
+            return [];
+        }
+
+        if (! $producto->categoria_id_especificaciones_internas || ! $producto->categoria_especificaciones_internas_elegidas) {
+            return collect($ids)->map(fn ($id) => [
+                'id' => $id,
+                'grupo' => 'Especificación',
+                'etiqueta' => $id,
+            ])->values()->all();
+        }
+
+        $especificacionesElegidas = $producto->categoria_especificaciones_internas_elegidas;
+        $categoriaEspecificaciones = $producto->categoriaEspecificaciones;
+        if (! $categoriaEspecificaciones || ! $categoriaEspecificaciones->especificaciones_internas) {
+            return collect($ids)->map(fn ($id) => [
+                'id' => $id,
+                'grupo' => 'Especificación',
+                'etiqueta' => $id,
+            ])->values()->all();
+        }
+
+        $especificacionesCategoria = $categoriaEspecificaciones->especificaciones_internas;
+        $filtros = $especificacionesCategoria['filtros'] ?? [];
+        $filtrosProducto = [];
+        if (isset($especificacionesElegidas['_producto']['filtros']) && is_array($especificacionesElegidas['_producto']['filtros'])) {
+            $filtrosProducto = $especificacionesElegidas['_producto']['filtros'];
+        }
+        $filtrosCombinados = array_merge($filtros, $filtrosProducto);
+
+        $out = [];
+        foreach ($ids as $sublineaId) {
+            $resolved = $this->resolverEtiquetaSublineaHistorial($sublineaId, $especificacionesElegidas, $filtrosCombinados);
+            $out[] = [
+                'id' => $sublineaId,
+                'grupo' => $resolved['grupo'],
+                'etiqueta' => $resolved['etiqueta'],
+            ];
+        }
+
+        usort($out, function ($a, $b) {
+            $c = strcmp($a['grupo'], $b['grupo']);
+
+            return $c !== 0 ? $c : strcmp($a['etiqueta'], $b['etiqueta']);
+        });
+
+        return $out;
+    }
+
+    /**
+     * @param  array<string, mixed>  $especificacionesElegidas
+     * @param  list<array<string, mixed>>  $filtrosCombinados
+     * @return array{grupo: string, etiqueta: string}
+     */
+    protected function resolverEtiquetaSublineaHistorial(string $sublineaId, array $especificacionesElegidas, array $filtrosCombinados): array
+    {
+        foreach ($especificacionesElegidas as $lineaId => $sublineasProducto) {
+            if (str_starts_with((string) $lineaId, '_')) {
+                continue;
+            }
+
+            $lineaPrincipal = null;
+            foreach ($filtrosCombinados as $filtro) {
+                if (isset($filtro['id']) && strval($filtro['id']) === strval($lineaId)) {
+                    $lineaPrincipal = $filtro;
+                    break;
+                }
+            }
+            if (! $lineaPrincipal) {
+                continue;
+            }
+
+            $grupo = $lineaPrincipal['texto'] ?? $lineaPrincipal['slug'] ?? ('Grupo '.$lineaId);
+
+            $sublineasArray = is_array($sublineasProducto) ? $sublineasProducto : [$sublineasProducto];
+            foreach ($sublineasArray as $sublineaProducto) {
+                $sublineaIdProducto = is_array($sublineaProducto) ? ($sublineaProducto['id'] ?? null) : strval($sublineaProducto);
+                if (strval($sublineaIdProducto) !== strval($sublineaId)) {
+                    continue;
+                }
+
+                $subprincipales = $lineaPrincipal['subprincipales'] ?? [];
+                foreach ($subprincipales as $subprincipal) {
+                    $subprincipalId = is_array($subprincipal) ? ($subprincipal['id'] ?? null) : strval($subprincipal);
+                    if (strval($subprincipalId) !== strval($sublineaId)) {
+                        continue;
+                    }
+
+                    $etiqueta = null;
+                    if (is_array($subprincipal)) {
+                        $etiqueta = $subprincipal['texto'] ?? $subprincipal['slug'] ?? null;
+                        if (! $etiqueta && isset($subprincipal['texto'])) {
+                            $etiqueta = Str::slug($subprincipal['texto']);
+                        }
+                        if (! $etiqueta) {
+                            $etiqueta = strval($subprincipalId);
+                        }
+                    } else {
+                        $etiqueta = strval($subprincipal);
+                    }
+                    if (is_array($sublineaProducto) && ! empty($sublineaProducto['textoAlternativo'] ?? null)) {
+                        $etiqueta = $sublineaProducto['textoAlternativo'];
+                    }
+
+                    return ['grupo' => $grupo, 'etiqueta' => $etiqueta];
+                }
+            }
+        }
+
+        return ['grupo' => 'Especificación', 'etiqueta' => $sublineaId];
     }
 
     //BUSCAR PRODUCTOS RELACIONADOS CON LAS PALABRAS CLAVES QUE TENGO ESCRITAS EN EL FORMULARIO DE PRODUCTO

@@ -43,14 +43,15 @@ class Neo extends Model
     {
         $value = is_string($value) ? trim($value) : $value;
 
+        // No persistir columna legacy `neo` (renombrada o retirada); solo v2.
+        unset($this->attributes['neo']);
+
         if ($value === null || $value === '') {
-            $this->attributes['neo'] = '';
             $this->attributes['neo_cipher'] = null;
             $this->attributes['neo_lookup'] = null;
             return;
         }
         $payload = app(ConsultarNeoCifrado::class)->construirPayload((string) $value);
-        $this->attributes['neo'] = '';
         $this->attributes['neo_cipher'] = $payload['neo_cipher'];
         $this->attributes['neo_lookup'] = $payload['neo_lookup'];
     }
@@ -75,15 +76,16 @@ class Neo extends Model
     {
         $value = is_string($value) ? trim($value) : $value;
 
+        // No persistir columna legacy `url` (renombrada o retirada); solo v2.
+        unset($this->attributes['url']);
+
         if ($value === null || $value === '') {
-            $this->attributes['url'] = '';
             $this->attributes['url_cipher'] = null;
             $this->attributes['url_lookup'] = null;
             return;
         }
 
         $payload = app(ConsultarNeoCifrado::class)->construirPayload((string) $value);
-        $this->attributes['url'] = '';
         $this->attributes['url_cipher'] = $payload['neo_cipher'];
         $this->attributes['url_lookup'] = $payload['neo_lookup'];
     }

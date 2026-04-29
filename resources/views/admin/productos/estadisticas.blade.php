@@ -26,6 +26,10 @@
                 <button onclick="cerrarHistorial()" class="text-gray-500 hover:text-gray-700">✖</button>
             </div>
 
+            <div id="historial-selector-wrap" class="text-left border-b border-gray-200 dark:border-gray-600 pb-3 mb-2">
+                <!-- pestañas: general + especificaciones con historial (JS) -->
+            </div>
+
             <div class="flex items-center justify-between">
                 <button onclick="cambiarMes(-1)" class="px-2 py-1 bg-gray-300 rounded">←</button>
                 <h3 id="mesActual" class="text-lg font-bold text-gray-700 dark:text-white text-center"></h3>
@@ -51,10 +55,90 @@
         let anioActual = new Date().getFullYear();
         let preciosCargados = {}; // clave: 'YYYY-MM-DD', valor: precio
         let cambios = {};
+        const historialEspecificacionesOpciones = @json($historialEspecificacionesModal ?? []);
+        let historialEspecificacionSeleccionada = null; // null = histórico general
 
         function abrirHistorial() {
+            historialEspecificacionSeleccionada = null;
+            cambios = {};
             document.getElementById('modal-historial').classList.remove('hidden');
+            renderSelectorHistorial();
             cargarMes();
+        }
+
+        function renderSelectorHistorial() {
+            const wrap = document.getElementById('historial-selector-wrap');
+            if (!wrap) return;
+            wrap.innerHTML = '';
+            const row = document.createElement('div');
+            row.className = 'flex flex-wrap gap-2 items-center mb-2';
+            const lbl = document.createElement('span');
+            lbl.className = 'text-xs font-medium text-gray-500 dark:text-gray-400';
+            lbl.textContent = 'Serie de precios:';
+            row.appendChild(lbl);
+            const btnGen = document.createElement('button');
+            btnGen.type = 'button';
+            btnGen.className = 'historial-tab px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 dark:text-gray-200';
+            btnGen.textContent = 'Histórico general';
+            btnGen.dataset.specId = '';
+            btnGen.addEventListener('click', () => seleccionarHistorialEspecificacion(null));
+            row.appendChild(btnGen);
+            wrap.appendChild(row);
+
+            if (!historialEspecificacionesOpciones.length) {
+                updateHistorialTabStyles();
+                return;
+            }
+
+            const byGrupo = {};
+            for (const item of historialEspecificacionesOpciones) {
+                const g = item.grupo || 'Especificación';
+                if (!byGrupo[g]) byGrupo[g] = [];
+                byGrupo[g].push(item);
+            }
+            for (const grupo of Object.keys(byGrupo).sort()) {
+                const sec = document.createElement('div');
+                sec.className = 'mb-2';
+                const gh = document.createElement('div');
+                gh.className = 'text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1';
+                gh.textContent = grupo;
+                sec.appendChild(gh);
+                const flex = document.createElement('div');
+                flex.className = 'flex flex-wrap gap-1';
+                for (const it of byGrupo[grupo]) {
+                    const b = document.createElement('button');
+                    b.type = 'button';
+                    b.className = 'historial-tab px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 dark:text-gray-200';
+                    b.textContent = it.etiqueta;
+                    b.dataset.specId = String(it.id);
+                    b.addEventListener('click', () => seleccionarHistorialEspecificacion(it.id));
+                    flex.appendChild(b);
+                }
+                sec.appendChild(flex);
+                wrap.appendChild(sec);
+            }
+            updateHistorialTabStyles();
+        }
+
+        function seleccionarHistorialEspecificacion(id) {
+            historialEspecificacionSeleccionada = (id == null || id === '') ? null : String(id);
+            cambios = {};
+            updateHistorialTabStyles();
+            cargarMes();
+        }
+
+        function updateHistorialTabStyles() {
+            const cur = historialEspecificacionSeleccionada == null ? '' : String(historialEspecificacionSeleccionada);
+            document.querySelectorAll('#historial-selector-wrap .historial-tab').forEach(btn => {
+                const idBtn = btn.dataset.specId ?? '';
+                const isActive = idBtn === cur;
+                btn.classList.toggle('bg-indigo-600', isActive);
+                btn.classList.toggle('text-white', isActive);
+                btn.classList.toggle('border-indigo-600', isActive);
+                btn.classList.toggle('dark:border-indigo-500', isActive);
+                btn.classList.toggle('border-gray-300', !isActive);
+                btn.classList.toggle('dark:border-gray-600', !isActive);
+            });
         }
 
         function cerrarHistorial() {
@@ -80,7 +164,12 @@
             });
             document.getElementById('mesActual').textContent = `${mesNombre.toUpperCase()} ${anioActual}`;
 
-            fetch(`{{ route('admin.productos.historial.mes', $producto) }}?mes=${mesActual + 1}&anio=${anioActual}`)
+            let url = `{{ route('admin.productos.historial.mes', $producto) }}?mes=${mesActual + 1}&anio=${anioActual}`;
+            if (historialEspecificacionSeleccionada) {
+                url += `&especificacion_interna_id=${encodeURIComponent(historialEspecificacionSeleccionada)}`;
+            }
+
+            fetch(url)
                 .then(res => res.json())
                 .then(data => {
                     preciosCargados = data;
@@ -104,8 +193,6 @@
                     String(cambios[fecha]) :
                     (preciosCargados.hasOwnProperty(fecha) ? String(preciosCargados[fecha]) : '');
 
-                console.log(`Día ${dia}: ${fecha} => Precio:`, precio);
-
                 tabla.innerHTML += `
         <div class="border p-1">
             <div class="font-semibold mb-1">${dia}</div>
@@ -125,7 +212,8 @@
                     'X-CSRF-TOKEN': '{{ csrf_token() }}'
                 },
                 body: JSON.stringify({
-                    cambios
+                    cambios,
+                    especificacion_interna_id: historialEspecificacionSeleccionada
                 })
             }).then(() => {
                 cerrarHistorial();

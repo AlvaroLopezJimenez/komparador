@@ -41,15 +41,15 @@ class Neoobjetivo extends Model
     {
         $value = is_string($value) ? trim($value) : $value;
 
+        // No persistir columna legacy `url` (renombrada o retirada); solo v2.
+        unset($this->attributes['url']);
+
         if ($value === null || $value === '') {
-            // Mantener columna legacy no nula.
-            $this->attributes['url'] = '';
             $this->attributes['url_cipher'] = null;
             $this->attributes['url_lookup'] = null;
             return;
         }
         $payload = app(ConsultarNeoCifrado::class)->construirPayload((string) $value);
-        $this->attributes['url'] = '';
         $this->attributes['url_cipher'] = $payload['neo_cipher'];
         $this->attributes['url_lookup'] = $payload['neo_lookup'];
     }
