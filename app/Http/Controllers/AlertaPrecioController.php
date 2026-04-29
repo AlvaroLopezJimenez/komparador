@@ -23,6 +23,7 @@ class AlertaPrecioController extends Controller
             'correo' => 'required|email',
             'precio_limite' => 'required|numeric|min:0',
             'producto_id' => 'required|exists:productos,id',
+            'especificaciones_internas_seleccionadas' => 'nullable|array',
             'acepto_politicas' => 'required|boolean'
         ], [
             'correo.required' => 'El correo electrónico es obligatorio.',
@@ -52,6 +53,10 @@ class AlertaPrecioController extends Controller
         }
 
         try {
+            $seleccionNormalizada = $this->normalizarEspecificacionesInternasSeleccionadas(
+                $request->input('especificaciones_internas_seleccionadas')
+            );
+
             // Verificar si ya existe una alerta para este correo y producto
             $alertaExistente = CorreoAvisoPrecio::where('correo', $request->correo)
                 ->where('producto_id', $request->producto_id)
@@ -61,6 +66,7 @@ class AlertaPrecioController extends Controller
                 // Actualizar la alerta existente
                 $datosActualizacion = [
                     'precio_limite' => $request->precio_limite,
+                    'especificaciones_internas_seleccionadas' => $seleccionNormalizada,
                     // Si veces_enviado es null, inicializarlo a 0
                     'veces_enviado' => $alertaExistente->veces_enviado ?? 0
                 ];
@@ -77,6 +83,7 @@ class AlertaPrecioController extends Controller
                     'correo' => $request->correo,
                     'precio_limite' => $request->precio_limite,
                     'producto_id' => $request->producto_id,
+                    'especificaciones_internas_seleccionadas' => $seleccionNormalizada,
                     'token_cancelacion' => $this->generarTokenUnico(),
                     'veces_enviado' => 0
                 ]);
@@ -185,6 +192,53 @@ class AlertaPrecioController extends Controller
                 'success' => false,
                 'message' => 'Error al enviar alertas: ' . $e->getMessage(),
                 'enviados' => 0
+            ];
+        }
+    }
+
+    public function enviarAlertaIndividual(CorreoAvisoPrecio $alerta, float $precioActual): array
+    {
+        try {
+            $producto = $alerta->producto;
+            if (!$producto) {
+                return [
+                    'success' => false,
+                    'message' => 'No se encontró el producto asociado a la alerta',
+                ];
+            }
+
+            $urlProducto = $this->construirUrlProducto($producto);
+            $vecesEnviadoActual = (int) ($alerta->veces_enviado ?? 0);
+            $vecesEnviado = $vecesEnviadoActual + 1;
+            $correoDestino = $alerta->correo;
+            $precioLimiteSuscripcion = (float) $alerta->precio_limite;
+
+            $this->enviarCorreoAlerta($alerta, $producto, $precioActual, $urlProducto, $vecesEnviado);
+
+            $suscripcionEliminada = $vecesEnviado >= 4;
+            if ($suscripcionEliminada) {
+                $alerta->delete();
+            } else {
+                $alerta->update([
+                    'ultimo_envio_correo' => now(),
+                    'veces_enviado' => $vecesEnviado,
+                ]);
+            }
+
+            return [
+                'success' => true,
+                'message' => 'Correo enviado correctamente',
+                'correo' => $correoDestino,
+                'precio_actual' => round($precioActual, 4),
+                'precio_limite' => round($precioLimiteSuscripcion, 2),
+                'veces_enviado' => $vecesEnviado,
+                'suscripcion_eliminada' => $suscripcionEliminada,
+                'producto_nombre' => $producto->nombre ?? null,
+            ];
+        } catch (\Throwable $e) {
+            return [
+                'success' => false,
+                'message' => 'Error al enviar correo: ' . $e->getMessage(),
             ];
         }
     }
@@ -354,6 +408,43 @@ Este correo es solo para notificaciones de precios. No será utilizado para publ
     {
         $path = $producto->categoria->construirUrlCategorias($producto->slug);
         return 'https://komparador.com' . $path;
+    }
+
+    /**
+     * Normaliza el JSON de variantes para guardarlo en correos_aviso_precio (claves de línea string, ids string).
+     *
+     * @param  mixed  $raw
+     * @return array<string, list<string>>
+     */
+    private function normalizarEspecificacionesInternasSeleccionadas($raw): array
+    {
+        if ($raw === null) {
+            return [];
+        }
+        if (is_string($raw)) {
+            $decoded = json_decode($raw, true);
+            $raw = is_array($decoded) ? $decoded : [];
+        }
+        if (!is_array($raw)) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($raw as $lineaId => $ids) {
+            if ($lineaId === 'precio_min' || $lineaId === 'precio_max') {
+                continue;
+            }
+            if (!is_array($ids)) {
+                continue;
+            }
+            $lineaKey = strval($lineaId);
+            $idsLimpios = array_values(array_filter(array_map('strval', $ids), fn ($v) => $v !== ''));
+            if ($idsLimpios !== []) {
+                $out[$lineaKey] = $idsLimpios;
+            }
+        }
+
+        return $out;
     }
 
     /**

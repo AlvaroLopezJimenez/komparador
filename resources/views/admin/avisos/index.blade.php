@@ -33,6 +33,8 @@
                 return 'ofertas';
             case 'App\Models\Chollo':
                 return 'chollos';
+            case 'App\Models\CorreoAvisoPrecio':
+                return 'correos';
             default:
                 return 'internos';
         }
@@ -45,6 +47,7 @@
             'productos' => 0,
             'ofertas' => 0,
             'chollos' => 0,
+            'correos' => 0,
             'internos' => 0,
         ];
 
@@ -173,6 +176,87 @@
             return array_values(array_unique($etiquetas));
         }
     }
+
+    /**
+     * URL pública del producto con segmentos de variante (slugs de sublíneas).
+     * Usa la misma fuente de filtros que comparador/unidades: categoría de especificaciones internas + _producto.
+     */
+    if (!function_exists('urlPublicaProductoConVariantesCorreoAviso')) {
+        function urlPublicaProductoConVariantesCorreoAviso($suscripcion) {
+            if (!$suscripcion || !$suscripcion->producto || !$suscripcion->producto->categoria) {
+                return null;
+            }
+            $producto = $suscripcion->producto;
+            $producto->loadMissing('categoriaEspecificaciones');
+            $categoria = $producto->categoria;
+            $seleccion = $suscripcion->especificaciones_internas_seleccionadas;
+            if (!is_array($seleccion)) {
+                $seleccion = [];
+            }
+
+            $slugsCats = $categoria->obtenerSlugsJerarquia();
+            if (!is_array($slugsCats)) {
+                $slugsCats = [];
+            }
+
+            $filtrosCombinados = [];
+            $categoriaEspecificaciones = $producto->categoriaEspecificaciones;
+            if ($categoriaEspecificaciones
+                && $categoriaEspecificaciones->especificaciones_internas
+                && is_array($categoriaEspecificaciones->especificaciones_internas)
+                && isset($categoriaEspecificaciones->especificaciones_internas['filtros'])) {
+                $filtrosCombinados = array_merge(
+                    $filtrosCombinados,
+                    $categoriaEspecificaciones->especificaciones_internas['filtros']
+                );
+            }
+            $elegidas = $producto->categoria_especificaciones_internas_elegidas;
+            if (is_array($elegidas)
+                && isset($elegidas['_producto']['filtros'])
+                && is_array($elegidas['_producto']['filtros'])) {
+                $filtrosCombinados = array_merge($filtrosCombinados, $elegidas['_producto']['filtros']);
+            }
+
+            $seleccionPorLinea = [];
+            foreach ($seleccion as $lineaId => $ids) {
+                if ($lineaId === 'precio_min' || $lineaId === 'precio_max') {
+                    continue;
+                }
+                if (!is_array($ids)) {
+                    continue;
+                }
+                $seleccionPorLinea[strval($lineaId)] = array_values(array_map('strval', $ids));
+            }
+
+            $segmentosVariante = [];
+            foreach ($filtrosCombinados as $filtro) {
+                $lineaId = strval($filtro['id'] ?? '');
+                if ($lineaId === '' || !isset($seleccionPorLinea[$lineaId])) {
+                    continue;
+                }
+                $elegidos = $seleccionPorLinea[$lineaId];
+                foreach ($filtro['subprincipales'] ?? [] as $sub) {
+                    $subId = strval($sub['id'] ?? '');
+                    if ($subId === '' || !in_array($subId, $elegidos, true)) {
+                        continue;
+                    }
+                    $texto = $sub['texto'] ?? '';
+                    $slugGuardado = $sub['slug'] ?? null;
+                    $slugDesdeTexto = $texto ? \Illuminate\Support\Str::slug($texto) : null;
+                    $slug = $slugDesdeTexto ?: $slugGuardado;
+                    if ($slug !== null && $slug !== '') {
+                        $segmentosVariante[] = $slug;
+                    }
+                }
+            }
+
+            $partes = array_merge($slugsCats, [$producto->slug], $segmentosVariante);
+            $partes = array_values(array_filter($partes, fn ($p) => $p !== null && $p !== ''));
+            $path = '/' . implode('/', $partes);
+
+            return url($path);
+        }
+    }
 @endphp
 
 <x-app-layout>
@@ -225,6 +309,9 @@
             .aviso-borde-chollo td { border-top: 2px solid rgb(219 39 119); border-bottom: 2px solid rgb(219 39 119); }
             .aviso-borde-chollo td:first-child { border-left: 2px solid rgb(219 39 119); }
             .aviso-borde-chollo td:last-child { border-right: 2px solid rgb(219 39 119); }
+            .aviso-borde-correo td { border-top: 2px solid rgb(22 163 74); border-bottom: 2px solid rgb(22 163 74); }
+            .aviso-borde-correo td:first-child { border-left: 2px solid rgb(22 163 74); }
+            .aviso-borde-correo td:last-child { border-right: 2px solid rgb(22 163 74); }
             .aviso-borde-interno td { border-top: 2px solid rgb(75 85 99); border-bottom: 2px solid rgb(75 85 99); }
             .aviso-borde-interno td:first-child { border-left: 2px solid rgb(75 85 99); }
             .aviso-borde-interno td:last-child { border-right: 2px solid rgb(75 85 99); }
@@ -386,6 +473,7 @@
                     'productos' => 'Productos',
                     'ofertas' => 'Ofertas',
                     'chollos' => 'Chollos',
+                    'correos' => 'Correos',
                     'internos' => 'Internos',
                 ];
             @endphp
@@ -432,7 +520,13 @@
                         @forelse ($avisosVencidos as $aviso)
                         @php
                             $tipoAviso = obtenerTipoAviso($aviso);
-                            $claseTipo = $aviso->avisoable_type === 'App\Models\Producto' ? 'producto' : ($aviso->avisoable_type === 'App\Models\OfertaProducto' ? 'oferta' : ($aviso->avisoable_type === 'App\Models\Chollo' ? 'chollo' : 'interno'));
+                            $claseTipo = $aviso->avisoable_type === 'App\Models\Producto'
+                                ? 'producto'
+                                : ($aviso->avisoable_type === 'App\Models\OfertaProducto'
+                                    ? 'oferta'
+                                    : ($aviso->avisoable_type === 'App\Models\Chollo'
+                                        ? 'chollo'
+                                        : ($aviso->avisoable_type === 'App\Models\CorreoAvisoPrecio' ? 'correo' : 'interno')));
                         @endphp
                         <tr class="hover:bg-gray-700 dark:hover:bg-gray-700 transition-colors subtab-row aviso-borde-{{ $claseTipo }}" data-tipo="{{ $tipoAviso }}" data-aviso-id="{{ $aviso->id }}">
                             <td class="px-6 py-1">
@@ -548,6 +642,26 @@
                                                 <button onclick="event.stopPropagation(); window.open('{{ route('admin.productos.edit', $aviso->avisoable->producto->id) }}', '_blank')" 
                                                     class="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors">
                                                     Producto
+                                                </button>
+                                            @endif
+                                        </div>
+                                        <span class="text-xs text-gray-400">{{ $aviso->fecha_aviso->format('d/m/Y H:i') }}</span>
+                                    </div>
+                                @elseif($aviso->avisoable_type === 'App\Models\CorreoAvisoPrecio' && $aviso->avisoable)
+                                    @php
+                                        $urlWebCorreo = urlPublicaProductoConVariantesCorreoAviso($aviso->avisoable);
+                                    @endphp
+                                    <div class="flex flex-col space-y-1">
+                                        <span class="text-gray-200 dark:text-gray-200 break-words text-sm">Aviso Correo</span>
+                                        <div class="flex items-center space-x-1 flex-wrap gap-1">
+                                            <button type="button" onclick="event.stopPropagation(); editarAviso({{ $aviso->id }}, {{ json_encode($aviso->texto_aviso) }}, '{{ $aviso->fecha_aviso->format('Y-m-d\TH:i') }}', {{ $aviso->oculto ? 'true' : 'false' }})" 
+                                                class="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors">
+                                                Editar
+                                            </button>
+                                            @if($urlWebCorreo)
+                                                <button type="button" onclick="event.stopPropagation(); window.open('{{ $urlWebCorreo }}', '_blank')" 
+                                                    class="px-2 py-1 text-xs bg-green-600 hover:bg-green-700 text-white rounded transition-colors">
+                                                    Ver
                                                 </button>
                                             @endif
                                         </div>
@@ -697,10 +811,22 @@
                                             Comprobado
                                         </button>
                                     @else
+                                        @unless($aviso->avisoable_type === 'App\Models\CorreoAvisoPrecio')
                                         <button onclick="editarAviso({{ $aviso->id }}, {{ json_encode($aviso->texto_aviso) }}, '{{ $aviso->fecha_aviso->format('Y-m-d\TH:i') }}', {{ $aviso->oculto ? 'true' : 'false' }})" 
                                             class="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors">
                                             Editar
                                         </button>
+                                        @endunless
+                                        @if($aviso->avisoable_type === 'App\Models\CorreoAvisoPrecio')
+                                            <button onclick="enviarAvisoCorreo({{ $aviso->id }})" 
+                                                class="px-3 py-1 text-sm bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors">
+                                                Enviar correo
+                                            </button>
+                                            <button onclick="aplazarAvisoCorreoSieteDias({{ $aviso->id }})" 
+                                                class="px-3 py-1 text-sm bg-yellow-600 hover:bg-yellow-700 text-white rounded-md transition-colors">
+                                                No enviar
+                                            </button>
+                                        @endif
                                         @if($aviso->avisoable_type === 'App\Models\Producto' && strpos($aviso->texto_aviso, 'Precio actualizado producto') !== false)
                                             @php
                                                 $precioActual = $aviso->avisoable?->precio;
@@ -830,7 +956,13 @@
                         @forelse ($avisosPendientes as $aviso)
                         @php
                             $tipoAviso = obtenerTipoAviso($aviso);
-                            $claseTipo = $aviso->avisoable_type === 'App\Models\Producto' ? 'producto' : ($aviso->avisoable_type === 'App\Models\OfertaProducto' ? 'oferta' : ($aviso->avisoable_type === 'App\Models\Chollo' ? 'chollo' : 'interno'));
+                            $claseTipo = $aviso->avisoable_type === 'App\Models\Producto'
+                                ? 'producto'
+                                : ($aviso->avisoable_type === 'App\Models\OfertaProducto'
+                                    ? 'oferta'
+                                    : ($aviso->avisoable_type === 'App\Models\Chollo'
+                                        ? 'chollo'
+                                        : ($aviso->avisoable_type === 'App\Models\CorreoAvisoPrecio' ? 'correo' : 'interno')));
                         @endphp
                         <tr class="hover:bg-gray-700 dark:hover:bg-gray-700 transition-colors subtab-row aviso-borde-{{ $claseTipo }}" data-tipo="{{ $tipoAviso }}" data-aviso-id="{{ $aviso->id }}">
                             <td class="px-6 py-1">
@@ -896,6 +1028,26 @@
                                                 class="px-3 py-1.5 text-sm bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors">
                                                 Mostrar->si
                                             </button>
+                                        </div>
+                                        <span class="text-xs text-gray-400">{{ $aviso->fecha_aviso->format('d/m/Y H:i') }}</span>
+                                    </div>
+                                @elseif($aviso->avisoable_type === 'App\Models\CorreoAvisoPrecio' && $aviso->avisoable)
+                                    @php
+                                        $urlWebCorreo = urlPublicaProductoConVariantesCorreoAviso($aviso->avisoable);
+                                    @endphp
+                                    <div class="flex flex-col space-y-1">
+                                        <span class="text-gray-200 dark:text-gray-200 break-words text-sm">Aviso Correo</span>
+                                        <div class="flex items-center space-x-1 flex-wrap gap-1">
+                                            <button type="button" onclick="event.stopPropagation(); editarAviso({{ $aviso->id }}, {{ json_encode($aviso->texto_aviso) }}, '{{ $aviso->fecha_aviso->format('Y-m-d\TH:i') }}', {{ $aviso->oculto ? 'true' : 'false' }})" 
+                                                class="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors">
+                                                Editar
+                                            </button>
+                                            @if($urlWebCorreo)
+                                                <button type="button" onclick="event.stopPropagation(); window.open('{{ $urlWebCorreo }}', '_blank')" 
+                                                    class="px-2 py-1 text-xs bg-green-600 hover:bg-green-700 text-white rounded transition-colors">
+                                                    Ver
+                                                </button>
+                                            @endif
                                         </div>
                                         <span class="text-xs text-gray-400">{{ $aviso->fecha_aviso->format('d/m/Y H:i') }}</span>
                                     </div>
@@ -1021,10 +1173,22 @@
                                             Comprobado
                                         </button>
                                     @else
+                                        @unless($aviso->avisoable_type === 'App\Models\CorreoAvisoPrecio')
                                         <button onclick="editarAviso({{ $aviso->id }}, {{ json_encode($aviso->texto_aviso) }}, '{{ $aviso->fecha_aviso->format('Y-m-d\TH:i') }}', {{ $aviso->oculto ? 'true' : 'false' }})" 
                                             class="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors">
                                             Editar
                                         </button>
+                                        @endunless
+                                        @if($aviso->avisoable_type === 'App\Models\CorreoAvisoPrecio')
+                                            <button onclick="enviarAvisoCorreo({{ $aviso->id }})" 
+                                                class="px-3 py-1 text-sm bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors">
+                                                Enviar correo
+                                            </button>
+                                            <button onclick="aplazarAvisoCorreoSieteDias({{ $aviso->id }})" 
+                                                class="px-3 py-1 text-sm bg-yellow-600 hover:bg-yellow-700 text-white rounded-md transition-colors">
+                                                No enviar
+                                            </button>
+                                        @endif
                                         @if($aviso->avisoable_type === 'App\Models\OfertaProducto' && preg_match('/\d+\s*(?:a\s*)?vez/i', $aviso->texto_aviso))
                                             <button onclick="aplazarAviso({{ $aviso->id }})" 
                                                 class="px-3 py-1 text-sm bg-yellow-600 hover:bg-yellow-700 text-white rounded-md transition-colors">
@@ -1127,7 +1291,13 @@
                         @forelse ($avisosOcultos as $aviso)
                         @php
                             $tipoAviso = obtenerTipoAviso($aviso);
-                            $claseTipo = $aviso->avisoable_type === 'App\Models\Producto' ? 'producto' : ($aviso->avisoable_type === 'App\Models\OfertaProducto' ? 'oferta' : ($aviso->avisoable_type === 'App\Models\Chollo' ? 'chollo' : 'interno'));
+                            $claseTipo = $aviso->avisoable_type === 'App\Models\Producto'
+                                ? 'producto'
+                                : ($aviso->avisoable_type === 'App\Models\OfertaProducto'
+                                    ? 'oferta'
+                                    : ($aviso->avisoable_type === 'App\Models\Chollo'
+                                        ? 'chollo'
+                                        : ($aviso->avisoable_type === 'App\Models\CorreoAvisoPrecio' ? 'correo' : 'interno')));
                         @endphp
                         <tr class="hover:bg-gray-700 dark:hover:bg-gray-700 transition-colors subtab-row aviso-borde-{{ $claseTipo }}" data-tipo="{{ $tipoAviso }}" data-aviso-id="{{ $aviso->id }}">
                             <td class="px-6 py-1">
@@ -1193,6 +1363,26 @@
                                                 class="px-3 py-1.5 text-sm bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors">
                                                 Mostrar->si
                                             </button>
+                                        </div>
+                                        <span class="text-xs text-gray-400">{{ $aviso->fecha_aviso->format('d/m/Y H:i') }}</span>
+                                    </div>
+                                @elseif($aviso->avisoable_type === 'App\Models\CorreoAvisoPrecio' && $aviso->avisoable)
+                                    @php
+                                        $urlWebCorreo = urlPublicaProductoConVariantesCorreoAviso($aviso->avisoable);
+                                    @endphp
+                                    <div class="flex flex-col space-y-1">
+                                        <span class="text-gray-200 dark:text-gray-200 break-words text-sm">Aviso Correo</span>
+                                        <div class="flex items-center space-x-1 flex-wrap gap-1">
+                                            <button type="button" onclick="event.stopPropagation(); editarAviso({{ $aviso->id }}, {{ json_encode($aviso->texto_aviso) }}, '{{ $aviso->fecha_aviso->format('Y-m-d\TH:i') }}', {{ $aviso->oculto ? 'true' : 'false' }})" 
+                                                class="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors">
+                                                Editar
+                                            </button>
+                                            @if($urlWebCorreo)
+                                                <button type="button" onclick="event.stopPropagation(); window.open('{{ $urlWebCorreo }}', '_blank')" 
+                                                    class="px-2 py-1 text-xs bg-green-600 hover:bg-green-700 text-white rounded transition-colors">
+                                                    Ver
+                                                </button>
+                                            @endif
                                         </div>
                                         <span class="text-xs text-gray-400">{{ $aviso->fecha_aviso->format('d/m/Y H:i') }}</span>
                                     </div>
@@ -1318,10 +1508,22 @@
                                             Comprobado
                                         </button>
                                     @else
+                                        @unless($aviso->avisoable_type === 'App\Models\CorreoAvisoPrecio')
                                         <button onclick="editarAviso({{ $aviso->id }}, {{ json_encode($aviso->texto_aviso) }}, '{{ $aviso->fecha_aviso->format('Y-m-d\TH:i') }}', {{ $aviso->oculto ? 'true' : 'false' }})" 
                                             class="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors">
                                             Editar
                                         </button>
+                                        @endunless
+                                        @if($aviso->avisoable_type === 'App\Models\CorreoAvisoPrecio')
+                                            <button onclick="enviarAvisoCorreo({{ $aviso->id }})" 
+                                                class="px-3 py-1 text-sm bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors">
+                                                Enviar correo
+                                            </button>
+                                            <button onclick="aplazarAvisoCorreoSieteDias({{ $aviso->id }})" 
+                                                class="px-3 py-1 text-sm bg-yellow-600 hover:bg-yellow-700 text-white rounded-md transition-colors">
+                                                No enviar
+                                            </button>
+                                        @endif
                                         @if($aviso->avisoable_type === 'App\Models\OfertaProducto' && preg_match('/\d+\s*(?:a\s*)?vez/i', $aviso->texto_aviso))
                                             <button onclick="aplazarAviso({{ $aviso->id }})" 
                                                 class="px-3 py-1 text-sm bg-yellow-600 hover:bg-yellow-700 text-white rounded-md transition-colors">
@@ -2605,6 +2807,88 @@
             .catch(error => {
                 console.error('Error:', error);
                 alert('Error de conexión al aplazar el aviso');
+            });
+        }
+
+        async function enviarAvisoCorreo(avisoId) {
+            try {
+                const response = await fetch(`/panel-privado/avisos/${avisoId}/correo/enviar`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                        'Accept': 'application/json'
+                    }
+                });
+
+                const text = await response.text();
+                let data = {};
+                try {
+                    data = text ? JSON.parse(text) : {};
+                } catch (e) {
+                    data = { success: false, message: text || 'Respuesta no válida del servidor' };
+                }
+
+                let mensaje = '=== RESULTADO DEL ENVÍO (aviso correo) ===\n\n';
+
+                if (data.success) {
+                    mensaje += 'Estado: enviado correctamente\n';
+                    mensaje += (data.message || 'Correo enviado') + '\n\n';
+                    if (data.producto_nombre) {
+                        mensaje += 'Producto: ' + data.producto_nombre + '\n';
+                    }
+                    if (data.correo) {
+                        mensaje += 'Destino: ' + data.correo + '\n';
+                    }
+                    if (data.precio_actual !== undefined && data.precio_actual !== null) {
+                        mensaje += 'Precio en el aviso (€/ud u oferta usada): ' + Number(data.precio_actual).toFixed(4) + ' €\n';
+                    }
+                    if (data.precio_limite !== undefined && data.precio_limite !== null) {
+                        mensaje += 'Precio límite suscripción: ' + Number(data.precio_limite).toFixed(2) + ' €\n';
+                    }
+                    if (data.veces_enviado !== undefined && data.veces_enviado !== null) {
+                        mensaje += 'Veces enviado (tras este correo): ' + data.veces_enviado + '\n';
+                    }
+                    if (data.suscripcion_eliminada) {
+                        mensaje += '\nLa suscripción se ha eliminado (máximo de envíos alcanzado).\n';
+                    }
+                    mensaje += '\nSe actualizará el listado de avisos.';
+                } else {
+                    mensaje += 'Estado: error\n';
+                    mensaje += (data.message || 'No se pudo enviar el correo');
+                    if (!response.ok) {
+                        mensaje += '\n\n(HTTP ' + response.status + ')';
+                    }
+                }
+
+                alert(mensaje);
+
+                if (data.success) {
+                    window.location.reload();
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error de conexión al enviar el correo: ' + (error.message || error));
+            }
+        }
+
+        function aplazarAvisoCorreoSieteDias(avisoId) {
+            fetch(`/panel-privado/avisos/${avisoId}/correo/aplazar-7-dias`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                    'Accept': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.reload();
+                    return;
+                }
+                alert(data.message || 'No se pudo aplazar el aviso');
+            })
+            .catch(() => {
+                alert('Error al aplazar el aviso');
             });
         }
 

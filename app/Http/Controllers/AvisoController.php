@@ -12,6 +12,7 @@ use App\Models\Producto;
 use App\Models\Chollo;
 use App\Models\OfertaProducto;
 use App\Models\ProductoOfertaMasBarataPorProducto;
+use App\Models\CorreoAvisoPrecio;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -96,6 +97,8 @@ class AvisoController extends Controller
                             $aviso->load('avisoable.producto', 'avisoable.tienda');
                         } elseif ($aviso->avisoable_type === 'App\Models\Chollo') {
                             $aviso->load('avisoable.producto', 'avisoable.tienda', 'avisoable.categoria');
+                        } elseif ($aviso->avisoable_type === 'App\Models\CorreoAvisoPrecio') {
+                            $aviso->load('avisoable.producto.categoria', 'avisoable.producto.categoriaEspecificaciones');
                         } else {
                             $aviso->load('avisoable');
                         }
@@ -142,7 +145,7 @@ class AvisoController extends Controller
         $request->validate([
             'texto_aviso' => 'required|string|max:1000',
             'fecha_aviso' => 'required|date',
-            'avisoable_type' => 'nullable|string|in:App\Models\Producto,App\Models\OfertaProducto,App\Models\Chollo,App\Models\Tienda',
+            'avisoable_type' => 'nullable|string|in:App\Models\Producto,App\Models\OfertaProducto,App\Models\Chollo,App\Models\Tienda,App\Models\CorreoAvisoPrecio',
             'avisoable_id' => 'nullable|integer',
             'oculto' => 'boolean'
         ]);
@@ -351,7 +354,7 @@ class AvisoController extends Controller
     public function getAvisosElemento(Request $request)
     {
         $request->validate([
-            'avisoable_type' => 'required|string|in:App\Models\Producto,App\Models\OfertaProducto,App\Models\Chollo,App\Models\Tienda',
+            'avisoable_type' => 'required|string|in:App\Models\Producto,App\Models\OfertaProducto,App\Models\Chollo,App\Models\Tienda,App\Models\CorreoAvisoPrecio',
             'avisoable_id' => 'required|integer'
         ]);
 
@@ -562,6 +565,97 @@ class AvisoController extends Controller
                 'message' => 'Error al enviar alertas: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    public function enviarAvisoCorreo(Aviso $aviso)
+    {
+        if ($aviso->avisoable_type !== CorreoAvisoPrecio::class) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Este aviso no es de tipo correo'
+            ], 422);
+        }
+
+        /** @var CorreoAvisoPrecio|null $suscripcion */
+        $suscripcion = $aviso->avisoable ?? CorreoAvisoPrecio::find($aviso->avisoable_id);
+        if (!$suscripcion || !$suscripcion->producto) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se encontró la suscripción o el producto asociado'
+            ], 404);
+        }
+
+        $precioActual = $this->obtenerPrecioMinimoFiltradoSuscripcion($suscripcion);
+        if ($precioActual === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No hay ofertas activas que coincidan con las especificaciones seleccionadas'
+            ], 422);
+        }
+
+        if ($precioActual > (float) $suscripcion->precio_limite) {
+            return response()->json([
+                'success' => false,
+                'message' => 'El precio actual no está por debajo del precio límite de la suscripción'
+            ], 422);
+        }
+
+        try {
+            $alertaController = app(\App\Http\Controllers\AlertaPrecioController::class);
+            $resultado = $alertaController->enviarAlertaIndividual($suscripcion, $precioActual);
+            if (empty($resultado['success'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $resultado['message'] ?? 'No se pudo enviar el correo'
+                ], 500);
+            }
+
+            $aviso->delete();
+
+            $payload = ['success' => true];
+            foreach (['message', 'correo', 'precio_actual', 'precio_limite', 'veces_enviado', 'suscripcion_eliminada', 'producto_nombre'] as $clave) {
+                if (array_key_exists($clave, $resultado)) {
+                    $payload[$clave] = $resultado[$clave];
+                }
+            }
+
+            return response()->json($payload);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al enviar correo: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function aplazarCorreoSieteDias(Aviso $aviso)
+    {
+        if ($aviso->avisoable_type !== CorreoAvisoPrecio::class) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Este aviso no es de tipo correo'
+            ], 422);
+        }
+
+        /** @var CorreoAvisoPrecio|null $suscripcion */
+        $suscripcion = $aviso->avisoable ?? CorreoAvisoPrecio::find($aviso->avisoable_id);
+        if (!$suscripcion) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se encontró la suscripción asociada'
+            ], 404);
+        }
+
+        $suscripcion->ultimo_envio_correo = now();
+        $suscripcion->save();
+
+        $aviso->fecha_aviso = now()->addDays(7);
+        $aviso->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Aviso aplazado 7 días correctamente'
+        ]);
     }
 
     /**
@@ -944,6 +1038,73 @@ class AvisoController extends Controller
             \Log::error('Error al eliminar avisos duplicados vencidos: ' . $e->getMessage());
             // No lanzar excepción para no interrumpir el flujo principal
         }
+    }
+
+    private function obtenerPrecioMinimoFiltradoSuscripcion(CorreoAvisoPrecio $suscripcion): ?float
+    {
+        $ofertas = OfertaProducto::query()
+            ->where('producto_id', $suscripcion->producto_id)
+            ->where('mostrar', 'si')
+            ->whereNotNull('precio_unidad')
+            ->get();
+
+        $seleccionadas = is_array($suscripcion->especificaciones_internas_seleccionadas)
+            ? $suscripcion->especificaciones_internas_seleccionadas
+            : [];
+
+        $ofertasFiltradas = $this->filtrarOfertasPorEspecificaciones($ofertas->all(), $seleccionadas);
+        if (empty($ofertasFiltradas)) {
+            return null;
+        }
+
+        return (float) collect($ofertasFiltradas)->min(function (OfertaProducto $oferta) {
+            return (float) $oferta->precio_unidad;
+        });
+    }
+
+    /**
+     * @param  OfertaProducto[]  $ofertas
+     * @param  array<string, array<int, string|int>>  $seleccionadas
+     * @return OfertaProducto[]
+     */
+    private function filtrarOfertasPorEspecificaciones(array $ofertas, array $seleccionadas): array
+    {
+        $seleccion = collect($seleccionadas)
+            ->filter(function ($ids, $lineaId) {
+                if (!is_array($ids) || $lineaId === 'precio_min' || $lineaId === 'precio_max') {
+                    return false;
+                }
+
+                return count($ids) > 0;
+            })
+            ->map(function ($ids) {
+                return array_values(array_map('strval', $ids));
+            })
+            ->toArray();
+
+        if (empty($seleccion)) {
+            return $ofertas;
+        }
+
+        return array_values(array_filter($ofertas, function (OfertaProducto $oferta) use ($seleccion) {
+            $especificacionesOferta = is_array($oferta->especificaciones_internas)
+                ? $oferta->especificaciones_internas
+                : [];
+
+            foreach ($seleccion as $lineaId => $sublineasSeleccionadas) {
+                $sublineasOfertaRaw = $especificacionesOferta[$lineaId] ?? [];
+                if (!is_array($sublineasOfertaRaw)) {
+                    return false;
+                }
+
+                $sublineasOferta = array_map('strval', $sublineasOfertaRaw);
+                if (count(array_intersect($sublineasSeleccionadas, $sublineasOferta)) === 0) {
+                    return false;
+                }
+            }
+
+            return true;
+        }));
     }
 
     /**

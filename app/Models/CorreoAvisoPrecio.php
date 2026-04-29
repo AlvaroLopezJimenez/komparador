@@ -18,12 +18,14 @@ class CorreoAvisoPrecio extends Model
         'token_cancelacion',
         'ultimo_envio_correo',
         'veces_enviado',
+        'especificaciones_internas_seleccionadas',
     ];
 
     protected $casts = [
         'ultimo_envio_correo' => 'datetime',
         'precio_limite' => 'decimal:2',
         'veces_enviado' => 'integer',
+        'especificaciones_internas_seleccionadas' => 'array',
     ];
 
     public function producto()

@@ -320,6 +320,19 @@ Route::prefix('admin')->group(function () {
         ]);
     })->name('admin.cron.avisos-scrapear-sin-stock');
 
+    // Generar avisos de tipo correo en base a suscripciones de precio (7+ días)
+    Route::get('avisos/generar-correo-precio', function (Request $request) {
+        if ($request->get('token') !== env('TOKEN_ACTUALIZAR_PRECIOS')) {
+            abort(403, 'Token inválido');
+        }
+        $controller = app(\App\Http\Controllers\Crons\AvisosCorreoPrecioCronController::class);
+        $controller();
+        return response()->json([
+            'status' => 'ok',
+            'message' => 'Cron avisos de correo ejecutado correctamente',
+        ]);
+    })->name('admin.cron.avisos-generar-correo-precio');
+
     // Cron neo objetivos: neoobjetivo con visitada > 7 días y URL de rama Neo comparador → petición a VPS sacar-ofertas-idea
     Route::get('cron-neo-objetivos', function (Request $request) {
         if ($request->get('token') !== env('TOKEN_ACTUALIZAR_PRECIOS')) {
@@ -751,6 +764,8 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
         Route::get('/{aviso}/texto', [AvisoController::class, 'getTextoAviso'])->name('get.texto');
         Route::delete('/{aviso}', [AvisoController::class, 'destroy'])->name('destroy');
         Route::post('/{aviso}/aplazar', [AvisoController::class, 'aplazar'])->name('aplazar');
+        Route::post('/{aviso}/correo/enviar', [AvisoController::class, 'enviarAvisoCorreo'])->name('correo.enviar');
+        Route::post('/{aviso}/correo/aplazar-7-dias', [AvisoController::class, 'aplazarCorreoSieteDias'])->name('correo.aplazar-7-dias');
         Route::post('/marcar-envio-comprobado', [AvisoController::class, 'marcarEnvioComprobado'])->name('marcar.envio.comprobado');
         Route::post('/{aviso}/gestionar-oferta-resucitada', [AvisoController::class, 'gestionarOfertaResucitada'])->name('gestionar.oferta.resucitada');
         Route::get('/elemento', [AvisoController::class, 'getAvisosElemento'])->name('get.elemento');

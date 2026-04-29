@@ -1748,6 +1748,10 @@
           </div>
           
           <form id="formAlertaPrecio2" class="space-y-4">
+            <div id="alerta-especificaciones-resumen" class="hidden">
+              <div class="text-xs font-semibold text-blue-100 mb-1">Avisar solo de:</div>
+              <div id="alerta-especificaciones-tags" class="flex flex-wrap gap-2"></div>
+            </div>
             <div>
               <label for="correo_alerta2" class="block text-sm font-medium text-blue-100 mb-1">Tu email</label>
               <input type="email" id="correo_alerta2" name="correo" required 
@@ -1780,7 +1784,8 @@
               </label>
               <input type="number" id="precio_limite2" name="precio_limite" step="0.01" min="0" required 
                      class="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-md focus:outline-none focus:ring-2 focus:ring-white focus:border-transparent text-white placeholder-blue-200"
-                     value="{{ number_format($producto->precio, 2, '.', '') }}">
+                     value="{{ number_format($producto->precio, 2, '.', '') }}"
+                     data-default-price="{{ number_format($producto->precio, 2, '.', '') }}">
             </div>
             
             <div class="flex items-start space-x-2">
@@ -1793,6 +1798,7 @@
             </div>
             
             <input type="hidden" name="producto_id" value="{{ $producto->id }}">
+            <input type="hidden" name="especificaciones_internas_seleccionadas" id="especificaciones_internas_alerta2" value="">
             
             <button type="submit" 
                     class="w-full bg-yellow-400 hover:bg-yellow-300 text-gray-800 font-bold py-3 px-4 rounded-md transition-all duration-200 transform hover:scale-105 shadow-lg">
@@ -2198,6 +2204,7 @@
                                 data-linea-id="{{ $filtro['id'] }}"
                                 data-sublinea-id="{{ $sub['id'] }}"
                                 data-sublinea-texto="{{ htmlspecialchars($sub['texto'], ENT_QUOTES, 'UTF-8') }}"
+                                data-sublinea-precio="{{ $tienePrecio ? str_replace(',', '.', $sub['precio_mas_barato']) : '' }}"
                                 @if($tieneImagen && !$usarImagenesProducto)
                                   data-imagenes='{!! json_encode($sub['imagenes'], JSON_HEX_QUOT | JSON_HEX_APOS | JSON_UNESCAPED_UNICODE) !!}'
                                 @endif>
@@ -2276,7 +2283,8 @@
                             style="background-color: #ffffff !important; color: #111827 !important; border-color: #9ca3af !important;"
                             data-linea-id="{{ $filtro['id'] }}"
                             data-sublinea-id="{{ $sub['id'] }}"
-                            data-sublinea-texto="{{ htmlspecialchars($sub['texto'], ENT_QUOTES, 'UTF-8') }}">
+                            data-sublinea-texto="{{ htmlspecialchars($sub['texto'], ENT_QUOTES, 'UTF-8') }}"
+                            data-sublinea-precio="{{ $tienePrecio ? str_replace(',', '.', $sub['precio_mas_barato']) : '' }}">
                             @if($formato === 'texto')
                               <span>{{ $sub['texto'] }}</span>
                               <span class="contador-sublinea" data-linea-id="{{ $filtro['id'] }}" data-sublinea-id="{{ $sub['id'] }}">(0)</span>
@@ -2877,7 +2885,8 @@
           {{-- Filtros de especificaciones internas --}}
           {{-- Inicializar con filtros recibidos desde la URL (si existen) --}}
           {{-- v13: especificacionesSeleccionadas - Objeto con las especificaciones seleccionadas por el usuario desde la URL --}}
-          window.v13 = @json($filtrosAplicadosDesdeUrl ?? []);
+          {{-- Debe ser siempre un objeto literal {}, nunca []: si v13 es Array, JSON.stringify ignora claves de línea no numéricas y el guardado en BD queda []. --}}
+          window.v13 = @json(empty($filtrosAplicadosDesdeUrl) ? new \stdClass() : ($filtrosAplicadosDesdeUrl ?? []));
           
           {{-- v18: especificacionesElegidasProducto - Especificaciones internas elegidas del producto para verificar "mostrar" --}}
           window.v18 = @json($producto->categoria_especificaciones_internas_elegidas ?? null);
@@ -2887,6 +2896,18 @@
           }
           if (window.v13.precio_max !== undefined) {
             delete window.v13.precio_max;
+          }
+          {{-- Por si en caché antigua v13 llegara como Array, convertir a objeto conservando claves de línea --}}
+          if (Array.isArray(window.v13)) {
+            const _v13Arr = window.v13;
+            window.v13 = {};
+            Object.keys(_v13Arr).forEach(function (k) {
+              if (k === 'precio_min' || k === 'precio_max') return;
+              const v = _v13Arr[k];
+              if (Array.isArray(v)) {
+                window.v13[k] = v.map(function (id) { return String(id); });
+              }
+            });
           }
           {{-- Convertir arrays de IDs a strings para consistencia --}}
           Object.keys(window.v13).forEach(lineaId => {
@@ -4160,6 +4181,10 @@
                 {{-- Actualizar gráfica --}}
                 if (typeof window._aug1 === 'function') {
                   window._aug1();
+                }
+
+                if (typeof window._aeu1 === 'function') {
+                  window._aeu1();
                 }
               });
             });
@@ -6676,6 +6701,59 @@ function _tbf1() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+    window._aeu1 = function() {
+        const _r1 = document.getElementById('alerta-especificaciones-resumen');
+        const _t1 = document.getElementById('alerta-especificaciones-tags');
+        if (!_r1 || !_t1) return;
+
+        const _x1 = [];
+        const _x2 = [];
+        const _b1 = document.querySelectorAll('.filtro-sublinea-btn');
+        _b1.forEach((_b2) => {
+            const _l1 = String(_b2.dataset.lineaId || '');
+            const _s1 = String(_b2.dataset.sublineaId || '');
+            const _z1 = (_b2.dataset.sublineaTexto || '').trim();
+            const _p1 = (_b2.dataset.sublineaPrecio || '').trim();
+            if (!_l1 || !_s1 || !_z1) return;
+
+            const _v1 = window.v13 && window.v13[_l1];
+            if (Array.isArray(_v1) && _v1.some(id => String(id) === _s1)) {
+                _x1.push(_z1);
+                const _n1 = Number(_p1);
+                if (!Number.isNaN(_n1) && Number.isFinite(_n1) && _n1 > 0) {
+                    _x2.push(_n1);
+                }
+            }
+        });
+
+        const _u1 = [...new Set(_x1)];
+        if (_u1.length === 0) {
+            _t1.innerHTML = '';
+            _r1.classList.add('hidden');
+            const _i1 = document.getElementById('precio_limite2');
+            if (_i1) {
+                const _d1 = Number(_i1.dataset.defaultPrice || _i1.defaultValue || '');
+                if (!Number.isNaN(_d1) && Number.isFinite(_d1) && _d1 > 0) {
+                    _i1.value = _d1.toFixed(2);
+                }
+            }
+            return;
+        }
+
+        _t1.innerHTML = _u1.map((_z2) =>
+            `<span class="inline-flex items-center rounded-md text-white text-xs font-semibold px-2 py-1" style="background-color:#e97b11;border:1px solid #d16a0f;">${_z2}</span>`
+        ).join('');
+        _r1.classList.remove('hidden');
+
+        const _i2 = document.getElementById('precio_limite2');
+        if (_i2) {
+            const _m1 = _x2.length > 0 ? Math.min(..._x2) : null;
+            if (_m1 !== null) {
+                _i2.value = _m1.toFixed(2);
+            }
+        }
+    };
+
     {{-- Función para manejar formularios de alerta --}}
     {{-- _sfa1: setupFormularioAlerta - Configura los event listeners del formulario de alerta de precio --}}
     function _sfa1(formId, mensajeId) {
@@ -6688,10 +6766,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 {{-- Obtener los datos del formulario --}}
                 const formData = new FormData(formAlerta);
+                {{-- Clonar selección como objeto plano (v13 nunca debe ser Array al enviar; arrays serializan mal las claves de línea). --}}
+                const _selAlerta = {};
+                const _rawV13 = window.v13;
+                if (_rawV13 && typeof _rawV13 === 'object') {
+                    const _keys = Object.keys(_rawV13);
+                    for (let _i = 0; _i < _keys.length; _i++) {
+                        const _k = _keys[_i];
+                        if (_k === 'precio_min' || _k === 'precio_max') continue;
+                        const _v = _rawV13[_k];
+                        if (Array.isArray(_v) && _v.length > 0) {
+                            _selAlerta[String(_k)] = _v.map(function (id) { return String(id); });
+                        }
+                    }
+                }
                 const data = {
                     correo: formData.get('correo'),
                     precio_limite: parseFloat(formData.get('precio_limite')),
                     producto_id: parseInt(formData.get('producto_id')),
+                    especificaciones_internas_seleccionadas: _selAlerta,
                     acepto_politicas: formData.get('acepto_politicas') === 'on'
                 };
                 
@@ -6770,6 +6863,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     {{-- Configurar el formulario de alerta --}}
     _sfa1('formAlertaPrecio2', 'mensajeAlerta2');
+    if (typeof window._aeu1 === 'function') {
+        window._aeu1();
+    }
     
     {{-- Configurar el comportamiento del botón flotante --}}
     window.addEventListener('scroll', _tbf1);

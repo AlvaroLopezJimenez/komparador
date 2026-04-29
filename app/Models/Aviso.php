@@ -96,6 +96,10 @@ class Aviso extends Model
                     return $tienda ? $titulo . ' - ' . $tienda : $titulo;
                 case 'App\Models\Tienda':
                     return $this->avisoable->nombre;
+                case 'App\Models\CorreoAvisoPrecio':
+                    $correo = $this->avisoable->correo ?? 'Correo';
+                    $producto = $this->avisoable->producto->nombre ?? null;
+                    return $producto ? ($correo . ' - ' . $producto) : $correo;
                 default:
                     return 'Elemento desconocido';
             }
@@ -119,6 +123,9 @@ class Aviso extends Model
                 return route('admin.chollos.edit', $this->avisoable_id);
             case 'App\Models\Tienda':
                 return route('admin.tiendas.edit', $this->avisoable_id);
+            case 'App\Models\CorreoAvisoPrecio':
+                $productoId = $this->avisoable?->producto_id;
+                return $productoId ? route('admin.productos.edit', $productoId) : '#';
             default:
                 return '#';
         }
@@ -140,6 +147,8 @@ class Aviso extends Model
                 return 'Chollo';
             case 'App\Models\Tienda':
                 return 'Tienda';
+            case 'App\Models\CorreoAvisoPrecio':
+                return 'Correo';
             default:
                 return 'Desconocido';
         }

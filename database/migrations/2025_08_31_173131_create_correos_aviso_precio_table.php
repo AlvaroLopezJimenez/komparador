@@ -16,6 +16,7 @@ return new class extends Migration
             $table->string('correo');
             $table->decimal('precio_limite', 8, 2);
             $table->unsignedBigInteger('producto_id');
+            $table->json('especificaciones_internas_seleccionadas')->nullable();
             $table->string('token_cancelacion', 64)->unique()->nullable();
             $table->dateTime('ultimo_envio_correo')->nullable();
             $table->integer('veces_enviado')->nullable();

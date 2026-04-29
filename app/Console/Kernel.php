@@ -28,6 +28,9 @@ class Kernel extends ConsoleKernel
 
         // Scrapear ofertas con aviso sin stock vencido (tiendas con scrapeo automático)
         $schedule->command('avisos:scrapear-sin-stock')->hourly();
+
+        // Generar avisos de gestion para alertas de correo por precio
+        $schedule->command('avisos:generar-correo-precio')->hourly();
     }
 
     /**
