@@ -14,6 +14,7 @@ use App\Models\OfertaProducto;
 use App\Models\ProductoOfertaMasBarataPorProducto;
 use App\Models\CorreoAvisoPrecio;
 use App\Models\User;
+use App\Services\SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -110,34 +111,10 @@ class AvisoController extends Controller
             }
         }
 
-        // Detectar avisos de productos con precio NULL
-        $avisosProductoPrecioNullQuery = Aviso::query()
-            ->leftJoin('productos', 'productos.id', '=', 'avisos.avisoable_id')
-            ->where('avisos.avisoable_type', 'App\Models\Producto')
-            ->where('avisos.texto_aviso', 'like', '%Precio actualizado producto%')
-            ->whereNull('productos.precio');
-        
-        // Aplicar filtro por usuario solo si no se está mostrando todos
-        if (!$mostrarTodos) {
-            $avisosProductoPrecioNullQuery->visiblesPorUsuario($userId);
-        }
-        
-        $avisosProductoPrecioNullQuery->select([
-                'avisos.id as aviso_id',
-                'avisos.avisoable_id as producto_id',
-                'avisos.fecha_aviso as fecha_aviso',
-                'avisos.oculto as oculto',
-                'productos.nombre as producto_nombre',
-            ])
-            ->orderBy('avisos.fecha_aviso', 'desc');
-        
-        $avisosProductoPrecioNullCount = (clone $avisosProductoPrecioNullQuery)->count('avisos.id');
-        $avisosProductoPrecioNull = $avisosProductoPrecioNullQuery->limit(50)->get();
-
         // Obtener todos los usuarios para el desplegable de crear aviso interno
         $usuarios = User::orderBy('name')->get();
 
-        return view('admin.avisos.index', compact('avisosVencidos', 'avisosPendientes', 'avisosOcultos', 'perPage', 'totalVencidos', 'totalPendientes', 'totalOcultos', 'avisosProductoPrecioNullCount', 'avisosProductoPrecioNull', 'mostrarTodos', 'usuarios'));
+        return view('admin.avisos.index', compact('avisosVencidos', 'avisosPendientes', 'avisosOcultos', 'perPage', 'totalVencidos', 'totalPendientes', 'totalOcultos', 'mostrarTodos', 'usuarios'));
     }
 
     public function store(Request $request)
@@ -498,75 +475,6 @@ class AvisoController extends Controller
         ]);
     }
 
-    /**
-     * Obtener información de alertas para un producto (para mostrar en modal)
-     */
-    public function obtenerInfoAlertasProducto(Request $request)
-    {
-        $request->validate([
-            'producto_id' => 'required|exists:productos,id',
-            'precio_actual' => 'required|numeric|min:0'
-        ]);
-
-        try {
-            $producto = Producto::findOrFail($request->producto_id);
-            
-            // Obtener alertas que cumplen las condiciones
-            $alertas = \App\Models\CorreoAvisoPrecio::where('producto_id', $request->producto_id)
-                ->where('precio_limite', '>=', $request->precio_actual)
-                ->where(function($query) {
-                    $query->whereNull('ultimo_envio_correo')
-                          ->orWhere('ultimo_envio_correo', '<', now()->subWeek());
-                })
-                ->get();
-            
-            // Agrupar por precio_limite y contar
-            $preciosAgrupados = $alertas->groupBy('precio_limite')->map(function($group) {
-                return $group->count();
-            })->toArray();
-            
-            // Ordenar por precio (mayor a menor)
-            krsort($preciosAgrupados);
-            
-            return response()->json([
-                'success' => true,
-                'precio_producto' => $producto->precio,
-                'precios_limites' => $preciosAgrupados,
-                'total_alertas' => $alertas->count()
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Error al obtener información: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * Enviar correos de alerta para un producto específico
-     */
-    public function enviarAlertasProducto(Request $request)
-    {
-        $request->validate([
-            'producto_id' => 'required|exists:productos,id',
-            'precio_actual' => 'required|numeric|min:0'
-        ]);
-
-        try {
-            $alertaController = new \App\Http\Controllers\AlertaPrecioController();
-            $resultado = $alertaController->enviarAlertasPrecio($request->producto_id, $request->precio_actual);
-
-            return response()->json($resultado);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Error al enviar alertas: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-
     public function enviarAvisoCorreo(Aviso $aviso)
     {
         if ($aviso->avisoable_type !== CorreoAvisoPrecio::class) {
@@ -578,18 +486,32 @@ class AvisoController extends Controller
 
         /** @var CorreoAvisoPrecio|null $suscripcion */
         $suscripcion = $aviso->avisoable ?? CorreoAvisoPrecio::find($aviso->avisoable_id);
-        if (!$suscripcion || !$suscripcion->producto) {
+        if (!$suscripcion) {
             return response()->json([
                 'success' => false,
-                'message' => 'No se encontró la suscripción o el producto asociado'
+                'message' => 'No se encontró la suscripción asociada'
             ], 404);
         }
 
-        $precioActual = $this->obtenerPrecioMinimoFiltradoSuscripcion($suscripcion);
+        $esAvisoCategoria = $this->esSuscripcionCategoria($suscripcion);
+        $esAvisoProducto = !$esAvisoCategoria;
+        if (!$esAvisoProducto && !$esAvisoCategoria) {
+            return response()->json([
+                'success' => false,
+                'message' => 'La suscripción no tiene producto ni categoría asociados'
+            ], 422);
+        }
+
+        $productosCoincidentesCategoria = [];
+        $precioActual = $esAvisoProducto
+            ? $this->obtenerPrecioMinimoFiltradoSuscripcion($suscripcion)
+            : $this->obtenerPrecioMinimoCategoriaFiltradoSuscripcion($suscripcion, $productosCoincidentesCategoria);
         if ($precioActual === null) {
             return response()->json([
                 'success' => false,
-                'message' => 'No hay ofertas activas que coincidan con las especificaciones seleccionadas'
+                'message' => $esAvisoProducto
+                    ? 'No hay ofertas activas que coincidan con las especificaciones seleccionadas'
+                    : 'No hay productos de la categoría que coincidan con las especificaciones seleccionadas'
             ], 422);
         }
 
@@ -600,9 +522,19 @@ class AvisoController extends Controller
             ], 422);
         }
 
+        if ($esAvisoCategoria) {
+            $limite = (float) $suscripcion->precio_limite;
+            $productosCoincidentesCategoria = array_values(array_filter(
+                $productosCoincidentesCategoria,
+                fn (Producto $producto) => (float) ($producto->precio_alerta ?? $producto->precio ?? 0) <= $limite
+            ));
+        }
+
         try {
             $alertaController = app(\App\Http\Controllers\AlertaPrecioController::class);
-            $resultado = $alertaController->enviarAlertaIndividual($suscripcion, $precioActual);
+            $resultado = $esAvisoProducto
+                ? $alertaController->enviarAlertaIndividual($suscripcion, $precioActual)
+                : $alertaController->enviarAlertaCategoriaIndividual($suscripcion, $precioActual, $productosCoincidentesCategoria);
             if (empty($resultado['success'])) {
                 return response()->json([
                     'success' => false,
@@ -613,7 +545,18 @@ class AvisoController extends Controller
             $aviso->delete();
 
             $payload = ['success' => true];
-            foreach (['message', 'correo', 'precio_actual', 'precio_limite', 'veces_enviado', 'suscripcion_eliminada', 'producto_nombre'] as $clave) {
+            foreach ([
+                'message',
+                'correo',
+                'precio_actual',
+                'precio_limite',
+                'veces_enviado',
+                'suscripcion_eliminada',
+                'producto_nombre',
+                'categoria_nombre',
+                'productos_coincidentes',
+                'url_categoria'
+            ] as $clave) {
                 if (array_key_exists($clave, $resultado)) {
                     $payload[$clave] = $resultado[$clave];
                 }
@@ -1063,6 +1006,217 @@ class AvisoController extends Controller
     }
 
     /**
+     * @param  array<int, Producto>  $productosCoincidentesSalida
+     */
+    private function obtenerPrecioMinimoCategoriaFiltradoSuscripcion(CorreoAvisoPrecio $suscripcion, array &$productosCoincidentesSalida = []): ?float
+    {
+        $meta = $this->metaSuscripcionCategoria($suscripcion);
+        if (!isset($meta['categoria_id'])) {
+            return null;
+        }
+
+        $categoriaIds = Categoria::idsSelfAndDescendants((int) $meta['categoria_id']);
+        $productos = Producto::query()
+            ->whereIn('categoria_id', $categoriaIds)
+            ->where('mostrar', 'si')
+            ->where('precio', '>', 0)
+            ->get(['id', 'precio', 'categoria_especificaciones_internas_elegidas']);
+
+        $seleccion = is_array($suscripcion->especificaciones_internas_seleccionadas)
+            ? $suscripcion->especificaciones_internas_seleccionadas
+            : [];
+        $seleccionNormalizada = $this->normalizarSeleccionEspecificaciones($seleccion);
+
+        $productosCoincidentes = $productos->filter(function (Producto $producto) use ($seleccionNormalizada) {
+            if ($seleccionNormalizada === []) {
+                return true;
+            }
+
+            $esp = $producto->categoria_especificaciones_internas_elegidas;
+            if (!is_array($esp)) {
+                return false;
+            }
+
+            foreach ($seleccionNormalizada as $lineaId => $sublineasIds) {
+                $productoLinea = $esp[$lineaId] ?? null;
+                if ($productoLinea === null) {
+                    return false;
+                }
+                $productoSublineas = is_array($productoLinea) ? $productoLinea : [$productoLinea];
+                $coincide = false;
+                foreach ($productoSublineas as $item) {
+                    $itemId = (is_array($item) && isset($item['id'])) ? strval($item['id']) : strval($item);
+                    if (in_array($itemId, $sublineasIds, true)) {
+                        if (is_array($item) && isset($item['c'])) {
+                            if (($item['c'] ?? 0) > 0) {
+                                $coincide = true;
+                                break;
+                            }
+                        } else {
+                            $coincide = true;
+                            break;
+                        }
+                    }
+                }
+                if (!$coincide) {
+                    return false;
+                }
+            }
+
+            return true;
+        })->values();
+
+        if ($productosCoincidentes->isEmpty()) {
+            return null;
+        }
+
+        $productosConPrecioFiltrado = $productosCoincidentes
+            ->map(function (Producto $producto) use ($seleccionNormalizada) {
+                $precioFiltrado = $this->resolverPrecioProductoCategoriaSegunSeleccion($producto, $seleccionNormalizada);
+                if ($precioFiltrado === null) {
+                    return null;
+                }
+
+                $producto->precio_alerta = $precioFiltrado;
+                return $producto;
+            })
+            ->filter()
+            ->values();
+
+        $productosCoincidentesSalida = $productosConPrecioFiltrado->all();
+        if ($productosConPrecioFiltrado->isEmpty()) {
+            return null;
+        }
+
+        return (float) $productosConPrecioFiltrado->min(function (Producto $producto) {
+            return (float) ($producto->precio_alerta ?? $producto->precio ?? 0);
+        });
+    }
+
+    /**
+     * @param array<string, mixed> $seleccion
+     * @return array<string, array<int, string>>
+     */
+    private function normalizarSeleccionEspecificaciones(array $seleccion): array
+    {
+        return collect($seleccion)
+            ->filter(function ($ids, $lineaId) {
+                if (!is_array($ids) || $lineaId === 'precio_min' || $lineaId === 'precio_max' || str_starts_with((string) $lineaId, '_')) {
+                    return false;
+                }
+                return count($ids) > 0;
+            })
+            ->map(fn ($ids) => array_values(array_map('strval', $ids)))
+            ->toArray();
+    }
+
+    /**
+     * Calcula el precio efectivo de un producto respetando las especificaciones seleccionadas.
+     *
+     * @param array<string, array<int, string>> $seleccionNormalizada
+     */
+    private function resolverPrecioProductoCategoriaSegunSeleccion(Producto $producto, array $seleccionNormalizada): ?float
+    {
+        if ($seleccionNormalizada === []) {
+            $precioBase = (float) ($producto->precio ?? 0);
+            return $precioBase > 0 ? $precioBase : null;
+        }
+
+        $espProducto = is_array($producto->categoria_especificaciones_internas_elegidas)
+            ? $producto->categoria_especificaciones_internas_elegidas
+            : [];
+        if ($espProducto === []) {
+            return null;
+        }
+
+        $filtrosConMostrar = [];
+        foreach ($seleccionNormalizada as $lineaId => $sublineasIds) {
+            $productoLinea = $espProducto[$lineaId] ?? null;
+            if ($productoLinea === null) {
+                return null;
+            }
+
+            $productoSublineas = is_array($productoLinea) ? $productoLinea : [$productoLinea];
+            $coincideLinea = false;
+            $requiereOfertaEnLinea = false;
+            foreach ($productoSublineas as $item) {
+                $itemId = (is_array($item) && isset($item['id'])) ? strval($item['id']) : strval($item);
+                if (!in_array($itemId, $sublineasIds, true)) {
+                    continue;
+                }
+
+                if (is_array($item) && isset($item['c']) && ($item['c'] ?? 0) <= 0) {
+                    continue;
+                }
+
+                $coincideLinea = true;
+                if (is_array($item)) {
+                    $mostrar = (isset($item['m']) && ($item['m'] === 1 || $item['m'] === true))
+                        || (isset($item['mostrar']) && $item['mostrar'] === true);
+                    if ($mostrar) {
+                        $requiereOfertaEnLinea = true;
+                    }
+                }
+                break;
+            }
+
+            if (!$coincideLinea) {
+                return null;
+            }
+
+            if ($requiereOfertaEnLinea) {
+                $filtrosConMostrar[$lineaId] = $sublineasIds;
+            }
+        }
+
+        if ($filtrosConMostrar === []) {
+            $precioBase = (float) ($producto->precio ?? 0);
+            return $precioBase > 0 ? $precioBase : null;
+        }
+
+        $servicioOfertas = app(SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos::class);
+        $ofertas = $servicioOfertas->obtenerTodas($producto);
+        if ($ofertas->isEmpty()) {
+            return null;
+        }
+
+        $ofertasFiltradas = $ofertas->filter(function ($oferta) use ($filtrosConMostrar) {
+            $espOferta = is_array($oferta->especificaciones_internas) ? $oferta->especificaciones_internas : [];
+            if ($espOferta === []) {
+                return false;
+            }
+
+            foreach ($filtrosConMostrar as $lineaId => $sublineasIds) {
+                $ofertaLinea = $espOferta[$lineaId] ?? null;
+                if ($ofertaLinea === null) {
+                    return false;
+                }
+                $ofertaSublineas = is_array($ofertaLinea) ? $ofertaLinea : [$ofertaLinea];
+
+                $coincide = false;
+                foreach ($ofertaSublineas as $item) {
+                    $itemId = (is_array($item) && isset($item['id'])) ? strval($item['id']) : strval($item);
+                    if (in_array($itemId, $sublineasIds, true)) {
+                        $coincide = true;
+                        break;
+                    }
+                }
+                if (!$coincide) {
+                    return false;
+                }
+            }
+            return true;
+        })->values();
+
+        if ($ofertasFiltradas->isEmpty()) {
+            return null;
+        }
+
+        $precioMin = (float) $ofertasFiltradas->min(fn ($oferta) => (float) ($oferta->precio_unidad ?? 0));
+        return $precioMin > 0 ? $precioMin : null;
+    }
+
+    /**
      * @param  OfertaProducto[]  $ofertas
      * @param  array<string, array<int, string|int>>  $seleccionadas
      * @return OfertaProducto[]
@@ -1071,7 +1225,7 @@ class AvisoController extends Controller
     {
         $seleccion = collect($seleccionadas)
             ->filter(function ($ids, $lineaId) {
-                if (!is_array($ids) || $lineaId === 'precio_min' || $lineaId === 'precio_max') {
+                if (!is_array($ids) || $lineaId === 'precio_min' || $lineaId === 'precio_max' || str_starts_with((string) $lineaId, '_')) {
                     return false;
                 }
 
@@ -1105,6 +1259,28 @@ class AvisoController extends Controller
 
             return true;
         }));
+    }
+
+    /**
+     * @return array{categoria_id?: int}
+     */
+    private function metaSuscripcionCategoria(CorreoAvisoPrecio $suscripcion): array
+    {
+        $raw = is_array($suscripcion->especificaciones_internas_seleccionadas)
+            ? $suscripcion->especificaciones_internas_seleccionadas
+            : [];
+        if (($raw['_alerta_tipo'] ?? null) !== 'categoria') {
+            return [];
+        }
+        if (!isset($raw['_categoria_id']) || !is_numeric($raw['_categoria_id'])) {
+            return [];
+        }
+        return ['categoria_id' => (int) $raw['_categoria_id']];
+    }
+
+    private function esSuscripcionCategoria(CorreoAvisoPrecio $suscripcion): bool
+    {
+        return $this->metaSuscripcionCategoria($suscripcion) !== [];
     }
 
     /**

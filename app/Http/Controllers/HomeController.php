@@ -424,6 +424,19 @@ public function todasCategorias()
                 return true;
             });
         }
+
+        if (!empty($fa1SinPrecio) && $productosParaRango->isNotEmpty()) {
+            $paginadorRango = new LengthAwarePaginator(
+                $productosParaRango->values(),
+                $productosParaRango->count(),
+                max($productosParaRango->count(), 1),
+                1,
+                ['path' => LengthAwarePaginator::resolveCurrentPath()]
+            );
+            $paginadorRango = $this->recalcularPreciosConFiltros($paginadorRango, $fa1SinPrecio);
+            $productosParaRango = $paginadorRango->getCollection();
+        }
+
         // Calcular rango de precios: min/max de productos filtrados, excluir 0 del mínimo
         $precios = $productosParaRango->pluck('precio')->filter(function($p) {
             return $p !== null && $p !== '' && (float)$p > 0;

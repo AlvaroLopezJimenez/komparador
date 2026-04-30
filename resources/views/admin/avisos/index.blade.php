@@ -183,17 +183,67 @@
      */
     if (!function_exists('urlPublicaProductoConVariantesCorreoAviso')) {
         function urlPublicaProductoConVariantesCorreoAviso($suscripcion) {
-            if (!$suscripcion || !$suscripcion->producto || !$suscripcion->producto->categoria) {
+            if (!$suscripcion) {
+                return null;
+            }
+
+            $seleccion = is_array($suscripcion->especificaciones_internas_seleccionadas)
+                ? $suscripcion->especificaciones_internas_seleccionadas
+                : [];
+            $esCategoria = (($seleccion['_alerta_tipo'] ?? null) === 'categoria') && isset($seleccion['_categoria_id']);
+            if ($esCategoria) {
+                $categoriaId = intval($seleccion['_categoria_id'] ?? 0);
+                $categoria = $categoriaId > 0 ? \App\Models\Categoria::find($categoriaId) : null;
+                if (!$categoria) {
+                    return null;
+                }
+                $mapaIdsASlugs = [];
+                $filtrosCategoria = [];
+                if (is_array($categoria->especificaciones_internas) && isset($categoria->especificaciones_internas['filtros']) && is_array($categoria->especificaciones_internas['filtros'])) {
+                    $filtrosCategoria = $categoria->especificaciones_internas['filtros'];
+                }
+                foreach ($filtrosCategoria as $filtro) {
+                    foreach (($filtro['subprincipales'] ?? []) as $sub) {
+                        $subId = strval($sub['id'] ?? '');
+                        if ($subId === '') {
+                            continue;
+                        }
+                        $slug = $sub['slug'] ?? \Illuminate\Support\Str::slug($sub['texto'] ?? '');
+                        if ($slug !== '') {
+                            $mapaIdsASlugs[$subId] = $slug;
+                        }
+                    }
+                }
+                $segmentos = [];
+                foreach ($seleccion as $lineaId => $ids) {
+                    if (!is_array($ids) || str_starts_with((string) $lineaId, '_') || $lineaId === 'precio_min' || $lineaId === 'precio_max') {
+                        continue;
+                    }
+                    $slugs = [];
+                    foreach ($ids as $subId) {
+                        $subIdKey = strval($subId);
+                        if (isset($mapaIdsASlugs[$subIdKey])) {
+                            $slugs[] = $mapaIdsASlugs[$subIdKey];
+                        }
+                    }
+                    $slugs = array_values(array_unique(array_filter($slugs)));
+                    if ($slugs !== []) {
+                        $segmentos[] = implode('-', $slugs);
+                    }
+                }
+                $path = '/categoria/' . $categoria->slug;
+                if ($segmentos !== []) {
+                    $path .= '/' . implode('/', $segmentos);
+                }
+                return url($path . '?orden=precio');
+            }
+
+            if (!$suscripcion->producto || !$suscripcion->producto->categoria) {
                 return null;
             }
             $producto = $suscripcion->producto;
             $producto->loadMissing('categoriaEspecificaciones');
             $categoria = $producto->categoria;
-            $seleccion = $suscripcion->especificaciones_internas_seleccionadas;
-            if (!is_array($seleccion)) {
-                $seleccion = [];
-            }
-
             $slugsCats = $categoria->obtenerSlugsJerarquia();
             if (!is_array($slugsCats)) {
                 $slugsCats = [];
@@ -219,7 +269,7 @@
 
             $seleccionPorLinea = [];
             foreach ($seleccion as $lineaId => $ids) {
-                if ($lineaId === 'precio_min' || $lineaId === 'precio_max') {
+                    if (str_starts_with((string) $lineaId, '_') || $lineaId === 'precio_min' || $lineaId === 'precio_max') {
                     continue;
                 }
                 if (!is_array($ids)) {
@@ -342,40 +392,6 @@
                 .avisos-oferta-inner { flex-direction: row; flex-wrap: wrap; align-items: center; font-size: 0.75rem; }
             }
         </style>
-        <!-- Banner de advertencia para productos con precio NULL -->
-        @if(($avisosProductoPrecioNullCount ?? 0) > 0)
-            <div class="mb-6 bg-red-900 border-l-4 border-red-500 text-red-100 p-4 rounded">
-                <div class="flex items-center">
-                    <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
-                    </svg>
-                    <div>
-                        <p class="font-bold">Advertencia: Hay {{ $avisosProductoPrecioNullCount }} aviso(s) de Producto con precio NULL</p>
-                        <p class="text-sm mt-1">Estos productos no tienen ofertas activas y su precio no se ha actualizado. Revisa estos productos para evitar errores en la vista.</p>
-                        @if($avisosProductoPrecioNull && $avisosProductoPrecioNull->count() > 0)
-                            <details class="mt-2">
-                                <summary class="cursor-pointer text-sm underline">Ver ejemplos ({{ $avisosProductoPrecioNull->count() }})</summary>
-                                <ul class="mt-2 ml-4 list-disc text-sm">
-                                    @foreach($avisosProductoPrecioNull->take(10) as $avisoNull)
-                                        <li>
-                                            Aviso #{{ $avisoNull->aviso_id }} - 
-                                            Producto #{{ $avisoNull->producto_id }} 
-                                            @if($avisoNull->producto_nombre)
-                                                ({{ $avisoNull->producto_nombre }})
-                                            @endif
-                                            - 
-                                            <a href="{{ route('admin.productos.edit', $avisoNull->producto_id) }}" target="_blank" class="underline hover:text-red-200">
-                                                Editar Producto
-                                            </a>
-                                        </li>
-                                    @endforeach
-                                </ul>
-                            </details>
-                        @endif
-                    </div>
-                </div>
-            </div>
-        @endif
 
         <!-- Botones de acción -->
         <div class="mb-6 flex justify-between items-center">
@@ -826,33 +842,6 @@
                                                 class="px-3 py-1 text-sm bg-yellow-600 hover:bg-yellow-700 text-white rounded-md transition-colors">
                                                 No enviar
                                             </button>
-                                        @endif
-                                        @if($aviso->avisoable_type === 'App\Models\Producto' && strpos($aviso->texto_aviso, 'Precio actualizado producto') !== false)
-                                            @php
-                                                $precioActual = $aviso->avisoable?->precio;
-                                                $alertasCount = 0;
-                                                
-                                                // Solo contar alertas si el precio no es NULL
-                                                if ($aviso->avisoable_id && $precioActual !== null) {
-                                                    $alertasCount = \App\Models\CorreoAvisoPrecio::where('producto_id', $aviso->avisoable_id)
-                                                        ->where('precio_limite', '>=', $precioActual)
-                                                        ->where(function($query) {
-                                                            $query->whereNull('ultimo_envio_correo')
-                                                                  ->orWhere('ultimo_envio_correo', '<', now()->subWeek());
-                                                        })
-                                                        ->count();
-                                                }
-                                            @endphp
-                                            @if($precioActual === null)
-                                                <div class="px-3 py-1 text-xs bg-red-600 text-white rounded">
-                                                    ERROR: Producto #{{ $aviso->avisoable_id }} con precio NULL
-                                                </div>
-                                            @elseif($alertasCount > 0)
-                                                <button onclick="enviarAlertasProducto({{ $aviso->avisoable_id }}, {{ $precioActual }})" 
-                                                    class="px-3 py-1 text-sm text-white rounded-md transition-all duration-300 bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 animate-pulse shadow-lg font-bold">
-                                                    📧 Correos ({{ $alertasCount }})
-                                                </button>
-                                            @endif
                                         @endif
                                         @if($aviso->avisoable_type === 'App\Models\OfertaProducto' && preg_match('/\d+\s*(?:a\s*)?vez/i', $aviso->texto_aviso))
                                             <button onclick="aplazarAviso({{ $aviso->id }})" 
@@ -1615,35 +1604,6 @@
                     </div>
                 </div>
             </form>
-        </div>
-    </div>
-
-    <!-- Modal para confirmar envío de alertas -->
-    <div id="modal-enviar-alertas" class="hidden fixed inset-0 flex items-center justify-center z-50 p-4 backdrop-blur-sm" style="pointer-events: none;">
-        <div class="bg-gray-800 dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full shadow-2xl border-2 border-gray-600" style="pointer-events: auto;">
-            <h2 class="text-lg font-semibold mb-4 text-gray-200 dark:text-gray-200">Confirmar envío de alertas</h2>
-            <div class="mb-4">
-                <p class="text-sm text-gray-300 dark:text-gray-300 mb-3">Precio actual del producto:</p>
-                <div class="flex items-center gap-3 mb-4">
-                    <p class="text-xl font-bold text-gray-200" id="modal-precio-producto">-</p>
-                    <p class="text-sm font-medium" id="modal-mensaje-validacion"></p>
-                </div>
-                
-                <p class="text-sm text-gray-300 dark:text-gray-300 mb-3">Precios límites de las alertas:</p>
-                <div id="modal-precios-limites" class="space-y-2 mb-4">
-                    <!-- Se llenará dinámicamente -->
-                </div>
-                
-                <p class="text-sm text-gray-400 dark:text-gray-400" id="modal-total-alertas">Total: 0 alertas</p>
-            </div>
-            <div class="flex justify-end space-x-3">
-                <button type="button" onclick="cerrarModalEnviarAlertas()" class="px-6 py-4 text-sm font-medium text-gray-300 bg-gray-600 rounded-md hover:bg-gray-500 dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500">
-                    Cancelar
-                </button>
-                <button type="button" id="btn-confirmar-enviar-alertas" onclick="confirmarEnviarAlertas()" class="px-6 py-4 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700">
-                    Enviar
-                </button>
-            </div>
         </div>
     </div>
 
@@ -2479,174 +2439,6 @@
             });
         }
 
-        // Variables globales para el modal de alertas
-        let productoIdActual = null;
-        let precioActualModal = null;
-
-        // Función para mostrar modal de confirmación de alertas
-        async function enviarAlertasProducto(productoId, precioActual) {
-            productoIdActual = productoId;
-            precioActualModal = precioActual;
-            
-            // Obtener información de las alertas
-            try {
-                const response = await fetch('{{ route("avisos.info-alertas") }}?producto_id=' + productoId + '&precio_actual=' + precioActual, {
-                    method: 'GET',
-                    headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                    }
-                });
-                
-                const data = await response.json();
-                
-                if (!data.success) {
-                    alert('Error al obtener información de alertas: ' + data.message);
-                    return;
-                }
-                
-                // Mostrar precio del producto
-                const precioProducto = parseFloat(data.precio_producto);
-                const precioProductoFormateado = precioProducto.toFixed(2);
-                document.getElementById('modal-precio-producto').textContent = precioProductoFormateado + ' €';
-                
-                // Mostrar precios límites agrupados
-                const preciosContainer = document.getElementById('modal-precios-limites');
-                preciosContainer.innerHTML = '';
-                
-                if (Object.keys(data.precios_limites).length === 0) {
-                    preciosContainer.innerHTML = '<p class="text-gray-400 text-sm">No hay alertas disponibles</p>';
-                    return;
-                }
-                
-                // Verificar si todos los precios límites son >= precio del producto
-                let todosCorrectos = true;
-                const mensajeValidacion = document.getElementById('modal-mensaje-validacion');
-                
-                for (const [precioLimite, cantidad] of Object.entries(data.precios_limites)) {
-                    const precioLimiteNum = parseFloat(precioLimite);
-                    
-                    // Si algún precio límite es menor al precio del producto, marcar como incorrecto
-                    if (precioLimiteNum < precioProducto) {
-                        todosCorrectos = false;
-                    }
-                    
-                    // Si el precio límite es mayor o igual al precio del producto, verde; si es menor, rojo
-                    const colorTexto = precioLimiteNum >= precioProducto ? 'text-green-400' : 'text-red-400';
-                    
-                    const div = document.createElement('div');
-                    div.className = 'flex justify-between items-center bg-gray-700 p-3 rounded';
-                    div.innerHTML = `
-                        <span class="${colorTexto} font-bold">${precioLimiteNum.toFixed(2)} €</span>
-                        <span class="text-gray-400">${cantidad} ${cantidad === 1 ? 'alerta' : 'alertas'}</span>
-                    `;
-                    preciosContainer.appendChild(div);
-                }
-                
-                // Mostrar mensaje de validación
-                if (todosCorrectos) {
-                    mensajeValidacion.textContent = 'Todos los correos son correctos';
-                    mensajeValidacion.className = 'text-sm font-medium text-green-400';
-                } else {
-                    mensajeValidacion.textContent = 'Hay un precio de un correo que aplica a enviar correo que es inferior al precio del producto';
-                    mensajeValidacion.className = 'text-sm font-medium text-red-400';
-                }
-                
-                // Mostrar total
-                document.getElementById('modal-total-alertas').textContent = 'Total: ' + data.total_alertas + ' ' + (data.total_alertas === 1 ? 'alerta' : 'alertas');
-                
-                // Mostrar modal
-                document.getElementById('modal-enviar-alertas').classList.remove('hidden');
-                
-            } catch (error) {
-                console.error('Error:', error);
-                alert('Error de conexión al obtener información de alertas: ' + error.message);
-            }
-        }
-
-        // Función para cerrar modal de alertas
-        function cerrarModalEnviarAlertas() {
-            document.getElementById('modal-enviar-alertas').classList.add('hidden');
-            productoIdActual = null;
-            precioActualModal = null;
-        }
-
-        // Función para confirmar y enviar alertas
-        function confirmarEnviarAlertas() {
-            if (!productoIdActual || precioActualModal === null) {
-                alert('Error: No se pudo obtener la información del producto');
-                return;
-            }
-            
-            const btnConfirmar = document.getElementById('btn-confirmar-enviar-alertas');
-            const textoOriginal = btnConfirmar.textContent;
-            btnConfirmar.disabled = true;
-            btnConfirmar.textContent = 'Enviando...';
-            
-            fetch('{{ route("avisos.enviar-alertas") }}', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                },
-                body: JSON.stringify({
-                    producto_id: productoIdActual,
-                    precio_actual: precioActualModal
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                console.log('Respuesta completa:', data);
-                
-                let mensaje = '=== RESULTADO DEL ENVÍO ===\n\n';
-                mensaje += 'Correos enviados: ' + data.enviados + '\n';
-                mensaje += 'Mensaje: ' + data.message + '\n\n';
-                
-                if (data.total_alertas !== undefined) {
-                    mensaje += 'Total de alertas encontradas: ' + data.total_alertas + '\n';
-                }
-                
-                if (data.alertas_filtradas !== undefined) {
-                    mensaje += 'Alertas después de filtrar por fecha: ' + data.alertas_filtradas + '\n';
-                }
-                
-                if (data.errores && data.errores.length > 0) {
-                    mensaje += '\n--- ERRORES ---\n';
-                    data.errores.forEach((error, index) => {
-                        mensaje += (index + 1) + '. ' + error + '\n';
-                    });
-                }
-                
-                alert(mensaje);
-                
-                // Cerrar modal
-                cerrarModalEnviarAlertas();
-                
-                if (data.success && data.enviados > 0) {
-                    location.reload();
-                } else {
-                    btnConfirmar.disabled = false;
-                    btnConfirmar.textContent = textoOriginal;
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Error de conexión al enviar alertas: ' + error.message);
-                btnConfirmar.disabled = false;
-                btnConfirmar.textContent = textoOriginal;
-            });
-        }
-
-
-        // Cerrar modal de alertas con Escape
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                const modalAlertas = document.getElementById('modal-enviar-alertas');
-                if (!modalAlertas.classList.contains('hidden')) {
-                    cerrarModalEnviarAlertas();
-                }
-            }
-        });
-
         // Funcionalidad para eliminar múltiples avisos
 
         function toggleAllCheckboxes(tabla) {
@@ -2836,6 +2628,9 @@
                     if (data.producto_nombre) {
                         mensaje += 'Producto: ' + data.producto_nombre + '\n';
                     }
+                    if (data.categoria_nombre) {
+                        mensaje += 'Categoría: ' + data.categoria_nombre + '\n';
+                    }
                     if (data.correo) {
                         mensaje += 'Destino: ' + data.correo + '\n';
                     }
@@ -2850,6 +2645,12 @@
                     }
                     if (data.suscripcion_eliminada) {
                         mensaje += '\nLa suscripción se ha eliminado (máximo de envíos alcanzado).\n';
+                    }
+                    if (data.productos_coincidentes !== undefined && data.productos_coincidentes !== null) {
+                        mensaje += 'Productos coincidentes: ' + data.productos_coincidentes + '\n';
+                    }
+                    if (data.url_categoria) {
+                        mensaje += 'URL categoría filtrada: ' + data.url_categoria + '\n';
                     }
                     mensaje += '\nSe actualizará el listado de avisos.';
                 } else {

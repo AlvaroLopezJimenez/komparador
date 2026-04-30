@@ -524,6 +524,51 @@
       visibility: visible;
     }
 
+    {{-- Bottom sheet alerta móvil: anclar al viewport y por encima de listados/capas (evita fixed atrapado por transform) --}}
+    #alerta-sheet-overlay {
+      position: fixed !important;
+      inset: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+      min-height: 100dvh !important;
+      z-index: 2147483646 !important;
+      isolation: isolate;
+    }
+    #alerta-sheet-overlay .alerta-sheet-hit-layer {
+      display: flex !important;
+      flex-direction: column !important;
+      min-height: 0 !important;
+      flex: 1 1 0% !important;
+      width: 100% !important;
+    }
+    #alerta-sheet-overlay #alerta-sheet-backdrop {
+      flex: 1 1 auto !important;
+      min-height: 0 !important;
+      cursor: pointer !important;
+    }
+    #alerta-sheet-overlay .alerta-sheet-dock {
+      flex-shrink: 0 !important;
+      width: 100% !important;
+    }
+    #alerta-sheet-overlay #alerta-sheet-panel {
+      position: relative !important;
+    }
+    #x19 {
+      z-index: 9990 !important;
+    }
+
+    #alerta-sheet-close {
+      position: absolute !important;
+      top: calc(0.75rem + 1rem - 0.125rem) !important;
+      right: calc(0.75rem + 1rem) !important;
+      width: 20px !important;
+      height: 20px !important;
+      font-size: 0.7rem !important;
+      font-weight: 300 !important;
+      line-height: 1 !important;
+      z-index: 30 !important;
+    }
+
     .cupon-modal {
       background: white;
       border-radius: 12px;
@@ -1736,9 +1781,10 @@
     <div class="flex flex-col-reverse lg:flex-row gap-6">
       <aside class="w-full lg:w-1/4">
 
-
+        {{-- Slot desktop: #alerta-precio-card se reparenta al panel móvil vía JS (un solo formulario) --}}
+        <div id="aside-alert-slot">
         {{-- FORMULARIO DE ALERTA DE PRECIO - DISEÑO AZUL-PÚRPURA --}}
-        <div class="bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg rounded-lg p-4 mb-6 text-white kk-u-alert">
+        <div id="alerta-precio-card" class="bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg rounded-lg p-4 mb-6 text-white kk-u-alert">
           <div class="flex items-center mb-3">
             <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-5 5v-5z"></path>
@@ -1794,6 +1840,7 @@
               <label for="acepto_politicas2" class="text-sm text-blue-100">
                 Acepto las <a href="{{ route('politicas.privacidad') }}" target="_blank" class="text-yellow-300 hover:text-yellow-200 underline font-semibold">políticas de privacidad</a>. 
                 <span class="text-[11px] leading-snug text-blue-200 block mt-1">Solo te avisaremos cuando baje el precio, nada de spam, ni publicidad👉👈.</span>
+                <span class="text-[11px] leading-snug text-blue-200 block mt-1">Tras enviarlo, debes confirmarlo por correo en un plazo maximo de 1 hora.</span>
               </label>
             </div>
             
@@ -1807,6 +1854,7 @@
           </form>
           
           <div id="mensajeAlerta2" class="mt-3 text-sm hidden"></div>
+        </div>
         </div>
 
         <div class="bg-white shadow rounded-lg p-4 kk-u-side-card">
@@ -2852,7 +2900,7 @@
               if (typeof _afd1 === 'function' && typeof _ro1 === 'function' && typeof _acs1 === 'function' && typeof _cos1 === 'function' && typeof _aeb1 === 'function' && typeof _tod1 === 'function') {
                 {{-- Actualizar filtros dinámicos con todas las ofertas --}}
                 _afd1(ofertas);
-                {{-- Actualizar estado de botones (habilitar/deshabilitar según ofertas disponibles) --}}
+                {{-- Actualizar estado visual de botones (gris / naranja / naranja apagado según ofertas) --}}
                 _aeb1();
                 {{-- Actualizar contadores de sublíneas (esto cuenta las ofertas por especificación) --}}
                 _acs1();
@@ -3867,119 +3915,58 @@
           }
           
           {{-- Función para actualizar el estado de los botones --}}
-          {{-- _aeb1: actualizarEstadoBotones - Actualiza el estado visual (habilitado/deshabilitado) de los botones de filtros --}}
+          {{-- _aeb1: actualizarEstadoBotones - Gris = sin ofertas con el contexto actual, pero siempre pulsable; selección gris usa naranja apagado --}}
           function _aeb1() {
             const botones = document.querySelectorAll('.filtro-sublinea-btn');
-            const lineasPrincipales = new Set();
-            
-            {{-- Primero, recopilar todas las líneas principales --}}
-            botones.forEach(boton => {
-              lineasPrincipales.add(boton.dataset.lineaId);
-            });
-            
-            {{-- Verificar si hay una primera línea seleccionada --}}
             const hayPrimeraLinea = primeraLineaSeleccionada !== null;
-            
+
             botones.forEach(boton => {
               const lineaId = boton.dataset.lineaId;
               const sublineaId = String(boton.dataset.sublineaId);
-              {{-- Convertir a string para comparación consistente --}}
-              const estaSeleccionado = window.v13[lineaId] && 
-                                       window.v13[lineaId].some(id => String(id) === sublineaId);
-              
-              {{-- Si es la primera línea seleccionada, verificar si tiene ofertas disponibles --}}
+              const estaSeleccionado = window.v13[lineaId] &&
+                window.v13[lineaId].some(id => String(id) === sublineaId);
+
+              let sinOfertas = false;
               if (primeraLineaSeleccionada === lineaId) {
-                {{-- Verificar si esta sublínea tiene ofertas disponibles --}}
-                const disponible = _tod1(lineaId, sublineaId);
-                
-                if (!disponible) {
-                  {{-- Esta sublínea no tiene ofertas disponibles, desactivarla --}}
-                  boton.disabled = true;
-                  boton.style.setProperty('background-color', '#d1d5db', 'important');
-                  boton.style.setProperty('color', '#6b7280', 'important');
-                  boton.style.setProperty('border-color', '#9ca3af', 'important');
-                  boton.classList.add('opacity-50', 'cursor-not-allowed');
-                } else {
-                  {{-- Esta sublínea tiene ofertas disponibles, habilitarla --}}
-                  boton.disabled = false;
-                  if (estaSeleccionado) {
-                    boton.style.setProperty('background-color', '#e97b11', 'important');
-                    boton.style.setProperty('color', '#ffffff', 'important');
-                    boton.style.setProperty('border-color', '#d16a0f', 'important');
-                    boton.style.setProperty('border-width', '1px', 'important');
-                    boton.classList.remove('opacity-50', 'cursor-not-allowed');
-                  } else {
-                    boton.style.setProperty('background-color', '#ffffff', 'important');
-                    boton.style.setProperty('color', '#111827', 'important');
-                    boton.style.setProperty('border-color', '#9ca3af', 'important');
-                    boton.style.setProperty('border-width', '1px', 'important');
-                    boton.classList.remove('opacity-50', 'cursor-not-allowed');
-                  }
-                }
+                sinOfertas = !_tod1(lineaId, sublineaId);
               } else if (hayPrimeraLinea) {
-                {{-- Si hay una primera línea seleccionada y esta no es ella --}}
-                {{-- Primero verificar si la línea completa tiene alguna sublínea disponible --}}
-                const lineaTieneAlgunaDisponible = _tlasd1(lineaId);
-                
-                if (!lineaTieneAlgunaDisponible) {
-                  {{-- Si la línea completa no tiene ninguna sublínea disponible, desactivar todos los botones --}}
-                  boton.disabled = true;
-                  boton.style.setProperty('background-color', '#d1d5db', 'important');
-                  boton.style.setProperty('color', '#6b7280', 'important');
-                  boton.style.setProperty('border-color', '#9ca3af', 'important');
-                  boton.classList.add('opacity-50', 'cursor-not-allowed');
-                  {{-- Si estaba seleccionado, deseleccionarlo visualmente --}}
-                  if (estaSeleccionado) {
-                    {{-- No cambiar el color si está deshabilitado, solo mantenerlo gris --}}
-                  }
+                if (!_tlasd1(lineaId)) {
+                  sinOfertas = true;
                 } else {
-                  {{-- Si la línea tiene alguna disponible, verificar esta sublínea específica --}}
-                  const disponible = _tod1(lineaId, sublineaId);
-                  
-                  if (!disponible) {
-                    {{-- Esta sublínea específica no tiene ofertas disponibles --}}
-                    boton.disabled = true;
-                    boton.style.setProperty('background-color', '#d1d5db', 'important');
-                    boton.style.setProperty('color', '#6b7280', 'important');
-                    boton.style.setProperty('border-color', '#9ca3af', 'important');
-                    boton.classList.add('opacity-50', 'cursor-not-allowed');
-                  } else {
-                    {{-- Esta sublínea tiene ofertas disponibles --}}
-                    boton.disabled = false;
-                    boton.style.setProperty('background-color', estaSeleccionado ? '#e97b11' : '#ffffff', 'important');
-                    boton.style.setProperty('color', estaSeleccionado ? '#ffffff' : '#111827', 'important');
-                    boton.style.setProperty('border-color', estaSeleccionado ? '#d16a0f' : '#9ca3af', 'important');
-                    boton.style.setProperty('border-width', estaSeleccionado ? '1px' : '1px', 'important');
-                    boton.classList.remove('opacity-50', 'cursor-not-allowed');
-                  }
+                  sinOfertas = !_tod1(lineaId, sublineaId);
                 }
               } else {
-                {{-- Si no hay primera línea seleccionada, verificar si esta sublínea tiene ofertas disponibles --}}
-                const disponible = _tod1(lineaId, sublineaId);
-                
-                if (!disponible) {
-                  {{-- Esta sublínea no tiene ofertas disponibles, desactivarla desde el principio --}}
-                  boton.disabled = true;
+                sinOfertas = !_tod1(lineaId, sublineaId);
+              }
+
+              boton.disabled = false;
+              boton.classList.remove('opacity-50', 'cursor-not-allowed');
+
+              if (sinOfertas) {
+                boton.classList.add('kk-sublinea-sin-ofertas');
+                if (estaSeleccionado) {
+                  boton.style.setProperty('background-color', '#c4a07a', 'important');
+                  boton.style.setProperty('color', '#2f2319', 'important');
+                  boton.style.setProperty('border-color', '#9d7a55', 'important');
+                  boton.style.setProperty('border-width', '1px', 'important');
+                } else {
                   boton.style.setProperty('background-color', '#d1d5db', 'important');
                   boton.style.setProperty('color', '#6b7280', 'important');
                   boton.style.setProperty('border-color', '#9ca3af', 'important');
-                  boton.classList.add('opacity-50', 'cursor-not-allowed');
+                  boton.style.setProperty('border-width', '1px', 'important');
+                }
+              } else {
+                boton.classList.remove('kk-sublinea-sin-ofertas');
+                if (estaSeleccionado) {
+                  boton.style.setProperty('background-color', '#e97b11', 'important');
+                  boton.style.setProperty('color', '#ffffff', 'important');
+                  boton.style.setProperty('border-color', '#d16a0f', 'important');
+                  boton.style.setProperty('border-width', '1px', 'important');
                 } else {
-                  {{-- Esta sublínea tiene ofertas disponibles --}}
-                  boton.disabled = false;
-                  if (estaSeleccionado) {
-                    boton.style.setProperty('background-color', '#e97b11', 'important');
-                    boton.style.setProperty('color', '#ffffff', 'important');
-                    boton.style.setProperty('border-color', '#d16a0f', 'important');
-                    boton.style.setProperty('border-width', '1px', 'important');
-                    boton.classList.remove('opacity-50', 'cursor-not-allowed');
-                  } else {
-                    boton.style.setProperty('background-color', '#ffffff', 'important');
-                    boton.style.setProperty('color', '#111827', 'important');
-                    boton.style.setProperty('border-color', '#9ca3af', 'important');
-                    boton.style.setProperty('border-width', '1px', 'important');
-                    boton.classList.remove('opacity-50', 'cursor-not-allowed');
-                  }
+                  boton.style.setProperty('background-color', '#ffffff', 'important');
+                  boton.style.setProperty('color', '#111827', 'important');
+                  boton.style.setProperty('border-color', '#9ca3af', 'important');
+                  boton.style.setProperty('border-width', '1px', 'important');
                 }
               }
             });
@@ -4003,8 +3990,6 @@
               if (tieneImagenes) {
                 {{-- Solo en móvil (ancho < 640px) --}}
                 boton.addEventListener('touchstart', function(e) {
-                  if (this.disabled) return;
-                  
                   hasMoved = false;
                   longPressExecuted = false;
                   const touch = e.touches[0];
@@ -4083,7 +4068,6 @@
                   e.stopPropagation();
                   return;
                 }
-                if (this.disabled) return;
                 
                 const lineaId = this.dataset.lineaId;
                 const sublineaId = this.dataset.sublineaId;
@@ -4148,7 +4132,7 @@
                   }
                 }
                 
-                {{-- Actualizar estado de botones PRIMERO para deshabilitar los que no tienen ofertas --}}
+                {{-- Actualizar estado visual de botones (gris / naranja / naranja apagado) --}}
                 _aeb1();
                 {{-- Actualizar contadores de sublíneas --}}
                 _acs1();
@@ -5915,19 +5899,40 @@
   {{-- FOOTER DESDE LA RUTA COMPONENTS/FOOTER --}}
     <x-footer />
 
-  {{-- BOTÓN FLOTANTE PARA MÓVIL - ALERTA DE PRECIO --}}
+  {{-- Panel emergente móvil (desde abajo): mismo bloque #alerta-precio-card; z-index por encima de cupones (1000) y listados --}}
+  <div id="alerta-sheet-overlay"
+       class="fixed inset-0 flex min-h-0 flex-col lg:hidden invisible opacity-0 pointer-events-none transition-opacity duration-300"
+       aria-hidden="true">
+    <div class="pointer-events-none absolute inset-0 bg-black/50" aria-hidden="true"></div>
+    <div class="alerta-sheet-hit-layer relative z-10 min-h-0 flex flex-1 flex-col">
+      <div id="alerta-sheet-backdrop" class="min-h-0 w-full flex-1 bg-transparent" aria-hidden="true"></div>
+      <div class="alerta-sheet-dock flex w-full shrink-0 justify-center">
+        <div id="alerta-sheet-panel"
+           class="pointer-events-auto relative flex h-[58vh] max-h-[60vh] w-[56%] min-w-[260px] max-w-[440px] flex-col overflow-hidden rounded-t-2xl bg-slate-900 shadow-2xl translate-y-full transition-transform duration-300 ease-out">
+        <button type="button" id="alerta-sheet-close"
+                class="flex shrink-0 items-center justify-center rounded-full border border-white/30 bg-white/20 text-white hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-0"
+                aria-label="Cerrar">×</button>
+        <div id="mobile-alert-slot" class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-6 pt-3"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {{-- BOTÓN FLOTANTE PARA MÓVIL - ALERTA DE PRECIO (campana + flecha tipo FAQ) --}}
   {{-- x19: Botón flotante de alerta (móvil) --}}
   <div id="x19" class="fixed bottom-8 right-4 z-50 lg:hidden">
-    <button onclick="_sa1()" 
-            class="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-full p-3 shadow-xl transform hover:scale-105 transition-all duration-300 flex items-center justify-center group">
-      <svg class="w-5 h-5 group-hover:rotate-12 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-5 5v-5z"></path>
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+    <button type="button"
+            onclick="_sa1()"
+            aria-label="Avísame si baja de precio"
+            class="flex flex-row items-center justify-center gap-1 rounded-full py-2.5 px-3 text-white shadow-xl transition-transform duration-300 hover:scale-105 active:scale-95"
+            style="background: linear-gradient(145deg, #fde047 0%, #f59e0b 40%, #e97b11 100%);">
+      <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+      </svg>
+      <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
       </svg>
     </button>
-    <div class="absolute -top-1 -right-1 bg-yellow-400 text-gray-800 text-xs rounded-full w-5 h-5 flex items-center justify-center animate-bounce">
-      <span class="text-xs font-bold">⚡</span>
-    </div>
   </div>
 
   {{-- VENTANA EMERGENTE PARA CUPONES Y 3x2 --}}
@@ -6631,76 +6636,228 @@
 
   {{-- JS PARA LOS FORMULARIOS DE ALERTA DE PRECIO --}}
 <script>
-{{-- Función para scroll suave al formulario de alerta --}}
-{{-- _sa1: scrollToAlerta - Realiza scroll suave hasta el formulario de alerta de precio --}}
-function _sa1() {
-  const formularioAlerta = document.querySelector('aside');
-  if (formularioAlerta) {
-    {{-- Añadir efecto visual al botón --}}
-    const boton = document.querySelector('#boton-flotante-alerta button');
-    if (boton) {
-      boton.classList.add('scale-95');
-      setTimeout(() => boton.classList.remove('scale-95'), 200);
-    }
-    
-    {{-- Calcular la posición del formulario --}}
-    const rect = formularioAlerta.getBoundingClientRect();
-    const windowHeight = window.innerHeight;
-    
-    {{-- Scroll para que el formulario esté completamente visible con offset --}}
-    formularioAlerta.scrollIntoView({ 
-      behavior: 'smooth', 
-      block: 'start' 
-    });
-    
-    {{-- Añadir un offset adicional para que el formulario aparezca más abajo --}}
-    setTimeout(() => {
-      window.scrollBy({
-        top: -50,
-        behavior: 'smooth'
-      });
-    }, 300);
-    
-    {{-- Añadir un pequeño delay y hacer focus en el primer input --}}
-    setTimeout(() => {
-      const primerInput = document.getElementById('correo_alerta2');
-      if (primerInput) {
-        primerInput.focus();
-        {{-- Añadir un efecto de highlight sutil --}}
-        primerInput.classList.add('ring-4', 'ring-blue-300');
-        setTimeout(() => {
-          primerInput.classList.remove('ring-4', 'ring-blue-300');
-        }, 2000);
-      }
-    }, 800);
+{{-- Mover el bloque de alerta entre aside (desktop) y panel móvil (un solo formulario, mismos IDs) --}}
+{{-- _syncAlertaPrecioHost: coloca #alerta-precio-card en el slot correcto según breakpoint --}}
+{{-- _ensureAlertaSheetPortal: el overlay y el FAB deben colgar de body (si no, position:fixed puede quedar atrapado por un ancestro con transform) --}}
+function _ensureAlertaSheetPortal() {
+  const overlay = document.getElementById('alerta-sheet-overlay');
+  const fab = document.getElementById('x19');
+  if (overlay && overlay.parentNode !== document.body) {
+    document.body.appendChild(overlay);
+  }
+  if (fab && fab.parentNode !== document.body) {
+    document.body.appendChild(fab);
   }
 }
 
-{{-- Ocultar botón flotante cuando el usuario está cerca del formulario --}}
+function _syncAlertaPrecioHost() {
+  const card = document.getElementById('alerta-precio-card');
+  const asideSlot = document.getElementById('aside-alert-slot');
+  const mobileSlot = document.getElementById('mobile-alert-slot');
+  if (!card || !asideSlot || !mobileSlot) return;
+  const isDesktop = window.matchMedia('(min-width: 1024px)').matches;
+  if (isDesktop) {
+    asideSlot.appendChild(card);
+  } else {
+    mobileSlot.appendChild(card);
+  }
+}
+
+function _alertaSheetSetBodyScroll(lock) {
+  const html = document.documentElement;
+  if (lock) {
+    window._alertaSheetScrollY = window.scrollY || window.pageYOffset || 0;
+    html.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.top = '-' + window._alertaSheetScrollY + 'px';
+    document.body.style.left = '0';
+    document.body.style.right = '0';
+    document.body.style.width = '100%';
+  } else {
+    const y = typeof window._alertaSheetScrollY === 'number' ? window._alertaSheetScrollY : 0;
+    html.style.overflow = '';
+    document.body.style.overflow = '';
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.left = '';
+    document.body.style.right = '';
+    document.body.style.width = '';
+    window._alertaSheetScrollY = undefined;
+    window.scrollTo(0, y);
+  }
+}
+
+{{-- _openAlertaSheet / _closeAlertaSheet: panel inferior tipo bottom sheet (solo móvil) --}}
+function _openAlertaSheet() {
+  _ensureAlertaSheetPortal();
+  _alertaSheetSetBodyScroll(true);
+  _syncAlertaPrecioHost();
+  const overlay = document.getElementById('alerta-sheet-overlay');
+  const panel = document.getElementById('alerta-sheet-panel');
+  if (!overlay || !panel) {
+    _alertaSheetSetBodyScroll(false);
+    return;
+  }
+
+  const fabBtn = document.querySelector('#x19 button');
+  if (fabBtn) {
+    fabBtn.classList.add('scale-95');
+    setTimeout(() => fabBtn.classList.remove('scale-95'), 200);
+  }
+
+  overlay.classList.remove('invisible', 'opacity-0', 'pointer-events-none');
+  overlay.classList.add('visible', 'opacity-100', 'pointer-events-auto');
+  overlay.setAttribute('aria-hidden', 'false');
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      panel.classList.remove('translate-y-full');
+      panel.classList.add('translate-y-0');
+    });
+  });
+
+  setTimeout(() => {
+    const primerInput = document.getElementById('correo_alerta2');
+    if (primerInput) {
+      try {
+        primerInput.focus({ preventScroll: true });
+      } catch (e) {
+        primerInput.focus();
+      }
+      primerInput.classList.add('ring-4', 'ring-blue-300');
+      setTimeout(() => primerInput.classList.remove('ring-4', 'ring-blue-300'), 2000);
+    }
+  }, 400);
+
+  if (typeof _tbf1 === 'function') _tbf1();
+}
+
+function _closeAlertaSheet() {
+  const overlay = document.getElementById('alerta-sheet-overlay');
+  const panel = document.getElementById('alerta-sheet-panel');
+  if (!overlay || !panel) return;
+  if (overlay.getAttribute('aria-hidden') !== 'false') return;
+
+  panel.classList.remove('translate-y-0');
+  panel.classList.add('translate-y-full');
+
+  setTimeout(() => {
+    overlay.classList.add('invisible', 'opacity-0', 'pointer-events-none');
+    overlay.classList.remove('visible', 'opacity-100', 'pointer-events-auto');
+    overlay.setAttribute('aria-hidden', 'true');
+    _alertaSheetSetBodyScroll(false);
+    if (typeof _tbf1 === 'function') _tbf1();
+  }, 280);
+}
+
+{{-- _sa1: móvil = abrir bottom sheet; desktop = scroll al bloque de alerta --}}
+function _sa1() {
+  const isDesktop = window.matchMedia('(min-width: 1024px)').matches;
+  if (!isDesktop) {
+    _openAlertaSheet();
+    return;
+  }
+
+  const card = document.getElementById('alerta-precio-card');
+  if (!card) return;
+
+  const fabBtn = document.querySelector('#x19 button');
+  if (fabBtn) {
+    fabBtn.classList.add('scale-95');
+    setTimeout(() => fabBtn.classList.remove('scale-95'), 200);
+  }
+
+  card.scrollIntoView({
+    behavior: 'smooth',
+    block: 'start'
+  });
+
+  setTimeout(() => {
+    window.scrollBy({
+      top: -50,
+      behavior: 'smooth'
+    });
+  }, 300);
+
+  setTimeout(() => {
+    const primerInput = document.getElementById('correo_alerta2');
+    if (primerInput) {
+      primerInput.focus();
+      primerInput.classList.add('ring-4', 'ring-blue-300');
+      setTimeout(() => {
+        primerInput.classList.remove('ring-4', 'ring-blue-300');
+      }, 2000);
+    }
+  }, 800);
+}
+
+{{-- Ocultar botón flotante cuando el usuario está cerca del formulario o el panel móvil está abierto --}}
 {{-- _tbf1: toggleBotonFlotante - Muestra/oculta el botón flotante de alerta según la posición del scroll --}}
 function _tbf1() {
-  {{-- x19: Botón flotante de alerta (móvil) --}}
   const botonFlotante = document.getElementById('x19');
-  const formularioAlerta = document.querySelector('aside');
-  
-  if (botonFlotante && formularioAlerta) {
-    const rect = formularioAlerta.getBoundingClientRect();
-    const windowHeight = window.innerHeight;
-    
-    {{-- El formulario está visible si está en la pantalla y no está muy arriba --}}
-    const isVisible = rect.top < windowHeight * 0.8 && rect.bottom > windowHeight * 0.2;
-    
-    if (isVisible) {
-      botonFlotante.style.opacity = '0';
-      botonFlotante.style.pointerEvents = 'none';
-    } else {
-      botonFlotante.style.opacity = '1';
-      botonFlotante.style.pointerEvents = 'auto';
-    }
+  const card = document.getElementById('alerta-precio-card');
+  const overlay = document.getElementById('alerta-sheet-overlay');
+
+  if (!botonFlotante || !card) return;
+
+  if (overlay && overlay.getAttribute('aria-hidden') === 'false') {
+    botonFlotante.style.opacity = '0';
+    botonFlotante.style.pointerEvents = 'none';
+    return;
+  }
+
+  const isDesktop = window.matchMedia('(min-width: 1024px)').matches;
+  if (!isDesktop) {
+    botonFlotante.style.opacity = '1';
+    botonFlotante.style.pointerEvents = 'auto';
+    return;
+  }
+
+  const rect = card.getBoundingClientRect();
+  const windowHeight = window.innerHeight;
+  const isVisible = rect.top < windowHeight * 0.8 && rect.bottom > windowHeight * 0.2;
+
+  if (isVisible) {
+    botonFlotante.style.opacity = '0';
+    botonFlotante.style.pointerEvents = 'none';
+  } else {
+    botonFlotante.style.opacity = '1';
+    botonFlotante.style.pointerEvents = 'auto';
   }
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+    _ensureAlertaSheetPortal();
+    _syncAlertaPrecioHost();
+
+    const _asBackdrop = document.getElementById('alerta-sheet-backdrop');
+    const _asClose = document.getElementById('alerta-sheet-close');
+    if (_asBackdrop) {
+      _asBackdrop.addEventListener('click', _closeAlertaSheet);
+    }
+    if (_asClose) {
+      _asClose.addEventListener('click', _closeAlertaSheet);
+    }
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape') return;
+      const o = document.getElementById('alerta-sheet-overlay');
+      if (o && o.getAttribute('aria-hidden') === 'false') {
+        _closeAlertaSheet();
+      }
+    });
+    window.addEventListener('resize', function () {
+      clearTimeout(window._brkAlertaSheet);
+      window._brkAlertaSheet = setTimeout(function () {
+        if (window.matchMedia('(min-width: 1024px)').matches) {
+          _closeAlertaSheet();
+        }
+        _ensureAlertaSheetPortal();
+        _syncAlertaPrecioHost();
+        _tbf1();
+      }, 150);
+    });
+
     window._aeu1 = function() {
         const _r1 = document.getElementById('alerta-especificaciones-resumen');
         const _t1 = document.getElementById('alerta-especificaciones-tags');

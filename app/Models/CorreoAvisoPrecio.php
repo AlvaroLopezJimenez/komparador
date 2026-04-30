@@ -16,6 +16,7 @@ class CorreoAvisoPrecio extends Model
         'precio_limite',
         'producto_id',
         'token_cancelacion',
+        'confirmado',
         'ultimo_envio_correo',
         'veces_enviado',
         'especificaciones_internas_seleccionadas',

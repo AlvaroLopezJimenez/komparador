@@ -13,7 +13,14 @@
         <div class="max-w-md mx-auto bg-white rounded-lg shadow-md p-6">
             <div class="text-center mb-6">
                 <h1 class="text-2xl font-bold text-gray-800 mb-2">Cancelar Alerta de Precio</h1>
-                <p class="text-gray-600">Confirma que quieres cancelar tu alerta para este producto</p>
+                <p class="text-gray-600">
+                    Confirma que quieres cancelar tu alerta para
+                    @if(isset($producto) && $producto)
+                        este producto
+                    @else
+                        esta categoría
+                    @endif
+                </p>
             </div>
 
             @if(session('success'))
@@ -29,8 +36,13 @@
             @endif
 
             <div class="bg-gray-50 rounded-lg p-4 mb-6">
-                <h2 class="font-semibold text-lg text-gray-800 mb-2">{{ $producto->nombre }}</h2>
-                <p class="text-sm text-gray-600">Precio actual: {{ number_format($producto->precio, 2, ',', '.') }}€</p>
+                @if(isset($producto) && $producto)
+                    <h2 class="font-semibold text-lg text-gray-800 mb-2">{{ $producto->nombre }}</h2>
+                    <p class="text-sm text-gray-600">Precio actual: {{ number_format($producto->precio, 2, ',', '.') }}€</p>
+                @elseif(isset($categoria) && $categoria)
+                    <h2 class="font-semibold text-lg text-gray-800 mb-2">{{ $categoria->nombre }}</h2>
+                    <p class="text-sm text-gray-600">Alerta por categoría con filtros de especificaciones.</p>
+                @endif
             </div>
 
             <form method="POST" action="{{ route('alertas.cancelar-procesar') }}" class="space-y-4">
@@ -49,7 +61,7 @@
                     <input type="checkbox" id="confirmacion" name="confirmacion" required 
                            class="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
                     <label for="confirmacion" class="text-sm text-gray-700">
-                        Confirmo que quiero cancelar mi alerta de precio para este producto
+                        Confirmo que quiero cancelar mi alerta de precio
                     </label>
                 </div>
 
@@ -58,9 +70,9 @@
                 @enderror
 
                 <div class="flex space-x-3">
-                    <a href="{{ $producto->categoria->construirUrlCategorias($producto->slug) }}" 
+                    <a href="{{ (isset($producto) && $producto) ? $producto->categoria->construirUrlCategorias($producto->slug) : ((isset($categoria) && $categoria) ? '/categoria/' . $categoria->slug : '/') }}" 
                        class="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-md transition-colors duration-200 text-center">
-                        Volver al producto
+                        Volver
                     </a>
                     <button type="submit" 
                             class="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-md transition-colors duration-200">
@@ -71,7 +83,7 @@
 
             <div class="mt-6 text-center">
                 <p class="text-xs text-gray-500">
-                    Al cancelar tu alerta, ya no recibirás más notificaciones cuando el precio de este producto baje.
+                    Al cancelar tu alerta, ya no recibirás más notificaciones.
                 </p>
             </div>
         </div>

@@ -18,6 +18,7 @@ return new class extends Migration
             $table->unsignedBigInteger('producto_id');
             $table->json('especificaciones_internas_seleccionadas')->nullable();
             $table->string('token_cancelacion', 64)->unique()->nullable();
+            $table->string('confirmado', 2)->default('no');
             $table->dateTime('ultimo_envio_correo')->nullable();
             $table->integer('veces_enviado')->nullable();
             $table->timestamps();
@@ -26,6 +27,7 @@ return new class extends Migration
             $table->index(['producto_id', 'precio_limite']);
             $table->index('correo');
             $table->index('token_cancelacion');
+            $table->index('confirmado');
             
             // Clave foránea
             $table->foreign('producto_id')->references('id')->on('productos')->onDelete('cascade');

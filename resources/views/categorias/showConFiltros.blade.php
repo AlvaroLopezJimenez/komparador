@@ -168,6 +168,7 @@
         (isset($u['query']) ? '?' . $u['query'] : '');
 @endphp
     <meta charset="UTF-8">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="canonical" href="{{ $u1 }}">
     <meta property="og:type" content="website">
@@ -377,6 +378,60 @@
             @if($fi1->count() > 0)
             <aside class="hidden lg:block lg:w-1/4 lg:flex-shrink-0">
                 <div class="bg-white rounded-lg shadow-md p-4">
+                    <div id="aside-alert-slot-categoria">
+                    <div id="alerta-categoria-card" class="shadow-lg rounded-lg p-4 mb-6 text-white kk-u-alert alerta-categoria-cerrada">
+                        <button type="button" id="alerta-categoria-toggle" class="w-full flex items-center justify-between text-left">
+                            <div class="flex items-center">
+                                <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-5 5v-5z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                                </svg>
+                                <h3 class="text-lg font-bold">¡Avísame si baja de precio!</h3>
+                            </div>
+                            <svg id="alerta-categoria-flecha" class="w-5 h-5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        <div id="alerta-categoria-contenido" class="hidden mt-3">
+                        <div id="resumen-alerta-categoria" class="hidden mb-3">
+                            <div class="text-xs font-semibold text-blue-100 mb-1">Avisar solo de:</div>
+                            <div id="resumen-alerta-categoria-tags" class="flex flex-wrap gap-2"></div>
+                        </div>
+                        <form id="formAlertaCategoria" class="space-y-4">
+                            <input type="hidden" name="categoria_id" value="{{ $ca1->id }}">
+                            <div>
+                                <label for="correo_alerta_categoria" class="block text-sm font-medium text-gray-200 mb-1">Tu email</label>
+                                <input type="email" id="correo_alerta_categoria" name="correo" required
+                                    class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-white placeholder-gray-400"
+                                    placeholder="tu@email.com">
+                            </div>
+                            <div>
+                                <label for="precio_limite_categoria" class="block text-sm font-medium text-gray-200 mb-1">Precio máximo que pagarías</label>
+                                <input type="number" id="precio_limite_categoria" name="precio_limite" required step="0.01" min="0"
+                                    value="{{ isset($pmg1) ? number_format((float)$pmg1, 2, '.', '') : '0.00' }}"
+                                    class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-white placeholder-gray-400">
+                            </div>
+                            <label class="flex items-start space-x-2">
+                                <input type="checkbox" id="acepto_politicas_categoria" name="acepto_politicas" required
+                                    class="mt-1 h-4 w-4 text-orange-500 focus:ring-orange-500 border-gray-600 rounded bg-gray-800">
+                                <span class="text-sm text-gray-200">
+                                    Acepto las <a href="{{ route('politicas.privacidad') }}" target="_blank" class="text-yellow-300 hover:text-yellow-200 underline font-semibold">políticas de privacidad</a>.
+                                    <span class="text-[11px] leading-snug text-gray-400 block mt-1">Solo te avisaremos cuando aparezcan productos por debajo de tu precio, nada de spam.</span>
+                                    <span class="text-[11px] leading-snug text-gray-400 block mt-1">Tras enviarlo, debes confirmarlo por correo en un plazo maximo de 1 hora.</span>
+                                </span>
+                            </label>
+                            <button type="submit"
+                                class="w-full text-white font-bold py-3 px-4 rounded-md transition-all duration-200 transform hover:scale-105 shadow-lg"
+                                style="background-color:#e97b11;"
+                                onmouseover="this.style.backgroundColor='#d16a0f'"
+                                onmouseout="this.style.backgroundColor='#e97b11'">
+                                ⚡ ¡Activar alerta ahora!
+                            </button>
+                            <p id="mensajeAlertaCategoria" class="mt-3 text-sm hidden"></p>
+                        </form>
+                        </div>
+                    </div>
+                    </div>
                     <h2 class="text-lg font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">Filtros</h2>
                     <form method="GET" action="{{ route('categoria.show', $ca1->slug) }}" id="ffs1" class="space-y-4">
                         {{-- FILTRO DE RANGO DE PRECIOS --}}
@@ -882,6 +937,41 @@
     </div>
     @endif
 
+    @if($fi1->count() > 0)
+    <div id="alerta-sheet-overlay-categoria"
+         class="fixed inset-0 flex min-h-0 flex-col lg:hidden invisible opacity-0 pointer-events-none transition-opacity duration-300"
+         aria-hidden="true">
+        <div class="pointer-events-none absolute inset-0 bg-black/50" aria-hidden="true"></div>
+        <div class="alerta-sheet-hit-layer-categoria relative z-10 min-h-0 flex flex-1 flex-col">
+            <div id="alerta-sheet-backdrop-categoria" class="min-h-0 w-full flex-1 bg-transparent" aria-hidden="true"></div>
+            <div class="alerta-sheet-dock-categoria flex w-full shrink-0 justify-center">
+                <div id="alerta-sheet-panel-categoria"
+                     class="pointer-events-auto relative flex h-[58vh] max-h-[60vh] w-[56%] min-w-[260px] max-w-[440px] flex-col overflow-hidden rounded-t-2xl bg-slate-900 shadow-2xl translate-y-full transition-transform duration-300 ease-out">
+                    <button type="button" id="alerta-sheet-close-categoria"
+                            class="flex shrink-0 items-center justify-center rounded-full border border-white/30 bg-white/20 text-white hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-0"
+                            aria-label="Cerrar">×</button>
+                    <div id="mobile-alert-slot-categoria" class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-6 pt-3"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="fab-alerta-categoria" class="fixed bottom-8 right-4 z-[60] lg:hidden">
+        <button type="button"
+                onclick="_saCategoria1()"
+                aria-label="Avísame si baja de precio"
+                class="flex flex-row items-center justify-center gap-1 rounded-full py-2.5 px-3 text-white shadow-xl transition-transform duration-300 hover:scale-105 active:scale-95"
+                style="background: linear-gradient(145deg, #fde047 0%, #f59e0b 40%, #e97b11 100%);">
+            <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+            <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+        </button>
+    </div>
+    @endif
+
     {{-- FOOTER DESDE LA RUTA COMPONENTS/FOOTER --}}
     <x-footer />
 
@@ -1096,6 +1186,120 @@
                 box-shadow: 0 0 8px rgba(239, 68, 68, 0.25), 0 0 4px rgba(251, 191, 36, 0.2);
             }
         }
+
+        .kk-u-alert {
+            background: linear-gradient(145deg, #1e293b 0%, #334155 55%, #0f172a 100%) !important;
+            border-radius: 14px !important;
+            box-shadow: 0 16px 40px rgba(15, 23, 42, 0.24) !important;
+            border: none !important;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kk-u-alert::before {
+            content: "";
+            position: absolute;
+            width: 180px;
+            height: 180px;
+            right: -60px;
+            top: -60px;
+            background: radial-gradient(circle, rgba(233, 123, 17, 0.35) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .kk-u-alert > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        .kk-u-alert label {
+            color: #94a3b8 !important;
+            font-size: 0.75rem !important;
+            font-weight: 600 !important;
+        }
+
+        .kk-u-alert input[type="email"],
+        .kk-u-alert input[type="number"] {
+            border-radius: 10px !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            background: rgba(255, 255, 255, 0.08) !important;
+            color: #fff !important;
+        }
+
+        .kk-u-alert input::placeholder {
+            color: #64748b !important;
+        }
+
+        .kk-u-alert button[type="submit"] {
+            border-radius: 10px !important;
+            background: linear-gradient(135deg, #e97b11 0%, #f59e0b 100%) !important;
+            color: #fff !important;
+            font-weight: 800 !important;
+            box-shadow: 0 4px 16px rgba(233, 123, 17, 0.35);
+        }
+
+        {{-- Bottom sheet alerta categoría (móvil): mismo patrón que comparador/unidades --}}
+        #alerta-sheet-overlay-categoria {
+            position: fixed !important;
+            inset: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            min-height: 100dvh !important;
+            z-index: 2147483646 !important;
+            isolation: isolate;
+        }
+        #alerta-sheet-overlay-categoria .alerta-sheet-hit-layer-categoria {
+            display: flex !important;
+            flex-direction: column !important;
+            min-height: 0 !important;
+            flex: 1 1 0% !important;
+            width: 100% !important;
+        }
+        #alerta-sheet-overlay-categoria #alerta-sheet-backdrop-categoria {
+            flex: 1 1 auto !important;
+            min-height: 0 !important;
+            cursor: pointer !important;
+        }
+        #alerta-sheet-overlay-categoria .alerta-sheet-dock-categoria {
+            flex-shrink: 0 !important;
+            width: 100% !important;
+        }
+        #alerta-sheet-overlay-categoria #alerta-sheet-panel-categoria {
+            position: relative !important;
+        }
+        #fab-alerta-categoria {
+            z-index: 9990 !important;
+        }
+        #alerta-sheet-close-categoria {
+            position: absolute !important;
+            top: calc(0.75rem + 1rem - 0.125rem) !important;
+            right: calc(0.75rem + 1rem) !important;
+            width: 20px !important;
+            height: 20px !important;
+            font-size: 0.7rem !important;
+            font-weight: 300 !important;
+            line-height: 1 !important;
+            z-index: 30 !important;
+        }
+        #mobile-alert-slot-categoria #alerta-categoria-contenido {
+            display: block !important;
+            margin-top: 0.75rem;
+        }
+        #mobile-alert-slot-categoria #alerta-categoria-flecha {
+            display: none !important;
+        }
+        #mobile-alert-slot-categoria #alerta-categoria-toggle {
+            pointer-events: none;
+            cursor: default;
+        }
+
+        .alerta-categoria-cerrada #alerta-categoria-flecha {
+            transform: rotate(0deg);
+        }
+
+        .alerta-categoria-abierta #alerta-categoria-flecha {
+            transform: rotate(180deg);
+        }
     </style>
 
     <script>
@@ -1269,6 +1473,333 @@
             {{-- Construir URL y redirigir --}}
             const url = _f3(filtrosSeleccionados, precioMin, precioMax, ordenActual, rebajado);
             return url;
+        }
+
+        {{-- _oas1() -> obtenerAlertaSeleccionCategoria() --}}
+        function _oas1() {
+            const salida = {};
+            const checkboxesSidebar = document.querySelectorAll('aside .filtro-sublinea-checkbox:checked, #mf1 .filtro-sublinea-checkbox:checked');
+            checkboxesSidebar.forEach(cb => {
+                const lineaId = String(cb.dataset.lineaId || '');
+                const sublineaId = String(cb.dataset.sublineaId || '');
+                if (!lineaId || !sublineaId) return;
+                if (!salida[lineaId]) {
+                    salida[lineaId] = [];
+                }
+                if (!salida[lineaId].includes(sublineaId)) {
+                    salida[lineaId].push(sublineaId);
+                }
+            });
+            return salida;
+        }
+
+        {{-- _uac1() -> actualizarResumenAlertaCategoria() --}}
+        function _uac1() {
+            const cont = document.getElementById('resumen-alerta-categoria');
+            const tags = document.getElementById('resumen-alerta-categoria-tags');
+            if (!cont || !tags) return;
+
+            const seleccion = _oas1();
+            const textos = [];
+            Object.keys(seleccion).forEach(lineaId => {
+                seleccion[lineaId].forEach(sublineaId => {
+                    const cb = document.querySelector(`aside .filtro-sublinea-checkbox[data-linea-id="${lineaId}"][data-sublinea-id="${sublineaId}"], #mf1 .filtro-sublinea-checkbox[data-linea-id="${lineaId}"][data-sublinea-id="${sublineaId}"]`);
+                    const texto = cb ? String(cb.dataset.sublineaTexto || '').trim() : '';
+                    if (texto) textos.push(texto);
+                });
+            });
+
+            const unicos = [...new Set(textos)];
+            if (unicos.length === 0) {
+                tags.innerHTML = '';
+                cont.classList.add('hidden');
+                return;
+            }
+
+            tags.innerHTML = unicos
+                .map(t => `<span class="inline-flex items-center rounded-md text-white text-xs font-semibold px-2 py-1" style="background-color:#e97b11;border:1px solid #d16a0f;">${_e1(t)}</span>`)
+                .join('');
+            cont.classList.remove('hidden');
+        }
+
+        {{-- _iac1() -> inicializarAlertaCategoria() --}}
+        function _iac1() {
+            const form = document.getElementById('formAlertaCategoria');
+            const msg = document.getElementById('mensajeAlertaCategoria');
+            if (!form || !msg) return;
+
+            _uac1();
+
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault();
+
+                const formData = new FormData(form);
+                const data = {
+                    correo: formData.get('correo'),
+                    precio_limite: parseFloat(formData.get('precio_limite')),
+                    categoria_id: parseInt(formData.get('categoria_id')),
+                    especificaciones_internas_seleccionadas: _oas1(),
+                    acepto_politicas: formData.get('acepto_politicas') === 'on',
+                };
+
+                if (!data.correo || !data.precio_limite || !data.categoria_id || !data.acepto_politicas) {
+                    msg.className = 'mt-3 text-sm p-3 rounded-md bg-red-100 text-red-800 border border-red-200';
+                    msg.textContent = 'Completa todos los campos y acepta la política.';
+                    msg.classList.remove('hidden');
+                    return;
+                }
+
+                const submitBtn = form.querySelector('button[type="submit"]');
+                const txt = submitBtn ? submitBtn.textContent : '';
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                    submitBtn.textContent = 'Guardando...';
+                }
+
+                try {
+                    const response = await fetch('{{ route("alertas.guardar-categoria") }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                        },
+                        body: JSON.stringify(data),
+                    });
+
+                    const result = await response.json();
+                    if (result.success) {
+                        msg.className = 'mt-3 text-sm p-3 rounded-md bg-green-100 text-green-800 border border-green-200';
+                        msg.textContent = result.message || 'Alerta guardada correctamente.';
+                    } else {
+                        let txtErr = result.message || 'Error al guardar la alerta.';
+                        if (result.errors) {
+                            const errs = Object.values(result.errors).flat();
+                            txtErr = errs.join(', ');
+                        }
+                        msg.className = 'mt-3 text-sm p-3 rounded-md bg-red-100 text-red-800 border border-red-200';
+                        msg.textContent = txtErr;
+                    }
+                    msg.classList.remove('hidden');
+                } catch (err) {
+                    msg.className = 'mt-3 text-sm p-3 rounded-md bg-red-100 text-red-800 border border-red-200';
+                    msg.textContent = 'Error de conexión al guardar la alerta.';
+                    msg.classList.remove('hidden');
+                } finally {
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = txt;
+                    }
+                }
+            });
+        }
+
+        {{-- _tac1() -> toggleAlertaCategoria() --}}
+        function _tac1() {
+            const card = document.getElementById('alerta-categoria-card');
+            const btn = document.getElementById('alerta-categoria-toggle');
+            const contenido = document.getElementById('alerta-categoria-contenido');
+            if (!card || !btn || !contenido) return;
+
+            const abrir = () => {
+                contenido.classList.remove('hidden');
+                card.classList.remove('alerta-categoria-cerrada');
+                card.classList.add('alerta-categoria-abierta');
+            };
+
+            const alternar = () => {
+                if (contenido.classList.contains('hidden')) {
+                    abrir();
+                } else {
+                    contenido.classList.add('hidden');
+                    card.classList.remove('alerta-categoria-abierta');
+                    card.classList.add('alerta-categoria-cerrada');
+                }
+            };
+
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                alternar();
+            });
+
+            // Si está contraído, pulsar en cualquier zona del bloque lo despliega
+            card.addEventListener('click', function(e) {
+                if (contenido.classList.contains('hidden')) {
+                    abrir();
+                }
+            });
+        }
+
+        function _ensureAlertaCategoriaPortal() {
+            const overlay = document.getElementById('alerta-sheet-overlay-categoria');
+            const fab = document.getElementById('fab-alerta-categoria');
+            if (overlay && overlay.parentNode !== document.body) {
+                document.body.appendChild(overlay);
+            }
+            if (fab && fab.parentNode !== document.body) {
+                document.body.appendChild(fab);
+            }
+        }
+
+        function _syncAlertaCategoriaHost() {
+            const card = document.getElementById('alerta-categoria-card');
+            const asideSlot = document.getElementById('aside-alert-slot-categoria');
+            const mobileSlot = document.getElementById('mobile-alert-slot-categoria');
+            if (!card || !asideSlot || !mobileSlot) return;
+            const isDesktop = window.matchMedia('(min-width: 1024px)').matches;
+            if (isDesktop) {
+                asideSlot.appendChild(card);
+            } else {
+                mobileSlot.appendChild(card);
+            }
+        }
+
+        function _alertaCategoriaSheetSetBodyScroll(lock) {
+            const html = document.documentElement;
+            if (lock) {
+                window._alertaCategoriaScrollY = window.scrollY || window.pageYOffset || 0;
+                html.style.overflow = 'hidden';
+                document.body.style.overflow = 'hidden';
+                document.body.style.position = 'fixed';
+                document.body.style.top = '-' + window._alertaCategoriaScrollY + 'px';
+                document.body.style.left = '0';
+                document.body.style.right = '0';
+                document.body.style.width = '100%';
+            } else {
+                const y = typeof window._alertaCategoriaScrollY === 'number' ? window._alertaCategoriaScrollY : 0;
+                html.style.overflow = '';
+                document.body.style.overflow = '';
+                document.body.style.position = '';
+                document.body.style.top = '';
+                document.body.style.left = '';
+                document.body.style.right = '';
+                document.body.style.width = '';
+                window._alertaCategoriaScrollY = undefined;
+                window.scrollTo(0, y);
+            }
+        }
+
+        function _abrirContenidoAlertaCategoria() {
+            const card = document.getElementById('alerta-categoria-card');
+            const contenido = document.getElementById('alerta-categoria-contenido');
+            if (!card || !contenido) return;
+            contenido.classList.remove('hidden');
+            card.classList.remove('alerta-categoria-cerrada');
+            card.classList.add('alerta-categoria-abierta');
+        }
+
+        function _openAlertaCategoriaSheet() {
+            _ensureAlertaCategoriaPortal();
+            _alertaCategoriaSheetSetBodyScroll(true);
+            _syncAlertaCategoriaHost();
+            _abrirContenidoAlertaCategoria();
+            if (typeof _uac1 === 'function') _uac1();
+
+            const overlay = document.getElementById('alerta-sheet-overlay-categoria');
+            const panel = document.getElementById('alerta-sheet-panel-categoria');
+            if (!overlay || !panel) {
+                _alertaCategoriaSheetSetBodyScroll(false);
+                return;
+            }
+
+            const fabBtn = document.querySelector('#fab-alerta-categoria button');
+            if (fabBtn) {
+                fabBtn.classList.add('scale-95');
+                setTimeout(() => fabBtn.classList.remove('scale-95'), 200);
+            }
+
+            overlay.classList.remove('invisible', 'opacity-0', 'pointer-events-none');
+            overlay.classList.add('visible', 'opacity-100', 'pointer-events-auto');
+            overlay.setAttribute('aria-hidden', 'false');
+
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    panel.classList.remove('translate-y-full');
+                    panel.classList.add('translate-y-0');
+                });
+            });
+
+            setTimeout(() => {
+                const primerInput = document.getElementById('correo_alerta_categoria');
+                if (primerInput) {
+                    try {
+                        primerInput.focus({ preventScroll: true });
+                    } catch (e) {
+                        primerInput.focus();
+                    }
+                    primerInput.classList.add('ring-4', 'ring-blue-300');
+                    setTimeout(() => primerInput.classList.remove('ring-4', 'ring-blue-300'), 2000);
+                }
+            }, 400);
+
+            if (typeof _tbfCategoria1 === 'function') _tbfCategoria1();
+        }
+
+        function _closeAlertaCategoriaSheet() {
+            const overlay = document.getElementById('alerta-sheet-overlay-categoria');
+            const panel = document.getElementById('alerta-sheet-panel-categoria');
+            if (!overlay || !panel) return;
+            if (overlay.getAttribute('aria-hidden') !== 'false') return;
+
+            panel.classList.remove('translate-y-0');
+            panel.classList.add('translate-y-full');
+
+            setTimeout(() => {
+                overlay.classList.add('invisible', 'opacity-0', 'pointer-events-none');
+                overlay.classList.remove('visible', 'opacity-100', 'pointer-events-auto');
+                overlay.setAttribute('aria-hidden', 'true');
+                _alertaCategoriaSheetSetBodyScroll(false);
+                _syncAlertaCategoriaHost();
+                if (typeof _tbfCategoria1 === 'function') _tbfCategoria1();
+            }, 280);
+        }
+
+        function _saCategoria1() {
+            const isDesktop = window.matchMedia('(min-width: 1024px)').matches;
+            if (!isDesktop) {
+                _openAlertaCategoriaSheet();
+                return;
+            }
+
+            const card = document.getElementById('alerta-categoria-card');
+            if (!card) return;
+
+            const fabBtn = document.querySelector('#fab-alerta-categoria button');
+            if (fabBtn) {
+                fabBtn.classList.add('scale-95');
+                setTimeout(() => fabBtn.classList.remove('scale-95'), 200);
+            }
+
+            card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            setTimeout(() => {
+                window.scrollBy({ top: -50, behavior: 'smooth' });
+            }, 300);
+            setTimeout(() => {
+                const primerInput = document.getElementById('correo_alerta_categoria');
+                if (primerInput) {
+                    primerInput.focus();
+                    primerInput.classList.add('ring-4', 'ring-blue-300');
+                    setTimeout(() => primerInput.classList.remove('ring-4', 'ring-blue-300'), 2000);
+                }
+            }, 800);
+        }
+
+        function _tbfCategoria1() {
+            const botonFlotante = document.getElementById('fab-alerta-categoria');
+            const overlay = document.getElementById('alerta-sheet-overlay-categoria');
+            if (!botonFlotante) return;
+            if (overlay && overlay.getAttribute('aria-hidden') === 'false') {
+                botonFlotante.style.opacity = '0';
+                botonFlotante.style.pointerEvents = 'none';
+                return;
+            }
+            const isDesktop = window.matchMedia('(min-width: 1024px)').matches;
+            if (!isDesktop) {
+                botonFlotante.style.opacity = '1';
+                botonFlotante.style.pointerEvents = 'auto';
+                return;
+            }
+            botonFlotante.style.opacity = '0';
+            botonFlotante.style.pointerEvents = 'none';
         }
 
         {{-- _em1() -> esMovil() --}}
@@ -2090,6 +2621,38 @@
             _cbm1();
             _cfc1();
             _cmf1();
+            _iac1();
+            _tac1();
+
+            _ensureAlertaCategoriaPortal();
+            _syncAlertaCategoriaHost();
+            _tbfCategoria1();
+            const _asBdCat = document.getElementById('alerta-sheet-backdrop-categoria');
+            const _asClCat = document.getElementById('alerta-sheet-close-categoria');
+            if (_asBdCat) {
+                _asBdCat.addEventListener('click', _closeAlertaCategoriaSheet);
+            }
+            if (_asClCat) {
+                _asClCat.addEventListener('click', _closeAlertaCategoriaSheet);
+            }
+            document.addEventListener('keydown', function (e) {
+                if (e.key !== 'Escape') return;
+                const o = document.getElementById('alerta-sheet-overlay-categoria');
+                if (o && o.getAttribute('aria-hidden') === 'false') {
+                    _closeAlertaCategoriaSheet();
+                }
+            });
+            window.addEventListener('resize', function () {
+                clearTimeout(window._brkAlertaSheetCategoria);
+                window._brkAlertaSheetCategoria = setTimeout(function () {
+                    if (window.matchMedia('(min-width: 1024px)').matches) {
+                        _closeAlertaCategoriaSheet();
+                    }
+                    _ensureAlertaCategoriaPortal();
+                    _syncAlertaCategoriaHost();
+                    _tbfCategoria1();
+                }, 150);
+            });
             
             {{-- En móvil, si existe el parámetro m, abrir el modal automáticamente --}}
             {{-- Usar setTimeout y requestAnimationFrame para asegurar que todo esté inicializado --}}

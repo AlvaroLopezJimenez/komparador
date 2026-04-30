@@ -151,22 +151,17 @@ Route::middleware(['security.headers', 'block.public.deletes'])->prefix('scrapin
 });
 
 // Rutas para alertas de precio
-Route::middleware(['security.headers', 'block.public.deletes', 'throttle:2,1'])->prefix('alertas')->name('alertas.')->group(function () {
+Route::middleware(['security.headers', 'block.public.deletes', 'throttle:3,1'])->prefix('alertas')->name('alertas.')->group(function () {
     Route::post('/guardar', [App\Http\Controllers\AlertaPrecioController::class, 'guardarAlerta'])->name('guardar');
+    Route::post('/guardar-categoria', [App\Http\Controllers\AlertaPrecioController::class, 'guardarAlertaCategoria'])->name('guardar-categoria');
 });
 
 // Rutas para cancelar alertas (excepción: permite DELETE porque usa token único)
 Route::middleware(['security.headers', 'block.public.deletes'])->group(function () {
+    Route::get('/confirmar-alerta/{token}', [App\Http\Controllers\AlertaPrecioController::class, 'confirmarAlerta'])->name('alertas.confirmar');
     Route::get('/cancelar-alerta/{token}', [App\Http\Controllers\AlertaPrecioController::class, 'mostrarCancelarAlerta'])->name('alertas.cancelar');
     Route::post('/cancelar-alerta', [App\Http\Controllers\AlertaPrecioController::class, 'cancelarAlerta'])->name('alertas.cancelar-procesar');
 });
-
-// Ruta para enviar alertas manualmente (solo para administradores)
-Route::middleware(['auth', 'admin'])->group(function () {
-    Route::get('/avisos/info-alertas', [App\Http\Controllers\AvisoController::class, 'obtenerInfoAlertasProducto'])->name('avisos.info-alertas');
-    Route::post('/avisos/enviar-alertas', [App\Http\Controllers\AvisoController::class, 'enviarAlertasProducto'])->name('avisos.enviar-alertas');
-});
-
 
 // RUTA PARA CATEGORÍAS INDIVIDUALES (MÁS ESPECÍFICA) - Con filtros opcionales y rate limiting
 Route::middleware(['security.headers', 'block.public.deletes', 'throttle:40,1'])->group(function () {

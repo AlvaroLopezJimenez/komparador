@@ -39,6 +39,11 @@
                            class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-md transition-colors duration-200">
                             Volver al producto
                         </a>
+                    @elseif(isset($categoria))
+                        <a href="{{ '/categoria/' . $categoria->slug }}" 
+                           class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-md transition-colors duration-200">
+                            Volver a la categoría
+                        </a>
                     @else
                         <a href="/" 
                            class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-md transition-colors duration-200">
