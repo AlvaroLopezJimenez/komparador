@@ -1402,6 +1402,16 @@
   @php
     // Obtener todas las ofertas del producto para el desplegable
     $todasLasOfertas = $producto->ofertas()->orderBy('id')->get();
+
+    $correoAlertasAdmin = 'alvarolopezjimenez91@gmail.com';
+    $alertasPrecioAdmin = \App\Models\CorreoAvisoPrecio::query()
+        ->where('correo', $correoAlertasAdmin)
+        ->where('producto_id', $producto->id)
+        ->with(['producto.categoria', 'producto.categoriaEspecificaciones'])
+        ->orderBy('id')
+        ->get();
+    $numAlertasPrecioAdmin = $alertasPrecioAdmin->count();
+    $alertaPrecioController = app(\App\Http\Controllers\AlertaPrecioController::class);
   @endphp
   <div class="bg-black text-white py-2 px-4 sticky top-0 z-50 shadow-lg">
     <div class="kk-u-wrap flex flex-wrap items-center gap-4 text-sm">
@@ -1418,6 +1428,53 @@
          class="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded transition-colors">
         Ofertas
       </a>
+
+      {{-- Alertas de precio (correo fijo) --}}
+      <div class="relative" id="admin-alertas-dropdown">
+        <button id="admin-alertas-btn" type="button"
+                class="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded transition-colors flex items-center gap-1">
+          Alertas ({{ $numAlertasPrecioAdmin }})
+          <svg id="admin-alertas-icon" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+          </svg>
+        </button>
+        <div id="admin-alertas-menu"
+             class="absolute top-full left-0 mt-1 bg-gray-800 rounded shadow-lg min-w-[280px] max-w-md hidden z-[60]">
+          <div class="py-1 max-h-96 overflow-y-auto">
+            @forelse($alertasPrecioAdmin as $alertaAdmin)
+              @php
+                $especsLegibles = $alertaPrecioController->especificacionesAgrupadasLegibles($alertaAdmin);
+              @endphp
+              <div class="px-4 py-3 border-b border-gray-700 last:border-b-0 text-left">
+                <div class="font-medium text-white">
+                  Precio límite: {{ number_format($alertaAdmin->precio_limite, 2, ',', '.') }} €
+                </div>
+                @if($alertaAdmin->confirmado === 'si')
+                  <div class="text-xs text-green-400 mt-0.5">Confirmada</div>
+                @else
+                  <div class="text-xs text-amber-300 mt-0.5">Pendiente de confirmación</div>
+                @endif
+                @if(!empty($especsLegibles))
+                  <ul class="mt-2 text-xs text-gray-300 space-y-1 list-none pl-0">
+                    @foreach($especsLegibles as $lineaTitulo => $valores)
+                      <li>
+                        <span class="text-gray-400">{{ $lineaTitulo }}:</span>
+                        {{ implode(', ', $valores) }}
+                      </li>
+                    @endforeach
+                  </ul>
+                @else
+                  <p class="mt-2 text-xs text-gray-400">Sin especificaciones internas (cualquier variante).</p>
+                @endif
+              </div>
+            @empty
+              <div class="px-4 py-2 text-gray-400">
+                No hay avisos para este producto con {{ $correoAlertasAdmin }}
+              </div>
+            @endforelse
+          </div>
+        </div>
+      </div>
 
       {{-- Desplegable de ofertas --}}
       <div class="relative" id="admin-ofertas-dropdown">
@@ -1462,54 +1519,49 @@
     </div>
   </div>
   <script>
-    {{-- Mejorar el comportamiento del desplegable --}}
+    {{-- Mejorar el comportamiento del desplegable (ofertas y alertas) --}}
     document.addEventListener('DOMContentLoaded', function() {
-      const btn = document.getElementById('admin-ofertas-btn');
-      const menu = document.getElementById('admin-ofertas-menu');
-      const icon = document.getElementById('admin-ofertas-icon');
-      const dropdown = document.getElementById('admin-ofertas-dropdown');
-      
-      if (!btn || !menu || !icon || !dropdown) return;
-      
-      let hoverTimeout;
-      
-      {{-- Toggle en clic (móvil y desktop) --}}
-      btn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        const isHidden = menu.classList.contains('hidden');
-        menu.classList.toggle('hidden');
-        if (isHidden) {
-          icon.classList.add('rotate-180');
-        } else {
-          icon.classList.remove('rotate-180');
-        }
-      });
-      
-      {{-- Cerrar al hacer clic fuera --}}
-      document.addEventListener('click', function(e) {
-        if (!btn.contains(e.target) && !menu.contains(e.target)) {
-          menu.classList.add('hidden');
-          icon.classList.remove('rotate-180');
-        }
-      });
-      
-      {{-- Hover en desktop (solo en pantallas grandes) --}}
-      dropdown.addEventListener('mouseenter', function() {
-        if (window.innerWidth >= 1024) {
-          clearTimeout(hoverTimeout);
-          menu.classList.remove('hidden');
-          icon.classList.add('rotate-180');
-        }
-      });
-      
-      dropdown.addEventListener('mouseleave', function() {
-        if (window.innerWidth >= 1024) {
-          hoverTimeout = setTimeout(function() {
+      function setupAdminDropdown(btnId, menuId, iconId, dropdownId) {
+        const btn = document.getElementById(btnId);
+        const menu = document.getElementById(menuId);
+        const icon = document.getElementById(iconId);
+        const dropdown = document.getElementById(dropdownId);
+        if (!btn || !menu || !icon || !dropdown) return;
+        let hoverTimeout;
+        btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          const isHidden = menu.classList.contains('hidden');
+          menu.classList.toggle('hidden');
+          if (isHidden) {
+            icon.classList.add('rotate-180');
+          } else {
+            icon.classList.remove('rotate-180');
+          }
+        });
+        document.addEventListener('click', function(e) {
+          if (!btn.contains(e.target) && !menu.contains(e.target)) {
             menu.classList.add('hidden');
             icon.classList.remove('rotate-180');
-          }, 200);
-        }
-      });
+          }
+        });
+        dropdown.addEventListener('mouseenter', function() {
+          if (window.innerWidth >= 1024) {
+            clearTimeout(hoverTimeout);
+            menu.classList.remove('hidden');
+            icon.classList.add('rotate-180');
+          }
+        });
+        dropdown.addEventListener('mouseleave', function() {
+          if (window.innerWidth >= 1024) {
+            hoverTimeout = setTimeout(function() {
+              menu.classList.add('hidden');
+              icon.classList.remove('rotate-180');
+            }, 200);
+          }
+        });
+      }
+      setupAdminDropdown('admin-alertas-btn', 'admin-alertas-menu', 'admin-alertas-icon', 'admin-alertas-dropdown');
+      setupAdminDropdown('admin-ofertas-btn', 'admin-ofertas-menu', 'admin-ofertas-icon', 'admin-ofertas-dropdown');
     });
   </script>
   @endauth

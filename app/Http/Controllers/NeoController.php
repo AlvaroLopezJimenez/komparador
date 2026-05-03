@@ -881,10 +881,10 @@ class NeoController extends Controller
                     continue;
                 }
 
-                $urlExisteEnOfertaProducto = OfertaProducto::query()
-                    ->where('url', $urlNueva)
-                    ->exists();
                 $urlNuevaLookup = app(ConsultarNeoCifrado::class)->hashLookup($urlNueva);
+                $urlExisteEnOfertaProducto = OfertaProducto::query()
+                    ->where('url_lookup', $urlNuevaLookup)
+                    ->exists();
 
                 $filaDestinoExistente = Neo::query()
                     ->where('url_lookup', $urlNuevaLookup)

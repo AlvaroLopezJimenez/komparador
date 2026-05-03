@@ -328,7 +328,7 @@ Route::prefix('admin')->group(function () {
         ]);
     })->name('admin.cron.avisos-generar-correo-precio');
 
-    // Cron neo objetivos: neoobjetivo con visitada > 7 días y URL de rama Neo comparador → petición a VPS sacar-ofertas-idea
+    // Cron neo objetivos: neoobjetivo con visitada > 7 días y URL de rama Neo → petición a VPS sacar-ofertas-idea
     Route::get('cron-neo-objetivos', function (Request $request) {
         if ($request->get('token') !== env('TOKEN_ACTUALIZAR_PRECIOS')) {
             abort(403, 'Token inválido');

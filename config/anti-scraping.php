@@ -201,5 +201,8 @@ return [
 
     // Nueva clave dedicada para lookup determinista de neo (HMAC para búsquedas exactas).
     'neo_lookup_key' => env('NEO_LOOKUP_KEY', ''),
+
+    // Token Bearer (o similar) para APIs consumidas por el programa externo del flujo Neo.
+    'neo_api_programa_externo' => env('NEO_API_PROGRAMA_EXTERNO', ''),
 ];
 

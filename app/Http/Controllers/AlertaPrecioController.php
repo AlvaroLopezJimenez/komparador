@@ -993,6 +993,24 @@ Este correo es solo para notificaciones de precios. No será utilizado para publ
     }
 
     /**
+     * Especificaciones internas legibles para una alerta (misma lógica que la página de confirmación).
+     *
+     * @return array<string, array<int, string>>
+     */
+    public function especificacionesAgrupadasLegibles(CorreoAvisoPrecio $alerta): array
+    {
+        $metaCategoria = $this->extraerMetaAlertaCategoria($alerta);
+        $categoria = isset($metaCategoria['categoria_id'])
+            ? Categoria::query()->find((int) $metaCategoria['categoria_id'])
+            : null;
+        $producto = $alerta->producto;
+        $categoriaFuenteEspecificaciones = $categoria
+            ?: ($producto?->categoriaEspecificaciones ?: $producto?->categoria);
+
+        return $this->obtenerEspecificacionesAgrupadasParaVista($alerta, $categoriaFuenteEspecificaciones, $producto);
+    }
+
+    /**
      * @return array<string, array<int, string>>
      */
     private function obtenerEspecificacionesAgrupadasParaVista(CorreoAvisoPrecio $alerta, ?Categoria $categoria, ?Producto $producto = null): array

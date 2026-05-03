@@ -46,3 +46,10 @@ Route::get('/precios-historicos/{productoId}', [App\Http\Controllers\ProductoCon
         \Illuminate\Session\Middleware\StartSession::class,
         'anti-scraping:historicos'
     ]);
+
+// Programa externo Neo (token NEO_API_PROGRAMA_EXTERNO: Bearer o cabecera X-Neo-Programa-Token)
+Route::middleware(['neo.programa.externo', 'throttle:120,1'])->prefix('neo-programa-externo')->group(function () {
+    Route::get('/neoobjetivos-rama-neo', [App\Http\Controllers\Api\NeoApiProgramaExternoController::class, 'neoobjetivosRamaNeoPendientes']);
+    Route::post('/comprobar-neo-neo', [App\Http\Controllers\Api\NeoApiProgramaExternoController::class, 'comprobarExisteNeoNeo']);
+    Route::post('/sincronizar-neo', [App\Http\Controllers\Api\NeoApiProgramaExternoController::class, 'sincronizarNeo']);
+});

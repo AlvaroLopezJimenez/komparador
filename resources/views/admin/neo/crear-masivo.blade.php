@@ -411,6 +411,30 @@
         signature: '',
     };
 
+    /** Diagnóstico en consola para POST crear-masivo/crear: error_ref coincide con laravel.log y con error_log de PHP. */
+    function logCrearOfertaBulkDiagnostico(etiqueta, res, responseText, data) {
+        const status = res && typeof res.status === 'number' ? res.status : null;
+        console.group(etiqueta + ' · HTTP ' + status);
+        if (data && data.error_ref) {
+            console.warn('error_ref (busca esta cadena en storage/logs/laravel.log o en el log del servidor web/PHP):', data.error_ref);
+        }
+        console.log('error:', data && data.error);
+        if (data && data.error_debug) {
+            console.error('error_debug:', data.error_debug);
+        }
+        if (data && data.message) {
+            console.log('message:', data.message);
+        }
+        if (data && data.errors) {
+            console.log('errors (validación Laravel):', data.errors);
+        }
+        console.log('payload JSON completo:', data);
+        if (responseText && (!data || (typeof data === 'object' && Object.keys(data).length === 0))) {
+            console.log('cuerpo bruto (primeros 2000 caracteres):', String(responseText).slice(0, 2000));
+        }
+        console.groupEnd();
+    }
+
     function obtenerUrlsLimpiasTextarea() {
         return document.getElementById('urls').value
             .split('\n')
@@ -1252,12 +1276,61 @@
         if (inp && inp.value.trim().length >= 2) buscarProductosCrearMasivo(div, inp.value.trim());
     }
 
+    // Fondos grises alternos para que se distinga bien el bloque frente al resto de resultados.
+    const CREAR_MASIVO_GRUPO_BORDE_CLASSES = [
+        'border-gray-400 dark:border-gray-500 bg-gray-200 dark:bg-gray-800 shadow-inner ring-1 ring-gray-300/90 dark:ring-gray-600',
+        'border-gray-500 dark:border-gray-400 bg-gray-300/95 dark:bg-zinc-900 shadow-inner ring-1 ring-gray-400/80 dark:ring-zinc-600',
+    ];
+
+    /** Clave de agrupación: mismo id de producto sugerido → mismo grupo; sin producto → fila suelta. */
+    function claveGrupoProductoSugeridoCrearMasivo(r) {
+        if (r.producto && r.producto.id != null && r.producto.id !== '') {
+            return 'p:' + String(r.producto.id);
+        }
+        return 'u:' + r.__crearMasivoOrigenIdx;
+    }
+
+    /** Ordena filas para que todas las URLs con el mismo producto sugerido queden seguidas (orden original dentro de cada grupo). */
+    function ordenarResultadosPorGrupoProductoCrearMasivo(resultados) {
+        resultados.forEach((r, i) => { r.__crearMasivoOrigenIdx = i; });
+        const entries = resultados.map((r, i) => ({ r, i }));
+        const primera = new Map();
+        entries.forEach((e) => {
+            const k = (e.r.producto && e.r.producto.id != null && e.r.producto.id !== '')
+                ? 'p:' + String(e.r.producto.id)
+                : 'u:' + e.i;
+            if (!primera.has(k)) primera.set(k, e.i);
+        });
+        entries.sort((a, b) => {
+            const ka = (a.r.producto && a.r.producto.id != null && a.r.producto.id !== '') ? 'p:' + String(a.r.producto.id) : 'u:' + a.i;
+            const kb = (b.r.producto && b.r.producto.id != null && b.r.producto.id !== '') ? 'p:' + String(b.r.producto.id) : 'u:' + b.i;
+            if (ka !== kb) return primera.get(ka) - primera.get(kb);
+            return a.i - b.i;
+        });
+        return entries.map(e => e.r);
+    }
+
+    function contarPorClaveGrupoCrearMasivo(ordenados) {
+        const m = new Map();
+        ordenados.forEach((r) => {
+            const k = claveGrupoProductoSugeridoCrearMasivo(r);
+            m.set(k, (m.get(k) || 0) + 1);
+        });
+        return m;
+    }
+
     function mostrarResultados(resultados) {
         const contenedor = document.getElementById('resultadosLista');
         contenedor.innerHTML = '';
         document.getElementById('resultados').classList.remove('hidden');
 
-        resultados.forEach((r, idx) => {
+        const ordenados = ordenarResultadosPorGrupoProductoCrearMasivo(resultados);
+        const conteosGrupo = contarPorClaveGrupoCrearMasivo(ordenados);
+        let claveGrupoWrapperAbierto = null;
+        let nodoWrapperGrupo = null;
+        let indiceEstiloGrupo = 0;
+
+        ordenados.forEach((r, idx) => {
             const div = document.createElement('div');
             const puedeCrear = !r.existe && r.tienda && r.producto && !r.error;
             const necesitaProducto = !r.existe && r.tienda && !r.producto;
@@ -1383,7 +1456,29 @@
                 <div class="mt-2 generado-msg hidden text-sm font-medium"></div>
             `;
 
-            contenedor.appendChild(div);
+            const claveGr = claveGrupoProductoSugeridoCrearMasivo(r);
+            const filasEnEsteGrupo = conteosGrupo.get(claveGr) || 1;
+            const envolverGrupo = claveGr.startsWith('p:') && filasEnEsteGrupo > 1;
+            if (envolverGrupo) {
+                if (claveGr !== claveGrupoWrapperAbierto) {
+                    claveGrupoWrapperAbierto = claveGr;
+                    nodoWrapperGrupo = document.createElement('div');
+                    nodoWrapperGrupo.className = 'crear-masivo-grupo-producto rounded-xl border-2 p-4 space-y-3 ' + CREAR_MASIVO_GRUPO_BORDE_CLASSES[indiceEstiloGrupo % CREAR_MASIVO_GRUPO_BORDE_CLASSES.length];
+                    nodoWrapperGrupo.dataset.grupoProductoId = String(r.producto.id);
+                    const etiquetaGrupo = document.createElement('div');
+                    etiquetaGrupo.className = 'text-xs font-bold uppercase tracking-wide text-gray-800 dark:text-gray-100 -mb-1 pb-2 border-b-2 border-gray-400/70 dark:border-gray-500';
+                    etiquetaGrupo.textContent = 'Mismo producto sugerido (' + filasEnEsteGrupo + ' URL' + (filasEnEsteGrupo !== 1 ? 's' : '') + '): ' + (r.producto.texto_completo || ('#' + r.producto.id));
+                    nodoWrapperGrupo.appendChild(etiquetaGrupo);
+                    indiceEstiloGrupo++;
+                    contenedor.appendChild(nodoWrapperGrupo);
+                }
+                nodoWrapperGrupo.appendChild(div);
+            } else {
+                claveGrupoWrapperAbierto = null;
+                nodoWrapperGrupo = null;
+                contenedor.appendChild(div);
+            }
+
             div.__rowData = r;
             renderUrlResaltadaFilaCrearMasivo(div);
             if (puedeCrear) actualizarEstadoBotonGenerar(div);
@@ -1704,6 +1799,9 @@
 
                         console.log('[CrearOfertaBulk] Parsed data:', data2);
                         if (data2.error) console.error('[CrearOfertaBulk] Server error:', data2.error);
+                        if (!data2.success || res2.status >= 400) {
+                            logCrearOfertaBulkDiagnostico('[CrearOfertaBulk]', res2, responseText, data2);
+                        }
 
                         const msgEl = div.querySelector('.generado-msg');
                         msgEl.classList.remove('hidden');
@@ -1748,7 +1846,12 @@
                                     headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content, 'Accept': 'application/json' },
                                     body: JSON.stringify(body),
                                 });
-                                const data3 = await res3.json().catch(() => ({}));
+                                const res3Text = await res3.text();
+                                let data3;
+                                try { data3 = JSON.parse(res3Text); } catch (e) { data3 = {}; }
+                                if (!data3.success || res3.status >= 400) {
+                                    logCrearOfertaBulkDiagnostico('[CrearOfertaBulk] reintento sin precio', res3, res3Text, data3);
+                                }
                                 if (data3.success) {
                                     div.classList.remove('bg-green-50', 'dark:bg-green-900/20', 'border-green-200', 'dark:border-green-700');
                                     div.classList.add('bg-gray-50', 'dark:bg-gray-800', 'border-gray-200', 'dark:border-gray-700');
@@ -2106,7 +2209,12 @@
                     const cbGenerarSinPrecioB = div.querySelector('.generar-sin-precio-cb');
                     if (cbGenerarSinPrecioB && cbGenerarSinPrecioB.checked) body.generar_sin_precio = true;
                     const res2 = await fetch('{{ route("admin.ofertas.crear-masivo.crear") }}', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content, 'Accept': 'application/json' }, body: JSON.stringify(body) });
-                    const data2 = await res2.json().catch(() => ({}));
+                    const res2TextB = await res2.text();
+                    let data2;
+                    try { data2 = JSON.parse(res2TextB); } catch (e) { data2 = {}; }
+                    if (!data2.success || res2.status >= 400) {
+                        logCrearOfertaBulkDiagnostico('[CrearOfertaBulk-B]', res2, res2TextB, data2);
+                    }
                     const msgEl = div.querySelector('.generado-msg');
                     msgEl.classList.remove('hidden');
                     if (data2.success) {
@@ -2145,7 +2253,12 @@
                             msgEl.textContent = 'Precio no encontrado. Creando oferta con precio 0...';
                             body.generar_sin_precio = true;
                             const res3B = await fetch('{{ route("admin.ofertas.crear-masivo.crear") }}', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content, 'Accept': 'application/json' }, body: JSON.stringify(body) });
-                            const data3B = await res3B.json().catch(() => ({}));
+                            const res3BText = await res3B.text();
+                            let data3B;
+                            try { data3B = JSON.parse(res3BText); } catch (e) { data3B = {}; }
+                            if (!data3B.success || res3B.status >= 400) {
+                                logCrearOfertaBulkDiagnostico('[CrearOfertaBulk-B] reintento sin precio', res3B, res3BText, data3B);
+                            }
                             if (data3B.success) {
                                 const wrapSinPrecioB2 = div.querySelector('.generar-sin-precio-wrap');
                                 if (wrapSinPrecioB2) wrapSinPrecioB2.classList.add('hidden');

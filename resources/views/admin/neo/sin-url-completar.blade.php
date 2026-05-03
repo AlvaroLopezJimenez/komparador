@@ -44,7 +44,7 @@
                 <ul class="text-sm text-green-900 dark:text-green-100 space-y-1">
                     <li>Líneas leídas en el CSV: <strong>{{ $res['lineas_procesadas'] ?? 0 }}</strong></li>
                     <li>Filas <strong>neo</strong> actualizadas (guardados): <strong>{{ $res['filas_actualizadas'] ?? 0 }}</strong></li>
-                    <li>Filas con <strong>aniadida = si</strong> (URL ya existía en <code class="text-xs">ofertas_producto.url</code>): <strong>{{ $res['filas_marcadas_aniadida_si'] ?? 0 }}</strong></li>
+                    <li>Filas con <strong>aniadida = si</strong> (URL ya existía en ofertas por <code class="text-xs">url_lookup</code>): <strong>{{ $res['filas_marcadas_aniadida_si'] ?? 0 }}</strong></li>
                     <li>Líneas omitidas (vacías): <strong>{{ $res['lineas_omitidas_vacias'] ?? 0 }}</strong></li>
                     <li>Líneas omitidas por <code class="text-xs">relocator/relocate</code>: <strong>{{ $res['lineas_omitidas_relocator'] ?? 0 }}</strong></li>
                 </ul>
@@ -106,7 +106,7 @@
                 <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
                     La <strong>primera columna</strong> es el valor de <strong>neo</strong> en claro (el mismo que en el CSV descargado).
                     La <strong>segunda columna</strong> son las <strong>URLs de tienda</strong> (enlace al producto en cada tienda).
-                    Tras normalizar con <code class="text-xs">LimpiarUrlDeTiendas</code>, si esa URL coincide con alguna fila de <code class="text-xs">ofertas_producto.url</code>, se guarda igual en <code class="text-xs">neo.url</code> y en esa fila <strong>neo</strong> se pone <strong>aniadida = si</strong>; si no hay coincidencia, solo se rellena <code class="text-xs">url</code> y <strong>aniadida</strong> no se modifica.
+                    Tras normalizar con <code class="text-xs">LimpiarUrlDeTiendas</code>, si esa URL coincide con alguna oferta (mismo <code class="text-xs">url_lookup</code> que <code class="text-xs">ConsultarNeoCifrado::hashLookup</code>), se guarda en neo (cifrado v2) y se pone <strong>aniadida = si</strong>; si no hay coincidencia, solo se rellena la URL en neo y <strong>aniadida</strong> no se modifica.
                 </p>
                 <form method="POST" action="{{ route('admin.neo.sin-url-completar.subir-csv') }}" enctype="multipart/form-data" class="space-y-4">
                     @csrf
@@ -132,7 +132,7 @@
                         <label for="csv" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Archivo CSV</label>
                         <input type="file" name="csv" id="csv" accept=".csv,.txt" required
                             class="block w-full text-sm text-gray-700 dark:text-gray-300 file:mr-3 file:py-2 file:px-4 file:rounded-md file:border-0 file:bg-gray-100 file:text-gray-800 dark:file:bg-gray-600 dark:file:text-white">
-                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Formato: columnas <code>neo_url</code> y <code>url_destino</code> (coma o punto y coma). Máx. 5&nbsp;MB. Las URLs de tienda se normalizan con <code>LimpiarUrlDeTiendas</code> y se cotejan con <code>ofertas_producto.url</code> para marcar <code>aniadida</code>.</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Formato: columnas <code>neo_url</code> y <code>url_destino</code> (coma o punto y coma). Máx. 5&nbsp;MB. Las URLs se normalizan con <code>LimpiarUrlDeTiendas</code> y se cotejan por <code>url_lookup</code> en ofertas para marcar <code>aniadida</code>.</p>
                     </div>
                     <button type="submit"
                         class="inline-flex items-center bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-5 py-2.5 rounded-md transition text-sm">

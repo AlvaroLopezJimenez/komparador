@@ -37,14 +37,6 @@ class DescuentosController extends Controller
         if ($oferta->relationLoaded('tienda') && $oferta->tienda) {
             $ofertaConDescuento->setRelation('tienda', $oferta->tienda);
         }
-        
-        Log::info('DescuentosController - Aplicando descuento:', [
-            'oferta_id' => $oferta->id,
-            'descuento' => $oferta->descuentos,
-            'unidades_originales' => $oferta->unidades,
-            'precio_total_original' => $oferta->precio_total,
-            'precio_unidad_original' => $oferta->precio_unidad
-        ]);
 
         // Verificar si es un cupón (formato: cupon;codigo;cantidad, cupon;valor o cupon;%valor)
         if (strpos($oferta->descuentos, 'cupon;') === 0) {
@@ -63,14 +55,6 @@ class DescuentosController extends Controller
                 $ofertaConDescuento->precio_unidad = $oferta->unidades > 0 
                     ? round($precioTotalConDescuento / $oferta->unidades, 3) 
                     : 0;
-                
-                Log::info('DescuentosController - Cupón porcentaje aplicado:', [
-                    'oferta_id' => $oferta->id,
-                    'porcentaje_cupon' => $porcentajeCupon,
-                    'precio_original' => $oferta->precio_total,
-                    'precio_con_cupon' => $precioTotalConDescuento,
-                    'precio_unidad' => $ofertaConDescuento->precio_unidad
-                ]);
             } else {
                 // Parsear formato: cupon;codigo;cantidad o cupon;cantidad (compatibilidad)
                 $partes = explode(';', $descuentoString);
@@ -93,15 +77,6 @@ class DescuentosController extends Controller
                 $ofertaConDescuento->precio_unidad = $oferta->unidades > 0 
                     ? round($precioTotalConDescuento / $oferta->unidades, 3) 
                     : 0;
-                
-                Log::info('DescuentosController - Cupón cantidad fija aplicado:', [
-                    'oferta_id' => $oferta->id,
-                    'codigo_cupon' => $codigoCupon,
-                    'valor_cupon' => $valorCupon,
-                    'precio_original' => $oferta->precio_total,
-                    'precio_con_cupon' => $precioTotalConDescuento,
-                    'precio_unidad' => $ofertaConDescuento->precio_unidad
-                ]);
             }
         } elseif (strpos($oferta->descuentos, 'CholloTienda1SoloCuponQueAplicaDescuento;') === 0) {
             // Procesar cupón de tipo "1 Solo cupón" que aplica descuento al precio total
@@ -155,16 +130,7 @@ class DescuentosController extends Controller
                 $ofertaConDescuento->precio_unidad = $oferta->unidades > 0 
                     ? round($precioTotalConDescuento / $oferta->unidades, 3) 
                     : 0;
-                
-                Log::info('DescuentosController - CholloTienda1SoloCupon aplicado:', [
-                    'oferta_id' => $oferta->id,
-                    'tipo_descuento' => $tipoDescuento,
-                    'descuento' => $descuento,
-                    'precio_original' => $precioOriginal,
-                    'precio_con_descuento' => $precioTotalConDescuento,
-                    'precio_unidad' => $ofertaConDescuento->precio_unidad
-                ]);
-                
+
                 return $ofertaConDescuento;
             }
             
@@ -248,13 +214,6 @@ class DescuentosController extends Controller
                     break;
             }
         }
-
-        Log::info('DescuentosController - Descuento aplicado:', [
-            'oferta_id' => $oferta->id,
-            'unidades_finales' => $ofertaConDescuento->unidades,
-            'precio_total_final' => $ofertaConDescuento->precio_total,
-            'precio_unidad_final' => $ofertaConDescuento->precio_unidad
-        ]);
 
         return $ofertaConDescuento;
     }

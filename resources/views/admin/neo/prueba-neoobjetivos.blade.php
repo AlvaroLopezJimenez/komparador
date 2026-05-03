@@ -147,7 +147,7 @@
                 $estadoEjecucion = $logEjecucion['estado'] ?? null;
                 $pasoActual = $logEjecucion['paso_actual'] ?? null;
                 $pasosEjecucion = is_array($logEjecucion['pasos'] ?? null) ? $logEjecucion['pasos'] : [];
-                $total_filas_neo_comparador = $resultado['total_filas_neo_comparador'] ?? 0;
+                $total_filas_rama_neo = $resultado['total_filas_rama_neo'] ?? $resultado['total_filas_neo_comparador'] ?? 0;
                 $total_filas_categoria_tienda_prueba = $resultado['total_filas_categoria_tienda_prueba'] ?? 0;
                 $resultados = $resultado['resultados'] ?? [];
                 $resultados_rama_categoria_tienda = $resultado['resultados_categoria_tienda'] ?? [];
@@ -220,7 +220,7 @@
 
             @unless ($soloRedireccion)
             <p class="text-gray-600 dark:text-gray-400">
-                Rama Neo comparador (VPS): <strong>{{ $total_filas_neo_comparador }}</strong>
+                Rama Neo (VPS): <strong>{{ $total_filas_rama_neo }}</strong>
                 — rama categoría/tienda: <strong>{{ $total_filas_categoria_tienda_prueba }}</strong>
             </p>
             @endunless
@@ -405,7 +405,7 @@
                 </div>
             @endif
 
-            {{-- Rama Neo comparador (VPS) --}}
+            {{-- Rama Neo (VPS) --}}
             @if (!$soloRedireccion && !empty($resultados))
                 @foreach ($resultados as $idx => $r)
                     <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 space-y-2">
@@ -514,9 +514,9 @@
                         </div>
                     </div>
                 @endforeach
-            @elseif (!$soloRedireccion && (int) $total_filas_neo_comparador > 0)
+            @elseif (!$soloRedireccion && (int) $total_filas_rama_neo > 0)
                 <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-                    <p class="text-gray-600 dark:text-gray-400">No se pudo montar el resultado rama Neo comparador (revisa el log de errores arriba).</p>
+                    <p class="text-gray-600 dark:text-gray-400">No se pudo montar el resultado de la rama Neo (revisa el log de errores arriba).</p>
                 </div>
             @endif
         @endif
@@ -533,9 +533,9 @@
             }
 
             const valorUrl = (inputUrl.value || '').toLowerCase();
-            const marcaRamaNeoComparador = typeof atob !== 'undefined' ? atob('aWRlYWxv') : '';
-            const esRamaNeoComparador = marcaRamaNeoComparador !== '' && valorUrl.includes(marcaRamaNeoComparador);
-            selectTienda.required = !esRamaNeoComparador;
+            const marcaRamaNeoSubcadena = typeof atob !== 'undefined' ? atob('aWRlYWxv') : '';
+            const esRamaNeo = marcaRamaNeoSubcadena !== '' && valorUrl.includes(marcaRamaNeoSubcadena);
+            selectTienda.required = !esRamaNeo;
         }
 
         document.addEventListener('DOMContentLoaded', function () {

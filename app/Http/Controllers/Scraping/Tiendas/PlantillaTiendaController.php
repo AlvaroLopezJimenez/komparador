@@ -41,7 +41,7 @@ use App\Http\Controllers\Scraping\PeticionApiHTMLController;
  * Si la tienda va a usarse en el cron de neo objetivos para sacar URLs de
  * productos desde una URL de categoría, implementa los métodos siguientes.
  * Si no implementas tipoListadoCategoria() o devuelves null, el cron
- * ignorará esta tienda para el flujo "no idealo".
+ * ignorará esta tienda para el flujo categoría/tienda (fuera de rama Neo).
  *
  * 1) tipoListadoCategoria(): string|null
  *    - Nombre del método: tipoListadoCategoria
@@ -92,7 +92,7 @@ abstract class PlantillaTiendaController extends Controller
     abstract public function obtenerPrecio($url, $variante = null, $tienda = null);
 
     /**
-     * Tipo de listado de categoría para el cron neo objetivos (no idealo).
+     * Tipo de listado de categoría para el cron neo objetivos (rama categoría/tienda).
      * Devuelve 'sitemap' | 'paginacion' | 'mostrar_mas' | null (null = no soportado).
      *
      * @return string|null

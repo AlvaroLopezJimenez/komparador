@@ -70,5 +70,6 @@ class Kernel extends HttpKernel
         'security.headers' => \App\Http\Middleware\SecurityHeaders::class,
         'block.public.deletes' => \App\Http\Middleware\BlockPublicDeletes::class,
         'anti-scraping' => \App\Http\Middleware\AntiScrapingMiddleware::class,
+        'neo.programa.externo' => \App\Http\Middleware\VerifyNeoProgramaExternoToken::class,
     ];
 }

@@ -1493,14 +1493,35 @@ Responde ÚNICAMENTE con el JSON.";
         ]);
 
         } catch (\Throwable $e) {
-            \Log::error('CrearOfertaBulk error: ' . $e->getMessage(), [
+            $errorRef = (string) Str::uuid();
+
+            $logMessage = sprintf(
+                'CrearOfertaBulk [%s] %s | %s:%d',
+                $errorRef,
+                $e->getMessage(),
+                $e->getFile(),
+                $e->getLine()
+            );
+
+            \Log::error($logMessage, [
+                'exception' => $e::class,
                 'trace' => $e->getTraceAsString(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
             ]);
+
+            // Respaldo: muchos entornos leen esto aunque storage/logs no sea escribible o LOG_CHANNEL apunte a null
+            error_log($logMessage . ' | ' . $e::class);
+
             return response()->json([
                 'success' => false,
-                'error' => config('app.debug') ? $e->getMessage() . ' (L' . $e->getLine() . ')' : 'Error al crear la oferta',
+                'error' => $e->getMessage() . ' (L' . $e->getLine() . ')',
+                'error_ref' => $errorRef,
+                'error_debug' => [
+                    'exception' => $e::class,
+                    'message' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'trace_head' => array_slice(explode("\n", $e->getTraceAsString()), 0, 12),
+                ],
             ], 500);
         }
     }

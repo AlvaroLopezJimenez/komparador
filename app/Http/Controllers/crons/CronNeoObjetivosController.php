@@ -21,23 +21,29 @@ use Illuminate\Support\Str;
 /**
  * Cron neo objetivos:
  * - Busca en neoobjetivo filas con visitada > 7 días
- * - Si la URL contiene la marca de rama Neo comparador (VPS) y NEO_CRON_PETICIONES_VPS_HABILITADAS es true, POST al VPS /sacar-ofertas-idea
+ * - Si NEO_CRON_EXCLUIR_RAMA_NEO_DEL_CUPO es true, las filas de la rama Neo no entran en el cupo de 5 ni se modifican (constante en este controlador)
+ * - Si la URL contiene la marca de rama Neo (VPS) y NEO_CRON_PETICIONES_VPS_HABILITADAS es true, POST al VPS /sacar-ofertas-idea
  * - Si NEO_CRON_REDIRECCION_HABILITADA es false, no se llama al VPS /redireccion y se guarda en neo sin URL final
- * - Si es false, la rama Neo comparador solo actualiza visitada (sin peticiones) hasta reactivar el flujo completo
+ * - Si NEO_CRON_PETICIONES_VPS_HABILITADAS es false, la rama Neo no se procesa: sin peticiones VPS, sin tocar visitada ni neo
  * - Muestra en vista el resultado de la(s) petición(es)
  */
 class CronNeoObjetivosController extends Controller
 {
     /**
-     * false: rama Neo comparador del cron no llama al VPS; solo marca visitada=now para no reelegir la fila 7 días.
-     * true: comportamiento completo (sacar-ofertas + redirecciones).
+     * false: rama Neo del cron no llama al VPS ni modifica neoobjetivo (visitada intacta).
+     * true: comportamiento completo (sacar-ofertas + redirecciones según NEO_CRON_REDIRECCION_HABILITADA).
      */
-    private const NEO_CRON_PETICIONES_VPS_HABILITADAS = true;
+    private const NEO_CRON_PETICIONES_VPS_HABILITADAS = false;
     /**
-     * false: tras extraer URLs del comparador no se intenta resolver /redireccion; se guarda en neo con url vacía.
-     * true: para cada URL del comparador se llama a /redireccion y se usa final_url para decidir guardado/actualización.
+     * false: tras extraer URLs de la rama Neo no se intenta resolver /redireccion; se guarda en neo con url vacía.
+     * true: para cada URL de la rama Neo se llama a /redireccion y se usa final_url para decidir guardado/actualización.
      */
     private const NEO_CRON_REDIRECCION_HABILITADA = false;
+    /**
+     * true: las filas neoobjetivo de la rama Neo no entran en el cupo de 5 ni se tocan en esta ejecución.
+     * false: comportamiento anterior (hasta 5 candidatas globales y se reparte rama Neo vs categoría/tienda).
+     */
+    private const NEO_CRON_EXCLUIR_RAMA_NEO_DEL_CUPO = false;
 
     private const VPS_URL = 'http://51.38.184.245/sacar-ofertas-idea';
     private const VPS_REDIRECCION_URL = 'http://51.38.184.245/redireccion';
@@ -46,26 +52,35 @@ class CronNeoObjetivosController extends Controller
     private const TIMEOUT_REDIRECCION_PRUEBA_SEGUNDOS = 900;
     private const RETENCION_EJECUCIONES_DIAS = 30;
 
-    /** Marca en neoobjetivo.url para la rama que delega en el VPS (valor en base64 para no exponer el literal en código). */
-    private static function neoObjetivoMarcaRamaUrl(): string
+    /**
+     * Subcadena que identifica URLs de la rama Neo en neoobjetivo (fragmento en base64 para no exponer el dominio en claro).
+     */
+    private static function marcaRamaNeoSubcadenaEntradaUrl(): string
     {
         return (string) base64_decode('aWRlYWxv', true);
     }
 
-    private static function neoComparadorHostWww(): string
+    private static function ramaNeoHostWww(): string
     {
         return (string) base64_decode('d3d3LmlkZWFsby5lcw==', true);
     }
 
-    private static function neoComparadorOrigenHttps(): string
+    private static function ramaNeoOrigenHttps(): string
     {
         return (string) base64_decode('aHR0cHM6Ly93d3cuaWRlYWxvLmVz', true);
     }
 
-    /** Patrón en minúsculas para detectar URL relocator del comparador. */
-    private static function neoComparadorRelocatorMarcadorMinusculas(): string
+    /** Patrón en minúsculas para detectar URL relocator de la rama Neo. */
+    private static function ramaNeoRelocatorMarcadorMinusculas(): string
     {
         return strtolower((string) base64_decode('aWRlYWxvLmVzL3JlbG9jYXRvcg==', true));
+    }
+
+    private function esNeoobjetivoRamaNeo(Neoobjetivo $n): bool
+    {
+        $url = trim((string) $n->url);
+
+        return $url !== '' && stripos($url, self::marcaRamaNeoSubcadenaEntradaUrl()) !== false;
     }
 
     public function __invoke(Request $request)
@@ -137,6 +152,16 @@ class CronNeoObjetivosController extends Controller
             return true;
         })->values();
 
+        $exclusionRamaNeoCupoActiva = self::NEO_CRON_EXCLUIR_RAMA_NEO_DEL_CUPO;
+        $totalFilasValidasAntesExcluirRamaNeo = $filasNeoValidas->count();
+        $filasRamaNeoExcluidasSinTocar = 0;
+        if ($exclusionRamaNeoCupoActiva) {
+            $filasNeoValidas = $filasNeoValidas->filter(function (Neoobjetivo $n) {
+                return !$this->esNeoobjetivoRamaNeo($n);
+            })->values();
+            $filasRamaNeoExcluidasSinTocar = $totalFilasValidasAntesExcluirRamaNeo - $filasNeoValidas->count();
+        }
+
         $filasNeo = $filasNeoValidas
             ->sortBy('visitada')
             ->take(5)
@@ -145,12 +170,15 @@ class CronNeoObjetivosController extends Controller
         $this->actualizarEjecucionPaso($ejecucion, 'filtrado_neo', [
             'total_filas_candidatas' => $filasNeoCandidatas->count(),
             'total_no_encontrado_marcadas_3999' => $noEncontradoMarcadas,
+            'total_filas_validas_antes_excluir_rama_neo' => $totalFilasValidasAntesExcluirRamaNeo,
+            'exclusion_rama_neo_del_cupo_activa' => $exclusionRamaNeoCupoActiva,
+            'filas_rama_neo_fuera_del_cupo_sin_modificar' => $filasRamaNeoExcluidasSinTocar,
             'total_filas_validas' => $filasNeoValidas->count(),
             'total_filas_seleccionadas' => $filasNeo->count(),
         ]);
 
         $filas = $filasNeo->filter(function (Neoobjetivo $n) {
-            return stripos($n->url, self::neoObjetivoMarcaRamaUrl()) !== false;
+            return stripos($n->url, self::marcaRamaNeoSubcadenaEntradaUrl()) !== false;
         });
         $this->actualizarEjecucionPaso($ejecucion, 'procesando_neo', [
             'total_filas_neo' => $filas->count(),
@@ -165,8 +193,6 @@ class CronNeoObjetivosController extends Controller
             }
             try {
                 if (!self::NEO_CRON_PETICIONES_VPS_HABILITADAS) {
-                    $neo->visitada = now();
-                    $neo->save();
                     $resultados[] = [
                         'neoobjetivo_id'     => $neo->id,
                         'url'                => $url,
@@ -176,7 +202,8 @@ class CronNeoObjetivosController extends Controller
                         'hrefs'              => [],
                         'redirecciones'      => [],
                         'neo_cron_sin_peticion_vps' => true,
-                        'nota'               => 'Neo comparador: peticiones VPS desactivadas (NEO_CRON_PETICIONES_VPS_HABILITADAS); solo actualizado visitada.',
+                        'visitada_modificada' => false,
+                        'nota'               => 'Rama Neo omitida: NEO_CRON_PETICIONES_VPS_HABILITADAS=false; sin peticiones VPS y sin cambiar visitada.',
                     ];
                     continue;
                 }
@@ -197,9 +224,9 @@ class CronNeoObjetivosController extends Controller
                 }
                 $hrefs = [];
                 if (is_array($decoded) && !empty($decoded['success']) && !empty($decoded['html_b64'])) {
-                    $hrefsBrutos = $this->extraerHrefsOfertasNeoComparador($decoded['html_b64']);
+                    $hrefsBrutos = $this->extraerHrefsOfertasRamaNeo($decoded['html_b64']);
                     foreach ($hrefsBrutos as $h) {
-                        $limpia = $this->limpiarUrlNeoComparadorRelocate($h);
+                        $limpia = $this->limpiarUrlRamaNeoRelocate($h);
                         if ($limpia !== '') {
                             $hrefs[] = $limpia;
                         }
@@ -284,9 +311,9 @@ class CronNeoObjetivosController extends Controller
             return $copia;
         }, $resultados);
 
-        // Rama categoría/tienda: mismas filas que arriba, sin marca de rama Neo comparador en la URL
+        // Rama categoría/tienda: mismas filas que arriba, sin marca de rama Neo en la URL
         $filasRamaCategoriaTienda = $filasNeo->filter(function (Neoobjetivo $n) {
-            return stripos($n->url, self::neoObjetivoMarcaRamaUrl()) === false;
+            return stripos($n->url, self::marcaRamaNeoSubcadenaEntradaUrl()) === false;
         });
         $this->actualizarEjecucionPaso($ejecucion, 'procesando_categoria_tienda', [
             'total_filas_categoria_tienda' => $filasRamaCategoriaTienda->count(),
@@ -362,7 +389,7 @@ class CronNeoObjetivosController extends Controller
                 'tipo_listado'     => $tipoListado,
             ];
 
-            // Ejecutar petición(es) y extracción de URLs según tipo listado; guardar en log como en la rama Neo comparador
+            // Ejecutar petición(es) y extracción de URLs según tipo listado; guardar en log como en la rama Neo (VPS)
             $peticionesRamaCategoriaTienda = [];
             $todasLasUrlsExtraidas = [];
             try {
@@ -556,13 +583,13 @@ class CronNeoObjetivosController extends Controller
         ]);
 
         $url = trim($data['url']);
-        $esRamaNeoComparador = stripos($url, self::neoObjetivoMarcaRamaUrl()) !== false;
-        $esSoloRedireccionRelocator = $this->esUrlNeoComparadorRelocatorDirecta($url);
+        $esRamaNeo = stripos($url, self::marcaRamaNeoSubcadenaEntradaUrl()) !== false;
+        $esSoloRedireccionRelocator = $this->esUrlRamaNeoRelocatorDirecta($url);
         $tienda = null;
-        if (!$esRamaNeoComparador) {
+        if (!$esRamaNeo) {
             if (empty($data['tienda_id'])) {
                 return back()
-                    ->withErrors(['tienda_id' => 'La tienda es obligatoria cuando la URL no es de la rama Neo comparador.'])
+                    ->withErrors(['tienda_id' => 'La tienda es obligatoria cuando la URL no es de la rama Neo.'])
                     ->withInput();
             }
             $tienda = Tienda::findOrFail((int) $data['tienda_id']);
@@ -644,7 +671,7 @@ class CronNeoObjetivosController extends Controller
                         'error_excepcion' => $errorRed,
                         'timeout_segundos' => self::TIMEOUT_REDIRECCION_PRUEBA_SEGUNDOS,
                     ],
-                    'total_filas_neo_comparador' => 0,
+                    'total_filas_rama_neo' => 0,
                     'total_filas_categoria_tienda_prueba' => 0,
                     'resultados' => [],
                     'resultados_categoria_tienda' => [],
@@ -670,10 +697,10 @@ class CronNeoObjetivosController extends Controller
                 ]);
             }
 
-            if ($esRamaNeoComparador) {
+            if ($esRamaNeo) {
                 if (!self::NEO_CRON_PETICIONES_VPS_HABILITADAS) {
-                    $this->agregarPasoPrueba($pasos, 'procesando_rama_neo_comparador', 'Rama Neo comparador: peticiones VPS desactivadas (NEO_CRON_PETICIONES_VPS_HABILITADAS)');
-                    $this->agregarPasoPrueba($pasos, 'sin_peticiones_vps', 'Sin llamadas al VPS. En el cron real se actualizaría visitada en neoobjetivo.');
+                    $this->agregarPasoPrueba($pasos, 'procesando_rama_neo', 'Rama Neo: peticiones VPS desactivadas (NEO_CRON_PETICIONES_VPS_HABILITADAS)');
+                    $this->agregarPasoPrueba($pasos, 'sin_peticiones_vps', 'Sin llamadas al VPS. En el cron real no se modifica visitada ni se procesa la rama Neo.');
                     $resultados[] = [
                         'neoobjetivo_id' => 0,
                         'url' => $url,
@@ -685,12 +712,12 @@ class CronNeoObjetivosController extends Controller
                         'neo_cron_sin_peticion_vps' => true,
                         'nota' => 'Prueba manual alineada con cron: sin peticiones mientras NEO_CRON_PETICIONES_VPS_HABILITADAS es false.',
                     ];
-                    $this->agregarPasoPrueba($pasos, 'fin_rama_neo_comparador', 'Finalizada rama Neo comparador (sin peticiones)', [
+                    $this->agregarPasoPrueba($pasos, 'fin_rama_neo', 'Finalizada rama Neo (sin peticiones)', [
                         'hrefs_extraidos' => 0,
                         'redirecciones' => 0,
                     ]);
                 } else {
-                $this->agregarPasoPrueba($pasos, 'procesando_rama_neo_comparador', 'La URL pertenece a rama Neo comparador');
+                $this->agregarPasoPrueba($pasos, 'procesando_rama_neo', 'La URL pertenece a la rama Neo');
                 $resp = null;
                 $body = '';
                 $decoded = null;
@@ -724,9 +751,9 @@ class CronNeoObjetivosController extends Controller
 
                 $hrefs = [];
                 if (is_array($decoded) && !empty($decoded['success']) && !empty($decoded['html_b64'])) {
-                    $hrefsBrutos = $this->extraerHrefsOfertasNeoComparador($decoded['html_b64']);
+                    $hrefsBrutos = $this->extraerHrefsOfertasRamaNeo($decoded['html_b64']);
                     foreach ($hrefsBrutos as $h) {
-                        $limpia = $this->limpiarUrlNeoComparadorRelocate($h);
+                        $limpia = $this->limpiarUrlRamaNeoRelocate($h);
                         if ($limpia !== '') {
                             $hrefs[] = $limpia;
                         }
@@ -797,7 +824,7 @@ class CronNeoObjetivosController extends Controller
                     ],
                 ];
 
-                $this->agregarPasoPrueba($pasos, 'fin_rama_neo_comparador', 'Finalizada rama Neo comparador', [
+                $this->agregarPasoPrueba($pasos, 'fin_rama_neo', 'Finalizada rama Neo', [
                     'http_status' => $resp?->status() ?? 0,
                     'hrefs_extraidos' => count($hrefs),
                     'redirecciones' => count($redirecciones),
@@ -1016,8 +1043,8 @@ class CronNeoObjetivosController extends Controller
                 'paso_actual' => !empty($pasos) ? ($pasos[count($pasos) - 1]['paso'] ?? 'finalizado') : 'finalizado',
                 'pasos' => $pasos,
             ],
-            'total_filas_neo_comparador' => $esRamaNeoComparador ? 1 : 0,
-            'total_filas_categoria_tienda_prueba' => $esRamaNeoComparador ? 0 : 1,
+            'total_filas_rama_neo' => $esRamaNeo ? 1 : 0,
+            'total_filas_categoria_tienda_prueba' => $esRamaNeo ? 0 : 1,
             'resultados' => $resultados,
             'resultados_categoria_tienda' => $resultadosRamaCategoriaTienda,
             'resultados_categoria_tienda_detalle' => $resultadosRamaCategoriaTiendaDetalle,
@@ -1061,7 +1088,7 @@ class CronNeoObjetivosController extends Controller
                     'tienda_id' => $neo->tienda_id,
                     'url_cifrada' => (string) $neo->getRawOriginal('url_cipher'),
                     'url_descifrada' => $urlDescifrada,
-                    'es_url_neo' => $urlDescifrada !== '' && stripos($urlDescifrada, self::neoObjetivoMarcaRamaUrl()) !== false,
+                    'es_url_neo' => $urlDescifrada !== '' && stripos($urlDescifrada, self::marcaRamaNeoSubcadenaEntradaUrl()) !== false,
                 ];
             });
     }
@@ -1241,7 +1268,7 @@ class CronNeoObjetivosController extends Controller
      *
      * @return array<int, string>
      */
-    private function extraerHrefsOfertasNeoComparador(string $htmlB64): array
+    private function extraerHrefsOfertasRamaNeo(string $htmlB64): array
     {
         $html = base64_decode($htmlB64, true);
         if ($html === false || $html === '') {
@@ -1274,16 +1301,16 @@ class CronNeoObjetivosController extends Controller
     }
 
     /**
-     * Pasa la URL a absoluta (origen del comparador si es relativa) y deja solo offerKey y type en la query.
+     * Pasa la URL a absoluta (origen de la rama Neo si es relativa) y deja solo offerKey y type en la query.
      */
-    private function limpiarUrlNeoComparadorRelocate(string $href): string
+    private function limpiarUrlRamaNeoRelocate(string $href): string
     {
         $href = trim($href);
         if ($href === '') {
             return '';
         }
         if (!str_starts_with($href, 'http')) {
-            $base = self::neoComparadorOrigenHttps();
+            $base = self::ramaNeoOrigenHttps();
             $href = $base . (str_starts_with($href, '/') ? '' : '/') . $href;
         }
         $parts = parse_url($href);
@@ -1291,7 +1318,7 @@ class CronNeoObjetivosController extends Controller
             return $href;
         }
         $scheme = $parts['scheme'] ?? 'https';
-        $host = $parts['host'] ?? self::neoComparadorHostWww();
+        $host = $parts['host'] ?? self::ramaNeoHostWww();
         $path = $parts['path'] ?? '/';
         $query = $parts['query'] ?? '';
         parse_str($query, $params);
@@ -1335,7 +1362,7 @@ class CronNeoObjetivosController extends Controller
                 'neo'          => $urlLimpia,
                 'aniadida'     => 'no',
             ]);
-            $log[] = ['paso' => count($log) + 1, 'texto' => '¿Redirección Neo comparador habilitada?', 'decision' => 'No'];
+            $log[] = ['paso' => count($log) + 1, 'texto' => '¿Redirección rama Neo habilitada?', 'decision' => 'No'];
             $log[] = ['paso' => count($log) + 1, 'texto' => 'Acción', 'decision' => 'Insertado en neo sin url (vacía) y con datos del neoobjetivo; columna neo=URL limpiada'];
             return [
                 'success'                       => true,
@@ -1881,7 +1908,7 @@ class CronNeoObjetivosController extends Controller
 
     /**
      * POST al VPS /redireccion con una URL de relocator; devuelve la respuesta (final_url o error).
-     * Entrada: JSON con clave "url" (relocators del comparador).
+     * Entrada: JSON con clave "url" (relocators de la rama Neo).
      *
      * @return array{success: bool, final_url?: string, error?: string, url_solicitada?: string, intentos?: int, proxies_intentados?: int, ips_intentadas?: array, detalle_por_intento?: array}
      */
@@ -1915,11 +1942,11 @@ class CronNeoObjetivosController extends Controller
     }
 
     /**
-     * Prueba manual: URL ya es un relocator del comparador → solo POST a /redireccion.
+     * Prueba manual: URL ya es un relocator de la rama Neo → solo POST a /redireccion.
      */
-    private function esUrlNeoComparadorRelocatorDirecta(string $url): bool
+    private function esUrlRamaNeoRelocatorDirecta(string $url): bool
     {
-        return stripos(strtolower($url), self::neoComparadorRelocatorMarcadorMinusculas()) !== false;
+        return stripos(strtolower($url), self::ramaNeoRelocatorMarcadorMinusculas()) !== false;
     }
 
     /**

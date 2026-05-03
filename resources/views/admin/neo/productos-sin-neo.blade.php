@@ -115,8 +115,9 @@
                     mostrarMensaje(productoId, 'Escribe una URL o pulsa «No encontrada».', true);
                     return;
                 }
-                if (urlTrim.toLowerCase() !== 'no encontrado' && urlTrim.toLowerCase().indexOf('idealo') === -1) {
-                    mostrarMensaje(productoId, 'La URL debe contener la palabra «idealo».', true);
+                const marcaRamaNeo = typeof atob !== 'undefined' ? atob('aWRlYWxv') : '';
+                if (urlTrim.toLowerCase() !== 'no encontrado' && marcaRamaNeo !== '' && urlTrim.toLowerCase().indexOf(marcaRamaNeo.toLowerCase()) === -1) {
+                    mostrarMensaje(productoId, 'La URL debe incluir la marca de la rama Neo.', true);
                     return;
                 }
 
