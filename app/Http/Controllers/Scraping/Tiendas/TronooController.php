@@ -41,6 +41,28 @@ class TronooController extends PlantillaTiendaController
             return response()->json(['success' => false, 'error' => 'Producto sin stock']);
         }
 
+        if ($this->esPagina404($html)) {
+            if ($oferta && $oferta instanceof OfertaProducto) {
+                $oferta->update(['mostrar' => 'no']);
+
+                DB::table('avisos')->insert([
+                    'texto_aviso'    => '404 - 1a vez',
+                    'fecha_aviso'    => now()->addHour(),
+                    'user_id'        => 1,
+                    'avisoable_type' => OfertaProducto::class,
+                    'avisoable_id'   => $oferta->id,
+                    'oculto'         => 0,
+                    'created_at'     => now(),
+                    'updated_at'     => now(),
+                ]);
+            }
+
+            return response()->json([
+                'success' => false,
+                'error'   => 'Producto no encontrado (página 404)',
+            ]);
+        }
+
         $precio = $this->extraerPrecioDesdeBloquePrincipal($html);
         if ($precio === null) {
             return response()->json([
@@ -58,6 +80,15 @@ class TronooController extends PlantillaTiendaController
     private function esSinStock(string $html): bool
     {
         return false;
+    }
+
+    /**
+     * Búsqueda sin resultados (Elementor): equivale a producto no encontrado / 404.
+     */
+    private function esPagina404(string $html): bool
+    {
+        return strpos($html, 'No hemos encontrado ningún resultado') !== false
+            && strpos($html, 'elementor-heading-title') !== false;
     }
 
     /**

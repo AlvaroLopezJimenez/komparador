@@ -476,6 +476,117 @@ class TiendaController extends Controller
     }
 
     /**
+     * JSON: desglose de valores de envío (columna envio) por número de ofertas de la tienda.
+     */
+    public function resumenEnvioOfertasTienda(Tienda $tienda)
+    {
+        $filas = $tienda->ofertas()
+            ->selectRaw('envio, COUNT(*) as total')
+            ->groupBy('envio')
+            ->orderByRaw('envio IS NULL ASC')
+            ->orderBy('envio')
+            ->get();
+
+        $grupos = $filas->map(function ($row) {
+            $total = (int) $row->total;
+            $ofertaTxt = $total === 1 ? 'oferta' : 'ofertas';
+
+            if ($row->envio === null) {
+                $clave = '__null__';
+                $textoLinea = 'Sin gasto definido (' . $total . ' ' . $ofertaTxt . ')';
+            } else {
+                $valor = (float) $row->envio;
+                $clave = number_format($valor, 2, '.', '');
+                $parteEuro = $valor === 1.0 ? '1 euro' : number_format($valor, 2, ',', '') . ' euros';
+                $textoLinea = $parteEuro . ' (' . $total . ' ' . $ofertaTxt . ')';
+            }
+
+            return [
+                'clave' => $clave,
+                'texto' => $textoLinea,
+                'total' => $total,
+            ];
+        })->values();
+
+        return response()->json(['grupos' => $grupos]);
+    }
+
+    /**
+     * Actualiza el campo envio (y fecha_actualizacion_envio) en bloque para ofertas
+     * cuyo envío actual coincide con los grupos seleccionados.
+     */
+    public function modificarEnvioOfertasMasivo(Request $request, Tienda $tienda)
+    {
+        $validated = $request->validate([
+            'nuevo_envio' => ['required', 'numeric', 'min:0', 'max:99.99'],
+            'claves_envio' => ['required', 'array', 'min:1'],
+            'claves_envio.*' => ['required', 'string', 'max:32'],
+        ]);
+
+        $clavesPermitidas = $tienda->ofertas()
+            ->selectRaw('envio')
+            ->groupBy('envio')
+            ->get()
+            ->pluck('envio')
+            ->map(function ($v) {
+                return $v === null ? '__null__' : number_format((float) $v, 2, '.', '');
+            })
+            ->all();
+
+        $claves = array_values(array_intersect($validated['claves_envio'], $clavesPermitidas));
+
+        if ($claves === []) {
+            return response()->json([
+                'ok' => false,
+                'mensaje' => 'Ninguna de las claves enviadas coincide con los gastos de envío actuales de esta tienda.',
+                'actualizadas' => 0,
+                'errores' => [],
+            ], 422);
+        }
+
+        $incluyeNull = in_array('__null__', $claves, true);
+        $valoresNumericos = [];
+        foreach ($claves as $c) {
+            if ($c === '__null__') {
+                continue;
+            }
+            $valoresNumericos[] = round((float) $c, 2);
+        }
+
+        $nuevoEnvio = round((float) $validated['nuevo_envio'], 2);
+        $ahora = now();
+
+        try {
+            $afectadas = $tienda->ofertas()->where(function ($q) use ($incluyeNull, $valoresNumericos) {
+                if ($valoresNumericos !== [] && $incluyeNull) {
+                    $q->whereIn('envio', $valoresNumericos)->orWhereNull('envio');
+                } elseif ($valoresNumericos !== []) {
+                    $q->whereIn('envio', $valoresNumericos);
+                } elseif ($incluyeNull) {
+                    $q->whereNull('envio');
+                }
+            })->update([
+                'envio' => $nuevoEnvio,
+                'fecha_actualizacion_envio' => $ahora,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'ok' => false,
+                'mensaje' => 'Error al actualizar las ofertas.',
+                'actualizadas' => 0,
+                'errores' => [$e->getMessage()],
+            ], 500);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'mensaje' => 'Se ha actualizado el gasto de envío a ' . number_format($nuevoEnvio, 2, ',', '') . ' € en ' . $afectadas . ' oferta(s).',
+            'actualizadas' => $afectadas,
+            'errores' => [],
+        ]);
+    }
+
+    /**
      * Mostrar vista para gestionar tiempos de actualización de ofertas por tienda
      */
     public function tiemposActualizacion()
@@ -573,6 +684,109 @@ class TiendaController extends Controller
             'message' => "Se actualizaron {$ofertasActualizadas} ofertas de {$tienda->nombre}",
             'tiempo_formateado' => $this->formatearTiempo($minutos)
         ]);
+    }
+
+    /**
+     * Gestionar URLs de listado por categoría para todas las tiendas.
+     */
+    public function urlsPorCategoria(Request $request)
+    {
+        $categoriaSeleccionada = null;
+        $tiendas = collect();
+        $categoriaId = $request->input('categoria_id');
+
+        if ($categoriaId) {
+            $categoriaSeleccionada = Categoria::find($categoriaId);
+
+            if ($categoriaSeleccionada) {
+                $neoPorTienda = Neoobjetivo::query()
+                    ->where('categoria_id', $categoriaId)
+                    ->whereNull('oferta_id')
+                    ->whereNull('producto_id')
+                    ->get()
+                    ->keyBy('tienda_id');
+
+                $tiendas = Tienda::query()
+                    ->orderBy('tiendas.nombre')
+                    ->get([
+                        'tiendas.id',
+                        'tiendas.nombre',
+                        'tiendas.url',
+                        'tiendas.mostrar_tienda',
+                        'tiendas.scrapear',
+                        'tiendas.anotaciones_internas',
+                    ])
+                    ->map(function ($tienda) use ($neoPorTienda) {
+                        $neo = $neoPorTienda->get($tienda->id);
+                        $tienda->url_categoria = $neo?->url ?? '';
+                        $tienda->visitada_categoria = $neo?->visitada;
+                        return $tienda;
+                    });
+            }
+        }
+
+        return view('admin.tiendas.urls-por-categoria', [
+            'categoriaSeleccionada' => $categoriaSeleccionada,
+            'categoriaId' => $categoriaSeleccionada?->id,
+            'categoriaNombre' => $categoriaSeleccionada?->nombre,
+            'tiendas' => $tiendas,
+        ]);
+    }
+
+    /**
+     * Guardar URL de categoría para una tienda concreta.
+     */
+    public function guardarUrlPorCategoria(Request $request)
+    {
+        $validated = $request->validate([
+            'tienda_id' => 'required|exists:tiendas,id',
+            'categoria_id' => 'required|exists:categorias,id',
+            'url_categoria' => 'nullable|string',
+            'visitada_categoria' => 'nullable|date',
+        ]);
+
+        $urlCategoria = trim((string) ($validated['url_categoria'] ?? ''));
+        $visitadaCategoria = $validated['visitada_categoria'] ?? null;
+
+        if ($urlCategoria === '') {
+            Neoobjetivo::where('tienda_id', (int) $validated['tienda_id'])
+                ->where('categoria_id', (int) $validated['categoria_id'])
+                ->whereNull('oferta_id')
+                ->whereNull('producto_id')
+                ->delete();
+
+            return redirect()
+                ->route('admin.tiendas.urls-por-categoria', ['categoria_id' => $validated['categoria_id']])
+                ->with('success', 'URL eliminada para esta tienda en la categoría seleccionada.');
+        }
+
+        $visitada = now()->subDays(7);
+        if (is_string($visitadaCategoria) && trim($visitadaCategoria) !== '') {
+            try {
+                $visitada = Carbon::parse($visitadaCategoria);
+            } catch (\Throwable $e) {
+                $visitada = now()->subDays(7);
+            }
+        }
+
+        Neoobjetivo::updateOrCreate(
+            [
+                'tienda_id' => (int) $validated['tienda_id'],
+                'categoria_id' => (int) $validated['categoria_id'],
+                'oferta_id' => null,
+                'producto_id' => null,
+            ],
+            [
+                'url' => $urlCategoria,
+                'visitada' => $visitada,
+                'oferta_id' => null,
+                'producto_id' => null,
+            ]
+        );
+
+        return redirect()
+            ->route('admin.tiendas.urls-por-categoria', ['categoria_id' => $validated['categoria_id']])
+            ->with('success', 'URL guardada correctamente.');
     }
 
     /**

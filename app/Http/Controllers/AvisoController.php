@@ -18,9 +18,13 @@ use App\Services\SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Database\Eloquent\Builder;
 
 class AvisoController extends Controller
 {
+    /** @var list<string> */
+    private const AVISOS_FILTRO_TIPOS = ['todos', 'productos', 'ofertas', 'chollos', 'correos', 'internos'];
+
     public function index(Request $request)
     {
         $userId = auth()->id();
@@ -30,12 +34,45 @@ class AvisoController extends Controller
         if (!in_array($perPage, [10, 20, 50, 100])) {
             $perPage = 20;
         }
+
+        $vencidosTipo = $this->normalizarFiltroTipoAvisos($request->get('vencidos_tipo'));
+        $pendientesTipo = $this->normalizarFiltroTipoAvisos($request->get('pendientes_tipo'));
+        $ocultosTipo = $this->normalizarFiltroTipoAvisos($request->get('ocultos_tipo'));
+
+        $avisosTabRaw = $request->get('avisos_tab');
+        if (in_array($avisosTabRaw, ['vencidos', 'pendientes', 'ocultos'], true)) {
+            $avisosTab = $avisosTabRaw;
+        } elseif ($pendientesTipo !== 'todos') {
+            $avisosTab = 'pendientes';
+        } elseif ($ocultosTipo !== 'todos') {
+            $avisosTab = 'ocultos';
+        } elseif ($vencidosTipo !== 'todos') {
+            $avisosTab = 'vencidos';
+        } else {
+            $avisosTab = 'vencidos';
+        }
         
         // Verificar si el usuario ID 1 quiere ver todos los avisos
         $mostrarTodos = false;
         if ($userId === 1 && session('avisos_mostrar_todos', false)) {
             $mostrarTodos = true;
         }
+
+        $appendQuery = $this->avisosIndexQueryAppends($perPage, $vencidosTipo, $pendientesTipo, $ocultosTipo, $avisosTab);
+
+        $conteosTiposVencidos = $this->conteosPorTipoAvisosEnQuery(
+            Aviso::query()->vencidos()->visibles()->when(! $mostrarTodos, fn (Builder $q) => $q->visiblesPorUsuario($userId))
+        );
+        $conteosTiposPendientes = $this->conteosPorTipoAvisosEnQuery(
+            Aviso::query()->pendientes()->visibles()->when(! $mostrarTodos, fn (Builder $q) => $q->visiblesPorUsuario($userId))
+        );
+        $conteosTiposOcultos = $this->conteosPorTipoAvisosEnQuery(
+            Aviso::query()->ocultos()->when(! $mostrarTodos, fn (Builder $q) => $q->visiblesPorUsuario($userId))
+        );
+
+        $totalVencidos = $conteosTiposVencidos['todos'];
+        $totalPendientes = $conteosTiposPendientes['todos'];
+        $totalOcultos = $conteosTiposOcultos['todos'];
         
         // Obtener avisos vencidos (solo visibles) con paginación
         $avisosVencidosQuery = Aviso::with(['user'])
@@ -46,12 +83,15 @@ class AvisoController extends Controller
         if (!$mostrarTodos) {
             $avisosVencidosQuery->visiblesPorUsuario($userId);
         }
+
+        $this->aplicarFiltroTipoAvisos($avisosVencidosQuery, $vencidosTipo);
         
-        $avisosVencidosQuery->orderBy('fecha_aviso', 'desc');
+        $avisosVencidosQuery
+            ->orderByRaw('CASE WHEN avisoable_type = ? THEN 0 ELSE 1 END', [CorreoAvisoPrecio::class])
+            ->orderBy('fecha_aviso', 'desc');
         
-        $totalVencidos = $avisosVencidosQuery->count();
         $avisosVencidos = $avisosVencidosQuery->paginate($perPage, ['*'], 'vencidos_page');
-        $avisosVencidos->appends(['perPage' => $perPage]);
+        $avisosVencidos->appends($appendQuery);
 
         // Obtener avisos pendientes (solo visibles) con paginación
         $avisosPendientesQuery = Aviso::with(['user'])
@@ -62,12 +102,15 @@ class AvisoController extends Controller
         if (!$mostrarTodos) {
             $avisosPendientesQuery->visiblesPorUsuario($userId);
         }
+
+        $this->aplicarFiltroTipoAvisos($avisosPendientesQuery, $pendientesTipo);
         
-        $avisosPendientesQuery->orderBy('fecha_aviso', 'asc');
+        $avisosPendientesQuery
+            ->orderByRaw('CASE WHEN avisoable_type = ? THEN 0 ELSE 1 END', [CorreoAvisoPrecio::class])
+            ->orderBy('fecha_aviso', 'asc');
         
-        $totalPendientes = $avisosPendientesQuery->count();
         $avisosPendientes = $avisosPendientesQuery->paginate($perPage, ['*'], 'pendientes_page');
-        $avisosPendientes->appends(['perPage' => $perPage]);
+        $avisosPendientes->appends($appendQuery);
 
         // Obtener avisos ocultos con paginación
         $avisosOcultosQuery = Aviso::with(['user'])
@@ -77,12 +120,15 @@ class AvisoController extends Controller
         if (!$mostrarTodos) {
             $avisosOcultosQuery->visiblesPorUsuario($userId);
         }
+
+        $this->aplicarFiltroTipoAvisos($avisosOcultosQuery, $ocultosTipo);
         
-        $avisosOcultosQuery->orderBy('fecha_aviso', 'desc');
+        $avisosOcultosQuery
+            ->orderByRaw('CASE WHEN avisoable_type = ? THEN 0 ELSE 1 END', [CorreoAvisoPrecio::class])
+            ->orderBy('fecha_aviso', 'desc');
         
-        $totalOcultos = $avisosOcultosQuery->count();
         $avisosOcultos = $avisosOcultosQuery->paginate($perPage, ['*'], 'ocultos_page');
-        $avisosOcultos->appends(['perPage' => $perPage]);
+        $avisosOcultos->appends($appendQuery);
 
         // Cargar relaciones avisoable solo para avisos que no sean internos
         foreach ([$avisosVencidos, $avisosPendientes, $avisosOcultos] as $avisos) {
@@ -114,7 +160,123 @@ class AvisoController extends Controller
         // Obtener todos los usuarios para el desplegable de crear aviso interno
         $usuarios = User::orderBy('name')->get();
 
-        return view('admin.avisos.index', compact('avisosVencidos', 'avisosPendientes', 'avisosOcultos', 'perPage', 'totalVencidos', 'totalPendientes', 'totalOcultos', 'mostrarTodos', 'usuarios'));
+        return view('admin.avisos.index', compact(
+            'avisosVencidos',
+            'avisosPendientes',
+            'avisosOcultos',
+            'perPage',
+            'totalVencidos',
+            'totalPendientes',
+            'totalOcultos',
+            'mostrarTodos',
+            'usuarios',
+            'vencidosTipo',
+            'pendientesTipo',
+            'ocultosTipo',
+            'avisosTab',
+            'conteosTiposVencidos',
+            'conteosTiposPendientes',
+            'conteosTiposOcultos',
+        ));
+    }
+
+    private function normalizarFiltroTipoAvisos(?string $valor): string
+    {
+        $v = strtolower(trim((string) $valor));
+
+        return in_array($v, self::AVISOS_FILTRO_TIPOS, true) ? $v : 'todos';
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function conteosPorTipoAvisosEnQuery(Builder $queryBase): array
+    {
+        $p = Producto::class;
+        $o = OfertaProducto::class;
+        $c = Chollo::class;
+        $e = CorreoAvisoPrecio::class;
+        $conocidos = [$p, $o, $c, $e];
+
+        $row = (clone $queryBase)
+            ->selectRaw(
+                'COUNT(*) as todos, '.
+                'SUM(CASE WHEN avisoable_type = ? THEN 1 ELSE 0 END) as productos, '.
+                'SUM(CASE WHEN avisoable_type = ? THEN 1 ELSE 0 END) as ofertas, '.
+                'SUM(CASE WHEN avisoable_type = ? THEN 1 ELSE 0 END) as chollos, '.
+                'SUM(CASE WHEN avisoable_type = ? THEN 1 ELSE 0 END) as correos, '.
+                'SUM(CASE WHEN avisoable_type IS NULL OR avisoable_type NOT IN (?,?,?,?) THEN 1 ELSE 0 END) as internos',
+                array_merge([$p, $o, $c, $e], $conocidos)
+            )
+            ->first();
+
+        return [
+            'todos' => (int) ($row->todos ?? 0),
+            'productos' => (int) ($row->productos ?? 0),
+            'ofertas' => (int) ($row->ofertas ?? 0),
+            'chollos' => (int) ($row->chollos ?? 0),
+            'correos' => (int) ($row->correos ?? 0),
+            'internos' => (int) ($row->internos ?? 0),
+        ];
+    }
+
+    private function aplicarFiltroTipoAvisos(Builder $query, string $tipo): void
+    {
+        if ($tipo === 'todos') {
+            return;
+        }
+
+        if ($tipo === 'productos') {
+            $query->where('avisoable_type', Producto::class);
+
+            return;
+        }
+
+        if ($tipo === 'ofertas') {
+            $query->where('avisoable_type', OfertaProducto::class);
+
+            return;
+        }
+
+        if ($tipo === 'chollos') {
+            $query->where('avisoable_type', Chollo::class);
+
+            return;
+        }
+
+        if ($tipo === 'correos') {
+            $query->where('avisoable_type', CorreoAvisoPrecio::class);
+
+            return;
+        }
+
+        $tiposConocidos = [Producto::class, OfertaProducto::class, Chollo::class, CorreoAvisoPrecio::class];
+        $query->where(function ($q) use ($tiposConocidos) {
+            $q->whereNotIn('avisoable_type', $tiposConocidos)
+                ->orWhereNull('avisoable_type');
+        });
+    }
+
+    /**
+     * @return array<string, int|string>
+     */
+    private function avisosIndexQueryAppends(int $perPage, string $vencidosTipo, string $pendientesTipo, string $ocultosTipo, string $avisosTab): array
+    {
+        $q = [
+            'perPage' => $perPage,
+            'avisos_tab' => $avisosTab,
+        ];
+        if ($vencidosTipo !== 'todos') {
+            $q['vencidos_tipo'] = $vencidosTipo;
+        }
+        if ($pendientesTipo !== 'todos') {
+            $q['pendientes_tipo'] = $pendientesTipo;
+        }
+        if ($ocultosTipo !== 'todos') {
+            $q['ocultos_tipo'] = $ocultosTipo;
+        }
+
+        return $q;
     }
 
     public function store(Request $request)

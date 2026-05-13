@@ -115,6 +115,12 @@
             <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Resultados</h2>
             <div id="resultadosLista" class="space-y-4"></div>
         </div>
+
+        <div id="crear-masivo-siguiente-wrap" class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 border border-gray-200 dark:border-gray-700 hidden">
+            <button type="button" id="btnSiguienteOrigenNeo" class="inline-flex items-center bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-6 py-3 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed">
+                Siguiente
+            </button>
+        </div>
     </div>
 
     {{-- Modal para ver imágenes de especificaciones internas --}}
@@ -178,9 +184,37 @@
     {{-- Modal elegir producto (neo aniadida=no) --}}
     <div id="modal-producto-neo" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-2xl w-full max-h-[80vh] flex flex-col border border-gray-200 dark:border-gray-700">
-            <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700 space-y-3">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-700 dark:text-gray-300">
+                        <span>Total URLs disponibles: <strong id="modal-producto-neo-total-urls" class="text-gray-900 dark:text-white">—</strong></span>
+                        <span class="hidden sm:inline text-gray-400 dark:text-gray-500">|</span>
+                        <span class="inline-flex flex-wrap items-center gap-3">
+                            <span class="font-medium text-gray-800 dark:text-gray-200">Tiendas con mostrar</span>
+                            <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                                <input type="checkbox" id="modal-producto-neo-chk-mostrar-si" checked class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                <span>Sí</span>
+                            </label>
+                            <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                                <input type="checkbox" id="modal-producto-neo-chk-mostrar-no" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                <span>No</span>
+                            </label>
+                            <label class="inline-flex items-center gap-1.5 cursor-pointer" title="Solo filas neo sin tienda (desmarca Sí y No). Con Sí o No marcados, también suma enlaces sin tienda.">
+                                <input type="checkbox" id="modal-producto-neo-chk-tienda-null" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                <span>null (<span id="modal-producto-neo-null-count">0</span>)</span>
+                            </label>
+                        </span>
+                    </div>
+                    <button type="button" id="modal-producto-neo-cerrar" class="text-2xl leading-none text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 shrink-0">&times;</button>
+                </div>
+                <details id="modal-producto-neo-details-tiendas-no" class="hidden w-full text-sm text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 rounded-lg open:shadow-sm">
+                    <summary class="cursor-pointer select-none px-3 py-2 font-medium text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-700/50 rounded-lg list-none [&::-webkit-details-marker]:hidden flex items-center gap-2">
+                        <span class="text-gray-400 dark:text-gray-500 text-xs" aria-hidden="true">▸</span>
+                        <span>Elegir tiendas (mostrar «no»)</span>
+                    </summary>
+                    <div id="modal-producto-neo-tiendas-no-lista" class="p-3 max-h-48 overflow-y-auto space-y-1.5 border-t border-gray-200 dark:border-gray-600"></div>
+                </details>
                 <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Elegir producto (neo con añadida=no)</h3>
-                <button type="button" id="modal-producto-neo-cerrar" class="text-2xl leading-none text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">&times;</button>
             </div>
             <div id="modal-producto-neo-lista" class="flex-1 overflow-y-auto p-4 space-y-2">
                 <p class="text-gray-500 dark:text-gray-400 text-sm">Cargando...</p>
@@ -318,6 +352,7 @@
                     <button type="button" id="tab-url-sublinea-cm" class="tab-modal-sublinea-cm border-b-2 border-blue-500 py-2 px-1 text-sm font-medium text-blue-600 dark:text-blue-400">URL</button>
                     <button type="button" id="tab-subir-sublinea-cm" class="tab-modal-sublinea-cm border-b-2 border-transparent py-2 px-1 text-sm font-medium text-gray-500 dark:text-gray-400">Subir</button>
                     <button type="button" id="tab-amazon-sublinea-cm" class="tab-modal-sublinea-cm border-b-2 border-transparent py-2 px-1 text-sm font-medium text-gray-500 dark:text-gray-400">Amazon</button>
+                    <button type="button" id="tab-interna-sublinea-cm" class="tab-modal-sublinea-cm border-b-2 border-transparent py-2 px-1 text-sm font-medium text-gray-500 dark:text-gray-400">Interna</button>
                 </nav>
             </div>
             <div id="content-url-sublinea-cm" class="tab-content-modal-sublinea-cm space-y-4">
@@ -371,6 +406,29 @@
                     <select id="carpeta-amazon-sublinea-cm" class="w-full px-3 py-2 rounded bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white border text-sm">
                         <option value="">Selecciona una carpeta</option>
                     </select>
+                </div>
+            </div>
+            <div id="content-interna-sublinea-cm" class="tab-content-modal-sublinea-cm space-y-4 hidden">
+                <p class="text-sm text-gray-600 dark:text-gray-400">Rutas de imágenes ya subidas (relativas al almacén de imágenes). Solo se guarda la ruta grande en el borrador; la pequeña sirve para comprobar la miniatura.</p>
+                <div class="flex flex-wrap items-start gap-3">
+                    <div class="flex-1 min-w-[220px]">
+                        <label class="block mb-1 text-sm text-gray-600 dark:text-gray-400" for="ruta-interna-grande-sublinea-cm">Ruta imagen grande</label>
+                        <input type="text" id="ruta-interna-grande-sublinea-cm" autocomplete="off" class="w-full px-3 py-2 rounded bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white border text-sm" placeholder="carpeta/archivo.webp">
+                    </div>
+                    <div class="flex-shrink-0">
+                        <span class="block mb-1 text-xs text-gray-500 dark:text-gray-400">Vista previa</span>
+                        <img id="preview-interna-grande-sublinea-cm" src="" alt="" class="hidden w-16 h-16 object-cover rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800">
+                    </div>
+                </div>
+                <div class="flex flex-wrap items-start gap-3">
+                    <div class="flex-1 min-w-[220px]">
+                        <label class="block mb-1 text-sm text-gray-600 dark:text-gray-400" for="ruta-interna-pequena-sublinea-cm">Ruta imagen pequeña</label>
+                        <input type="text" id="ruta-interna-pequena-sublinea-cm" autocomplete="off" class="w-full px-3 py-2 rounded bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white border text-sm" placeholder="carpeta/archivo-thumbnail.webp">
+                    </div>
+                    <div class="flex-shrink-0">
+                        <span class="block mb-1 text-xs text-gray-500 dark:text-gray-400">Vista previa</span>
+                        <img id="preview-interna-pequena-sublinea-cm" src="" alt="" class="hidden w-16 h-16 object-cover rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800">
+                    </div>
                 </div>
             </div>
             <div class="flex justify-end gap-3 mt-6">
@@ -605,54 +663,314 @@
         document.getElementById('mismo-producto-search').value = '';
     });
 
+    function parseRespuestaProductosNeoApi(raw) {
+        if (Array.isArray(raw)) {
+            return { productos: raw, filas_neo_tienda_id_null: 0 };
+        }
+        return {
+            productos: Array.isArray(raw.productos) ? raw.productos : [],
+            filas_neo_tienda_id_null: parseInt(String(raw.filas_neo_tienda_id_null ?? 0), 10) || 0,
+        };
+    }
+
+    function queryMostrarTiendaModalProductoNeo() {
+        const chkSi = document.getElementById('modal-producto-neo-chk-mostrar-si');
+        const chkNo = document.getElementById('modal-producto-neo-chk-mostrar-no');
+        const chkNull = document.getElementById('modal-producto-neo-chk-tienda-null');
+        const si = chkSi && chkSi.checked;
+        const no = chkNo && chkNo.checked;
+        const incluirNull = chkNull && chkNull.checked;
+        let q = 'mostrar_si=' + (si ? '1' : '0') + '&mostrar_no=' + (no ? '1' : '0');
+        if (incluirNull) {
+            q += '&mostrar_null=1';
+        }
+        return q;
+    }
+
+    function esSoloMostrarNoModalProductoNeo() {
+        const si = document.getElementById('modal-producto-neo-chk-mostrar-si');
+        const no = document.getElementById('modal-producto-neo-chk-mostrar-no');
+        return !!(si && no && !si.checked && no.checked);
+    }
+
+    function queryTiendasNoSeleccionadasModalProductoNeo() {
+        if (!esSoloMostrarNoModalProductoNeo()) {
+            return '';
+        }
+        const container = document.getElementById('modal-producto-neo-tiendas-no-lista');
+        if (!container || container.dataset.loaded !== '1') {
+            return '';
+        }
+        const checks = container.querySelectorAll('input[type="checkbox"].modal-producto-neo-tienda-no-cb');
+        const parts = [];
+        checks.forEach(function(c) {
+            if (c.checked) {
+                parts.push('tienda_ids[]=' + encodeURIComponent(c.value));
+            }
+        });
+        return parts.length ? '&' + parts.join('&') : '';
+    }
+
+    function queryModalProductoNeoFiltros() {
+        return queryMostrarTiendaModalProductoNeo() + queryTiendasNoSeleccionadasModalProductoNeo();
+    }
+
+    const urlTplUrlsPorProductoNeo = '{{ route("admin.neo.crear-masivo.urls-por-producto", ["productoId" => "__ID__"]) }}';
+
+    /**
+     * Carga URLs neo + mismo producto (igual que al elegir en el modal Producto).
+     * Deja window.__crearMasivoOrigenNeo = { tipo: 'producto', ... } para el botón Siguiente.
+     */
+    async function aplicarProductoNeoAlFormulario(productoId, filtrosQuery) {
+        const fq = filtrosQuery != null ? filtrosQuery : queryModalProductoNeoFiltros();
+        const resUrl = await fetch(urlTplUrlsPorProductoNeo.replace('__ID__', String(productoId)) + '?' + fq + '&_=' + Date.now(), { cache: 'no-store', headers: { 'Accept': 'application/json' } });
+        const dataUrl = await resUrl.json();
+        const urls = dataUrl.urls || [];
+        const producto = dataUrl.producto;
+        window.__neoCategoriaFiltro = null;
+        actualizarIndicadorCategoriaFiltroNeo();
+        document.getElementById('urls').value = urls.join('\n');
+        actualizarEstadoLotesDesdeTextarea();
+        document.getElementById('mismo_producto').checked = true;
+        document.getElementById('mismo-producto-block').classList.remove('hidden');
+        if (producto) {
+            await seleccionarMismoProducto({ id: producto.id, nombre: producto.nombre, marca: producto.marca, modelo: producto.modelo, talla: producto.talla, texto_completo: producto.texto_completo });
+        }
+        window.__crearMasivoOrigenNeo = { tipo: 'producto', producto_id: productoId, filtrosQuery: fq };
+    }
+
+    async function siguienteProductoNeoCrearMasivo() {
+        const ctx = window.__crearMasivoOrigenNeo;
+        if (!ctx || ctx.tipo !== 'producto' || ctx.filtrosQuery == null) {
+            return;
+        }
+        const urlListado = '{{ route("admin.neo.crear-masivo.productos") }}' + '?' + ctx.filtrosQuery + '&_=' + Date.now();
+        const res = await fetch(urlListado, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
+        const parsedList = parseRespuestaProductosNeoApi(await res.json());
+        const productos = parsedList.productos;
+        if (!Array.isArray(productos) || productos.length === 0) {
+            alert('No quedan productos pendientes con este filtro de tiendas.');
+            return;
+        }
+        const ids = productos.map(function(p) { return parseInt(String(p.producto_id), 10); });
+        const curId = parseInt(String(ctx.producto_id), 10);
+        let idx = ids.indexOf(curId);
+        let nextItem = null;
+        if (idx >= 0 && idx < productos.length - 1) {
+            nextItem = productos[idx + 1];
+        } else if (idx === -1) {
+            nextItem = productos[0];
+        }
+        if (!nextItem) {
+            alert('No hay más productos pendientes con este filtro.');
+            return;
+        }
+        await aplicarProductoNeoAlFormulario(nextItem.producto_id, ctx.filtrosQuery);
+    }
+
+    async function cargarOpcionesTiendasMostrarNoModal() {
+        const container = document.getElementById('modal-producto-neo-tiendas-no-lista');
+        if (!container || container.dataset.loaded === '1') {
+            return;
+        }
+        container.innerHTML = '<p class="text-xs text-gray-500 dark:text-gray-400">Cargando tiendas...</p>';
+        let lista;
+        try {
+            const res = await fetch('{{ route("admin.neo.crear-masivo.tiendas-mostrar-no") }}' + '?_=' + Date.now(), { cache: 'no-store', headers: { 'Accept': 'application/json' } });
+            lista = await res.json();
+        } catch (e) {
+            console.error(e);
+            container.innerHTML = '<p class="text-xs text-red-500">Error al cargar tiendas.</p>';
+            return;
+        }
+        container.innerHTML = '';
+        if (!Array.isArray(lista) || lista.length === 0) {
+            container.innerHTML = '<p class="text-xs text-gray-500 dark:text-gray-400">No hay tiendas con mostrar «no».</p>';
+            container.dataset.loaded = '1';
+            return;
+        }
+        const masterLabel = document.createElement('label');
+        masterLabel.className = 'flex items-center gap-2 cursor-pointer font-medium text-gray-900 dark:text-gray-100 pb-2 mb-1 border-b border-gray-200 dark:border-gray-600';
+        const masterCb = document.createElement('input');
+        masterCb.type = 'checkbox';
+        masterCb.id = 'modal-producto-neo-chk-tiendas-no-todas';
+        masterCb.checked = true;
+        masterCb.className = 'rounded border-gray-300 text-blue-600 focus:ring-blue-500 shrink-0 modal-producto-neo-tiendas-no-master';
+        const masterSpan = document.createElement('span');
+        masterSpan.textContent = 'Todas las tiendas';
+        masterLabel.appendChild(masterCb);
+        masterLabel.appendChild(masterSpan);
+        container.appendChild(masterLabel);
+        masterCb.addEventListener('change', function() {
+            const marcar = masterCb.checked;
+            container.querySelectorAll('input.modal-producto-neo-tienda-no-cb').forEach(function(c) {
+                c.checked = marcar;
+            });
+            recargarListaModalProductoNeo();
+        });
+        lista.forEach(function(t) {
+            const label = document.createElement('label');
+            label.className = 'flex items-center gap-2 cursor-pointer text-gray-800 dark:text-gray-200';
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.value = String(t.id);
+            cb.checked = true;
+            cb.className = 'rounded border-gray-300 text-blue-600 focus:ring-blue-500 modal-producto-neo-tienda-no-cb';
+            cb.addEventListener('change', function() {
+                actualizarMasterTiendasMostrarNoModal();
+                recargarListaModalProductoNeo();
+            });
+            const span = document.createElement('span');
+            span.textContent = t.nombre || ('Tienda #' + t.id);
+            label.appendChild(cb);
+            label.appendChild(span);
+            container.appendChild(label);
+        });
+        container.dataset.loaded = '1';
+    }
+
+    function actualizarMasterTiendasMostrarNoModal() {
+        const master = document.getElementById('modal-producto-neo-chk-tiendas-no-todas');
+        const checks = document.querySelectorAll('#modal-producto-neo-tiendas-no-lista input.modal-producto-neo-tienda-no-cb');
+        if (!master || !checks.length) {
+            return;
+        }
+        master.checked = Array.from(checks).every(function(c) {
+            return c.checked;
+        });
+    }
+
+    async function actualizarVisibilidadPanelTiendasNoModal() {
+        const details = document.getElementById('modal-producto-neo-details-tiendas-no');
+        if (!details) {
+            return;
+        }
+        const soloNo = esSoloMostrarNoModalProductoNeo();
+        details.classList.toggle('hidden', !soloNo);
+        if (soloNo) {
+            details.open = true;
+            await cargarOpcionesTiendasMostrarNoModal();
+        } else {
+            details.open = false;
+        }
+    }
+
+    /**
+     * Si "Sí" sigue marcado y el usuario marca "No", sin esto quedarían los dos marcados
+     * y el backend interpreta "ambos" = sin filtro (mismas URLs que todo).
+     * Regla: al activar "No" mientras "Sí" está activo → solo "No".
+     * Para "ambos": primero deja solo "No", luego marca también "Sí".
+     */
+    function ajustarChecksMostrarTiendaModalProductoNeo(ev) {
+        const t = ev && ev.target ? ev.target.id : '';
+        const si = document.getElementById('modal-producto-neo-chk-mostrar-si');
+        const no = document.getElementById('modal-producto-neo-chk-mostrar-no');
+        if (!si || !no || t !== 'modal-producto-neo-chk-mostrar-no') {
+            return;
+        }
+        if (no.checked && si.checked) {
+            si.checked = false;
+        }
+    }
+
+    async function recargarListaModalProductoNeo() {
+        await actualizarVisibilidadPanelTiendasNoModal();
+        const lista = document.getElementById('modal-producto-neo-lista');
+        const totalEl = document.getElementById('modal-producto-neo-total-urls');
+        const btn = document.getElementById('btnProductoNeo');
+        const modal = document.getElementById('modal-producto-neo');
+        lista.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-sm">Cargando...</p>';
+        if (totalEl) totalEl.textContent = '…';
+        const urlListado = '{{ route("admin.neo.crear-masivo.productos") }}' + '?' + queryModalProductoNeoFiltros() + '&_=' + Date.now();
+        const res = await fetch(urlListado, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
+        const parsedList = parseRespuestaProductosNeoApi(await res.json());
+        const productos = parsedList.productos;
+        const nuloCountEl = document.getElementById('modal-producto-neo-null-count');
+        if (nuloCountEl) {
+            nuloCountEl.textContent = String(parsedList.filas_neo_tienda_id_null);
+        }
+        if (!Array.isArray(productos) || productos.length === 0) {
+            lista.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-sm">No hay productos con filas neo (añadida=no) para este filtro.</p>';
+            if (totalEl) totalEl.textContent = '0';
+            return;
+        }
+        let suma = 0;
+        productos.forEach(function(item) { suma += parseInt(item.count, 10) || 0; });
+        if (totalEl) totalEl.textContent = String(suma);
+        lista.innerHTML = '';
+        productos.forEach(function(item) {
+            const div = document.createElement('div');
+            div.className = 'p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition';
+            div.innerHTML = '<span class="font-medium text-gray-900 dark:text-white">' + (item.texto_completo || 'Producto #' + item.producto_id) + '</span> <span class="text-gray-500 dark:text-gray-400 text-sm">(' + item.count + ' URL' + (item.count !== 1 ? 's' : '') + ')</span>';
+            div.addEventListener('click', async function() {
+                modal.classList.add('hidden');
+                const fq = queryModalProductoNeoFiltros();
+                try {
+                    await aplicarProductoNeoAlFormulario(item.producto_id, fq);
+                } catch (err) {
+                    console.error(err);
+                    alert('Error al cargar URLs: ' + err.message);
+                }
+                btn.disabled = false;
+            });
+            lista.appendChild(div);
+        });
+    }
+
     document.getElementById('btnProductoNeo').addEventListener('click', async function() {
         const btn = this;
         const modal = document.getElementById('modal-producto-neo');
-        const lista = document.getElementById('modal-producto-neo-lista');
+        const chkSiOpen = document.getElementById('modal-producto-neo-chk-mostrar-si');
+        const chkNoOpen = document.getElementById('modal-producto-neo-chk-mostrar-no');
+        const tiendasLista = document.getElementById('modal-producto-neo-tiendas-no-lista');
+        if (tiendasLista) {
+            tiendasLista.innerHTML = '';
+            delete tiendasLista.dataset.loaded;
+        }
+        const detTiendas = document.getElementById('modal-producto-neo-details-tiendas-no');
+        if (detTiendas) {
+            detTiendas.classList.add('hidden');
+            detTiendas.open = false;
+        }
+        if (chkSiOpen) chkSiOpen.checked = true;
+        if (chkNoOpen) chkNoOpen.checked = false;
+        const chkNullOpen = document.getElementById('modal-producto-neo-chk-tienda-null');
+        if (chkNullOpen) chkNullOpen.checked = false;
         btn.disabled = true;
-        lista.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-sm">Cargando...</p>';
         modal.classList.remove('hidden');
         try {
-            const res = await fetch('{{ route("admin.neo.crear-masivo.productos") }}', { headers: { 'Accept': 'application/json' } });
-            const productos = await res.json();
-            if (!Array.isArray(productos) || productos.length === 0) {
-                lista.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-sm">No hay productos con filas neo (añadida=no).</p>';
-                return;
-            }
-            lista.innerHTML = '';
-            productos.forEach(function(item) {
-                const div = document.createElement('div');
-                div.className = 'p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition';
-                div.innerHTML = '<span class="font-medium text-gray-900 dark:text-white">' + (item.texto_completo || 'Producto #' + item.producto_id) + '</span> <span class="text-gray-500 dark:text-gray-400 text-sm">(' + item.count + ' URL' + (item.count !== 1 ? 's' : '') + ')</span>';
-                div.addEventListener('click', async function() {
-                    modal.classList.add('hidden');
-                    try {
-                        const resUrl = await fetch('{{ route("admin.neo.crear-masivo.urls-por-producto", ["productoId" => "__ID__"]) }}'.replace('__ID__', item.producto_id), { headers: { 'Accept': 'application/json' } });
-                        const dataUrl = await resUrl.json();
-                        const urls = dataUrl.urls || [];
-                        const producto = dataUrl.producto;
-                        window.__neoCategoriaFiltro = null;
-                        actualizarIndicadorCategoriaFiltroNeo();
-                        document.getElementById('urls').value = urls.join('\n');
-                        actualizarEstadoLotesDesdeTextarea();
-                        document.getElementById('mismo_producto').checked = true;
-                        document.getElementById('mismo-producto-block').classList.remove('hidden');
-                        if (producto) {
-                            await seleccionarMismoProducto({ id: producto.id, nombre: producto.nombre, marca: producto.marca, modelo: producto.modelo, talla: producto.talla, texto_completo: producto.texto_completo });
-                        }
-                    } catch (err) {
-                        console.error(err);
-                        alert('Error al cargar URLs: ' + err.message);
-                    }
-                    btn.disabled = false;
-                });
-                lista.appendChild(div);
-            });
+            await recargarListaModalProductoNeo();
         } catch (err) {
             console.error(err);
-            lista.innerHTML = '<p class="text-red-500 text-sm">Error al cargar: ' + err.message + '</p>';
+            document.getElementById('modal-producto-neo-lista').innerHTML = '<p class="text-red-500 text-sm">Error al cargar: ' + err.message + '</p>';
+            const totalEl = document.getElementById('modal-producto-neo-total-urls');
+            if (totalEl) totalEl.textContent = '—';
         }
         btn.disabled = false;
+    });
+
+    ['modal-producto-neo-chk-mostrar-si', 'modal-producto-neo-chk-mostrar-no', 'modal-producto-neo-chk-tienda-null'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('change', async function(ev) {
+            if (document.getElementById('modal-producto-neo').classList.contains('hidden')) return;
+            if (id === 'modal-producto-neo-chk-tienda-null' && el.checked) {
+                const si = document.getElementById('modal-producto-neo-chk-mostrar-si');
+                const no = document.getElementById('modal-producto-neo-chk-mostrar-no');
+                if (si) si.checked = false;
+                if (no) no.checked = false;
+            } else if ((id === 'modal-producto-neo-chk-mostrar-si' || id === 'modal-producto-neo-chk-mostrar-no') && el.checked) {
+                const nulo = document.getElementById('modal-producto-neo-chk-tienda-null');
+                if (nulo) nulo.checked = false;
+            }
+            ajustarChecksMostrarTiendaModalProductoNeo(ev);
+            try {
+                await recargarListaModalProductoNeo();
+            } catch (err) {
+                console.error(err);
+                document.getElementById('modal-producto-neo-lista').innerHTML = '<p class="text-red-500 text-sm">Error al cargar: ' + err.message + '</p>';
+            }
+        });
     });
 
     document.getElementById('modal-producto-neo-cerrar').addEventListener('click', function() {
@@ -700,6 +1018,17 @@
         });
     }
 
+    function htmlEtiquetasTiendaRestringidaNeo(item) {
+        var parts = [];
+        if (String(item.mostrar_tienda || '').toLowerCase() === 'no') {
+            parts.push('<span class="text-red-600 dark:text-red-400 text-xs font-semibold ml-1">no mostrar</span>');
+        }
+        if (String(item.scrapear || '').toLowerCase() === 'no') {
+            parts.push('<span class="text-red-600 dark:text-red-400 text-xs font-semibold ml-1">no scrapear</span>');
+        }
+        return parts.length ? ' ' + parts.join(' ') : '';
+    }
+
     async function renderTiendasDeCategoriaModalNeo(item) {
         const lista = document.getElementById('modal-categoria-neo-lista');
         estadoModalCategoriaNeo.categoriaSeleccionada = item;
@@ -716,7 +1045,7 @@
             tiendas.forEach(function(tienda) {
                 const div = document.createElement('div');
                 div.className = 'p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition';
-                div.innerHTML = '<span class="font-medium text-gray-900 dark:text-white">' + (tienda.nombre || ('Tienda #' + tienda.tienda_id)) + '</span> <span class="text-gray-500 dark:text-gray-400 text-sm">(' + tienda.count + ' URL' + (tienda.count !== 1 ? 's' : '') + ')</span>';
+                div.innerHTML = '<span class="font-medium text-gray-900 dark:text-white">' + (tienda.nombre || ('Tienda #' + tienda.tienda_id)) + '</span>' + htmlEtiquetasTiendaRestringidaNeo(tienda) + ' <span class="text-gray-500 dark:text-gray-400 text-sm">(' + tienda.count + ' URL' + (tienda.count !== 1 ? 's' : '') + ')</span>';
                 div.addEventListener('click', async function() {
                     try {
                         const resUrl = await fetch('{{ route("admin.neo.crear-masivo.urls-por-categoria-tienda", ["categoriaId" => "__CID__", "tiendaId" => "__TID__"]) }}'.replace('__CID__', item.categoria_id).replace('__TID__', tienda.tienda_id), { headers: { 'Accept': 'application/json' } });
@@ -724,6 +1053,8 @@
                         window.__neoCategoriaFiltro = { id: item.categoria_id, nombre: item.nombre || ('Categoría #' + item.categoria_id) };
                         actualizarIndicadorCategoriaFiltroNeo();
                         pegarUrlsEnTextareaCrearMasivo(dataUrl.urls || []);
+                        window.__crearMasivoOrigenNeo = null;
+                        actualizarVisibilidadFooterSiguienteNeo();
                         document.getElementById('modal-categoria-neo').classList.add('hidden');
                     } catch (err) {
                         console.error(err);
@@ -740,6 +1071,8 @@
 
     document.getElementById('btnCategoriaNeo').addEventListener('click', async function() {
         const btn = this;
+        window.__crearMasivoOrigenNeo = null;
+        actualizarVisibilidadFooterSiguienteNeo();
         const modal = document.getElementById('modal-categoria-neo');
         const lista = document.getElementById('modal-categoria-neo-lista');
         btn.disabled = true;
@@ -811,7 +1144,7 @@
         tiendas.forEach(function(item) {
             const div = document.createElement('div');
             div.className = 'p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition';
-            div.innerHTML = '<span class="font-medium text-gray-900 dark:text-white">' + (item.nombre || 'Tienda #' + item.tienda_id) + '</span> <span class="text-gray-500 dark:text-gray-400 text-sm">(' + item.count + ' URL' + (item.count !== 1 ? 's' : '') + ')</span>';
+            div.innerHTML = '<span class="font-medium text-gray-900 dark:text-white">' + (item.nombre || 'Tienda #' + item.tienda_id) + '</span>' + htmlEtiquetasTiendaRestringidaNeo(item) + ' <span class="text-gray-500 dark:text-gray-400 text-sm">(' + item.count + ' URL' + (item.count !== 1 ? 's' : '') + ')</span>';
             div.addEventListener('click', async function() {
                 await renderCategoriasDeTiendaModalNeo(item);
             });
@@ -819,28 +1152,97 @@
         });
     }
 
+    /**
+     * Pega URLs desde neo por tienda (opcionalmente por categoría) y guarda contexto para Siguiente.
+     */
+    async function aplicarTiendaNeoUrlsAlFormulario(item, categoriaId, categoriaNombre) {
+        const routeBase = categoriaId == null
+            ? '{{ route("admin.neo.crear-masivo.urls-por-tienda", ["tiendaId" => "__TID__"]) }}'.replace('__TID__', item.tienda_id)
+            : '{{ route("admin.neo.crear-masivo.urls-por-tienda-categoria", ["tiendaId" => "__TID__", "categoriaId" => "__CID__"]) }}'.replace('__TID__', item.tienda_id).replace('__CID__', categoriaId);
+        const resUrl = await fetch(routeBase, { headers: { 'Accept': 'application/json' } });
+        const dataUrl = await resUrl.json();
+        if (categoriaId == null) {
+            window.__neoCategoriaFiltro = null;
+        } else {
+            window.__neoCategoriaFiltro = {
+                id: categoriaId,
+                nombre: (categoriaNombre && String(categoriaNombre).trim()) ? categoriaNombre : ('Categoría #' + categoriaId),
+            };
+        }
+        actualizarIndicadorCategoriaFiltroNeo();
+        pegarUrlsEnTextareaCrearMasivo(dataUrl.urls || []);
+        window.__crearMasivoOrigenNeo = {
+            tipo: 'tienda',
+            tienda_id: item.tienda_id,
+            categoria_id: categoriaId == null ? null : categoriaId,
+            categoria_nombre: categoriaId == null ? null : ((categoriaNombre && String(categoriaNombre).trim()) ? categoriaNombre : ('Categoría #' + categoriaId)),
+        };
+    }
+
     async function cargarUrlsDeTiendaYCerrarModal(item, categoriaId, categoriaNombre) {
         const modal = document.getElementById('modal-tienda-neo');
         try {
-            const routeBase = categoriaId == null
-                ? '{{ route("admin.neo.crear-masivo.urls-por-tienda", ["tiendaId" => "__TID__"]) }}'.replace('__TID__', item.tienda_id)
-                : '{{ route("admin.neo.crear-masivo.urls-por-tienda-categoria", ["tiendaId" => "__TID__", "categoriaId" => "__CID__"]) }}'.replace('__TID__', item.tienda_id).replace('__CID__', categoriaId);
-            const resUrl = await fetch(routeBase, { headers: { 'Accept': 'application/json' } });
-            const dataUrl = await resUrl.json();
-            if (categoriaId == null) {
-                window.__neoCategoriaFiltro = null;
-            } else {
-                window.__neoCategoriaFiltro = {
-                    id: categoriaId,
-                    nombre: (categoriaNombre && String(categoriaNombre).trim()) ? categoriaNombre : ('Categoría #' + categoriaId),
-                };
-            }
-            actualizarIndicadorCategoriaFiltroNeo();
-            pegarUrlsEnTextareaCrearMasivo(dataUrl.urls || []);
+            await aplicarTiendaNeoUrlsAlFormulario(item, categoriaId, categoriaNombre);
             modal.classList.add('hidden');
         } catch (err) {
             console.error(err);
             alert('Error al cargar URLs: ' + err.message);
+        }
+    }
+
+    async function siguienteTiendaNeoCrearMasivo() {
+        const ctx = window.__crearMasivoOrigenNeo;
+        if (!ctx || ctx.tipo !== 'tienda') {
+            return;
+        }
+        const urlTiendas = '{{ route("admin.neo.crear-masivo.tiendas") }}' + '?_=' + Date.now();
+        const resTiendas = await fetch(urlTiendas, { headers: { 'Accept': 'application/json' } });
+        const tiendas = await resTiendas.json();
+        if (!Array.isArray(tiendas) || tiendas.length === 0) {
+            alert('No quedan tiendas pendientes.');
+            return;
+        }
+        const tidCur = parseInt(String(ctx.tienda_id), 10);
+        const tidIndex = tiendas.findIndex(function(t) { return parseInt(String(t.tienda_id), 10) === tidCur; });
+        const curTienda = tidIndex >= 0 ? tiendas[tidIndex] : null;
+        const preferredCat = ctx.categoria_id != null ? parseInt(String(ctx.categoria_id), 10) : null;
+
+        if (preferredCat != null && curTienda) {
+            const resCat = await fetch('{{ route("admin.neo.crear-masivo.categorias-por-tienda", ["tiendaId" => "__ID__"]) }}'.replace('__ID__', curTienda.tienda_id), { headers: { 'Accept': 'application/json' } } );
+            const rawCats = await resCat.json();
+            const cats = Array.isArray(rawCats) ? rawCats : [];
+            const ci = cats.findIndex(function(c) { return parseInt(String(c.categoria_id), 10) === preferredCat; });
+            if (ci >= 0 && ci < cats.length - 1) {
+                const nextCat = cats[ci + 1];
+                await aplicarTiendaNeoUrlsAlFormulario(curTienda, nextCat.categoria_id, nextCat.nombre);
+                return;
+            }
+        }
+
+        let nextIdx = tidIndex + 1;
+        if (tidIndex < 0) {
+            nextIdx = 0;
+        }
+        if (nextIdx >= tiendas.length) {
+            alert('No hay más tiendas ni categorías pendientes en este recorrido.');
+            return;
+        }
+        const nextTienda = tiendas[nextIdx];
+
+        if (preferredCat == null) {
+            await aplicarTiendaNeoUrlsAlFormulario(nextTienda, null, null);
+            return;
+        }
+
+        const resCat2 = await fetch('{{ route("admin.neo.crear-masivo.categorias-por-tienda", ["tiendaId" => "__ID__"]) }}'.replace('__ID__', nextTienda.tienda_id), { headers: { 'Accept': 'application/json' } } );
+        const rawCats2 = await resCat2.json();
+        const cats2 = Array.isArray(rawCats2) ? rawCats2 : [];
+        if (cats2.length > 0) {
+            const match = cats2.find(function(c) { return parseInt(String(c.categoria_id), 10) === preferredCat; });
+            const pick = match || cats2[0];
+            await aplicarTiendaNeoUrlsAlFormulario(nextTienda, pick.categoria_id, pick.nombre);
+        } else {
+            await aplicarTiendaNeoUrlsAlFormulario(nextTienda, null, null);
         }
     }
 
@@ -915,6 +1317,13 @@
         document.getElementById('modal-tienda-neo').classList.add('hidden');
     });
 
+    const btnSiguienteOrigenNeo = document.getElementById('btnSiguienteOrigenNeo');
+    if (btnSiguienteOrigenNeo) {
+        btnSiguienteOrigenNeo.addEventListener('click', function() {
+            ejecutarSiguienteOrigenNeoCrearMasivo();
+        });
+    }
+
     document.getElementById('usar_chatgpt').addEventListener('change', function() {
         const opciones = document.getElementById('chatgpt_opciones');
         if (this.checked) {
@@ -937,7 +1346,7 @@
         const lote = obtenerLoteSegunCantidad(repetirUltimo);
         if (!lote || !Array.isArray(lote.urls) || lote.urls.length === 0) {
             alert(repetirUltimo ? 'No hay un lote previo para repetir.' : 'No quedan URLs pendientes por analizar.');
-            return;
+            return false;
         }
         const btn = document.getElementById('btnAnalizar');
         btn.disabled = true;
@@ -1018,11 +1427,13 @@
                 if (!lote.repetir) estadoLotesAnalisis.cursor = lote.end;
                 mostrarResultados(data.resultados);
                 actualizarEstadoLotesDesdeTextarea();
-            } else {
-                alert(data.message || 'Error al analizar');
+                return true;
             }
+            alert(data.message || 'Error al analizar');
+            return false;
         } catch (err) {
             alert('Error de conexión: ' + err.message);
+            return false;
         } finally {
             btn.disabled = false;
             if (btnRepetir) btnRepetir.disabled = false;
@@ -1054,6 +1465,70 @@
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
+    }
+
+    /** Texto para el input de envío (€) según envio_sugerido del análisis; vacío si gratis / sin dato (no 0). */
+    function textoEnvioInputDesdeRowCrearMasivo(row) {
+        if (!row || row.envio_sugerido == null || row.envio_sugerido === '') return '';
+        const n = parseFloat(row.envio_sugerido);
+        if (!isFinite(n) || n <= 0) return '';
+        const rounded = Math.round(n * 100) / 100;
+        let s = String(rounded);
+        if (s.indexOf('.') !== -1) {
+            s = s.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+        }
+        return s.replace('.', ',');
+    }
+
+    function aplicarEnvioInputAlBodyCrearMasivo(div, body) {
+        const inp = div.querySelector('.cm-envio-oferta-input');
+        if (!inp) return;
+        const t = (inp.value || '').trim().replace(',', '.');
+        if (t === '') {
+            body.envio = null;
+            return;
+        }
+        const v = parseFloat(t);
+        if (isFinite(v) && v > 0) {
+            body.envio = Math.round(v * 100) / 100;
+        } else {
+            body.envio = null;
+        }
+    }
+
+    function actualizarValorEnvioInputEnFilaCrearMasivo(div) {
+        const inp = div.querySelector('.cm-envio-oferta-input');
+        if (!inp || !div.__rowData) return;
+        inp.value = textoEnvioInputDesdeRowCrearMasivo(div.__rowData);
+    }
+
+    function ponerMensajeGeneradoPendienteCrearMasivo(div) {
+        if (!div || div.__rowData?.ofertaGenerada) return;
+        const msg = div.querySelector('.generado-msg');
+        if (!msg) return;
+        msg.classList.remove('hidden');
+        msg.className = 'mt-2 generado-msg text-sm font-medium text-gray-600 dark:text-gray-400';
+        msg.textContent = 'URL pendiente de añadir';
+    }
+
+    /** Reemplaza el botón «Generar oferta»: icono editar a la izquierda y resumen envío/precio a la derecha (misma fila que el input de envío debajo). */
+    function crearWrapEditarOfertaConResumenCrearMasivo(editUrl, envioVal, precioVal) {
+        const wrap = document.createElement('div');
+        wrap.className = 'flex items-center gap-2 flex-wrap';
+        const btnEditar = document.createElement('a');
+        btnEditar.href = editUrl;
+        btnEditar.target = '_blank';
+        btnEditar.rel = 'noopener noreferrer';
+        btnEditar.className = 'inline-flex items-center justify-center shrink-0 p-1.5 rounded bg-blue-600 hover:bg-blue-700 text-white transition';
+        btnEditar.title = 'Editar oferta';
+        btnEditar.setAttribute('aria-label', 'Editar oferta');
+        btnEditar.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>';
+        const infoSpan = document.createElement('span');
+        infoSpan.className = 'text-sm text-gray-600 dark:text-gray-400 min-w-0';
+        infoSpan.textContent = envioVal + (precioVal ? ' · ' + precioVal : '');
+        wrap.appendChild(btnEditar);
+        wrap.appendChild(infoSpan);
+        return wrap;
     }
 
     function extraerPalabrasSlugDesdeUrlCrearMasivo(url) {
@@ -1319,6 +1794,134 @@
         return m;
     }
 
+    let generacionesOfertaEnCursoCrearMasivo = 0;
+
+    /** Con recorrido Neo activo: mientras queden URLs del textarea sin analizar, el pie es «Siguientes URLs»; si no, «Siguiente producto/tienda». */
+    function textoBotonSiguienteFooterNeoSinGenerarCrearMasivo() {
+        const ctx = window.__crearMasivoOrigenNeo;
+        if (!ctx || (ctx.tipo !== 'producto' && ctx.tipo !== 'tienda')) return 'Siguiente';
+        actualizarEstadoLotesDesdeTextarea();
+        const pend = Math.max(estadoLotesAnalisis.urls.length - estadoLotesAnalisis.cursor, 0);
+        if (pend > 0) return 'Siguientes URLs';
+        return ctx.tipo === 'producto' ? 'Siguiente producto' : 'Siguiente tienda';
+    }
+
+    function marcarInicioGeneracionOfertaCrearMasivo() {
+        generacionesOfertaEnCursoCrearMasivo++;
+        aplicarEstadoBotonSiguienteSegunGeneracionCrearMasivo();
+    }
+
+    function marcarFinGeneracionOfertaCrearMasivo() {
+        generacionesOfertaEnCursoCrearMasivo = Math.max(0, generacionesOfertaEnCursoCrearMasivo - 1);
+        aplicarEstadoBotonSiguienteSegunGeneracionCrearMasivo();
+    }
+
+    /** Deshabilita «Siguiente producto/tienda» en gris con texto «Generando» mientras haya creación de oferta en curso. */
+    function aplicarEstadoBotonSiguienteSegunGeneracionCrearMasivo() {
+        const btn = document.getElementById('btnSiguienteOrigenNeo');
+        const wrap = document.getElementById('crear-masivo-siguiente-wrap');
+        if (!btn || !wrap || wrap.classList.contains('hidden')) return;
+        const ctx = window.__crearMasivoOrigenNeo;
+        if (!ctx || (ctx.tipo !== 'producto' && ctx.tipo !== 'tienda')) return;
+        if (generacionesOfertaEnCursoCrearMasivo > 0) {
+            btn.disabled = true;
+            btn.textContent = 'Generando';
+            btn.classList.remove('bg-emerald-600', 'hover:bg-emerald-700');
+            btn.classList.add('bg-gray-400', 'hover:bg-gray-500');
+            return;
+        }
+        btn.disabled = false;
+        btn.textContent = textoBotonSiguienteFooterNeoSinGenerarCrearMasivo();
+        btn.classList.remove('bg-gray-400', 'hover:bg-gray-500');
+        btn.classList.add('bg-emerald-600', 'hover:bg-emerald-700');
+    }
+
+    function actualizarVisibilidadFooterSiguienteNeo() {
+        const wrap = document.getElementById('crear-masivo-siguiente-wrap');
+        const btn = document.getElementById('btnSiguienteOrigenNeo');
+        if (!wrap) return;
+        const ctx = window.__crearMasivoOrigenNeo;
+        if (!ctx || (ctx.tipo !== 'producto' && ctx.tipo !== 'tienda')) {
+            wrap.classList.add('hidden');
+            return;
+        }
+        wrap.classList.remove('hidden');
+        aplicarEstadoBotonSiguienteSegunGeneracionCrearMasivo();
+    }
+
+    function scrollCrearMasivoAlFormularioUrls() {
+        const el = document.getElementById('urls');
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    /** Desplaza a la primera fila del bloque de resultados (p. ej. tras «Siguientes URLs»). */
+    function scrollCrearMasivoAPrimerResultadoAnalisis() {
+        requestAnimationFrame(function() {
+            const lista = document.getElementById('resultadosLista');
+            const first = lista && lista.firstElementChild;
+            if (first && typeof first.scrollIntoView === 'function') {
+                first.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                return;
+            }
+            const res = document.getElementById('resultados');
+            if (res && !res.classList.contains('hidden') && typeof res.scrollIntoView === 'function') {
+                res.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+    }
+
+    async function ejecutarSiguienteOrigenNeoCrearMasivo() {
+        const ctx = window.__crearMasivoOrigenNeo;
+        const btn = document.getElementById('btnSiguienteOrigenNeo');
+        if (!ctx || (ctx.tipo !== 'producto' && ctx.tipo !== 'tienda')) {
+            alert('No hay un recorrido activo desde Producto o Tienda. Usa esos botones arriba para cargar URLs y analizar.');
+            return;
+        }
+        actualizarEstadoLotesDesdeTextarea();
+        const pendientesUrls = Math.max(estadoLotesAnalisis.urls.length - estadoLotesAnalisis.cursor, 0);
+        if (pendientesUrls > 0) {
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = 'Analizando...';
+            }
+            try {
+                const analisisOk = await ejecutarAnalisisLote(false);
+                if (analisisOk) {
+                    scrollCrearMasivoAPrimerResultadoAnalisis();
+                }
+            } catch (err) {
+                console.error(err);
+                alert((err && err.message) ? err.message : 'Error al analizar URLs.');
+            } finally {
+                if (btn) btn.disabled = false;
+                actualizarVisibilidadFooterSiguienteNeo();
+            }
+            return;
+        }
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = 'Cargando...';
+        }
+        try {
+            if (ctx.tipo === 'producto') {
+                await siguienteProductoNeoCrearMasivo();
+            } else {
+                await siguienteTiendaNeoCrearMasivo();
+            }
+            const resDiv = document.getElementById('resultados');
+            const listaDiv = document.getElementById('resultadosLista');
+            if (listaDiv) listaDiv.innerHTML = '';
+            if (resDiv) resDiv.classList.add('hidden');
+            actualizarVisibilidadFooterSiguienteNeo();
+            scrollCrearMasivoAlFormularioUrls();
+        } catch (err) {
+            console.error(err);
+            alert((err && err.message) ? err.message : 'Error al cargar el siguiente.');
+        } finally {
+            actualizarVisibilidadFooterSiguienteNeo();
+        }
+    }
+
     function mostrarResultados(resultados) {
         const contenedor = document.getElementById('resultadosLista');
         contenedor.innerHTML = '';
@@ -1442,6 +2045,10 @@
                                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
                                 Generar oferta
                             </button>
+                            <label class="inline-flex flex-col gap-0.5 text-xs text-gray-600 dark:text-gray-300 shrink-0">
+                                <span>Envío (€)</span>
+                                <input type="text" class="cm-envio-oferta-input w-[5.5rem] px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm" value="${escapeHtmlCrearMasivo(textoEnvioInputDesdeRowCrearMasivo(r))}" autocomplete="off" inputmode="decimal" />
+                            </label>
                             ${permitirCheckPrecioCero ? `
                             <label class="generar-sin-precio-wrap inline-flex items-start gap-2 cursor-pointer text-xs text-amber-700 dark:text-amber-300">
                                 <input type="checkbox" class="generar-sin-precio-cb mt-0.5 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
@@ -1453,7 +2060,7 @@
                     </div>
                     ` : ''}
                 </div>
-                <div class="mt-2 generado-msg hidden text-sm font-medium"></div>
+                ${puedeCrear ? '<div class="mt-2 generado-msg text-sm font-medium text-gray-600 dark:text-gray-400">URL pendiente de añadir</div>' : '<div class="mt-2 generado-msg hidden text-sm font-medium"></div>'}
             `;
 
             const claveGr = claveGrupoProductoSugeridoCrearMasivo(r);
@@ -1691,6 +2298,8 @@
                     btnGen.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> Creando...';
 
                     try {
+                        marcarInicioGeneracionOfertaCrearMasivo();
+                        const msgEl = div.querySelector('.generado-msg');
                         // Validar que si hay especificaciones internas, cada grupo tenga al menos una opción marcada
                         const specLines = div.querySelectorAll('.spec-line');
                         if (specLines.length) {
@@ -1755,6 +2364,7 @@
                                     actualizarEstadoBotonGenerar(div);
                                     btnGen.innerHTML = '<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg> Generar oferta';
                                     console.log('[MismasEspecs] HTML insertado correctamente, ofertas:', dupData.ofertas.length);
+                                    ponerMensajeGeneradoPendienteCrearMasivo(div);
                                     return;
                                 } else {
                                     console.log('[MismasEspecs] No se insertó HTML. Razón: container=' + !!container + ', success=' + dupData.success + ', ofertas length=' + (dupData.ofertas?.length ?? 'N/A'));
@@ -1772,6 +2382,7 @@
                             tienda_id: btnGen.dataset.tiendaId,
                             especificaciones_internas: especs ? JSON.stringify(especs) : null,
                         };
+                        aplicarEnvioInputAlBodyCrearMasivo(div, body);
                         const cbGenerarSinPrecio = div.querySelector('.generar-sin-precio-cb');
                         if (cbGenerarSinPrecio && cbGenerarSinPrecio.checked) {
                             body.generar_sin_precio = true;
@@ -1803,7 +2414,6 @@
                             logCrearOfertaBulkDiagnostico('[CrearOfertaBulk]', res2, responseText, data2);
                         }
 
-                        const msgEl = div.querySelector('.generado-msg');
                         msgEl.classList.remove('hidden');
                         if (data2.success) {
                             // Marcar visualmente la fila como "procesada": pasar de verde a gris claro solo en esta URL
@@ -1815,20 +2425,9 @@
                             msgEl.className = 'mt-2 generado-msg text-sm font-medium text-green-600 dark:text-green-400';
                             msgEl.textContent = 'Oferta creada correctamente (ID: ' + data2.oferta_id + ')';
                             if (data2.oferta_edit_url) {
-                                const wrap = document.createElement('div');
-                                wrap.className = 'flex items-center gap-3';
                                 const envioVal = data2.envio != null && data2.envio !== '' ? parseFloat(data2.envio).toFixed(2).replace('.', ',') + ' € env.' : 'gratis';
                                 const precioVal = data2.precio_unidad != null ? parseFloat(data2.precio_unidad).toFixed(2).replace('.', ',') + ' €/ud' : '';
-                                const infoSpan = document.createElement('span');
-                                infoSpan.className = 'text-sm text-gray-600 dark:text-gray-400';
-                                infoSpan.textContent = envioVal + (precioVal ? ' · ' + precioVal : '');
-                                const btnEditar = document.createElement('a');
-                                btnEditar.href = data2.oferta_edit_url;
-                                btnEditar.target = '_blank';
-                                btnEditar.className = 'inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded transition';
-                                btnEditar.innerHTML = '<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>Editar oferta';
-                                wrap.appendChild(infoSpan);
-                                wrap.appendChild(btnEditar);
+                                const wrap = crearWrapEditarOfertaConResumenCrearMasivo(data2.oferta_edit_url, envioVal, precioVal);
                                 btnGen.parentNode.replaceChild(wrap, btnGen);
                             } else {
                                 btnGen.remove();
@@ -1861,20 +2460,9 @@
                                     msgEl.className = 'mt-2 generado-msg text-sm font-medium text-green-600 dark:text-green-400';
                                     msgEl.textContent = 'Oferta creada con precio 0 (ID: ' + data3.oferta_id + ')';
                                     if (data3.oferta_edit_url) {
-                                        const wrap = document.createElement('div');
-                                        wrap.className = 'flex items-center gap-3';
                                         const envioVal = data3.envio != null && data3.envio !== '' ? parseFloat(data3.envio).toFixed(2).replace('.', ',') + ' € env.' : 'gratis';
                                         const precioVal = data3.precio_unidad != null ? parseFloat(data3.precio_unidad).toFixed(2).replace('.', ',') + ' €/ud' : '0 €/ud';
-                                        const infoSpan = document.createElement('span');
-                                        infoSpan.className = 'text-sm text-gray-600 dark:text-gray-400';
-                                        infoSpan.textContent = envioVal + (precioVal ? ' · ' + precioVal : '');
-                                        const btnEditar = document.createElement('a');
-                                        btnEditar.href = data3.oferta_edit_url;
-                                        btnEditar.target = '_blank';
-                                        btnEditar.className = 'inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded transition';
-                                        btnEditar.innerHTML = '<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>Editar oferta';
-                                        wrap.appendChild(infoSpan);
-                                        wrap.appendChild(btnEditar);
+                                        const wrap = crearWrapEditarOfertaConResumenCrearMasivo(data3.oferta_edit_url, envioVal, precioVal);
                                         btnGen.parentNode.replaceChild(wrap, btnGen);
                                     } else { btnGen.remove(); }
                                 } else {
@@ -1897,10 +2485,13 @@
                         div.querySelector('.generado-msg').textContent = 'Error: ' + err.message;
                         btnGen.disabled = false;
                         btnGen.innerHTML = '<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg> Generar oferta';
+                    } finally {
+                        marcarFinGeneracionOfertaCrearMasivo();
                     }
                 });
             }
         });
+        actualizarVisibilidadFooterSiguienteNeo();
     }
 
     async function buscarProductosCrearMasivo(div, query) {
@@ -2117,10 +2708,12 @@
             const permitirCheckPrecioCero = !!r.tienda && !tiendaNoMostrar && !tiendaNoScraping;
             const btnWrap = document.createElement('div');
             btnWrap.className = 'acciones-url-wrap flex-shrink-0 flex items-start gap-3';
-            btnWrap.innerHTML = '<button type="button" class="btn-descartar-url ' + (mostrarBotonDescartar ? '' : 'hidden ') + 'inline-flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded transition" data-url="' + urlFila + '"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 7h12M9 7V5h6v2m-7 4v6m4-6v6"></path></svg>Descartar URL</button><div class="generar-oferta-wrap flex flex-col items-start gap-2"><button type="button" class="btn-generar inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded transition" data-url="' + (r.url_normalizada || r.url) + '" data-producto-id="' + producto.id + '" data-tienda-id="' + r.tienda.id + '"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg> Generar oferta</button>' + (permitirCheckPrecioCero ? '<label class="generar-sin-precio-wrap inline-flex items-start gap-2 cursor-pointer text-xs text-amber-700 dark:text-amber-300"><input type="checkbox" class="generar-sin-precio-cb mt-0.5 rounded border-gray-300 text-amber-600 focus:ring-amber-500"><span>Precio 0</span></label>' : '') + '</div>';
+            const envioLabelHtml = '<label class="inline-flex flex-col gap-0.5 text-xs text-gray-600 dark:text-gray-300 shrink-0"><span>Envío (€)</span><input type="text" class="cm-envio-oferta-input w-[5.5rem] px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm" value="' + escapeHtmlCrearMasivo(textoEnvioInputDesdeRowCrearMasivo(r)) + '" autocomplete="off" inputmode="decimal" /></label>';
+            btnWrap.innerHTML = '<button type="button" class="btn-descartar-url ' + (mostrarBotonDescartar ? '' : 'hidden ') + 'inline-flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded transition" data-url="' + urlFila + '"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 7h12M9 7V5h6v2m-7 4v6m4-6v6"></path></svg>Descartar URL</button><div class="generar-oferta-wrap flex flex-col items-start gap-2"><button type="button" class="btn-generar inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded transition" data-url="' + (r.url_normalizada || r.url) + '" data-producto-id="' + producto.id + '" data-tienda-id="' + r.tienda.id + '"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg> Generar oferta</button>' + envioLabelHtml + (permitirCheckPrecioCero ? '<label class="generar-sin-precio-wrap inline-flex items-start gap-2 cursor-pointer text-xs text-amber-700 dark:text-amber-300"><input type="checkbox" class="generar-sin-precio-cb mt-0.5 rounded border-gray-300 text-amber-600 focus:ring-amber-500"><span>Precio 0</span></label>' : '') + '</div>';
             div.querySelector('.flex.justify-between').appendChild(btnWrap);
             const btnGen = div.querySelector('.btn-generar');
             actualizarEstadoBotonGenerar(div);
+            ponerMensajeGeneradoPendienteCrearMasivo(div);
             if (!tieneEspecs) {
                 setTimeout(function() { buscarOfertasMismasEspecsYMostrar(div); }, 300);
             }
@@ -2131,6 +2724,8 @@
                 btn.disabled = true;
                 btn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> Creando...';
                 try {
+                    marcarInicioGeneracionOfertaCrearMasivo();
+                    const msgEl = div.querySelector('.generado-msg');
                     // Validar que si hay especificaciones internas, cada grupo tenga al menos una opción marcada
                     const specLines = div.querySelectorAll('.spec-line');
                     if (specLines.length) {
@@ -2194,6 +2789,7 @@
                                 actualizarEstadoBotonGenerar(div);
                                 btn.innerHTML = '<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg> Generar oferta';
                                 console.log('[MismasEspecs-B] HTML insertado, ofertas:', dupData.ofertas.length);
+                                ponerMensajeGeneradoPendienteCrearMasivo(div);
                                 return;
                             } else {
                                 console.log('[MismasEspecs-B] No se insertó. container=' + !!container + ', success=' + dupData.success + ', length=' + (dupData.ofertas?.length ?? 'N/A'));
@@ -2206,6 +2802,7 @@
                     }
 
                     const body = { url: btn.dataset.url, producto_id: btn.dataset.productoId, tienda_id: btn.dataset.tiendaId, especificaciones_internas: especsPayload ? JSON.stringify(especsPayload) : null };
+                    aplicarEnvioInputAlBodyCrearMasivo(div, body);
                     const cbGenerarSinPrecioB = div.querySelector('.generar-sin-precio-cb');
                     if (cbGenerarSinPrecioB && cbGenerarSinPrecioB.checked) body.generar_sin_precio = true;
                     const res2 = await fetch('{{ route("admin.ofertas.crear-masivo.crear") }}', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content, 'Accept': 'application/json' }, body: JSON.stringify(body) });
@@ -2215,7 +2812,6 @@
                     if (!data2.success || res2.status >= 400) {
                         logCrearOfertaBulkDiagnostico('[CrearOfertaBulk-B]', res2, res2TextB, data2);
                     }
-                    const msgEl = div.querySelector('.generado-msg');
                     msgEl.classList.remove('hidden');
                     if (data2.success) {
                         const wrapSinPrecioB = div.querySelector('.generar-sin-precio-wrap');
@@ -2229,20 +2825,9 @@
                         msgEl.className = 'mt-2 generado-msg text-sm font-medium text-green-600 dark:text-green-400';
                         msgEl.textContent = 'Oferta creada correctamente (ID: ' + (data2.oferta_id || '') + ')';
                         if (data2.oferta_edit_url) {
-                            const wrap = document.createElement('div');
-                            wrap.className = 'flex items-center gap-3';
                             const envioVal = data2.envio != null && data2.envio !== '' ? parseFloat(data2.envio).toFixed(2).replace('.', ',') + ' € env.' : 'gratis';
                             const precioVal = data2.precio_unidad != null ? parseFloat(data2.precio_unidad).toFixed(2).replace('.', ',') + ' €/ud' : '';
-                            const infoSpan = document.createElement('span');
-                            infoSpan.className = 'text-sm text-gray-600 dark:text-gray-400';
-                            infoSpan.textContent = envioVal + (precioVal ? ' · ' + precioVal : '');
-                            const btnEditar = document.createElement('a');
-                            btnEditar.href = data2.oferta_edit_url;
-                            btnEditar.target = '_blank';
-                            btnEditar.className = 'inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded transition';
-                            btnEditar.innerHTML = '<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>Editar oferta';
-                            wrap.appendChild(infoSpan);
-                            wrap.appendChild(btnEditar);
+                            const wrap = crearWrapEditarOfertaConResumenCrearMasivo(data2.oferta_edit_url, envioVal, precioVal);
                             btn.parentNode.replaceChild(wrap, btn);
                         } else { btn.remove(); }
                     } else {
@@ -2270,20 +2855,9 @@
                                 msgEl.className = 'mt-2 generado-msg text-sm font-medium text-green-600 dark:text-green-400';
                                 msgEl.textContent = 'Oferta creada con precio 0 (ID: ' + data3B.oferta_id + ')';
                                 if (data3B.oferta_edit_url) {
-                                    const wrapB = document.createElement('div');
-                                    wrapB.className = 'flex items-center gap-3';
                                     const envioValB = data3B.envio != null && data3B.envio !== '' ? parseFloat(data3B.envio).toFixed(2).replace('.', ',') + ' € env.' : 'gratis';
                                     const precioValB = data3B.precio_unidad != null ? parseFloat(data3B.precio_unidad).toFixed(2).replace('.', ',') + ' €/ud' : '0 €/ud';
-                                    const infoSpanB = document.createElement('span');
-                                    infoSpanB.className = 'text-sm text-gray-600 dark:text-gray-400';
-                                    infoSpanB.textContent = envioValB + (precioValB ? ' · ' + precioValB : '');
-                                    const btnEditarB = document.createElement('a');
-                                    btnEditarB.href = data3B.oferta_edit_url;
-                                    btnEditarB.target = '_blank';
-                                    btnEditarB.className = 'inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded transition';
-                                    btnEditarB.innerHTML = '<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>Editar oferta';
-                                    wrapB.appendChild(infoSpanB);
-                                    wrapB.appendChild(btnEditarB);
+                                    const wrapB = crearWrapEditarOfertaConResumenCrearMasivo(data3B.oferta_edit_url, envioValB, precioValB);
                                     btn.parentNode.replaceChild(wrapB, btn);
                                 } else { btn.remove(); }
                             } else {
@@ -2321,6 +2895,8 @@
                     div.querySelector('.generado-msg').textContent = 'Error: ' + err.message;
                     btn.disabled = false;
                     btn.innerHTML = '<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg> Generar oferta';
+                } finally {
+                    marcarFinGeneracionOfertaCrearMasivo();
                 }
             });
         } catch (err) {
@@ -2488,6 +3064,7 @@
             }
             const btnGen = div.querySelector('.btn-generar');
             if (btnGen) btnGen.dataset.productoId = candidato.id;
+            actualizarValorEnvioInputEnFilaCrearMasivo(div);
             const selectorEmpate = div.querySelector('.btn-elegir-producto')?.closest('.p-3');
             if (selectorEmpate) selectorEmpate.remove();
             if (!tieneEspecs) {
@@ -2495,6 +3072,9 @@
             }
             renderUrlResaltadaFilaCrearMasivo(div);
             actualizarConteosOpcionesEspecsFila(div);
+            if (div.querySelector('.btn-generar') && !div.__rowData?.ofertaGenerada) {
+                ponerMensajeGeneradoPendienteCrearMasivo(div);
+            }
         } catch (err) {
             console.error(err);
             alert('Error al cargar: ' + err.message);
@@ -2513,10 +3093,17 @@
         const parent = btnGen.closest('.flex-shrink-0');
         if (!parent) return;
         parent.classList.add('flex', 'items-center', 'gap-3');
+        const goWrap = btnGen.closest('.generar-oferta-wrap');
+        if (!goWrap) return;
         const label = document.createElement('label');
         label.className = 'confirmo-no-es-misma-wrap flex items-center gap-2 cursor-pointer text-sm text-amber-700 dark:text-amber-300';
         label.innerHTML = '<input type="checkbox" class="confirmo-no-es-misma rounded border-gray-300 text-amber-600 focus:ring-amber-500"> <span>No es la misma oferta</span>';
-        btnGen.parentNode.insertBefore(label, btnGen);
+        const precioWrap = goWrap.querySelector('.generar-sin-precio-wrap');
+        if (precioWrap) {
+            goWrap.insertBefore(label, precioWrap);
+        } else {
+            goWrap.appendChild(label);
+        }
     }
 
     function actualizarEstadoBotonGenerar(div) {
@@ -2731,6 +3318,35 @@
         p = p.replace(/^\/+/, '');
         if (/^images\//i.test(p)) return (publicBase.replace(/\/+$/, '')) + '/' + p;
         return (imagesBase.replace(/\/+$/, '')) + '/' + p;
+    }
+
+    function cmActualizarPreviewInternaCm(inputId, imgId) {
+        const inp = document.getElementById(inputId);
+        const img = document.getElementById(imgId);
+        if (!inp || !img) return;
+        const u = resolverUrlImagenCrearMasivo(inp.value);
+        if (!u) {
+            img.removeAttribute('src');
+            img.classList.add('hidden');
+            img.classList.remove('ring-2', 'ring-red-400');
+            return;
+        }
+        img.classList.remove('ring-2', 'ring-red-400');
+        img.src = u;
+        img.classList.remove('hidden');
+        img.onerror = function() { img.classList.add('ring-2', 'ring-red-400'); };
+        img.onload = function() { img.classList.remove('ring-2', 'ring-red-400'); };
+    }
+
+    function cmEnlazarPreviewsInternasCm() {
+        [['ruta-interna-grande-sublinea-cm', 'preview-interna-grande-sublinea-cm'], ['ruta-interna-pequena-sublinea-cm', 'preview-interna-pequena-sublinea-cm']].forEach(function(pair) {
+            const el = document.getElementById(pair[0]);
+            if (!el || el.dataset.kpPreviewBound) return;
+            el.dataset.kpPreviewBound = '1';
+            const fn = function() { cmActualizarPreviewInternaCm(pair[0], pair[1]); };
+            el.addEventListener('input', fn);
+            el.addEventListener('paste', function() { setTimeout(fn, 0); });
+        });
     }
 
     function abrirModalImagenesSpecCrearMasivo(key) {
@@ -2969,6 +3585,81 @@
     let cropperSublineaCm = null;
     let carpetaActualSublineaCm = null;
     let imagenesAmazonSeleccionadasSublineaCm = [];
+    const KP_PENDING_CM = '__pending:';
+    const uploadsPendientesCm = new Map();
+
+    if (!window.__kpSubirParejaConProgreso) {
+        window.__kpSubirParejaConProgreso = function(url, fdG, fdP, csrfToken, onProgress, xhrRegistryMap, uploadId) {
+            let pg = 0, pp = 0;
+            const emit = function() {
+                if (onProgress) onProgress(Math.min(100, Math.round((pg + pp) / 2)));
+            };
+            const entry = { xhrG: null, xhrP: null };
+            if (xhrRegistryMap && uploadId) xhrRegistryMap.set(uploadId, entry);
+            const one = function(fd, tag) {
+                return new Promise(function(resolve, reject) {
+                    const xhr = new XMLHttpRequest();
+                    if (tag === 'G') entry.xhrG = xhr;
+                    else entry.xhrP = xhr;
+                    xhr.open('POST', url);
+                    xhr.setRequestHeader('X-CSRF-TOKEN', csrfToken);
+                    xhr.setRequestHeader('Accept', 'application/json');
+                    xhr.upload.onprogress = function(e) {
+                        if (e.lengthComputable) {
+                            const pct = Math.round(100 * e.loaded / e.total);
+                            if (tag === 'G') pg = pct;
+                            else pp = pct;
+                            emit();
+                        }
+                    };
+                    xhr.onload = function() {
+                        let data;
+                        try { data = JSON.parse(xhr.responseText); } catch (e) {
+                            reject(new Error('Respuesta inválida'));
+                            return;
+                        }
+                        if (xhr.status >= 200 && xhr.status < 300 && data.success) resolve(data);
+                        else reject(new Error((data && data.message) || 'Error al subir'));
+                    };
+                    xhr.onerror = function() { reject(new Error('Error de red')); };
+                    xhr.send(fd);
+                });
+            };
+            return Promise.all([one(fdG, 'G'), one(fdP, 'P')]).then(function(results) {
+                if (xhrRegistryMap && uploadId) xhrRegistryMap.delete(uploadId);
+                return { dataG: results[0], dataP: results[1] };
+            }).catch(function(err) {
+                if (xhrRegistryMap && uploadId) xhrRegistryMap.delete(uploadId);
+                throw err;
+            });
+        };
+    }
+
+    function cmNuevoIdSubida() {
+        return Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+    }
+
+    function cmEsRutaPendiente(ruta) {
+        return typeof ruta === 'string' && ruta.indexOf(KP_PENDING_CM) === 0;
+    }
+
+    function cmCancelarSubida(uploadId) {
+        const x = uploadsPendientesCm.get(uploadId);
+        if (!x) return;
+        if (x.xhrG) try { x.xhrG.abort(); } catch (e) {}
+        if (x.xhrP) try { x.xhrP.abort(); } catch (e) {}
+        uploadsPendientesCm.delete(uploadId);
+    }
+
+    function cmQuitarPendienteDelDraft(panel, pendingPath) {
+        if (!panel || !Array.isArray(panel.__cmDraftImagenes)) return;
+        const ix = panel.__cmDraftImagenes.indexOf(pendingPath);
+        if (ix !== -1) {
+            panel.__cmDraftImagenes.splice(ix, 1);
+            renderizarMiniaturasSublineaCm();
+            actualizarBotonesImagenDraftCm(panel);
+        }
+    }
 
     function resolverContextoProductoCm(el) {
         const node = (el && el.closest) ? el : null;
@@ -2996,11 +3687,21 @@
         const usarOn = usar && usar.checked;
         const btnVer = panel.querySelector('.btn-cm-ver-imagenes-draft');
         const btnAdd = panel.querySelector('.btn-cm-anadir-imagenes-draft');
+        const btnGr = panel.querySelector('.btn-cm-guardar-nueva-opcion');
+        const haySubidaPendiente = !usarOn && Array.isArray(draft) && draft.some(cmEsRutaPendiente);
         if (btnVer) {
             btnVer.textContent = 'Ver imágenes (' + n + ')';
             btnVer.disabled = usarOn || n === 0;
         }
         if (btnAdd) btnAdd.disabled = !!usarOn;
+        if (btnGr && !btnGr.dataset.cmGuardandoOpcion) {
+            btnGr.disabled = !!haySubidaPendiente;
+            if (haySubidaPendiente) {
+                btnGr.setAttribute('title', 'Espera a que terminen de subirse todas las imágenes.');
+            } else {
+                btnGr.removeAttribute('title');
+            }
+        }
     }
 
     function resetPanelNuevaOpcionCm(panel) {
@@ -3068,6 +3769,12 @@
             cropperSublineaCm.destroy();
             cropperSublineaCm = null;
         }
+        const riGc = document.getElementById('ruta-interna-grande-sublinea-cm');
+        const riPc = document.getElementById('ruta-interna-pequena-sublinea-cm');
+        if (riGc) riGc.value = '';
+        if (riPc) riPc.value = '';
+        cmActualizarPreviewInternaCm('ruta-interna-grande-sublinea-cm', 'preview-interna-grande-sublinea-cm');
+        cmActualizarPreviewInternaCm('ruta-interna-pequena-sublinea-cm', 'preview-interna-pequena-sublinea-cm');
     }
 
     /** Tras subir una imagen con éxito: limpia el formulario pero deja el modal abierto en la misma pestaña (carpetas conservadas). */
@@ -3084,8 +3791,8 @@
 
     function cambiarTabModalSublineaCm(tab, opts) {
         opts = opts || {};
-        const tabs = ['tab-url-sublinea-cm', 'tab-subir-sublinea-cm', 'tab-amazon-sublinea-cm'];
-        const contents = ['content-url-sublinea-cm', 'content-subir-sublinea-cm', 'content-amazon-sublinea-cm'];
+        const tabs = ['tab-url-sublinea-cm', 'tab-subir-sublinea-cm', 'tab-amazon-sublinea-cm', 'tab-interna-sublinea-cm'];
+        const contents = ['content-url-sublinea-cm', 'content-subir-sublinea-cm', 'content-amazon-sublinea-cm', 'content-interna-sublinea-cm'];
         tabs.forEach(function(id) {
             const t = document.getElementById(id);
             if (t) {
@@ -3113,6 +3820,12 @@
             if (t) { t.classList.add('border-blue-500', 'text-blue-600', 'dark:text-blue-400'); t.classList.remove('border-transparent', 'text-gray-500', 'dark:text-gray-400'); }
             if (c) c.classList.remove('hidden');
             if (!opts.skipCargarCarpetas) cargarCarpetasModalSublineaCm();
+        } else if (tab === 'interna') {
+            const t = document.getElementById('tab-interna-sublinea-cm');
+            const c = document.getElementById('content-interna-sublinea-cm');
+            if (t) { t.classList.add('border-blue-500', 'text-blue-600', 'dark:text-blue-400'); t.classList.remove('border-transparent', 'text-gray-500', 'dark:text-gray-400'); }
+            if (c) c.classList.remove('hidden');
+            cmEnlazarPreviewsInternasCm();
         }
     }
 
@@ -3190,17 +3903,29 @@
             container.innerHTML = '<p class="text-sm text-gray-500">No hay imágenes</p>';
             return;
         }
-        imgGrande.src = resolverUrlImagenCrearMasivo(imagenes[0]);
+        const primeraCm = imagenes[0];
+        if (cmEsRutaPendiente(primeraCm)) {
+            imgGrande.src = '';
+        } else {
+            imgGrande.src = resolverUrlImagenCrearMasivo(primeraCm);
+        }
         imagenes.forEach(function(imgPath, index) {
             const div = document.createElement('div');
             div.className = 'miniatura-sublinea-cm relative group cursor-pointer border-2 border-gray-300 dark:border-gray-600 rounded p-1';
             div.dataset.index = String(index);
-            div.draggable = true;
+            const pendiente = cmEsRutaPendiente(imgPath);
+            div.draggable = !pendiente;
             if (index === 0) div.classList.add('border-blue-500');
             const url = resolverUrlImagenCrearMasivo(imgPath);
-            div.innerHTML = '<img src="' + url + '" alt="" class="w-full h-20 object-cover rounded"><button type="button" class="absolute top-0 right-0 bg-red-600 text-white rounded-full w-5 h-5 text-xs btn-eliminar-imagen-cm" data-index="' + index + '">×</button>';
+            const uidCm = pendiente ? imgPath.slice(KP_PENDING_CM.length) : '';
+            if (pendiente) {
+                div.innerHTML = '<div class="w-full h-20 flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-700 rounded p-1"><span class="text-[10px] text-gray-600 dark:text-gray-300 text-center leading-tight">Cargando imagen…</span><div class="w-full mt-1 h-1.5 bg-gray-200 dark:bg-gray-600 rounded overflow-hidden"><div id="kp-prog-cm-' + uidCm + '" class="h-full bg-blue-500 transition-[width] duration-150" style="width:0%"></div></div></div><button type="button" class="absolute top-0 right-0 bg-red-600 text-white rounded-full w-5 h-5 text-xs btn-eliminar-imagen-cm" data-index="' + index + '">×</button>';
+            } else {
+                div.innerHTML = '<img src="' + url + '" alt="" class="w-full h-20 object-cover rounded"><button type="button" class="absolute top-0 right-0 bg-red-600 text-white rounded-full w-5 h-5 text-xs btn-eliminar-imagen-cm" data-index="' + index + '">×</button>';
+            }
             div.addEventListener('click', function(ev) {
                 if (ev.target.closest('.btn-eliminar-imagen-cm')) return;
+                if (pendiente) return;
                 imgGrande.src = url;
                 container.querySelectorAll('.miniatura-sublinea-cm').forEach(function(m) { m.classList.remove('border-blue-500'); });
                 div.classList.add('border-blue-500');
@@ -3209,6 +3934,10 @@
                 ev.stopPropagation();
                 if (!confirm('¿Eliminar esta imagen del borrador?')) return;
                 const ix = parseInt(div.dataset.index, 10);
+                const pathDel = panel.__cmDraftImagenes[ix];
+                if (pathDel && cmEsRutaPendiente(pathDel)) {
+                    cmCancelarSubida(pathDel.slice(KP_PENDING_CM.length));
+                }
                 panel.__cmDraftImagenes.splice(ix, 1);
                 renderizarMiniaturasSublineaCm();
                 actualizarBotonesImagenDraftCm(panel);
@@ -3230,6 +3959,7 @@
         limpiarModalAñadirSublineaCm();
         const m = document.getElementById('modal-añadir-imagen-sublinea-cm');
         if (m) m.classList.remove('hidden');
+        cmEnlazarPreviewsInternasCm();
         cargarCarpetasModalSublineaCm();
         cambiarTabModalSublineaCm('url');
     }
@@ -3261,12 +3991,15 @@
             alert('Descarga y recorta la imagen primero.');
             return;
         }
+        const panel = window.__cmNuevaOpcionPanelDraft;
+        if (!panel) return;
         const canvasOriginal = cropperSublineaCm.getCroppedCanvas({ imageSmoothingEnabled: true, imageSmoothingQuality: 'high' });
         if (!canvasOriginal) { alert('Error al recortar'); return; }
-        const ctx = resolverContextoProductoCm(window.__cmNuevaOpcionPanelDraft);
+        const ctx = resolverContextoProductoCm(panel);
         const nombreBase = nombreBaseArchivoCm(ctx.productoId);
         const ts = Date.now();
         const token = document.querySelector('meta[name="csrf-token"]').content;
+        const carpetaUp = carpetaActualSublineaCm;
 
         const canvasGrande = document.createElement('canvas');
         canvasGrande.width = canvasOriginal.width;
@@ -3284,85 +4017,135 @@
         ctxP.fillRect(0, 0, 300, 250);
         ctxP.drawImage(canvasOriginal, 0, 0, 300, 250);
 
-        const blobGrande = await new Promise(function(res, rej) {
-            canvasGrande.toBlob(function(b) { b ? res(b) : rej(new Error('blob')); }, 'image/webp', 0.9);
-        });
-        const blobPequena = await new Promise(function(res, rej) {
-            canvasPequena.toBlob(function(b) { b ? res(b) : rej(new Error('blob')); }, 'image/webp', 0.9);
-        });
-
-        const fdG = new FormData();
-        fdG.append('imagen', blobGrande, nombreBase + '-' + ts + '.webp');
-        fdG.append('carpeta', carpetaActualSublineaCm);
-        fdG.append('_token', token);
-        const fdP = new FormData();
-        fdP.append('imagen', blobPequena, nombreBase + '-' + ts + '-thumbnail.webp');
-        fdP.append('carpeta', carpetaActualSublineaCm);
-        fdP.append('_token', token);
-
-        const [resG, resP] = await Promise.all([
-            fetch(@json(route('admin.imagenes.subir-simple')), { method: 'POST', headers: { 'X-CSRF-TOKEN': token }, body: fdG }),
-            fetch(@json(route('admin.imagenes.subir-simple')), { method: 'POST', headers: { 'X-CSRF-TOKEN': token }, body: fdP })
-        ]);
-        const dataG = await resG.json();
-        const dataP = await resP.json();
-        if (dataG.success && dataP.success && dataG.data && dataG.data.ruta_relativa) {
-            añadirRutaImagenDraftCm(dataG.data.ruta_relativa);
+        try {
+            const blobGrande = await new Promise(function(res, rej) {
+                canvasGrande.toBlob(function(b) { b ? res(b) : rej(new Error('blob')); }, 'image/webp', 0.9);
+            });
+            const blobPequena = await new Promise(function(res, rej) {
+                canvasPequena.toBlob(function(b) { b ? res(b) : rej(new Error('blob')); }, 'image/webp', 0.9);
+            });
+            const uploadId = cmNuevoIdSubida();
+            const pendingPath = KP_PENDING_CM + uploadId;
+            if (!Array.isArray(panel.__cmDraftImagenes)) panel.__cmDraftImagenes = [];
+            panel.__cmDraftImagenes.push(pendingPath);
+            actualizarBotonesImagenDraftCm(panel);
+            const modalVerCm = document.getElementById('modal-imagenes-sublinea-cm');
+            if (modalVerCm && !modalVerCm.classList.contains('hidden')) renderizarMiniaturasSublineaCm();
             prepararModalAnadirImagenParaOtraCm('url');
-        } else {
-            alert(dataG.message || dataP.message || 'Error al subir');
+
+            const fdG = new FormData();
+            fdG.append('imagen', blobGrande, nombreBase + '-' + ts + '.webp');
+            fdG.append('carpeta', carpetaUp);
+            fdG.append('_token', token);
+            const fdP = new FormData();
+            fdP.append('imagen', blobPequena, nombreBase + '-' + ts + '-thumbnail.webp');
+            fdP.append('carpeta', carpetaUp);
+            fdP.append('_token', token);
+
+            (async function() {
+                try {
+                    const onProg = function(pct) {
+                        const el = document.getElementById('kp-prog-cm-' + uploadId);
+                        if (el) el.style.width = pct + '%';
+                    };
+                    const r = @json(route('admin.imagenes.subir-simple'));
+                    const { dataG, dataP } = await window.__kpSubirParejaConProgreso(r, fdG, fdP, token, onProg, uploadsPendientesCm, uploadId);
+                    if (dataG.success && dataP.success && dataG.data && dataG.data.ruta_relativa) {
+                        const ix = panel.__cmDraftImagenes.indexOf(pendingPath);
+                        if (ix !== -1) panel.__cmDraftImagenes[ix] = dataG.data.ruta_relativa;
+                        renderizarMiniaturasSublineaCm();
+                        actualizarBotonesImagenDraftCm(panel);
+                    } else {
+                        throw new Error(dataG.message || dataP.message || 'Error al subir');
+                    }
+                } catch (err) {
+                    console.error(err);
+                    cmQuitarPendienteDelDraft(panel, pendingPath);
+                    alert(err.message || 'Error al subir');
+                }
+            })();
+        } catch (e) {
+            alert(e.message || 'Error');
         }
     }
 
-    async function procesarArchivoSublineaCm(file) {
+    function procesarArchivoSublineaCm(file) {
         const carpeta = document.getElementById('carpeta-subir-sublinea-cm').value;
         if (!carpeta) { alert('Selecciona una carpeta.'); return; }
         if (!file.type.startsWith('image/')) { alert('Archivo no válido.'); return; }
-        const ctx = resolverContextoProductoCm(window.__cmNuevaOpcionPanelDraft);
+        const panel = window.__cmNuevaOpcionPanelDraft;
+        if (!panel) return;
+        const ctx = resolverContextoProductoCm(panel);
         const nombreBase = nombreBaseArchivoCm(ctx.productoId);
         const ts = Date.now();
         const token = document.querySelector('meta[name="csrf-token"]').content;
+        const uploadId = cmNuevoIdSubida();
+        const pendingPath = KP_PENDING_CM + uploadId;
+        if (!Array.isArray(panel.__cmDraftImagenes)) panel.__cmDraftImagenes = [];
+        panel.__cmDraftImagenes.push(pendingPath);
+        actualizarBotonesImagenDraftCm(panel);
+        const modalVerCm2 = document.getElementById('modal-imagenes-sublinea-cm');
+        if (modalVerCm2 && !modalVerCm2.classList.contains('hidden')) renderizarMiniaturasSublineaCm();
+        document.getElementById('nombre-archivo-sublinea-cm').textContent = file.name || '';
+        prepararModalAnadirImagenParaOtraCm('subir');
+        cargarCarpetasModalSublineaCm();
+
         const img = new Image();
         img.crossOrigin = 'anonymous';
-        await new Promise(function(res, rej) {
-            img.onload = res;
-            img.onerror = rej;
-            img.src = URL.createObjectURL(file);
-        });
-        const canvasGrande = document.createElement('canvas');
-        canvasGrande.width = img.width;
-        canvasGrande.height = img.height;
-        canvasGrande.getContext('2d').drawImage(img, 0, 0);
-        const canvasPequena = document.createElement('canvas');
-        canvasPequena.width = 300;
-        canvasPequena.height = 250;
-        canvasPequena.getContext('2d').drawImage(img, 0, 0, 300, 250);
-        const blobGrande = await new Promise(function(res, rej) {
-            canvasGrande.toBlob(function(b) { b ? res(b) : rej(new Error('blob')); }, 'image/webp', 0.9);
-        });
-        const blobPequena = await new Promise(function(res, rej) {
-            canvasPequena.toBlob(function(b) { b ? res(b) : rej(new Error('blob')); }, 'image/webp', 0.9);
-        });
-        const fdG = new FormData();
-        fdG.append('imagen', blobGrande, nombreBase + '-' + ts + '.webp');
-        fdG.append('carpeta', carpeta);
-        fdG.append('_token', token);
-        const fdP = new FormData();
-        fdP.append('imagen', blobPequena, nombreBase + '-' + ts + '-thumbnail.webp');
-        fdP.append('carpeta', carpeta);
-        fdP.append('_token', token);
-        const [resG, resP] = await Promise.all([
-            fetch(@json(route('admin.imagenes.subir-simple')), { method: 'POST', headers: { 'X-CSRF-TOKEN': token }, body: fdG }),
-            fetch(@json(route('admin.imagenes.subir-simple')), { method: 'POST', headers: { 'X-CSRF-TOKEN': token }, body: fdP })
-        ]);
-        const dataG = await resG.json();
-        const dataP = await resP.json();
-        if (dataG.success && dataP.success && dataG.data && dataG.data.ruta_relativa) {
-            añadirRutaImagenDraftCm(dataG.data.ruta_relativa);
-            prepararModalAnadirImagenParaOtraCm('subir');
-        } else {
-            alert(dataG.message || dataP.message || 'Error al subir');
-        }
+        const blobUrl = URL.createObjectURL(file);
+        img.onload = function() {
+            URL.revokeObjectURL(blobUrl);
+            (async function() {
+                try {
+                    const canvasGrande = document.createElement('canvas');
+                    canvasGrande.width = img.width;
+                    canvasGrande.height = img.height;
+                    canvasGrande.getContext('2d').drawImage(img, 0, 0);
+                    const canvasPequena = document.createElement('canvas');
+                    canvasPequena.width = 300;
+                    canvasPequena.height = 250;
+                    canvasPequena.getContext('2d').drawImage(img, 0, 0, 300, 250);
+                    const blobGrande = await new Promise(function(res, rej) {
+                        canvasGrande.toBlob(function(b) { b ? res(b) : rej(new Error('blob')); }, 'image/webp', 0.9);
+                    });
+                    const blobPequena = await new Promise(function(res, rej) {
+                        canvasPequena.toBlob(function(b) { b ? res(b) : rej(new Error('blob')); }, 'image/webp', 0.9);
+                    });
+                    const fdG = new FormData();
+                    fdG.append('imagen', blobGrande, nombreBase + '-' + ts + '.webp');
+                    fdG.append('carpeta', carpeta);
+                    fdG.append('_token', token);
+                    const fdP = new FormData();
+                    fdP.append('imagen', blobPequena, nombreBase + '-' + ts + '-thumbnail.webp');
+                    fdP.append('carpeta', carpeta);
+                    fdP.append('_token', token);
+                    const onProg = function(pct) {
+                        const el = document.getElementById('kp-prog-cm-' + uploadId);
+                        if (el) el.style.width = pct + '%';
+                    };
+                    const r = @json(route('admin.imagenes.subir-simple'));
+                    const { dataG, dataP } = await window.__kpSubirParejaConProgreso(r, fdG, fdP, token, onProg, uploadsPendientesCm, uploadId);
+                    if (dataG.success && dataP.success && dataG.data && dataG.data.ruta_relativa) {
+                        const ix = panel.__cmDraftImagenes.indexOf(pendingPath);
+                        if (ix !== -1) panel.__cmDraftImagenes[ix] = dataG.data.ruta_relativa;
+                        renderizarMiniaturasSublineaCm();
+                        actualizarBotonesImagenDraftCm(panel);
+                    } else {
+                        throw new Error(dataG.message || dataP.message || 'Error al subir');
+                    }
+                } catch (err) {
+                    console.error(err);
+                    cmQuitarPendienteDelDraft(panel, pendingPath);
+                    alert(err.message || 'Error al subir');
+                }
+            })();
+        };
+        img.onerror = function() {
+            URL.revokeObjectURL(blobUrl);
+            cmQuitarPendienteDelDraft(panel, pendingPath);
+            alert('No se pudo leer el archivo.');
+        };
+        img.src = blobUrl;
     }
 
     function mostrarRecorteEnModalSublineaCm(urlImagen) {
@@ -3486,6 +4269,10 @@
                 if (msg) { msg.textContent = 'Indica el nombre de la opción.'; msg.classList.remove('hidden'); msg.className = 'nueva-opcion-cm-msg text-xs text-red-600 mt-1'; }
                 return;
             }
+            if (!usarProd && Array.isArray(panel.__cmDraftImagenes) && panel.__cmDraftImagenes.some(cmEsRutaPendiente)) {
+                alert('Espera a que terminen de subirse todas las imágenes antes de guardar la opción.');
+                return;
+            }
             const body = {
                 producto_id: ctx.productoId,
                 principal_id: principalId,
@@ -3496,12 +4283,15 @@
             if (panel.__cmInsertFirst) body.insert_first = true;
             else if (panel.__cmInsertAfterSubId) body.after_sub_id = panel.__cmInsertAfterSubId;
             btnGuardar.disabled = true;
+            btnGuardar.dataset.cmGuardandoOpcion = '1';
             fetch(@json(route('admin.ofertas.crear-masivo.anadir-opcion-especificacion')), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
                 body: JSON.stringify(body)
             }).then(function(r) { return r.json(); }).then(async function(data) {
+                delete btnGuardar.dataset.cmGuardandoOpcion;
                 btnGuardar.disabled = false;
+                actualizarBotonesImagenDraftCm(panel);
                 if (!data.success) {
                     if (msg) { msg.textContent = data.error || 'Error'; msg.classList.remove('hidden'); msg.className = 'nueva-opcion-cm-msg text-xs text-red-600 mt-1'; }
                     return;
@@ -3517,7 +4307,9 @@
                     if (specContainer) marcarNuevaOpcionTrasGuardarCm(specContainer, data.principal_id, data.sub_id, false);
                 }
             }).catch(function(err) {
+                delete btnGuardar.dataset.cmGuardandoOpcion;
                 btnGuardar.disabled = false;
+                actualizarBotonesImagenDraftCm(panel);
                 alert('Error: ' + (err && err.message ? err.message : err));
             });
         }
@@ -3601,9 +4393,11 @@
         const tabUrlCm = document.getElementById('tab-url-sublinea-cm');
         const tabSubirCm = document.getElementById('tab-subir-sublinea-cm');
         const tabAmazonCm = document.getElementById('tab-amazon-sublinea-cm');
+        const tabInternaCm = document.getElementById('tab-interna-sublinea-cm');
         if (tabUrlCm) tabUrlCm.addEventListener('click', function() { cambiarTabModalSublineaCm('url'); });
         if (tabSubirCm) tabSubirCm.addEventListener('click', function() { cambiarTabModalSublineaCm('subir'); });
         if (tabAmazonCm) tabAmazonCm.addEventListener('click', function() { cambiarTabModalSublineaCm('amazon'); });
+        if (tabInternaCm) tabInternaCm.addEventListener('click', function() { cambiarTabModalSublineaCm('interna'); });
 
         const btnDescUrlCm = document.getElementById('btn-descargar-url-sublinea-cm');
         if (btnDescUrlCm) {
@@ -3637,60 +4431,104 @@
                     }
                     const carpeta = document.getElementById('carpeta-amazon-sublinea-cm').value;
                     if (!carpeta) { alert('Selecciona una carpeta.'); return; }
-                    const ctx = resolverContextoProductoCm(window.__cmNuevaOpcionPanelDraft);
+                    const panelAmz = window.__cmNuevaOpcionPanelDraft;
+                    if (!panelAmz) {
+                        alert('No hay panel de borrador activo.');
+                        return;
+                    }
+                    const ctx = resolverContextoProductoCm(panelAmz);
                     const nombreBase = nombreBaseArchivoCm(ctx.productoId);
                     const token = document.querySelector('meta[name="csrf-token"]').content;
-                    const btn = btnGuardarImgCm;
-                    btn.disabled = true;
-                    try {
-                        for (let i = 0; i < imagenesAmazonSeleccionadasSublineaCm.length; i++) {
-                            const imagen = imagenesAmazonSeleccionadasSublineaCm[i];
-                            const ts = Date.now() + i;
-                            const urlProxy = imagen.url.startsWith('http')
-                                ? (@json(route('admin.imagenes.proxy'))) + '?url=' + encodeURIComponent(imagen.url)
-                                : imagen.url;
-                            await new Promise(function(resolve, reject) {
-                                const img = new Image();
-                                img.crossOrigin = 'anonymous';
-                                img.onload = async function() {
-                                    try {
-                                        const cG = document.createElement('canvas');
-                                        cG.width = img.width; cG.height = img.height;
-                                        cG.getContext('2d').drawImage(img, 0, 0);
-                                        const cP = document.createElement('canvas');
-                                        cP.width = 300; cP.height = 250;
-                                        cP.getContext('2d').drawImage(img, 0, 0, 300, 250);
-                                        const bG = await new Promise(function(res, rej) { cG.toBlob(function(b) { b ? res(b) : rej(new Error('b')); }, 'image/webp', 0.9); });
-                                        const bP = await new Promise(function(res, rej) { cP.toBlob(function(b) { b ? res(b) : rej(new Error('b')); }, 'image/webp', 0.9); });
-                                        const fdG = new FormData();
-                                        fdG.append('imagen', bG, nombreBase + '-' + ts + '.webp');
-                                        fdG.append('carpeta', carpeta);
-                                        fdG.append('_token', token);
-                                        const fdP = new FormData();
-                                        fdP.append('imagen', bP, nombreBase + '-' + ts + '-thumbnail.webp');
-                                        fdP.append('carpeta', carpeta);
-                                        fdP.append('_token', token);
-                                        const [rG, rP] = await Promise.all([
-                                            fetch(@json(route('admin.imagenes.subir-simple')), { method: 'POST', headers: { 'X-CSRF-TOKEN': token }, body: fdG }),
-                                            fetch(@json(route('admin.imagenes.subir-simple')), { method: 'POST', headers: { 'X-CSRF-TOKEN': token }, body: fdP })
-                                        ]);
-                                        const dG = await rG.json();
-                                        const dP = await rP.json();
-                                        if (dG.success && dP.success && dG.data && dG.data.ruta_relativa) {
-                                            añadirRutaImagenDraftCm(dG.data.ruta_relativa);
-                                            resolve();
-                                        } else reject(new Error(dG.message || dP.message));
-                                    } catch (ex) { reject(ex); }
+                    const rutaSubir = @json(route('admin.imagenes.subir-simple'));
+                    const seleccionAmzCm = imagenesAmazonSeleccionadasSublineaCm.slice();
+                    const trabajosAmz = seleccionAmzCm.map(function(imagen, i) {
+                        const uidAmz = cmNuevoIdSubida() + 'z' + i;
+                        return {
+                            imagen: imagen,
+                            ts: Date.now() + i,
+                            uploadId: uidAmz,
+                            pendingPath: KP_PENDING_CM + uidAmz
+                        };
+                    });
+                    trabajosAmz.forEach(function(t) {
+                        if (!Array.isArray(panelAmz.__cmDraftImagenes)) panelAmz.__cmDraftImagenes = [];
+                        panelAmz.__cmDraftImagenes.push(t.pendingPath);
+                    });
+                    actualizarBotonesImagenDraftCm(panelAmz);
+                    const modalVerAmz = document.getElementById('modal-imagenes-sublinea-cm');
+                    if (modalVerAmz && !modalVerAmz.classList.contains('hidden')) renderizarMiniaturasSublineaCm();
+
+                    trabajosAmz.forEach(function(t) {
+                        const urlProxy = t.imagen.url.startsWith('http')
+                            ? (@json(route('admin.imagenes.proxy'))) + '?url=' + encodeURIComponent(t.imagen.url)
+                            : t.imagen.url;
+                        (async function() {
+                            try {
+                                const img = await new Promise(function(resolve, reject) {
+                                    const im = new Image();
+                                    im.crossOrigin = 'anonymous';
+                                    im.onload = function() { resolve(im); };
+                                    im.onerror = function() { reject(new Error('Carga imagen')); };
+                                    im.src = urlProxy;
+                                });
+                                const cG = document.createElement('canvas');
+                                cG.width = img.width; cG.height = img.height;
+                                cG.getContext('2d').drawImage(img, 0, 0);
+                                const cP = document.createElement('canvas');
+                                cP.width = 300; cP.height = 250;
+                                cP.getContext('2d').drawImage(img, 0, 0, 300, 250);
+                                const bG = await new Promise(function(res, rej) { cG.toBlob(function(b) { b ? res(b) : rej(new Error('b')); }, 'image/webp', 0.9); });
+                                const bP = await new Promise(function(res, rej) { cP.toBlob(function(b) { b ? res(b) : rej(new Error('b')); }, 'image/webp', 0.9); });
+                                const fdG = new FormData();
+                                fdG.append('imagen', bG, nombreBase + '-' + t.ts + '.webp');
+                                fdG.append('carpeta', carpeta);
+                                fdG.append('_token', token);
+                                const fdP = new FormData();
+                                fdP.append('imagen', bP, nombreBase + '-' + t.ts + '-thumbnail.webp');
+                                fdP.append('carpeta', carpeta);
+                                fdP.append('_token', token);
+                                const onProg = function(pct) {
+                                    const el = document.getElementById('kp-prog-cm-' + t.uploadId);
+                                    if (el) el.style.width = pct + '%';
                                 };
-                                img.onerror = function() { reject(new Error('Carga imagen')); };
-                                img.src = urlProxy;
-                            });
-                        }
-                        prepararModalAnadirImagenParaOtraCm('amazon');
-                    } catch (ex) {
-                        alert('Error: ' + (ex && ex.message ? ex.message : ex));
+                                const { dataG, dataP } = await window.__kpSubirParejaConProgreso(rutaSubir, fdG, fdP, token, onProg, uploadsPendientesCm, t.uploadId);
+                                if (dataG.success && dataP.success && dataG.data && dataG.data.ruta_relativa) {
+                                    const ix = panelAmz.__cmDraftImagenes.indexOf(t.pendingPath);
+                                    if (ix !== -1) panelAmz.__cmDraftImagenes[ix] = dataG.data.ruta_relativa;
+                                    renderizarMiniaturasSublineaCm();
+                                    actualizarBotonesImagenDraftCm(panelAmz);
+                                } else {
+                                    throw new Error(dataG.message || dataP.message || 'Error al subir');
+                                }
+                            } catch (ex) {
+                                console.error(ex);
+                                cmQuitarPendienteDelDraft(panelAmz, t.pendingPath);
+                                alert('Error al subir una imagen de Amazon: ' + (ex && ex.message ? ex.message : ex));
+                            }
+                        })();
+                    });
+
+                    prepararModalAnadirImagenParaOtraCm('amazon');
+                    cargarCarpetasModalSublineaCm();
+                    return;
+                }
+                const tabInterna = document.getElementById('tab-interna-sublinea-cm');
+                const esInterna = tabInterna && tabInterna.classList.contains('border-blue-500');
+                if (esInterna) {
+                    const rG = (document.getElementById('ruta-interna-grande-sublinea-cm') && document.getElementById('ruta-interna-grande-sublinea-cm').value || '').trim();
+                    if (!rG) {
+                        alert('Indica la ruta de la imagen grande ya subida.');
+                        return;
                     }
-                    btn.disabled = false;
+                    const panelInt = window.__cmNuevaOpcionPanelDraft;
+                    if (!panelInt) {
+                        alert('No hay panel de borrador activo.');
+                        return;
+                    }
+                    añadirRutaImagenDraftCm(rG);
+                    const modalVerInt = document.getElementById('modal-imagenes-sublinea-cm');
+                    if (modalVerInt && !modalVerInt.classList.contains('hidden')) renderizarMiniaturasSublineaCm();
+                    prepararModalAnadirImagenParaOtraCm('interna');
                     return;
                 }
                 const tabSubir = document.getElementById('tab-subir-sublinea-cm');
@@ -3698,7 +4536,7 @@
                 if (esSubir) {
                     const fi = document.getElementById('file-subir-sublinea-cm');
                     if (!fi || !fi.files.length) { alert('Selecciona una imagen.'); return; }
-                    await procesarArchivoSublineaCm(fi.files[0]);
+                    procesarArchivoSublineaCm(fi.files[0]);
                     return;
                 }
                 await procesarImagenRecortadaSublineaCm();

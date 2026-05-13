@@ -109,19 +109,37 @@ class NeoApiProgramaExternoController extends Controller
     }
 
     /**
-     * POST sincronizar fila neo con datos del programa externo (URL listado neoobjetivo + relocator + URL final).
+     * POST sincronizar fila neo con datos del programa externo (id neoobjetivo + relocator + URL final).
      *
-     * Body: { "neoobjetivo_url": "...", "neo_neo": "...", "neo_url": "..." }
+     * Body completo: { "neoobjetivo_id": 123, "neo_neo": "...", "neo_url": "..." }
+     *
+     * Solo marcar visitada (sin tocar tabla neo): { "neoobjetivo_id": 123, "marcar_solo_visitada": true }
+     * Útil cuando la ficha no tiene leadouts o ningún flujo llegó a guardar destino en neo.
+     * neoobjetivo_url se acepta como respaldo para versiones antiguas del programa externo.
+     *
+     * Si la sincronización completa termina con éxito (HTTP 200, ok true), actualiza neoobjetivo.visitada a now().
      */
     public function sincronizarNeo(Request $request): JsonResponse
     {
+        if ($request->boolean('marcar_solo_visitada')) {
+            $data = $request->validate([
+                'neoobjetivo_id'  => ['nullable', 'integer', 'min:1'],
+                'neoobjetivo_url' => ['required_without:neoobjetivo_id', 'nullable', 'string', 'max:2048'],
+            ]);
+
+            return $this->marcarSoloVisitadaNeoobjetivo(
+                isset($data['neoobjetivo_id']) ? (int) $data['neoobjetivo_id'] : null,
+                isset($data['neoobjetivo_url']) ? trim((string) $data['neoobjetivo_url']) : null
+            );
+        }
+
         $data = $request->validate([
-            'neoobjetivo_url' => ['required', 'string', 'max:2048'],
+            'neoobjetivo_id'  => ['nullable', 'integer', 'min:1'],
+            'neoobjetivo_url' => ['required_without:neoobjetivo_id', 'nullable', 'string', 'max:2048'],
             'neo_neo'          => ['required', 'string', 'max:2048'],
             'neo_url'          => ['required', 'string', 'max:2048'],
         ]);
 
-        $neoobjetivoUrl = trim($data['neoobjetivo_url']);
         $neoNeoLimpia = NeoProgramaExternoRamaNeoUrlNormalizer::limpiarHrefRelocatorLeadout($data['neo_neo']);
         $finalLimpia = app(LimpiarUrlDeTiendas::class)->limpiar($data['neo_url']);
 
@@ -149,19 +167,14 @@ class NeoApiProgramaExternoController extends Controller
             ], 422);
         }
 
-        $lookupObj = app(ConsultarNeoCifrado::class)->hashLookup($neoobjetivoUrl);
-        if ($lookupObj === '') {
-            return response()->json([
-                'ok'    => false,
-                'error' => 'No se pudo calcular lookup de neoobjetivo_url.',
-            ], 422);
-        }
-
-        $neoobjetivo = Neoobjetivo::where('url_lookup', $lookupObj)->first();
+        $neoobjetivo = $this->resolverNeoobjetivoProgramaExterno(
+            isset($data['neoobjetivo_id']) ? (int) $data['neoobjetivo_id'] : null,
+            isset($data['neoobjetivo_url']) ? trim((string) $data['neoobjetivo_url']) : null
+        );
         if (!$neoobjetivo) {
             return response()->json([
                 'ok'    => false,
-                'error' => 'No se encontró neoobjetivo para la URL de listado indicada.',
+                'error' => 'No se encontró neoobjetivo para el id o URL de listado indicada.',
             ], 422);
         }
 
@@ -188,19 +201,79 @@ class NeoApiProgramaExternoController extends Controller
 
         if ($rowNeo) {
             $payload = $this->sincronizarCuandoExistePorNeoNeo($rowNeo, $neoobjetivo, $neoNeoLimpia, $finalLimpia);
+            $payload['neoobjetivo_id'] = $neoobjetivo->id;
+            if (!empty($payload['ok'])) {
+                $this->marcarNeoobjetivoVisitadaAhora($neoobjetivo);
+            }
 
             return response()->json($payload, !empty($payload['ok']) ? 200 : 422);
         }
 
         if ($rowUrl) {
-            return response()->json(
-                $this->sincronizarCuandoExisteSoloPorUrl($rowUrl, $neoobjetivo, $neoNeoLimpia, $finalLimpia)
-            );
+            $payload = $this->sincronizarCuandoExisteSoloPorUrl($rowUrl, $neoobjetivo, $neoNeoLimpia, $finalLimpia);
+            $payload['neoobjetivo_id'] = $neoobjetivo->id;
+            $this->marcarNeoobjetivoVisitadaAhora($neoobjetivo);
+
+            return response()->json($payload);
         }
 
-        return response()->json(
-            $this->sincronizarCrearFila($neoobjetivo, $neoNeoLimpia, $finalLimpia)
-        );
+        $payload = $this->sincronizarCrearFila($neoobjetivo, $neoNeoLimpia, $finalLimpia);
+        $payload['neoobjetivo_id'] = $neoobjetivo->id;
+        $this->marcarNeoobjetivoVisitadaAhora($neoobjetivo);
+
+        return response()->json($payload);
+    }
+
+    /**
+     * Marca el neoobjetivo como visitado en el instante actual (misma semántica que el cron al cerrar el flujo).
+     */
+    private function marcarNeoobjetivoVisitadaAhora(Neoobjetivo $neoobjetivo): void
+    {
+        $neoobjetivo->visitada = now();
+        $neoobjetivo->save();
+    }
+
+    /**
+     * Solo actualiza visitada del neoobjetivo (sin crear/actualizar filas en neo).
+     */
+    private function marcarSoloVisitadaNeoobjetivo(?int $neoobjetivoId, ?string $neoobjetivoUrl): JsonResponse
+    {
+        $neoobjetivo = $this->resolverNeoobjetivoProgramaExterno($neoobjetivoId, $neoobjetivoUrl);
+        if (!$neoobjetivo) {
+            return response()->json([
+                'ok'    => false,
+                'error' => 'No se encontró neoobjetivo para el id o URL de listado indicada.',
+            ], 422);
+        }
+
+        $this->marcarNeoobjetivoVisitadaAhora($neoobjetivo);
+        $neoobjetivo->refresh();
+
+        return response()->json([
+            'ok'             => true,
+            'accion'         => 'solo_visitada',
+            'neoobjetivo_id' => $neoobjetivo->id,
+            'visitada'       => $neoobjetivo->visitada?->format(DateTimeInterface::ATOM),
+        ]);
+    }
+
+    private function resolverNeoobjetivoProgramaExterno(?int $neoobjetivoId, ?string $neoobjetivoUrl): ?Neoobjetivo
+    {
+        if ($neoobjetivoId !== null && $neoobjetivoId > 0) {
+            return Neoobjetivo::find($neoobjetivoId);
+        }
+
+        $neoobjetivoUrl = trim((string) $neoobjetivoUrl);
+        if ($neoobjetivoUrl === '') {
+            return null;
+        }
+
+        $lookupObj = app(ConsultarNeoCifrado::class)->hashLookup($neoobjetivoUrl);
+        if ($lookupObj === '') {
+            return null;
+        }
+
+        return Neoobjetivo::where('url_lookup', $lookupObj)->first();
     }
 
     /**

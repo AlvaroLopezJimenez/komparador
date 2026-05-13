@@ -29,7 +29,7 @@ class DeozioController extends PlantillaTiendaController
 
                 DB::table('avisos')->insert([
                     'texto_aviso'    => 'SIN STOCK 1A VEZ - GENERADO AUTOMATICAMENTE',
-                    'fecha_aviso'    => now()->addDay(),
+                    'fecha_aviso'    => now()->addDays(4),
                     'user_id'        => 1,
                     'avisoable_type' => OfertaProducto::class,
                     'avisoable_id'   => $oferta->id,
@@ -54,17 +54,18 @@ class DeozioController extends PlantillaTiendaController
     }
 
     /**
-     * Stub de sin stock para Deozio (pendiente de definir patron exacto).
+     * En ficha con envío disponible aparece el texto de plazos; si no está, se considera sin stock.
      */
     private function esSinStock(string $html): bool
     {
-        return false;
+        $fraseEnvio = 'Los envíos se realizan en 24/48 horas laborales a España (Península y Baleares)';
+
+        return !str_contains($html, $fraseEnvio);
     }
 
     /**
-     * Extrae precio SOLO del bloque de ficha:
-     * <div class="product-info__block product-info__block--sm product-price"> ... <strong class="price__current">€47,18</strong>
-     * para evitar capturas de price__current en otros módulos.
+     * Extrae precio SOLO del bloque de ficha (product-price) para no capturar price__current en otros módulos.
+     * Actual: span.price__current > span.js-value. Antiguo: strong.price__current.
      */
     private function extraerPrecioDesdeBloqueProducto(string $html): ?float
     {
@@ -93,14 +94,29 @@ class DeozioController extends PlantillaTiendaController
             return null;
         }
 
+        $precioBase = '<div[^>]*\bclass=(["\'])[^"\']*\bproduct-info__price\b[^"\']*\1[^>]*>[\s\S]*?<div[^>]*\bclass=(["\'])[^"\']*\bprice__default\b[^"\']*\2[^>]*>[\s\S]*?';
+
         if (
             preg_match(
-                '~<div[^>]*\bclass=(["\'])[^"\']*\bproduct-info__price\b[^"\']*\1[^>]*>[\s\S]*?<div[^>]*\bclass=(["\'])[^"\']*\bprice__default\b[^"\']*\2[^>]*>[\s\S]*?<strong[^>]*\bclass=(["\'])[^"\']*\bprice__current\b[^"\']*\3[^>]*>\s*€?\s*(?<p>[0-9][0-9\.,\s]*[0-9])~i',
+                '~' . $precioBase . '<span[^>]*\bclass=(["\'])[^"\']*\bprice__current\b[^"\']*\3[^>]*>[\s\S]*?<span[^>]*\bclass=(["\'])[^"\']*\bjs-value\b[^"\']*\4[^>]*>\s*€?\s*(?<p>[0-9][0-9\.,\s]*[0-9])~i',
                 $bloqueProducto,
-                $m3
+                $mSpan
             )
         ) {
-            $p = $m3['p'] ?? null;
+            $p = $mSpan['p'] ?? null;
+            if ($p !== null) {
+                return $this->normalizarImporte($p);
+            }
+        }
+
+        if (
+            preg_match(
+                '~' . $precioBase . '<strong[^>]*\bclass=(["\'])[^"\']*\bprice__current\b[^"\']*\3[^>]*>\s*€?\s*(?<p>[0-9][0-9\.,\s]*[0-9])~i',
+                $bloqueProducto,
+                $mStrong
+            )
+        ) {
+            $p = $mStrong['p'] ?? null;
             if ($p !== null) {
                 return $this->normalizarImporte($p);
             }

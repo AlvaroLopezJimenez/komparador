@@ -21,9 +21,14 @@
         @endif
         {{-- Formulario de búsqueda --}}
         <div class="mb-4 text-left">
+            @if (!empty($neoBusquedaAviso))
+                <p class="mb-2 text-sm text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded px-3 py-2">
+                    {{ $neoBusquedaAviso }}
+                </p>
+            @endif
             <form method="GET" class="mb-6 flex flex-wrap items-center gap-2">
                 <input type="text" name="busqueda" value="{{ request('busqueda') }}"
-                    placeholder="Buscar por URL o neo"
+                    placeholder="Solo URL final guardada en neo (completa o trozo: dominio, path…)"
                     class="flex-1 min-w-[200px] px-4 py-2 border rounded bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-white" />
                 <button type="submit"
                     class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm">

@@ -1052,6 +1052,9 @@
                     <button type="button" id="tab-amazon-nueva" class="tab-modal border-b-2 border-transparent py-2 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300">
                         Amazon
                     </button>
+                    <button type="button" id="tab-interna-nueva" class="tab-modal border-b-2 border-transparent py-2 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300">
+                        Interna
+                    </button>
                 </nav>
             </div>
 
@@ -1144,6 +1147,21 @@
                 </div>
             </div>
 
+            <!-- Contenido pestaña Interna (rutas ya existentes en almacenamiento) -->
+            <div id="content-interna-nueva" class="tab-content-modal space-y-4 hidden">
+                <p class="text-sm text-gray-600 dark:text-gray-400">Elige imágenes ya subidas en este producto (galería del principal y de especificaciones internas de categoría y producto). Clic de nuevo para quitar. El orden de selección es el de guardado. Puedes editar las rutas en cada fila.</p>
+                <div class="border border-gray-200 dark:border-gray-600 rounded-lg p-3 bg-gray-50/80 dark:bg-gray-800/40">
+                    <p class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Galería (vista con miniatura si existe)</p>
+                    <div id="galeria-imgs-interna-nueva" class="grid gap-px max-h-44 overflow-y-auto p-0 min-h-[2rem] w-full" style="grid-template-columns: repeat(5, minmax(0, 1fr)); grid-auto-rows: minmax(0, auto);"></div>
+                    <p id="galeria-imgs-interna-nueva-vacio" class="text-xs text-gray-500 dark:text-gray-400 mt-2 hidden">Aún no hay rutas de imagen en el formulario. Sube imágenes por otras pestañas o escribe rutas manualmente abajo.</p>
+                </div>
+                <div>
+                    <p class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Rutas a guardar (una fila por imagen, en orden)</p>
+                    <div id="filas-interna-nueva-producto" class="space-y-3"></div>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">Tip: también puedes usar el botón «Añadir fila vacía» y pegar rutas a mano.</p>
+                    <button type="button" id="btn-interna-nueva-anadir-fila-vacia" class="mt-2 text-sm text-blue-600 dark:text-blue-400 hover:underline">Añadir fila vacía</button>
+                </div>
+            </div>
 
             <div class="flex justify-end gap-3 mt-6">
                 <button type="button" onclick="cerrarModalAñadirImagen()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600">
@@ -1196,6 +1214,16 @@
                         <div class="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 flex items-center justify-center" style="min-height: 400px;">
                             <img id="imagen-grande-sublinea" src="" alt="Imagen grande" class="max-w-full max-h-96 object-contain rounded">
                         </div>
+                        <div id="rutas-imagen-sublinea-panel" class="mt-3 space-y-2 hidden">
+                            <div>
+                                <label class="block mb-0.5 text-xs font-medium text-gray-600 dark:text-gray-400">Ruta imagen grande</label>
+                                <code id="ruta-grande-sublinea-vista" class="block w-full text-xs text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-600 rounded px-2 py-1.5 break-all whitespace-pre-wrap"></code>
+                            </div>
+                            <div>
+                                <label class="block mb-0.5 text-xs font-medium text-gray-600 dark:text-gray-400">Ruta imagen pequeña</label>
+                                <code id="ruta-pequena-sublinea-vista" class="block w-full text-xs text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-600 rounded px-2 py-1.5 break-all whitespace-pre-wrap"></code>
+                            </div>
+                        </div>
                     </div>
                     <!-- Miniaturas -->
                     <div class="md:col-span-1">
@@ -1234,6 +1262,9 @@
                     </button>
                     <button type="button" id="tab-amazon-sublinea" class="tab-modal-sublinea border-b-2 border-transparent py-2 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300">
                         Amazon
+                    </button>
+                    <button type="button" id="tab-interna-sublinea" class="tab-modal-sublinea border-b-2 border-transparent py-2 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300">
+                        Interna
                     </button>
                 </nav>
             </div>
@@ -1324,6 +1355,21 @@
                             <option value="">Selecciona una carpeta</option>
                         </select>
                     </div>
+                </div>
+            </div>
+
+            <!-- Contenido pestaña Interna sublínea -->
+            <div id="content-interna-sublinea" class="tab-content-modal-sublinea space-y-4 hidden">
+                <p class="text-sm text-gray-600 dark:text-gray-400">Imágenes ya subidas en este producto (principal y especificaciones). Solo se guarda la ruta <strong class="font-medium">grande</strong> por fila; la pequeña es referencia y vista previa.</p>
+                <div class="border border-gray-200 dark:border-gray-600 rounded-lg p-3 bg-gray-50/80 dark:bg-gray-800/40">
+                    <p class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Galería</p>
+                    <div id="galeria-imgs-interna-sublinea" class="grid gap-px max-h-44 overflow-y-auto p-0 min-h-[2rem] w-full" style="grid-template-columns: repeat(5, minmax(0, 1fr)); grid-auto-rows: minmax(0, auto);"></div>
+                    <p id="galeria-imgs-interna-sublinea-vacio" class="text-xs text-gray-500 dark:text-gray-400 mt-2 hidden">No hay imágenes en el formulario todavía.</p>
+                </div>
+                <div>
+                    <p class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Rutas grandes a añadir (orden = orden de guardado)</p>
+                    <div id="filas-interna-sublinea" class="space-y-3"></div>
+                    <button type="button" id="btn-interna-sublinea-anadir-fila-vacia" class="mt-2 text-sm text-blue-600 dark:text-blue-400 hover:underline">Añadir fila vacía</button>
                 </div>
             </div>
 
@@ -3841,6 +3887,19 @@
                     .filter(v => (typeof v === 'string' || typeof v === 'number'))
                     .map(v => String(v));
             };
+            // _columnas puede ser lista de IDs, lista de objetos {id}, o mapa { idPrincipal: sublineaId } (otros formularios)
+            const normalizarColumnasLista = (raw) => {
+                if (raw == null) return [];
+                if (Array.isArray(raw)) {
+                    return normalizarArrayIds(raw);
+                }
+                if (typeof raw === 'object') {
+                    return Object.keys(raw)
+                        .filter(k => k && !String(k).startsWith('_'))
+                        .map(k => String(k));
+                }
+                return [];
+            };
             const normalizarFormato = (v) => {
                 if (v && typeof v === 'object' && !Array.isArray(v)) {
                     return typeof v.id === 'string' ? v.id : 'texto';
@@ -3852,18 +3911,20 @@
             const unidadDeMedidaSelect = document.getElementById('unidadDeMedida');
             const esUnidadUnica = unidadDeMedidaSelect && unidadDeMedidaSelect.value === 'unidadUnica';
             
-            // Obtener orden guardado y columnas marcadas
+            // Obtener orden guardado y columnas marcadas (siempre como string para includes/Map coherentes con dataset y JSON mixto numérico)
             const ordenGuardado = normalizarArrayIds(opcionesGuardadas._orden || []);
-            const columnasGuardadas = normalizarArrayIds(opcionesGuardadas._columnas || []);
+            const columnasGuardadas = normalizarColumnasLista(opcionesGuardadas._columnas);
+            // Mostrar checkbox "Columna oferta" si es unidad única O ya hay datos de columnas (p.ej. _columnas en mapa desde oferta/legacy): si no, el JSON tenía flags pero la UI ocultaba el control y al guardar se perdía todo
+            const mostrarUIColumnaOferta = esUnidadUnica || columnasGuardadas.length > 0;
             
             // Ordenar filtros según el orden guardado, o mantener el orden original
             let filtrosOrdenados = [...especificaciones.filtros];
             if (ordenGuardado.length > 0) {
-                const filtrosMap = new Map(filtrosOrdenados.map(f => [f.id, f]));
+                const filtrosMap = new Map(filtrosOrdenados.map(f => [String(f.id), f]));
                 filtrosOrdenados = ordenGuardado
-                    .map(id => filtrosMap.get(id))
+                    .map(id => filtrosMap.get(String(id)))
                     .filter(f => f !== undefined)
-                    .concat(filtrosOrdenados.filter(f => !ordenGuardado.includes(f.id)));
+                    .concat(filtrosOrdenados.filter(f => !ordenGuardado.includes(String(f.id))));
             }
             
             let html = '<p class="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-4">Selecciona las opciones deseadas en cada línea principal:</p>';
@@ -3873,8 +3934,11 @@
                 const idPrincipal = filtro.id;
                 const textoPrincipal = filtro.texto || `Línea principal ${index + 1}`;
                 const subprincipales = filtro.subprincipales || [];
-                const opcionesSeleccionadas = opcionesGuardadas[idPrincipal] || [];
-                const esColumna = columnasGuardadas.includes(idPrincipal);
+                const opcionesSeleccionadas =
+                    opcionesGuardadas[idPrincipal] ||
+                    opcionesGuardadas[String(idPrincipal)] ||
+                    [];
+                const esColumna = columnasGuardadas.includes(String(idPrincipal));
                 
                 html += `<div class="linea-principal-especificaciones border border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-white dark:bg-gray-800" data-principal-id="${idPrincipal}" draggable="false">`;
                 
@@ -3893,8 +3957,8 @@
                 // Nombre de la línea principal y texto "Aplica Filtro Categoria" si es importante
                 html += `<label class="flex-1 block font-medium text-gray-700 dark:text-gray-200">${textoPrincipal}${filtro.importante ? ' <span class="text-yellow-600 dark:text-yellow-400">(Aplica Filtro Categoria)</span>' : ''}</label>`;
                 
-                // Checkbox "Columna oferta" (solo si es unidadUnica) - ahora a la derecha
-                if (esUnidadUnica) {
+                // Checkbox "Columna oferta" (unidad única o si ya hay _columnas guardadas)
+                if (mostrarUIColumnaOferta) {
                     html += `<div class="flex items-center gap-2">`;
                     html += `<label class="flex items-center gap-1 cursor-pointer">`;
                     html += `<input type="checkbox" class="columna-oferta-checkbox rounded border-gray-300 text-orange-600 focus:ring-orange-500" data-principal-id="${idPrincipal}" ${esColumna ? 'checked' : ''}>`;
@@ -3948,8 +4012,9 @@
                     const isChecked = sublineaData !== null && sublineaData !== undefined;
                     // Leer flags optimizados: 'm' = mostrar, 'o' = oferta
                     // Comparación flexible para manejar números y strings
-                    const mostrarChecked = sublineaData && (sublineaData.m === 1 || sublineaData.m === '1' || sublineaData.mostrar === true);
-                    const ofertaChecked = sublineaData && (sublineaData.o === 1 || sublineaData.o === '1' || sublineaData.oferta === true);
+                    const flagTruthy = (v) => v === true || v === 1 || v === '1';
+                    const mostrarChecked = sublineaData && (flagTruthy(sublineaData.m) || sublineaData.mostrar === true);
+                    const ofertaChecked = sublineaData && (flagTruthy(sublineaData.o) || sublineaData.oferta === true);
                     // Leer imágenes de la sublínea
                     const imagenesSublinea = sublineaData && Array.isArray(sublineaData.img) ? sublineaData.img : [];
                     const numImagenes = imagenesSublinea.length;
@@ -4094,8 +4159,8 @@
                 configurarDragAndDropEspecificaciones(contenedor);
             }
             
-            // Añadir event listeners a los checkboxes de "Columna oferta" (solo si es unidadUnica)
-            if (esUnidadUnica) {
+            // Añadir event listeners a los checkboxes de "Columna oferta"
+            if (mostrarUIColumnaOferta) {
                 const columnaCheckboxes = contenedor.querySelectorAll('.columna-oferta-checkbox');
                 columnaCheckboxes.forEach(checkbox => {
                     // Mostrar campos de texto alternativo si ya está marcado al cargar
@@ -4260,11 +4325,8 @@
                             ofertaCheckbox.checked = true;
                         }
                         
-                        // Marcar también "Columna oferta" del grupo (línea principal) si es unidadUnica y no está marcado
-                        const unidadDeMedidaSelect = document.getElementById('unidadDeMedida');
-                        const esUnidadUnica = unidadDeMedidaSelect && unidadDeMedidaSelect.value === 'unidadUnica';
-                        
-                        if (esUnidadUnica) {
+                        // Marcar también "Columna oferta" del grupo si aplica esa UI y no está marcado
+                        if (mostrarUIColumnaOferta) {
                             const columnaCheckbox = contenedor.querySelector(`.columna-oferta-checkbox[data-principal-id="${principalId}"]`);
                             if (columnaCheckbox && !columnaCheckbox.checked) {
                                 // Verificar que no se excedan las 4 columnas permitidas
@@ -4642,7 +4704,7 @@
                 const sublineaId = checkbox.dataset.sublineaId;
                 
                 // Si este ID pertenece al producto, NO procesarlo aquí (ya está preservado)
-                if (idsProducto.includes(principalId)) {
+                if (idsProducto.some(fid => String(fid) === String(principalId))) {
                     return; // Saltar este checkbox, es del producto, no de categoría
                 }
                 
@@ -4718,32 +4780,79 @@
             });
             
             // Si es unidadUnica, guardar orden y columnas (combinando con las del producto)
-            if (esUnidadUnica) {
-                const contenedorPrincipal = document.querySelector('#especificaciones-principales-container');
-                if (contenedorPrincipal) {
-                    const lineasPrincipales = Array.from(contenedorPrincipal.querySelectorAll('.linea-principal-especificaciones'));
-                    const orden = lineasPrincipales.map(linea => linea.dataset.principalId);
-                    especificaciones._orden = orden;
-                    
-                    // Obtener columnas de categoría (solo las marcadas actualmente)
-                    const columnasCheckboxes = contenedorPrincipal.querySelectorAll('.columna-oferta-checkbox:checked');
-                    const columnasCategoria = Array.from(columnasCheckboxes).map(cb => cb.dataset.principalId);
-                    
-                    // Obtener columnas del producto (del contenedor de producto, solo las marcadas actualmente)
-                    const contenedorProducto = document.querySelector('#especificaciones-producto-container');
-                    let columnasProducto = [];
-                    if (contenedorProducto) {
-                        const columnasCheckboxesProducto = contenedorProducto.querySelectorAll('.columna-oferta-producto-checkbox:checked');
-                        columnasProducto = Array.from(columnasCheckboxesProducto).map(cb => cb.dataset.principalId);
-                    }
-                    
-                    // Combinar solo las columnas actualmente marcadas: categoría + producto, eliminando duplicados
-                    const todasLasColumnas = [...new Set([...columnasCategoria, ...columnasProducto])];
-                    especificaciones._columnas = todasLasColumnas;
+            const contenedorPrincipalCol = document.querySelector('#especificaciones-principales-container');
+            const hayUiColumnaCategoria = !!(contenedorPrincipalCol && contenedorPrincipalCol.querySelector('.columna-oferta-checkbox'));
+
+            if (esUnidadUnica && contenedorPrincipalCol) {
+                const lineasPrincipales = Array.from(contenedorPrincipalCol.querySelectorAll('.linea-principal-especificaciones'));
+                const orden = lineasPrincipales.map(linea => linea.dataset.principalId);
+                especificaciones._orden = orden;
+                
+                // Obtener columnas de categoría (solo las marcadas actualmente)
+                const columnasCheckboxes = contenedorPrincipalCol.querySelectorAll('.columna-oferta-checkbox:checked');
+                const columnasCategoria = Array.from(columnasCheckboxes).map(cb => cb.dataset.principalId);
+                
+                // Obtener columnas del producto (del contenedor de producto, solo las marcadas actualmente)
+                const contenedorProducto = document.querySelector('#especificaciones-producto-container');
+                let columnasProducto = [];
+                if (contenedorProducto) {
+                    const columnasCheckboxesProducto = contenedorProducto.querySelectorAll('.columna-oferta-producto-checkbox:checked');
+                    columnasProducto = Array.from(columnasCheckboxesProducto).map(cb => cb.dataset.principalId);
                 }
+                
+                // Combinar solo las columnas actualmente marcadas: categoría + producto, eliminando duplicados
+                const todasLasColumnas = [...new Set([...columnasCategoria, ...columnasProducto])];
+                especificaciones._columnas = todasLasColumnas;
+            } else if (hayUiColumnaCategoria && contenedorPrincipalCol) {
+                // Unidad ≠ unidadUnica pero la UI muestra columnas porque había _columnas guardado: mantener objeto { principal: sublínea } si era así
+                const columnasCategoria = Array.from(contenedorPrincipalCol.querySelectorAll('.columna-oferta-checkbox:checked')).map(cb => String(cb.dataset.principalId));
+                const contenedorProductoCol = document.querySelector('#especificaciones-producto-container');
+                let columnasProducto = [];
+                if (contenedorProductoCol) {
+                    columnasProducto = Array.from(contenedorProductoCol.querySelectorAll('.columna-oferta-producto-checkbox:checked')).map(cb => String(cb.dataset.principalId));
+                }
+                const todosMarcados = [...new Set([...columnasCategoria, ...columnasProducto])];
+                const prevCol = especificacionesGuardadas._columnas;
+
+                const inferirSublinea = (principalIdStr) => {
+                    const arr = especificaciones[principalIdStr] ?? especificaciones[String(principalIdStr)];
+                    if (!Array.isArray(arr) || arr.length === 0) return null;
+                    const first = arr[0];
+                    if (typeof first === 'object' && first !== null && first.id !== undefined && first.id !== null) {
+                        return first.id;
+                    }
+                    return first;
+                };
+
+                if (prevCol !== undefined && prevCol !== null && typeof prevCol === 'object' && !Array.isArray(prevCol)) {
+                    const nuevo = {};
+                    todosMarcados.forEach(pid => {
+                        let sub =
+                            prevCol[pid] ?? prevCol[String(pid)];
+                        if (sub == null || sub === '') {
+                            sub = inferirSublinea(pid);
+                        }
+                        if (sub != null && sub !== '') {
+                            nuevo[pid] = sub;
+                        }
+                    });
+                    especificaciones._columnas = nuevo;
+                } else {
+                    especificaciones._columnas = todosMarcados;
+                }
+            } else if (especificacionesGuardadas._columnas !== undefined && especificacionesGuardadas._columnas !== null && !hayUiColumnaCategoria) {
+                // No hay UI de columnas pero había datos (p.ej. otra vista): no pisar la clave
+                especificaciones._columnas = especificacionesGuardadas._columnas;
             }
-            
-            // Preservar TODAS las especificaciones del producto (_producto) si existen
+
+            // Preservar _orden y _columnas si la UI anterior no los rellenó
+            if (especificaciones._orden === undefined && especificacionesGuardadas._orden !== undefined && Array.isArray(especificacionesGuardadas._orden)) {
+                especificaciones._orden = especificacionesGuardadas._orden.map(String);
+            }
+            if (especificaciones._columnas === undefined && especificacionesGuardadas._columnas !== undefined && especificacionesGuardadas._columnas !== null) {
+                especificaciones._columnas = especificacionesGuardadas._columnas;
+            }
+
             if (especificacionesGuardadas._producto) {
                 especificaciones._producto = especificacionesGuardadas._producto;
             }
@@ -4788,7 +4897,7 @@
                     // Verificar si pertenece al producto buscando en _producto.filtros
                     if (especificacionesGuardadas._producto && 
                         especificacionesGuardadas._producto.filtros &&
-                        especificacionesGuardadas._producto.filtros.some(f => f.id === key)) {
+                        especificacionesGuardadas._producto.filtros.some(f => String(f.id) === String(key))) {
                         // Es del producto, preservarla
                         especificaciones[key] = especificacionesGuardadas[key];
                     }
@@ -4828,6 +4937,299 @@
         let cropperSublinea = null;
         let carpetaActualSublinea = null;
         let imagenTemporalUrlSublinea = null;
+
+        const KP_PENDING_IMG = '__pending:';
+        const uploadsPendientesSublinea = new Map();
+
+        if (!window.__kpSubirParejaConProgreso) {
+            window.__kpSubirParejaConProgreso = function(url, fdG, fdP, csrfToken, onProgress, xhrRegistryMap, uploadId) {
+                let pg = 0, pp = 0;
+                const emit = function() {
+                    if (onProgress) onProgress(Math.min(100, Math.round((pg + pp) / 2)));
+                };
+                const entry = { xhrG: null, xhrP: null };
+                if (xhrRegistryMap && uploadId) xhrRegistryMap.set(uploadId, entry);
+                const one = function(fd, tag) {
+                    return new Promise(function(resolve, reject) {
+                        const xhr = new XMLHttpRequest();
+                        if (tag === 'G') entry.xhrG = xhr;
+                        else entry.xhrP = xhr;
+                        xhr.open('POST', url);
+                        xhr.setRequestHeader('X-CSRF-TOKEN', csrfToken);
+                        xhr.setRequestHeader('Accept', 'application/json');
+                        xhr.upload.onprogress = function(e) {
+                            if (e.lengthComputable) {
+                                const pct = Math.round(100 * e.loaded / e.total);
+                                if (tag === 'G') pg = pct;
+                                else pp = pct;
+                                emit();
+                            }
+                        };
+                        xhr.onload = function() {
+                            let data;
+                            try { data = JSON.parse(xhr.responseText); } catch (e) {
+                                reject(new Error('Respuesta inválida'));
+                                return;
+                            }
+                            if (xhr.status >= 200 && xhr.status < 300 && data.success) resolve(data);
+                            else reject(new Error((data && data.message) || 'Error al subir'));
+                        };
+                        xhr.onerror = function() { reject(new Error('Error de red')); };
+                        xhr.send(fd);
+                    });
+                };
+                return Promise.all([one(fdG, 'G'), one(fdP, 'P')]).then(function(results) {
+                    if (xhrRegistryMap && uploadId) xhrRegistryMap.delete(uploadId);
+                    return { dataG: results[0], dataP: results[1] };
+                }).catch(function(err) {
+                    if (xhrRegistryMap && uploadId) xhrRegistryMap.delete(uploadId);
+                    throw err;
+                });
+            };
+        }
+
+        function kpNuevoIdSubida() {
+            return Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+        }
+
+        function kpEsRutaPendiente(ruta) {
+            return typeof ruta === 'string' && ruta.indexOf(KP_PENDING_IMG) === 0;
+        }
+
+        function kpUrlVistaDesdeRutaAlmacen(raw) {
+            const t = (raw || '').trim();
+            if (!t) return '';
+            if (/^https?:\/\//i.test(t)) return t;
+            if (/^\/\//.test(t)) return 'https:' + t;
+            let p = t.replace(/^\/+/, '');
+            if (/^images\//i.test(p)) {
+                return @json(rtrim(url('/'), '/')) + '/' + p;
+            }
+            return @json(rtrim(asset('images/'), '/')) + '/' + p;
+        }
+        window.kpUrlVistaDesdeRutaAlmacen = kpUrlVistaDesdeRutaAlmacen;
+
+        function kpActualizarPreviewInputInterno(inputId, imgId) {
+            const inp = document.getElementById(inputId);
+            const img = document.getElementById(imgId);
+            if (!inp || !img) return;
+            const u = kpUrlVistaDesdeRutaAlmacen(inp.value);
+            if (!u) {
+                img.removeAttribute('src');
+                img.classList.add('hidden');
+                img.classList.remove('ring-2', 'ring-red-400');
+                return;
+            }
+            img.classList.remove('ring-2', 'ring-red-400');
+            img.src = u;
+            img.classList.remove('hidden');
+            img.onerror = function() { img.classList.add('ring-2', 'ring-red-400'); };
+            img.onload = function() { img.classList.remove('ring-2', 'ring-red-400'); };
+        }
+        window.kpActualizarPreviewInputInterno = kpActualizarPreviewInputInterno;
+
+        let __kpInternaSublineaSelOrden = [];
+        let __kpInternaSublineaRowInc = 0;
+        function kpPairKeyInternaSublinea(p) {
+            return (p.rutaGrande || '') + '\x01' + (p.rutaPequena || '');
+        }
+        function kpStableB64InternaSub(k) {
+            try { return btoa(unescape(encodeURIComponent(k))); } catch (e) { return String(k.length); }
+        }
+        function kpLimpiarInternaSublineaUI() {
+            __kpInternaSublineaSelOrden = [];
+            const g = document.getElementById('galeria-imgs-interna-sublinea');
+            if (g) g.innerHTML = '';
+            const f = document.getElementById('filas-interna-sublinea');
+            if (f) f.innerHTML = '';
+            const vac = document.getElementById('galeria-imgs-interna-sublinea-vacio');
+            if (vac) vac.classList.add('hidden');
+        }
+        function kpBindFilasInternaSublineaDelegation() {
+            const cont = document.getElementById('filas-interna-sublinea');
+            if (!cont || cont.dataset.kpDelegSubInt) return;
+            cont.dataset.kpDelegSubInt = '1';
+            const upd = function(inp) {
+                const row = inp.closest('.kp-fila-interna-sublinea');
+                if (!row) return;
+                const g = row.querySelector('.kp-interna-sub-g');
+                const p = row.querySelector('.kp-interna-sub-p');
+                const pg = row.querySelector('.kp-interna-sub-pg');
+                const pp = row.querySelector('.kp-interna-sub-pp');
+                if (g && pg && g.id && pg.id) kpActualizarPreviewInputInterno(g.id, pg.id);
+                if (p && pp && p.id && pp.id) kpActualizarPreviewInputInterno(p.id, pp.id);
+            };
+            cont.addEventListener('input', function(e) {
+                const t = e.target;
+                if (!t.classList.contains('kp-interna-sub-g') && !t.classList.contains('kp-interna-sub-p')) return;
+                upd(t);
+            });
+            cont.addEventListener('paste', function(e) {
+                const t = e.target;
+                if (!t.classList.contains('kp-interna-sub-g') && !t.classList.contains('kp-interna-sub-p')) return;
+                setTimeout(function() { upd(t); }, 0);
+            });
+        }
+        function kpParesParaGaleriaInternaSublinea() {
+            if (typeof window.kpRecolectarParesImagenesDisponiblesProducto === 'function') {
+                return window.kpRecolectarParesImagenesDisponiblesProducto();
+            }
+            return [];
+        }
+        function kpRenderGaleriaInternaSublinea() {
+            const wrap = document.getElementById('galeria-imgs-interna-sublinea');
+            const vac = document.getElementById('galeria-imgs-interna-sublinea-vacio');
+            if (!wrap) return;
+            const pairs = kpParesParaGaleriaInternaSublinea();
+            wrap.innerHTML = '';
+            if (!pairs.length) {
+                if (vac) vac.classList.remove('hidden');
+                return;
+            }
+            if (vac) vac.classList.add('hidden');
+            pairs.forEach(function(pair) {
+                const key = kpPairKeyInternaSublinea(pair);
+                const ord = __kpInternaSublineaSelOrden.findIndex(function(x) { return kpPairKeyInternaSublinea(x) === key; }) + 1;
+                const cell = document.createElement('div');
+                cell.className = 'min-w-0 w-full';
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'relative w-full aspect-square max-w-full border p-0 overflow-hidden rounded-sm transition ' + (ord ? 'border-blue-500 ring-1 ring-inset ring-blue-400/80 bg-blue-50/50 dark:bg-blue-900/30' : 'border-gray-200 dark:border-gray-600 hover:border-gray-400');
+                const src = kpUrlVistaDesdeRutaAlmacen(pair.thumbVisual || pair.rutaPequena || pair.rutaGrande);
+                const img = document.createElement('img');
+                img.src = src;
+                img.className = 'w-full h-full object-cover block pointer-events-none';
+                img.alt = '';
+                btn.appendChild(img);
+                if (ord) {
+                    const badge = document.createElement('span');
+                    badge.className = 'absolute -top-0.5 -right-0.5 min-w-3 h-3.5 px-0.5 flex items-center justify-center rounded-full bg-blue-600 text-white text-[8px] font-bold leading-none';
+                    badge.textContent = String(ord);
+                    btn.appendChild(badge);
+                }
+                btn.addEventListener('click', function() { kpToggleInternaSublineaSeleccion(pair); });
+                cell.appendChild(btn);
+                wrap.appendChild(cell);
+            });
+        }
+        function kpAddFilaInternaSublinea(pairOrNull) {
+            kpBindFilasInternaSublineaDelegation();
+            const cont = document.getElementById('filas-interna-sublinea');
+            if (!cont) return;
+            const idn = 'kpsubint' + (++__kpInternaSublineaRowInc);
+            let gVal = '';
+            let pVal = '';
+            let b64 = '';
+            if (pairOrNull) {
+                gVal = (pairOrNull.rutaGrande || '').trim();
+                pVal = (pairOrNull.rutaPequena || '').trim();
+                if (gVal && !pVal) pVal = kpInferirRutaThumbnailSublinea(gVal);
+                if (!gVal && pVal) gVal = '';
+                b64 = kpStableB64InternaSub(kpPairKeyInternaSublinea(pairOrNull));
+            }
+            const row = document.createElement('div');
+            row.className = 'kp-fila-interna-sublinea border border-gray-200 dark:border-gray-600 rounded-lg p-3 space-y-2';
+            if (b64) row.dataset.pairKey = b64;
+            row.innerHTML =
+                '<div class="flex flex-wrap items-start gap-3">' +
+                '<div class="flex-1 min-w-[200px]"><label class="block mb-1 text-xs text-gray-600 dark:text-gray-400">Ruta grande (se guarda)</label>' +
+                '<input type="text" id="' + idn + '-g" autocomplete="off" class="kp-interna-sub-g w-full px-3 py-2 rounded bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white border text-sm"></div>' +
+                '<div class="shrink-0"><span class="block mb-1 text-[10px] text-gray-500 dark:text-gray-400">Vista previa</span>' +
+                '<img id="' + idn + '-pg" alt="" class="kp-interna-sub-pg hidden w-9 h-9 object-cover rounded border border-gray-300 dark:border-gray-600"></div></div>' +
+                '<div class="flex flex-wrap items-start gap-3">' +
+                '<div class="flex-1 min-w-[200px]"><label class="block mb-1 text-xs text-gray-600 dark:text-gray-400">Ruta pequeña (referencia)</label>' +
+                '<input type="text" id="' + idn + '-p" autocomplete="off" class="kp-interna-sub-p w-full px-3 py-2 rounded bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white border text-sm"></div>' +
+                '<div class="shrink-0"><span class="block mb-1 text-[10px] text-gray-500 dark:text-gray-400">Vista previa</span>' +
+                '<img id="' + idn + '-pp" alt="" class="kp-interna-sub-pp hidden w-9 h-9 object-cover rounded border border-gray-300 dark:border-gray-600"></div></div>';
+            cont.appendChild(row);
+            row.querySelector('.kp-interna-sub-g').value = gVal;
+            row.querySelector('.kp-interna-sub-p').value = pVal;
+            kpActualizarPreviewInputInterno(idn + '-g', idn + '-pg');
+            kpActualizarPreviewInputInterno(idn + '-p', idn + '-pp');
+        }
+        function kpToggleInternaSublineaSeleccion(pair) {
+            const key = kpPairKeyInternaSublinea(pair);
+            const ix = __kpInternaSublineaSelOrden.findIndex(function(x) { return kpPairKeyInternaSublinea(x) === key; });
+            const cont = document.getElementById('filas-interna-sublinea');
+            const b64 = kpStableB64InternaSub(key);
+            if (ix === -1) {
+                __kpInternaSublineaSelOrden.push({ rutaGrande: pair.rutaGrande, rutaPequena: pair.rutaPequena, thumbVisual: pair.thumbVisual });
+                kpAddFilaInternaSublinea(pair);
+            } else {
+                __kpInternaSublineaSelOrden.splice(ix, 1);
+                if (cont) {
+                    const hit = cont.querySelector('.kp-fila-interna-sublinea[data-pair-key="' + b64 + '"]');
+                    if (hit) hit.remove();
+                }
+            }
+            kpRenderGaleriaInternaSublinea();
+        }
+
+        function kpCancelarSubidaSublinea(uploadId) {
+            const x = uploadsPendientesSublinea.get(uploadId);
+            if (!x) return;
+            if (x.xhrG) try { x.xhrG.abort(); } catch (e) {}
+            if (x.xhrP) try { x.xhrP.abort(); } catch (e) {}
+            uploadsPendientesSublinea.delete(uploadId);
+        }
+
+        function kpEliminarRutaPendienteDeEspecificaciones(pendingPath) {
+            const inputHidden = document.getElementById('categoria_especificaciones_internas_elegidas_input');
+            if (!inputHidden || !inputHidden.value) return;
+            let especificaciones = {};
+            try { especificaciones = JSON.parse(inputHidden.value); } catch (e) { return; }
+            let changed = false;
+            Object.keys(especificaciones).forEach(function(pid) {
+                const arr = especificaciones[pid];
+                if (!Array.isArray(arr)) return;
+                arr.forEach(function(item) {
+                    if (item && typeof item === 'object' && item.img && Array.isArray(item.img)) {
+                        const ix = item.img.indexOf(pendingPath);
+                        if (ix !== -1) {
+                            item.img.splice(ix, 1);
+                            changed = true;
+                        }
+                    }
+                });
+            });
+            if (changed) inputHidden.value = JSON.stringify(especificaciones, null, 0);
+        }
+
+        function kpReemplazarRutaPendienteEnEspecificaciones(pendingPath, rutaFinal) {
+            const inputHidden = document.getElementById('categoria_especificaciones_internas_elegidas_input');
+            let especificaciones = {};
+            if (inputHidden && inputHidden.value) {
+                try { especificaciones = JSON.parse(inputHidden.value); } catch (e) {}
+            }
+            let changed = false;
+            Object.keys(especificaciones).forEach(function(pid) {
+                const arr = especificaciones[pid];
+                if (!Array.isArray(arr)) return;
+                arr.forEach(function(item) {
+                    if (item && typeof item === 'object' && item.img && Array.isArray(item.img)) {
+                        const ix = item.img.indexOf(pendingPath);
+                        if (ix !== -1) {
+                            item.img[ix] = rutaFinal;
+                            changed = true;
+                        }
+                    }
+                });
+            });
+            if (changed && inputHidden) inputHidden.value = JSON.stringify(especificaciones, null, 0);
+            if (sublineaImagenesActual.imagenes && sublineaImagenesActual.imagenes.length) {
+                const j = sublineaImagenesActual.imagenes.indexOf(pendingPath);
+                if (j !== -1) sublineaImagenesActual.imagenes[j] = rutaFinal;
+            }
+            const modalImg = document.getElementById('modal-imagenes-sublinea');
+            if (modalImg && !modalImg.classList.contains('hidden')) renderizarMiniaturasSublinea();
+            if (typeof actualizarJSONProducto === 'function') actualizarJSONProducto();
+        }
+
+        function prepararModalAnadirSublineaParaOtra(tab) {
+            document.getElementById('modal-añadir-imagen-sublinea').classList.remove('hidden');
+            limpiarModalAñadirSublinea({ mantenerCarpetas: true });
+            cambiarTabModalSublinea(tab || 'url');
+        }
         
         // Configurar botones de imágenes de sublíneas
         function configurarBotonesImagenesSublineas(contenedor) {
@@ -4888,7 +5290,39 @@
         window.cerrarModalImagenesSublinea = function() {
             document.getElementById('modal-imagenes-sublinea').classList.add('hidden');
             sublineaImagenesActual = { principalId: null, sublineaId: null, imagenes: [] };
+            actualizarPanelRutasVistaSublinea(null);
         };
+
+        /** Deduce la ruta de la miniatura (misma convención que al subir: -thumbnail antes de la extensión). */
+        function kpInferirRutaThumbnailSublinea(rutaGrande) {
+            if (!rutaGrande || typeof rutaGrande !== 'string') return '';
+            if (kpEsRutaPendiente(rutaGrande)) return '';
+            const lastDot = rutaGrande.lastIndexOf('.');
+            if (lastDot === -1) return rutaGrande + '-thumbnail';
+            return rutaGrande.slice(0, lastDot) + '-thumbnail' + rutaGrande.slice(lastDot);
+        }
+
+        function actualizarPanelRutasVistaSublinea(imgPathActiva) {
+            const panel = document.getElementById('rutas-imagen-sublinea-panel');
+            const elG = document.getElementById('ruta-grande-sublinea-vista');
+            const elP = document.getElementById('ruta-pequena-sublinea-vista');
+            if (!panel || !elG || !elP) return;
+            if (!imgPathActiva || !sublineaImagenesActual.imagenes || sublineaImagenesActual.imagenes.length === 0) {
+                panel.classList.add('hidden');
+                elG.textContent = '';
+                elP.textContent = '';
+                return;
+            }
+            if (kpEsRutaPendiente(imgPathActiva)) {
+                panel.classList.remove('hidden');
+                elG.textContent = '(subiendo…)';
+                elP.textContent = '—';
+                return;
+            }
+            panel.classList.remove('hidden');
+            elG.textContent = imgPathActiva;
+            elP.textContent = kpInferirRutaThumbnailSublinea(imgPathActiva);
+        }
         
         // Renderizar miniaturas en el modal de imágenes de sublínea
         function renderizarMiniaturasSublinea() {
@@ -4900,33 +5334,55 @@
                 imgGrande.src = '';
                 imgGrande.alt = 'No hay imágenes';
                 container.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400">No hay imágenes</p>';
+                actualizarPanelRutasVistaSublinea(null);
                 return;
             }
             
             // Mostrar primera imagen como grande
-            if (sublineaImagenesActual.imagenes[0]) {
-                imgGrande.src = `{{ asset('images/') }}/${sublineaImagenesActual.imagenes[0]}`;
+            const primera = sublineaImagenesActual.imagenes[0];
+            if (primera && !kpEsRutaPendiente(primera)) {
+                imgGrande.src = `{{ asset('images/') }}/${primera}`;
                 imgGrande.alt = 'Imagen 1';
+            } else if (primera && kpEsRutaPendiente(primera)) {
+                imgGrande.src = '';
+                imgGrande.alt = 'Subiendo…';
             }
+            actualizarPanelRutasVistaSublinea(primera);
             
             // Renderizar miniaturas
             sublineaImagenesActual.imagenes.forEach((imgPath, index) => {
                 const div = document.createElement('div');
                 div.className = 'relative group miniatura-sublinea cursor-pointer border-2 border-gray-300 dark:border-gray-600 rounded p-1';
                 div.dataset.index = index;
-                div.draggable = true;
+                const pendiente = kpEsRutaPendiente(imgPath);
+                div.draggable = !pendiente;
                 if (index === 0) {
                     div.classList.add('border-blue-500');
                 }
                 
-                div.innerHTML = `
-                    <img src="{{ asset('images/') }}/${imgPath}" alt="Miniatura ${index + 1}" class="w-full h-20 object-cover rounded">
-                    <button type="button" class="absolute top-0 right-0 bg-red-600 hover:bg-red-700 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity btn-eliminar-imagen-sublinea" data-index="${index}">×</button>
-                `;
+                if (pendiente) {
+                    const uid = imgPath.slice(KP_PENDING_IMG.length);
+                    div.innerHTML = `
+                        <div class="w-full h-20 flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-700 rounded p-1">
+                            <span class="text-[10px] text-gray-600 dark:text-gray-300 text-center leading-tight">Cargando imagen…</span>
+                            <div class="w-full mt-1 h-1.5 bg-gray-200 dark:bg-gray-600 rounded overflow-hidden">
+                                <div id="kp-prog-sub-${uid}" class="h-full bg-blue-500 transition-[width] duration-150" style="width:0%"></div>
+                            </div>
+                        </div>
+                        <button type="button" class="absolute top-0 right-0 bg-red-600 hover:bg-red-700 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity btn-eliminar-imagen-sublinea" data-index="${index}">×</button>
+                    `;
+                } else {
+                    div.innerHTML = `
+                        <img src="{{ asset('images/') }}/${imgPath}" alt="Miniatura ${index + 1}" class="w-full h-20 object-cover rounded">
+                        <button type="button" class="absolute top-0 right-0 bg-red-600 hover:bg-red-700 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity btn-eliminar-imagen-sublinea" data-index="${index}">×</button>
+                    `;
+                }
                 
                 div.addEventListener('click', () => {
+                    if (pendiente) return;
                     imgGrande.src = `{{ asset('images/') }}/${imgPath}`;
                     imgGrande.alt = `Imagen ${index + 1}`;
+                    actualizarPanelRutasVistaSublinea(imgPath);
                     container.querySelectorAll('.miniatura-sublinea').forEach(m => m.classList.remove('border-blue-500'));
                     div.classList.add('border-blue-500');
                 });
@@ -5000,7 +5456,10 @@
             if (!confirm('¿Estás seguro de que quieres eliminar esta imagen?')) {
                 return;
             }
-            
+            const path = sublineaImagenesActual.imagenes[index];
+            if (path && kpEsRutaPendiente(path)) {
+                kpCancelarSubidaSublinea(path.slice(KP_PENDING_IMG.length));
+            }
             sublineaImagenesActual.imagenes.splice(index, 1);
             guardarImagenesSublinea();
             renderizarMiniaturasSublinea();
@@ -5058,6 +5517,7 @@
             sublineaImagenesActual.principalId = principalId;
             sublineaImagenesActual.sublineaId = sublineaId;
             document.getElementById('modal-añadir-imagen-sublinea').classList.remove('hidden');
+            kpRenderGaleriaInternaSublinea();
             cargarCarpetasModalSublinea();
             cambiarTabModalSublinea('url');
         }
@@ -5069,10 +5529,14 @@
         };
         
         // Limpiar modal de añadir imagen a sublínea
-        function limpiarModalAñadirSublinea() {
-            document.getElementById('carpeta-subir-sublinea').value = '';
-            document.getElementById('carpeta-url-sublinea').value = '';
-            document.getElementById('carpeta-amazon-sublinea').value = '';
+        function limpiarModalAñadirSublinea(opciones) {
+            opciones = opciones || {};
+            const mantener = !!opciones.mantenerCarpetas;
+            if (!mantener) {
+                document.getElementById('carpeta-subir-sublinea').value = '';
+                document.getElementById('carpeta-url-sublinea').value = '';
+                document.getElementById('carpeta-amazon-sublinea').value = '';
+            }
             document.getElementById('file-subir-sublinea').value = '';
             document.getElementById('url-imagen-sublinea').value = '';
             document.getElementById('url-amazon-sublinea').value = '';
@@ -5088,6 +5552,7 @@
                 cropperSublinea.destroy();
                 cropperSublinea = null;
             }
+            kpLimpiarInternaSublineaUI();
         }
         
         // Cambiar pestañas del modal de sublínea
@@ -5095,16 +5560,21 @@
             const tabSubir = document.getElementById('tab-subir-sublinea');
             const tabUrl = document.getElementById('tab-url-sublinea');
             const tabAmazon = document.getElementById('tab-amazon-sublinea');
+            const tabInterna = document.getElementById('tab-interna-sublinea');
             const contentSubir = document.getElementById('content-subir-sublinea');
             const contentUrl = document.getElementById('content-url-sublinea');
             const contentAmazon = document.getElementById('content-amazon-sublinea');
+            const contentInterna = document.getElementById('content-interna-sublinea');
             
             // Resetear todas las pestañas
-            [tabUrl, tabSubir, tabAmazon].forEach(t => {
+            [tabUrl, tabSubir, tabAmazon, tabInterna].forEach(t => {
+                if (!t) return;
                 t.classList.remove('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
                 t.classList.add('border-transparent', 'text-gray-500');
             });
-            [contentUrl, contentSubir, contentAmazon].forEach(c => c.classList.add('hidden'));
+            [contentUrl, contentSubir, contentAmazon, contentInterna].forEach(c => {
+                if (c) c.classList.add('hidden');
+            });
             
             if (tab === 'url') {
                 tabUrl.classList.add('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
@@ -5119,6 +5589,12 @@
                 tabAmazon.classList.remove('border-transparent', 'text-gray-500');
                 contentAmazon.classList.remove('hidden');
                 cargarCarpetasModalSublinea(); // Cargar carpetas cuando se abre la pestaña Amazon
+            } else if (tab === 'interna' && tabInterna && contentInterna) {
+                tabInterna.classList.add('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
+                tabInterna.classList.remove('border-transparent', 'text-gray-500');
+                contentInterna.classList.remove('hidden');
+                kpBindFilasInternaSublineaDelegation();
+                kpRenderGaleriaInternaSublinea();
             }
         }
         
@@ -5361,6 +5837,14 @@
         // Event listeners para pestañas del modal de sublínea
         document.getElementById('tab-subir-sublinea').addEventListener('click', () => cambiarTabModalSublinea('subir'));
         document.getElementById('tab-url-sublinea').addEventListener('click', () => cambiarTabModalSublinea('url'));
+        const tabInternaSubEl = document.getElementById('tab-interna-sublinea');
+        if (tabInternaSubEl) tabInternaSubEl.addEventListener('click', () => cambiarTabModalSublinea('interna'));
+        const btnInternaSubFilaVacia = document.getElementById('btn-interna-sublinea-anadir-fila-vacia');
+        if (btnInternaSubFilaVacia) {
+            btnInternaSubFilaVacia.addEventListener('click', function() {
+                kpAddFilaInternaSublinea(null);
+            });
+        }
         
         // ========== FUNCIONALIDAD AMAZON PARA MODAL SUBLÍNEA ==========
         let imagenesAmazonSeleccionadasSublinea = [];
@@ -5577,143 +6061,88 @@
             try {
                 const slugInput = document.querySelector('input[name="slug"]');
                 const nombreBase = slugInput ? slugInput.value.trim() : 'imagen';
-                
-                // Mostrar indicador de progreso
-                const loadingDiv = document.getElementById('loading-amazon-sublinea');
-                const btnGuardar = document.getElementById('btn-guardar-imagen-sublinea');
-                const totalImagenes = imagenesAmazonSeleccionadasSublinea.length;
-                
-                // Deshabilitar botón y mostrar progreso
-                if (btnGuardar) {
-                    btnGuardar.disabled = true;
-                    btnGuardar.textContent = 'Procesando...';
-                }
-                if (loadingDiv) {
-                    loadingDiv.textContent = `Procesando imagen 0 de ${totalImagenes}...`;
-                    loadingDiv.classList.remove('hidden');
-                }
-                
-                // Procesar cada imagen seleccionada
-                for (let i = 0; i < imagenesAmazonSeleccionadasSublinea.length; i++) {
-                    const imagen = imagenesAmazonSeleccionadasSublinea[i];
-                    const timestamp = Date.now() + i; // Añadir índice para evitar colisiones
-                    
-                    // Actualizar progreso
-                    if (loadingDiv) {
-                        loadingDiv.textContent = `Procesando imagen ${i + 1} de ${totalImagenes}...`;
-                    }
-                    
-                    // Cargar la imagen desde la URL usando proxy para evitar CORS
-                    const urlProxy = imagen.url.startsWith('http') 
+                const seleccionAmazonSub = imagenesAmazonSeleccionadasSublinea.slice();
+                const verModalAbiertoSub = document.getElementById('modal-imagenes-sublinea') && !document.getElementById('modal-imagenes-sublinea').classList.contains('hidden');
+
+                seleccionAmazonSub.forEach(function(imagen, i) {
+                    const uploadId = kpNuevoIdSubida();
+                    const pendingPath = KP_PENDING_IMG + uploadId;
+                    añadirImagenASublinea(pendingPath);
+
+                    const timestamp = Date.now() + i;
+                    const urlProxy = imagen.url.startsWith('http')
                         ? `{{ route('admin.imagenes.proxy') }}?url=${encodeURIComponent(imagen.url)}`
                         : imagen.url;
-                    
-                    await new Promise((resolve, reject) => {
-                        const img = new Image();
-                        img.crossOrigin = 'anonymous';
-                        
-                        img.onload = async function() {
-                            try {
-                                // Grande: tamaño original
-                                const canvasGrande = document.createElement('canvas');
-                                canvasGrande.width = img.width;
-                                canvasGrande.height = img.height;
-                                const ctxGrande = canvasGrande.getContext('2d');
-                                ctxGrande.drawImage(img, 0, 0);
-                                
-                                // Pequeña: 300x250
-                                const canvasPequena = document.createElement('canvas');
-                                canvasPequena.width = 300;
-                                canvasPequena.height = 250;
-                                const ctxPequena = canvasPequena.getContext('2d');
-                                ctxPequena.drawImage(img, 0, 0, 300, 250);
-                                
-                                // Convertir a blob webp
-                                const blobGrande = await new Promise((resolveBlob, rejectBlob) => {
-                                    canvasGrande.toBlob((blob) => blob ? resolveBlob(blob) : rejectBlob(new Error('Error grande')), 'image/webp', 0.9);
-                                });
-                                
-                                const blobPequena = await new Promise((resolveBlob, rejectBlob) => {
-                                    canvasPequena.toBlob((blob) => blob ? resolveBlob(blob) : rejectBlob(new Error('Error pequeña')), 'image/webp', 0.9);
-                                });
-                                
-                                // Subir ambas versiones
-                                const formDataGrande = new FormData();
-                                formDataGrande.append('imagen', blobGrande, `${nombreBase}-${timestamp}.webp`);
-                                formDataGrande.append('carpeta', carpeta);
-                                formDataGrande.append('_token', '{{ csrf_token() }}');
-                                
-                                const formDataPequena = new FormData();
-                                formDataPequena.append('imagen', blobPequena, `${nombreBase}-${timestamp}-thumbnail.webp`);
-                                formDataPequena.append('carpeta', carpeta);
-                                formDataPequena.append('_token', '{{ csrf_token() }}');
-                                
-                                const [resGrande, resPequena] = await Promise.all([
-                                    fetch('{{ route("admin.imagenes.subir-simple") }}', {
-                                        method: 'POST',
-                                        headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                                        body: formDataGrande
-                                    }),
-                                    fetch('{{ route("admin.imagenes.subir-simple") }}', {
-                                        method: 'POST',
-                                        headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                                        body: formDataPequena
-                                    })
-                                ]);
-                                
-                                const dataGrande = await resGrande.json();
-                                const dataPequena = await resPequena.json();
-                                
-                                if (dataGrande.success && dataPequena.success) {
-                                    // Guardar solo la ruta de la imagen grande en las sublíneas (igual que las otras pestañas)
-                                    añadirImagenASublinea(dataGrande.data.ruta_relativa);
-                                    resolve();
-                                } else {
-                                    throw new Error(dataGrande.message || dataPequena.message || 'Error al subir');
-                                }
-                            } catch (error) {
-                                console.error('Error al procesar imagen:', error);
-                                reject(error);
+
+                    (async function() {
+                        try {
+                            const img = await new Promise(function(resolve, reject) {
+                                const im = new Image();
+                                im.crossOrigin = 'anonymous';
+                                im.onload = function() { resolve(im); };
+                                im.onerror = function() { reject(new Error('Error al cargar la imagen desde Amazon')); };
+                                im.src = urlProxy;
+                            });
+                            const canvasGrande = document.createElement('canvas');
+                            canvasGrande.width = img.width;
+                            canvasGrande.height = img.height;
+                            canvasGrande.getContext('2d').drawImage(img, 0, 0);
+                            const canvasPequena = document.createElement('canvas');
+                            canvasPequena.width = 300;
+                            canvasPequena.height = 250;
+                            canvasPequena.getContext('2d').drawImage(img, 0, 0, 300, 250);
+                            const blobGrande = await new Promise(function(resolveBlob, rejectBlob) {
+                                canvasGrande.toBlob(function(b) { b ? resolveBlob(b) : rejectBlob(new Error('Error grande')); }, 'image/webp', 0.9);
+                            });
+                            const blobPequena = await new Promise(function(resolveBlob, rejectBlob) {
+                                canvasPequena.toBlob(function(b) { b ? resolveBlob(b) : rejectBlob(new Error('Error pequeña')); }, 'image/webp', 0.9);
+                            });
+                            const formDataGrande = new FormData();
+                            formDataGrande.append('imagen', blobGrande, `${nombreBase}-${timestamp}.webp`);
+                            formDataGrande.append('carpeta', carpeta);
+                            formDataGrande.append('_token', '{{ csrf_token() }}');
+                            const formDataPequena = new FormData();
+                            formDataPequena.append('imagen', blobPequena, `${nombreBase}-${timestamp}-thumbnail.webp`);
+                            formDataPequena.append('carpeta', carpeta);
+                            formDataPequena.append('_token', '{{ csrf_token() }}');
+                            const onProg = function(pct) {
+                                const el = document.getElementById('kp-prog-sub-' + uploadId);
+                                if (el) el.style.width = pct + '%';
+                            };
+                            const { dataG, dataP } = await window.__kpSubirParejaConProgreso(
+                                '{{ route("admin.imagenes.subir-simple") }}',
+                                formDataGrande,
+                                formDataPequena,
+                                '{{ csrf_token() }}',
+                                onProg,
+                                uploadsPendientesSublinea,
+                                uploadId
+                            );
+                            if (dataG.success && dataP.success) {
+                                kpReemplazarRutaPendienteEnEspecificaciones(pendingPath, dataG.data.ruta_relativa);
+                            } else {
+                                throw new Error(dataG.message || dataP.message || 'Error al subir');
                             }
-                        };
-                        
-                        img.onerror = function() {
-                            reject(new Error('Error al cargar la imagen desde Amazon'));
-                        };
-                        
-                        img.src = urlProxy;
-                    });
-                }
-                
-                // Ocultar indicador de progreso y restaurar botón
-                const loadingDivFinal = document.getElementById('loading-amazon-sublinea');
-                const btnGuardarFinal = document.getElementById('btn-guardar-imagen-sublinea');
-                if (loadingDivFinal) {
-                    loadingDivFinal.classList.add('hidden');
-                }
-                if (btnGuardarFinal) {
-                    btnGuardarFinal.disabled = false;
-                    btnGuardarFinal.textContent = 'Guardar';
-                }
-                
-                limpiarModalAñadirSublinea();
+                        } catch (error) {
+                            console.error('Error al procesar imagen Amazon sublínea:', error);
+                            kpEliminarRutaPendienteDeEspecificaciones(pendingPath);
+                            const j = sublineaImagenesActual.imagenes.indexOf(pendingPath);
+                            if (j !== -1) {
+                                sublineaImagenesActual.imagenes.splice(j, 1);
+                                guardarImagenesSublinea();
+                            }
+                            renderizarMiniaturasSublinea();
+                            alert('Error al subir una imagen de Amazon: ' + error.message);
+                        }
+                    })();
+                });
+
+                if (verModalAbiertoSub) renderizarMiniaturasSublinea();
+                prepararModalAnadirSublineaParaOtra('amazon');
                 cargarCarpetasModalSublinea();
-                cambiarTabModalSublinea('url');
-                
+
             } catch (error) {
                 console.error('Error al guardar imágenes:', error);
-                
-                // Restaurar botón y ocultar progreso en caso de error
-                const loadingDivError = document.getElementById('loading-amazon-sublinea');
-                const btnGuardarError = document.getElementById('btn-guardar-imagen-sublinea');
-                if (loadingDivError) {
-                    loadingDivError.classList.add('hidden');
-                }
-                if (btnGuardarError) {
-                    btnGuardarError.disabled = false;
-                    btnGuardarError.textContent = 'Guardar';
-                }
-                
                 alert('Error al guardar las imágenes: ' + error.message);
             }
         });
@@ -5754,117 +6183,105 @@
             });
         }
         
-        // Función para procesar archivo subido para sublínea
-        async function procesarArchivoSublinea(file) {
+        // Función para procesar archivo subido para sublínea (subida en segundo plano con barra de progreso)
+        function procesarArchivoSublinea(file) {
             const carpeta = document.getElementById('carpeta-subir-sublinea').value;
             if (!carpeta) {
                 alert('Por favor selecciona una carpeta primero.');
                 return;
             }
-            
             if (!file.type.startsWith('image/')) {
                 alert('Por favor selecciona un archivo de imagen válido.');
                 return;
             }
-            
             if (file.size > 5 * 1024 * 1024) {
                 alert('La imagen es demasiado grande. Máximo 5MB.');
                 return;
             }
-            
-            document.getElementById('nombre-archivo-sublinea').textContent = 'Subiendo...';
-            
-            try {
-                // Cargar imagen y procesar con canvas
-                const img = new Image();
-                img.crossOrigin = 'anonymous';
-                
-                img.onload = async function() {
+            const uploadId = kpNuevoIdSubida();
+            const pendingPath = KP_PENDING_IMG + uploadId;
+            añadirImagenASublinea(pendingPath);
+            const verModalAbierto = document.getElementById('modal-imagenes-sublinea') && !document.getElementById('modal-imagenes-sublinea').classList.contains('hidden');
+            if (verModalAbierto) renderizarMiniaturasSublinea();
+            document.getElementById('nombre-archivo-sublinea').textContent = file.name || '';
+            prepararModalAnadirSublineaParaOtra('subir');
+            cargarCarpetasModalSublinea();
+
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            const urlRevoke = URL.createObjectURL(file);
+            img.onload = function() {
+                URL.revokeObjectURL(urlRevoke);
+                (async function() {
                     try {
-                        // Grande: tamaño original
                         const canvasGrande = document.createElement('canvas');
                         canvasGrande.width = img.width;
                         canvasGrande.height = img.height;
-                        const ctxGrande = canvasGrande.getContext('2d');
-                        ctxGrande.drawImage(img, 0, 0);
-                        
-                        // Pequeña: 300x250
+                        canvasGrande.getContext('2d').drawImage(img, 0, 0);
                         const canvasPequena = document.createElement('canvas');
                         canvasPequena.width = 300;
                         canvasPequena.height = 250;
-                        const ctxPequena = canvasPequena.getContext('2d');
-                        ctxPequena.drawImage(img, 0, 0, 300, 250);
-                        
-                        // Convertir a blob webp
+                        canvasPequena.getContext('2d').drawImage(img, 0, 0, 300, 250);
                         const blobGrande = await new Promise((resolve, reject) => {
                             canvasGrande.toBlob((blob) => blob ? resolve(blob) : reject(new Error('Error grande')), 'image/webp', 0.9);
                         });
-                        
                         const blobPequena = await new Promise((resolve, reject) => {
                             canvasPequena.toBlob((blob) => blob ? resolve(blob) : reject(new Error('Error pequeña')), 'image/webp', 0.9);
                         });
-                        
                         const slugInput = document.querySelector('input[name="slug"]');
                         const nombreBase = slugInput ? slugInput.value.trim() : 'imagen';
                         const timestamp = Date.now();
-                        
-                        // Subir ambas
                         const formDataGrande = new FormData();
                         formDataGrande.append('imagen', blobGrande, `${nombreBase}-${timestamp}.webp`);
                         formDataGrande.append('carpeta', carpeta);
                         formDataGrande.append('_token', '{{ csrf_token() }}');
-                        
                         const formDataPequena = new FormData();
                         formDataPequena.append('imagen', blobPequena, `${nombreBase}-${timestamp}-thumbnail.webp`);
                         formDataPequena.append('carpeta', carpeta);
                         formDataPequena.append('_token', '{{ csrf_token() }}');
-                        
-                        const [resGrande, resPequena] = await Promise.all([
-                            fetch('{{ route("admin.imagenes.subir-simple") }}', {
-                                method: 'POST',
-                                headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                                body: formDataGrande
-                            }),
-                            fetch('{{ route("admin.imagenes.subir-simple") }}', {
-                                method: 'POST',
-                                headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                                body: formDataPequena
-                            })
-                        ]);
-                        
-                        const dataGrande = await resGrande.json();
-                        const dataPequena = await resPequena.json();
-                        
-                        if (dataGrande.success && dataPequena.success) {
-                            // Guardar solo la ruta de la imagen grande en las sublíneas
-                            añadirImagenASublinea(dataGrande.data.ruta_relativa);
-                            // Limpiar el modal y volver a abrirlo
-                            limpiarModalAñadirSublinea();
-                            // Mantener el modal abierto y recargar carpetas
-                            cargarCarpetasModalSublinea();
-                            cambiarTabModalSublinea('subir');
+                        const onProg = function(pct) {
+                            const el = document.getElementById('kp-prog-sub-' + uploadId);
+                            if (el) el.style.width = pct + '%';
+                        };
+                        const { dataG, dataP } = await window.__kpSubirParejaConProgreso(
+                            '{{ route("admin.imagenes.subir-simple") }}',
+                            formDataGrande,
+                            formDataPequena,
+                            '{{ csrf_token() }}',
+                            onProg,
+                            uploadsPendientesSublinea,
+                            uploadId
+                        );
+                        if (dataG.success && dataP.success) {
+                            kpReemplazarRutaPendienteEnEspecificaciones(pendingPath, dataG.data.ruta_relativa);
                         } else {
-                            throw new Error(dataGrande.message || dataPequena.message || 'Error al subir');
+                            throw new Error(dataG.message || dataP.message || 'Error al subir');
                         }
                     } catch (error) {
                         console.error('Error:', error);
-                        alert(`Error al procesar la imagen: ${error.message}`);
-                        document.getElementById('nombre-archivo-sublinea').textContent = '';
+                        kpEliminarRutaPendienteDeEspecificaciones(pendingPath);
+                        const j = sublineaImagenesActual.imagenes.indexOf(pendingPath);
+                        if (j !== -1) {
+                            sublineaImagenesActual.imagenes.splice(j, 1);
+                            guardarImagenesSublinea();
+                        }
+                        renderizarMiniaturasSublinea();
+                        alert('Error al procesar la imagen: ' + error.message);
                     }
-                };
-                
-                img.onerror = function() {
-                    alert('Error al cargar la imagen. Por favor, verifica que sea un formato válido.');
-                    document.getElementById('nombre-archivo-sublinea').textContent = '';
-                };
-                
-                img.src = URL.createObjectURL(file);
-                
-            } catch (error) {
-                console.error('Error:', error);
-                alert(`Error al subir la imagen: ${error.message}`);
-                document.getElementById('nombre-archivo-sublinea').textContent = '';
-            }
+                })();
+            };
+            img.onerror = function() {
+                URL.revokeObjectURL(urlRevoke);
+                kpEliminarRutaPendienteDeEspecificaciones(pendingPath);
+                const j = sublineaImagenesActual.imagenes.indexOf(pendingPath);
+                if (j !== -1) {
+                    sublineaImagenesActual.imagenes.splice(j, 1);
+                    guardarImagenesSublinea();
+                }
+                renderizarMiniaturasSublinea();
+                alert('Error al cargar la imagen. Por favor, verifica que sea un formato válido.');
+            };
+            img.src = urlRevoke;
         }
         
         // Event listener para descargar desde URL
@@ -5944,35 +6361,60 @@
                 return;
             }
             
+            if (tabId === 'tab-interna-sublinea') {
+                const contIs = document.getElementById('filas-interna-sublinea');
+                const filasIs = contIs ? contIs.querySelectorAll('.kp-fila-interna-sublinea') : [];
+                if (!filasIs.length) {
+                    alert('Selecciona imágenes en la galería o añade al menos una fila con la ruta grande.');
+                    return;
+                }
+                const verModalSub = document.getElementById('modal-imagenes-sublinea');
+                for (let i = 0; i < filasIs.length; i++) {
+                    const rG = (filasIs[i].querySelector('.kp-interna-sub-g') && filasIs[i].querySelector('.kp-interna-sub-g').value || '').trim();
+                    if (!rG) {
+                        alert('Fila ' + (i + 1) + ': indica la ruta de la imagen grande.');
+                        return;
+                    }
+                    añadirImagenASublinea(rG);
+                    if (verModalSub && !verModalSub.classList.contains('hidden')) {
+                        sublineaImagenesActual.imagenes.push(rG);
+                    }
+                }
+                if (verModalSub && !verModalSub.classList.contains('hidden')) renderizarMiniaturasSublinea();
+                prepararModalAnadirSublineaParaOtra('interna');
+                return;
+            }
+            
             if (tabId === 'tab-subir-sublinea') {
                 if (!fileInputSublinea.files.length) {
                     alert('Por favor selecciona una imagen primero.');
                     return;
                 }
-            } else {
-                if (!cropperSublinea || !carpetaActualSublinea) {
-                    alert('Por favor descarga y recorta la imagen primero.');
-                    return;
-                }
-                
-                await procesarImagenRecortadaSublinea();
+                return;
             }
+            if (!cropperSublinea || !carpetaActualSublinea) {
+                alert('Por favor descarga y recorta la imagen primero.');
+                return;
+            }
+            await procesarImagenRecortadaSublinea();
         });
         
-        // Procesar imagen recortada desde URL para sublínea
+        // Procesar imagen recortada desde URL para sublínea (subida en segundo plano)
         async function procesarImagenRecortadaSublinea() {
             const canvasOriginal = cropperSublinea.getCroppedCanvas({
                 imageSmoothingEnabled: true,
                 imageSmoothingQuality: 'high'
             });
-            
             if (!canvasOriginal) {
                 alert('Error al recortar la imagen');
                 return;
             }
-            
+            const carpetaUp = carpetaActualSublinea;
+            if (!carpetaUp) {
+                alert('Selecciona una carpeta primero.');
+                return;
+            }
             try {
-                // Grande: tamaño original (obtener dimensiones originales del canvas recortado)
                 const canvasGrande = document.createElement('canvas');
                 canvasGrande.width = canvasOriginal.width;
                 canvasGrande.height = canvasOriginal.height;
@@ -5980,8 +6422,6 @@
                 ctxGrande.fillStyle = '#ffffff';
                 ctxGrande.fillRect(0, 0, canvasGrande.width, canvasGrande.height);
                 ctxGrande.drawImage(canvasOriginal, 0, 0);
-                
-                // Pequeña: 300x250
                 const canvasPequena = document.createElement('canvas');
                 canvasPequena.width = 300;
                 canvasPequena.height = 250;
@@ -5989,61 +6429,67 @@
                 ctxPequena.fillStyle = '#ffffff';
                 ctxPequena.fillRect(0, 0, canvasPequena.width, canvasPequena.height);
                 ctxPequena.drawImage(canvasOriginal, 0, 0, 300, 250);
-                
-                // Convertir a blob webp
                 const blobGrande = await new Promise((resolve, reject) => {
                     canvasGrande.toBlob((blob) => blob ? resolve(blob) : reject(new Error('Error grande')), 'image/webp', 0.9);
                 });
-                
                 const blobPequena = await new Promise((resolve, reject) => {
                     canvasPequena.toBlob((blob) => blob ? resolve(blob) : reject(new Error('Error pequeña')), 'image/webp', 0.9);
                 });
-                
+                const uploadId = kpNuevoIdSubida();
+                const pendingPath = KP_PENDING_IMG + uploadId;
+                añadirImagenASublinea(pendingPath);
+                const verModalAbierto = document.getElementById('modal-imagenes-sublinea') && !document.getElementById('modal-imagenes-sublinea').classList.contains('hidden');
+                if (verModalAbierto) renderizarMiniaturasSublinea();
+                prepararModalAnadirSublineaParaOtra('url');
+                cargarCarpetasModalSublinea();
+
                 const slugInput = document.querySelector('input[name="slug"]');
                 const nombreBase = slugInput ? slugInput.value.trim() : 'imagen';
                 const timestamp = Date.now();
-                
-                // Subir ambas
                 const formDataGrande = new FormData();
                 formDataGrande.append('imagen', blobGrande, `${nombreBase}-${timestamp}.webp`);
-                formDataGrande.append('carpeta', carpetaActualSublinea);
+                formDataGrande.append('carpeta', carpetaUp);
                 formDataGrande.append('_token', '{{ csrf_token() }}');
-                
                 const formDataPequena = new FormData();
                 formDataPequena.append('imagen', blobPequena, `${nombreBase}-${timestamp}-thumbnail.webp`);
-                formDataPequena.append('carpeta', carpetaActualSublinea);
+                formDataPequena.append('carpeta', carpetaUp);
                 formDataPequena.append('_token', '{{ csrf_token() }}');
-                
-                const [resGrande, resPequena] = await Promise.all([
-                    fetch('{{ route("admin.imagenes.subir-simple") }}', {
-                        method: 'POST',
-                        headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                        body: formDataGrande
-                    }),
-                    fetch('{{ route("admin.imagenes.subir-simple") }}', {
-                        method: 'POST',
-                        headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                        body: formDataPequena
-                    })
-                ]);
-                
-                const dataGrande = await resGrande.json();
-                const dataPequena = await resPequena.json();
-                
-                if (dataGrande.success && dataPequena.success) {
-                    // Guardar solo la ruta de la imagen grande en las sublíneas
-                    añadirImagenASublinea(dataGrande.data.ruta_relativa);
-                    // Limpiar el modal y volver a abrirlo
-                    limpiarModalAñadirSublinea();
-                    // Mantener el modal abierto y recargar carpetas
-                    cargarCarpetasModalSublinea();
-                    cambiarTabModalSublinea('url');
-                } else {
-                    throw new Error(dataGrande.message || dataPequena.message || 'Error al subir');
-                }
+
+                (async function() {
+                    try {
+                        const onProg = function(pct) {
+                            const el = document.getElementById('kp-prog-sub-' + uploadId);
+                            if (el) el.style.width = pct + '%';
+                        };
+                        const { dataG, dataP } = await window.__kpSubirParejaConProgreso(
+                            '{{ route("admin.imagenes.subir-simple") }}',
+                            formDataGrande,
+                            formDataPequena,
+                            '{{ csrf_token() }}',
+                            onProg,
+                            uploadsPendientesSublinea,
+                            uploadId
+                        );
+                        if (dataG.success && dataP.success) {
+                            kpReemplazarRutaPendienteEnEspecificaciones(pendingPath, dataG.data.ruta_relativa);
+                        } else {
+                            throw new Error(dataG.message || dataP.message || 'Error al subir');
+                        }
+                    } catch (error) {
+                        console.error('Error:', error);
+                        kpEliminarRutaPendienteDeEspecificaciones(pendingPath);
+                        const j = sublineaImagenesActual.imagenes.indexOf(pendingPath);
+                        if (j !== -1) {
+                            sublineaImagenesActual.imagenes.splice(j, 1);
+                            guardarImagenesSublinea();
+                        }
+                        renderizarMiniaturasSublinea();
+                        alert('Error al procesar la imagen: ' + error.message);
+                    }
+                })();
             } catch (error) {
                 console.error('Error:', error);
-                alert(`Error al procesar la imagen: ${error.message}`);
+                alert('Error al procesar la imagen: ' + error.message);
             }
         }
         
@@ -6793,11 +7239,60 @@ document.addEventListener('DOMContentLoaded', function() {
     // Variables globales
     let imagenesGrandes = [];
     let imagenesPequenas = [];
+    const KP_PENDING_PRD = '__pending:';
+    const uploadsPendientesProducto = new Map();
     let imagenEditandoIndex = null;
     let cropperNueva = null;
     let imagenTemporalUrlNueva = null;
     let carpetaActualNueva = null;
     let wasDragged = false; // Flag para saber si se hizo drag
+
+    if (!window.__kpSubirParejaConProgreso) {
+        window.__kpSubirParejaConProgreso = function(url, fdG, fdP, csrfToken, onProgress, xhrRegistryMap, uploadId) {
+            let pg = 0, pp = 0;
+            const emit = function() {
+                if (onProgress) onProgress(Math.min(100, Math.round((pg + pp) / 2)));
+            };
+            const entry = { xhrG: null, xhrP: null };
+            if (xhrRegistryMap && uploadId) xhrRegistryMap.set(uploadId, entry);
+            const one = function(fd, tag) {
+                return new Promise(function(resolve, reject) {
+                    const xhr = new XMLHttpRequest();
+                    if (tag === 'G') entry.xhrG = xhr;
+                    else entry.xhrP = xhr;
+                    xhr.open('POST', url);
+                    xhr.setRequestHeader('X-CSRF-TOKEN', csrfToken);
+                    xhr.setRequestHeader('Accept', 'application/json');
+                    xhr.upload.onprogress = function(e) {
+                        if (e.lengthComputable) {
+                            const pct = Math.round(100 * e.loaded / e.total);
+                            if (tag === 'G') pg = pct;
+                            else pp = pct;
+                            emit();
+                        }
+                    };
+                    xhr.onload = function() {
+                        let data;
+                        try { data = JSON.parse(xhr.responseText); } catch (e) {
+                            reject(new Error('Respuesta inválida'));
+                            return;
+                        }
+                        if (xhr.status >= 200 && xhr.status < 300 && data.success) resolve(data);
+                        else reject(new Error((data && data.message) || 'Error al subir'));
+                    };
+                    xhr.onerror = function() { reject(new Error('Error de red')); };
+                    xhr.send(fd);
+                });
+            };
+            return Promise.all([one(fdG, 'G'), one(fdP, 'P')]).then(function(results) {
+                if (xhrRegistryMap && uploadId) xhrRegistryMap.delete(uploadId);
+                return { dataG: results[0], dataP: results[1] };
+            }).catch(function(err) {
+                if (xhrRegistryMap && uploadId) xhrRegistryMap.delete(uploadId);
+                throw err;
+            });
+        };
+    }
     
     // Cargar imágenes existentes al inicio
     function cargarImagenesExistentes() {
@@ -6820,6 +7315,232 @@ document.addEventListener('DOMContentLoaded', function() {
         
         renderizarImagenes();
     }
+
+    let __kpInternaNuevaSelOrden = [];
+    let __kpInternaNuevaRowInc = 0;
+
+    function kpPendientePrdLocal(r) {
+        return typeof r === 'string' && r.indexOf(KP_PENDING_PRD) === 0;
+    }
+    function kpInferirThumbnailDesdeGrandeProd(g) {
+        if (!g || typeof g !== 'string' || kpPendientePrdLocal(g)) return '';
+        const lastDot = g.lastIndexOf('.');
+        if (lastDot === -1) return g + '-thumbnail';
+        return g.slice(0, lastDot) + '-thumbnail' + g.slice(lastDot);
+    }
+    function kpInferirGrandeDesdeThumbnailProd(p) {
+        if (!p || typeof p !== 'string' || kpPendientePrdLocal(p)) return '';
+        const t = p.trim();
+        if (!t) return '';
+        const lastDot = t.lastIndexOf('.');
+        if (lastDot === -1) return t.endsWith('-thumbnail') ? t.slice(0, -'-thumbnail'.length) : '';
+        const base = t.slice(0, lastDot);
+        const ext = t.slice(lastDot);
+        if (base.endsWith('-thumbnail')) return base.slice(0, -'-thumbnail'.length) + ext;
+        return '';
+    }
+    function kpExtraerImagenesDeItemEspecProd(item, acc) {
+        if (!item || typeof item !== 'object' || !item.img || !Array.isArray(item.img)) return;
+        item.img.forEach(function(path) {
+            if (typeof path !== 'string' || !path.trim()) return;
+            const tr = path.trim();
+            if (kpPendientePrdLocal(tr)) return;
+            acc.push(tr);
+        });
+    }
+    function kpRecolectarRutasSueltasEspecificacionesProd(esp) {
+        const acc = [];
+        if (!esp || typeof esp !== 'object') return acc;
+        const meta = ['_formatos', '_orden', '_columnas'];
+        if (esp._producto && typeof esp._producto === 'object' && Array.isArray(esp._producto.filtros)) {
+            esp._producto.filtros.forEach(function(filtro) {
+                kpExtraerImagenesDeItemEspecProd(filtro, acc);
+                if (Array.isArray(filtro.subprincipales)) {
+                    filtro.subprincipales.forEach(function(sub) { kpExtraerImagenesDeItemEspecProd(sub, acc); });
+                }
+            });
+        }
+        Object.keys(esp).forEach(function(key) {
+            if (meta.indexOf(key) !== -1 || key === '_producto') return;
+            const arr = esp[key];
+            if (!Array.isArray(arr)) return;
+            arr.forEach(function(item) { kpExtraerImagenesDeItemEspecProd(item, acc); });
+        });
+        return acc;
+    }
+    function kpNormalizarParImagenProd(gRaw, pRaw) {
+        let g = (gRaw || '').trim();
+        let p = (pRaw || '').trim();
+        if (!g && p) g = kpInferirGrandeDesdeThumbnailProd(p) || '';
+        if (g && !p) p = kpInferirThumbnailDesdeGrandeProd(g) || '';
+        const thumbVisual = (p || kpInferirThumbnailDesdeGrandeProd(g) || g);
+        return { rutaGrande: g, rutaPequena: p, thumbVisual: thumbVisual };
+    }
+    function kpRecolectarParesImagenesDisponiblesProducto() {
+        const pairs = [];
+        const seen = new Set();
+        function addNorm(norm) {
+            if (!norm.rutaGrande && !norm.rutaPequena) return;
+            const key = norm.rutaGrande + '\n' + norm.rutaPequena;
+            if (seen.has(key)) return;
+            seen.add(key);
+            pairs.push(norm);
+        }
+        for (let i = 0; i < imagenesGrandes.length; i++) {
+            addNorm(kpNormalizarParImagenProd(imagenesGrandes[i], imagenesPequenas[i]));
+        }
+        const inp = document.getElementById('categoria_especificaciones_internas_elegidas_input');
+        if (inp && inp.value) {
+            try {
+                const esp = JSON.parse(inp.value);
+                kpRecolectarRutasSueltasEspecificacionesProd(esp).forEach(function(soloPath) {
+                    addNorm(kpNormalizarParImagenProd(soloPath, ''));
+                });
+            } catch (e) {}
+        }
+        return pairs;
+    }
+    window.kpRecolectarParesImagenesDisponiblesProducto = function() {
+        return kpRecolectarParesImagenesDisponiblesProducto();
+    };
+
+    function kpPairKeyInternaProd(p) {
+        return (p.rutaGrande || '') + '\x01' + (p.rutaPequena || '');
+    }
+    function kpStableB64KeyInterna(keyStr) {
+        try {
+            return btoa(unescape(encodeURIComponent(keyStr)));
+        } catch (e) {
+            return String(keyStr.length) + '_' + keyStr.slice(0, 80);
+        }
+    }
+    function kpLimpiarInternaNuevaProductoUI() {
+        __kpInternaNuevaSelOrden = [];
+        const g = document.getElementById('galeria-imgs-interna-nueva');
+        if (g) g.innerHTML = '';
+        const f = document.getElementById('filas-interna-nueva-producto');
+        if (f) f.innerHTML = '';
+        const vac = document.getElementById('galeria-imgs-interna-nueva-vacio');
+        if (vac) vac.classList.add('hidden');
+    }
+    function kpBindFilasInternaNuevaDelegation() {
+        const cont = document.getElementById('filas-interna-nueva-producto');
+        if (!cont || cont.dataset.kpDelegNueva) return;
+        cont.dataset.kpDelegNueva = '1';
+        const upd = function(inp) {
+            const row = inp.closest('.kp-fila-interna-nueva');
+            if (!row) return;
+            const g = row.querySelector('.kp-interna-nueva-g');
+            const p = row.querySelector('.kp-interna-nueva-p');
+            const pg = row.querySelector('.kp-interna-nueva-pg');
+            const pp = row.querySelector('.kp-interna-nueva-pp');
+            if (typeof window.kpActualizarPreviewInputInterno === 'function') {
+                if (g && pg && g.id && pg.id) window.kpActualizarPreviewInputInterno(g.id, pg.id);
+                if (p && pp && p.id && pp.id) window.kpActualizarPreviewInputInterno(p.id, pp.id);
+            }
+        };
+        cont.addEventListener('input', function(e) {
+            const t = e.target;
+            if (!t.classList.contains('kp-interna-nueva-g') && !t.classList.contains('kp-interna-nueva-p')) return;
+            upd(t);
+        });
+        cont.addEventListener('paste', function(e) {
+            const t = e.target;
+            if (!t.classList.contains('kp-interna-nueva-g') && !t.classList.contains('kp-interna-nueva-p')) return;
+            setTimeout(function() { upd(t); }, 0);
+        });
+    }
+    function kpRenderGaleriaInternaNueva() {
+        const wrap = document.getElementById('galeria-imgs-interna-nueva');
+        const vac = document.getElementById('galeria-imgs-interna-nueva-vacio');
+        if (!wrap) return;
+        const pairs = kpRecolectarParesImagenesDisponiblesProducto();
+        wrap.innerHTML = '';
+        if (!pairs.length) {
+            if (vac) vac.classList.remove('hidden');
+            return;
+        }
+        if (vac) vac.classList.add('hidden');
+        const urlFn = typeof window.kpUrlVistaDesdeRutaAlmacen === 'function' ? window.kpUrlVistaDesdeRutaAlmacen : function() { return ''; };
+        pairs.forEach(function(pair) {
+            const key = kpPairKeyInternaProd(pair);
+            const ord = __kpInternaNuevaSelOrden.findIndex(function(x) { return kpPairKeyInternaProd(x) === key; }) + 1;
+            const cell = document.createElement('div');
+            cell.className = 'min-w-0 w-full';
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'relative w-full aspect-square max-w-full border p-0 overflow-hidden rounded-sm transition ' + (ord ? 'border-blue-500 ring-1 ring-inset ring-blue-400/80 bg-blue-50/50 dark:bg-blue-900/30' : 'border-gray-200 dark:border-gray-600 hover:border-gray-400');
+            const src = urlFn(pair.thumbVisual || pair.rutaPequena || pair.rutaGrande);
+            const img = document.createElement('img');
+            img.src = src;
+            img.className = 'w-full h-full object-cover block pointer-events-none';
+            img.alt = '';
+            btn.appendChild(img);
+            if (ord) {
+                const badge = document.createElement('span');
+                badge.className = 'absolute -top-0.5 -right-0.5 min-w-3 h-3.5 px-0.5 flex items-center justify-center rounded-full bg-blue-600 text-white text-[8px] font-bold leading-none';
+                badge.textContent = String(ord);
+                btn.appendChild(badge);
+            }
+            btn.addEventListener('click', function() { kpToggleInternaNuevaSeleccion(pair); });
+            cell.appendChild(btn);
+            wrap.appendChild(cell);
+        });
+    }
+    function kpAddFilaInternaNuevaProducto(pairOrNull) {
+        kpBindFilasInternaNuevaDelegation();
+        const cont = document.getElementById('filas-interna-nueva-producto');
+        if (!cont) return;
+        const idn = 'kpin' + (++__kpInternaNuevaRowInc);
+        let gVal = '';
+        let pVal = '';
+        let b64 = '';
+        if (pairOrNull) {
+            const norm = kpNormalizarParImagenProd(pairOrNull.rutaGrande, pairOrNull.rutaPequena);
+            gVal = norm.rutaGrande;
+            pVal = norm.rutaPequena;
+            b64 = kpStableB64KeyInterna(kpPairKeyInternaProd(norm));
+        }
+        const row = document.createElement('div');
+        row.className = 'kp-fila-interna-nueva border border-gray-200 dark:border-gray-600 rounded-lg p-3 space-y-2';
+        if (b64) row.dataset.pairKey = b64;
+        row.innerHTML =
+            '<div class="flex flex-wrap items-start gap-3">' +
+            '<div class="flex-1 min-w-[200px]"><label class="block mb-1 text-xs text-gray-600 dark:text-gray-400">Ruta grande</label>' +
+            '<input type="text" id="' + idn + '-g" autocomplete="off" class="kp-interna-nueva-g w-full px-3 py-2 rounded bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white border text-sm"></div>' +
+            '<div class="shrink-0"><span class="block mb-1 text-[10px] text-gray-500 dark:text-gray-400">Vista previa</span>' +
+            '<img id="' + idn + '-pg" alt="" class="kp-interna-nueva-pg hidden w-9 h-9 object-cover rounded border border-gray-300 dark:border-gray-600"></div></div>' +
+            '<div class="flex flex-wrap items-start gap-3">' +
+            '<div class="flex-1 min-w-[200px]"><label class="block mb-1 text-xs text-gray-600 dark:text-gray-400">Ruta pequeña</label>' +
+            '<input type="text" id="' + idn + '-p" autocomplete="off" class="kp-interna-nueva-p w-full px-3 py-2 rounded bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white border text-sm"></div>' +
+            '<div class="shrink-0"><span class="block mb-1 text-[10px] text-gray-500 dark:text-gray-400">Vista previa</span>' +
+            '<img id="' + idn + '-pp" alt="" class="kp-interna-nueva-pp hidden w-9 h-9 object-cover rounded border border-gray-300 dark:border-gray-600"></div></div>';
+        cont.appendChild(row);
+        row.querySelector('.kp-interna-nueva-g').value = gVal;
+        row.querySelector('.kp-interna-nueva-p').value = pVal;
+        if (typeof window.kpActualizarPreviewInputInterno === 'function') {
+            window.kpActualizarPreviewInputInterno(idn + '-g', idn + '-pg');
+            window.kpActualizarPreviewInputInterno(idn + '-p', idn + '-pp');
+        }
+    }
+    function kpToggleInternaNuevaSeleccion(pair) {
+        const norm = kpNormalizarParImagenProd(pair.rutaGrande, pair.rutaPequena);
+        const key = kpPairKeyInternaProd(norm);
+        const ix = __kpInternaNuevaSelOrden.findIndex(function(x) { return kpPairKeyInternaProd(kpNormalizarParImagenProd(x.rutaGrande, x.rutaPequena)) === key; });
+        const cont = document.getElementById('filas-interna-nueva-producto');
+        const b64 = kpStableB64KeyInterna(key);
+        if (ix === -1) {
+            __kpInternaNuevaSelOrden.push(norm);
+            kpAddFilaInternaNuevaProducto(norm);
+        } else {
+            __kpInternaNuevaSelOrden.splice(ix, 1);
+            if (cont) {
+                const row = cont.querySelector('.kp-fila-interna-nueva[data-pair-key="' + b64 + '"]');
+                if (row) row.remove();
+            }
+        }
+        kpRenderGaleriaInternaNueva();
+    }
     
     // Renderizar las imágenes en el contenedor
     function renderizarImagenes() {
@@ -6833,11 +7554,12 @@ document.addEventListener('DOMContentLoaded', function() {
         imagenesGrandes.forEach((imgGrande, index) => {
             const imgPequena = imagenesPequenas[index] || '';
             if (!imgGrande && !imgPequena) return; // Saltar si ambas están vacías
-            
+            const pendiente = typeof imgGrande === 'string' && imgGrande.indexOf(KP_PENDING_PRD) === 0;
+
             const div = document.createElement('div');
             div.className = 'relative group imagen-miniatura cursor-pointer';
             div.dataset.index = index;
-            div.draggable = true;
+            div.draggable = !pendiente;
             
             // Si es la primera (índice 0), marcar como principal con borde naranja
             if (index === 0) {
@@ -6847,11 +7569,23 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             const imgSrc = imgPequena || imgGrande;
-            // Construir la URL correctamente como en el modal de edición: asset('images/') + '/' + ruta
-            // imgSrc contiene la ruta relativa (ej: 'panales/imagen.jpg')
-            const imgUrl = imgSrc ? `{{ asset('images/') }}/${imgSrc}` : '';
-            
-            div.innerHTML = `
+            const imgUrl = (!pendiente && imgSrc) ? `{{ asset('images/') }}/${imgSrc}` : '';
+            const uidPrd = pendiente ? imgGrande.slice(KP_PENDING_PRD.length) : '';
+
+            div.innerHTML = pendiente
+                ? `
+                ${index === 0 ? '<div class="absolute -left-7 top-0 bottom-0 flex items-center justify-center z-10"><span class="writing-vertical text-xs font-semibold text-orange-500 bg-white dark:bg-gray-800 px-1 py-1 rounded shadow-sm border border-orange-200 dark:border-orange-700">Principal</span></div>' : ''}
+                <div class="w-20 h-20 flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-700 rounded p-1 pointer-events-none">
+                    <span class="text-[10px] text-gray-600 dark:text-gray-300 text-center leading-tight">Cargando imagen…</span>
+                    <div class="w-full mt-1 h-1.5 bg-gray-200 dark:bg-gray-600 rounded overflow-hidden">
+                        <div id="kp-prog-prd-${uidPrd}" class="h-full bg-blue-500 transition-[width] duration-150" style="width:0%"></div>
+                    </div>
+                </div>
+                <button type="button" class="absolute top-0 right-0 bg-red-600 hover:bg-red-700 text-white rounded-full w-7 h-7 flex items-center justify-center font-bold text-base opacity-0 group-hover:opacity-100 transition-opacity btn-eliminar-imagen shadow-lg" style="transform: translate(25%, -25%); z-index: 30;" data-index="${index}" title="Eliminar">
+                    ×
+                </button>
+            `
+                : `
                 ${index === 0 ? '<div class="absolute -left-7 top-0 bottom-0 flex items-center justify-center z-10"><span class="writing-vertical text-xs font-semibold text-orange-500 bg-white dark:bg-gray-800 px-1 py-1 rounded shadow-sm border border-orange-200 dark:border-orange-700">Principal</span></div>' : ''}
                 <img src="${imgUrl}" 
                      alt="Imagen ${index + 1}" 
@@ -6868,6 +7602,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (e.target.closest('.btn-eliminar-imagen')) {
                     return;
                 }
+                if (pendiente) return;
                 // Si se hizo drag, no abrir modal
                 if (wasDragged) {
                     wasDragged = false;
@@ -6963,10 +7698,18 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!confirm('¿Estás seguro de que quieres eliminar esta imagen?')) {
             return;
         }
-        
+        const g = imagenesGrandes[index];
+        if (typeof g === 'string' && g.indexOf(KP_PENDING_PRD) === 0) {
+            const id = g.slice(KP_PENDING_PRD.length);
+            const x = uploadsPendientesProducto.get(id);
+            if (x) {
+                if (x.xhrG) try { x.xhrG.abort(); } catch (e) {}
+                if (x.xhrP) try { x.xhrP.abort(); } catch (e) {}
+                uploadsPendientesProducto.delete(id);
+            }
+        }
         imagenesGrandes.splice(index, 1);
         imagenesPequenas.splice(index, 1);
-        
         renderizarImagenes();
     }
     
@@ -7038,12 +7781,22 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('modal-añadir-imagen').classList.add('hidden');
         limpiarModalAñadir();
     };
+
+    function prepararModalAñadirImagenParaOtraProducto(tab) {
+        document.getElementById('modal-añadir-imagen').classList.remove('hidden');
+        limpiarModalAñadir({ mantenerCarpetas: true });
+        cambiarTabModal(tab || 'url');
+    }
     
     // Limpiar modal añadir
-    function limpiarModalAñadir() {
-        document.getElementById('carpeta-subir-nueva').value = '';
-        document.getElementById('carpeta-url-nueva').value = '';
-        document.getElementById('carpeta-amazon-nueva').value = '';
+    function limpiarModalAñadir(opciones) {
+        opciones = opciones || {};
+        const mantener = !!opciones.mantenerCarpetas;
+        if (!mantener) {
+            document.getElementById('carpeta-subir-nueva').value = '';
+            document.getElementById('carpeta-url-nueva').value = '';
+            document.getElementById('carpeta-amazon-nueva').value = '';
+        }
         document.getElementById('file-subir-nueva').value = '';
         document.getElementById('url-imagen-nueva').value = '';
         document.getElementById('url-amazon-nueva').value = '';
@@ -7059,6 +7812,7 @@ document.addEventListener('DOMContentLoaded', function() {
             cropperNueva.destroy();
             cropperNueva = null;
         }
+        kpLimpiarInternaNuevaProductoUI();
     }
     
     // Cambiar pestañas del modal
@@ -7066,16 +7820,21 @@ document.addEventListener('DOMContentLoaded', function() {
         const tabSubir = document.getElementById('tab-subir-nueva');
         const tabUrl = document.getElementById('tab-url-nueva');
         const tabAmazon = document.getElementById('tab-amazon-nueva');
+        const tabInterna = document.getElementById('tab-interna-nueva');
         const contentSubir = document.getElementById('content-subir-nueva');
         const contentUrl = document.getElementById('content-url-nueva');
         const contentAmazon = document.getElementById('content-amazon-nueva');
+        const contentInterna = document.getElementById('content-interna-nueva');
         
         // Resetear todas las pestañas
-        [tabUrl, tabSubir, tabAmazon].forEach(t => {
+        [tabUrl, tabSubir, tabAmazon, tabInterna].forEach(t => {
+            if (!t) return;
             t.classList.remove('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
             t.classList.add('border-transparent', 'text-gray-500');
         });
-        [contentUrl, contentSubir, contentAmazon].forEach(c => c.classList.add('hidden'));
+        [contentUrl, contentSubir, contentAmazon, contentInterna].forEach(c => {
+            if (c) c.classList.add('hidden');
+        });
         
         if (tab === 'url') {
             tabUrl.classList.add('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
@@ -7090,12 +7849,26 @@ document.addEventListener('DOMContentLoaded', function() {
             tabAmazon.classList.remove('border-transparent', 'text-gray-500');
             contentAmazon.classList.remove('hidden');
             cargarCarpetasModal(); // Cargar carpetas cuando se abre la pestaña Amazon
+        } else if (tab === 'interna' && tabInterna && contentInterna) {
+            tabInterna.classList.add('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
+            tabInterna.classList.remove('border-transparent', 'text-gray-500');
+            contentInterna.classList.remove('hidden');
+            kpBindFilasInternaNuevaDelegation();
+            kpRenderGaleriaInternaNueva();
         }
     }
     
     document.getElementById('tab-subir-nueva').addEventListener('click', () => cambiarTabModal('subir'));
     document.getElementById('tab-url-nueva').addEventListener('click', () => cambiarTabModal('url'));
     document.getElementById('tab-amazon-nueva').addEventListener('click', () => cambiarTabModal('amazon'));
+    const tabInternaNuevaEl = document.getElementById('tab-interna-nueva');
+    if (tabInternaNuevaEl) tabInternaNuevaEl.addEventListener('click', () => cambiarTabModal('interna'));
+    const btnInternaNuevaFilaVacia = document.getElementById('btn-interna-nueva-anadir-fila-vacia');
+    if (btnInternaNuevaFilaVacia) {
+        btnInternaNuevaFilaVacia.addEventListener('click', function() {
+            kpAddFilaInternaNuevaProducto(null);
+        });
+    }
     
     // Cargar carpetas en modales
     function cargarCarpetasModal() {
@@ -7337,126 +8110,87 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const slugInput = document.querySelector('input[name="slug"]');
             const nombreBase = slugInput ? slugInput.value.trim() : 'imagen';
-            
-            // Mostrar indicador de progreso
-            const loadingDiv = document.getElementById('loading-amazon-nueva');
-            const btnGuardar = document.getElementById('btn-guardar-nueva');
-            const totalImagenes = imagenesAmazonSeleccionadas.length;
-            
-            // Deshabilitar botón y mostrar progreso
-            btnGuardar.disabled = true;
-            btnGuardar.textContent = 'Procesando...';
-            loadingDiv.textContent = `Procesando imagen 0 de ${totalImagenes}...`;
-            loadingDiv.classList.remove('hidden');
-            
-            // Procesar cada imagen seleccionada
-            for (let i = 0; i < imagenesAmazonSeleccionadas.length; i++) {
-                const imagen = imagenesAmazonSeleccionadas[i];
-                const timestamp = Date.now() + i; // Añadir índice para evitar colisiones
-                
-                // Actualizar progreso
-                loadingDiv.textContent = `Procesando imagen ${i + 1} de ${totalImagenes}...`;
-                
-                // Cargar la imagen desde la URL usando proxy para evitar CORS
-                const urlProxy = imagen.url.startsWith('http') 
+            const seleccionAmz = imagenesAmazonSeleccionadas.slice();
+
+            seleccionAmz.forEach(function(imagen, i) {
+                const uploadId = Date.now().toString(36) + Math.random().toString(36).slice(2, 9) + 'a' + i;
+                const pendingPath = KP_PENDING_PRD + uploadId;
+                imagenesGrandes.push(pendingPath);
+                imagenesPequenas.push(pendingPath);
+
+                const timestamp = Date.now() + i;
+                const urlProxy = imagen.url.startsWith('http')
                     ? `{{ route('admin.imagenes.proxy') }}?url=${encodeURIComponent(imagen.url)}`
                     : imagen.url;
-                
-                await new Promise((resolve, reject) => {
-                    const img = new Image();
-                    img.crossOrigin = 'anonymous';
-                    
-                    img.onload = async function() {
-                        try {
-                            // Grande: tamaño original
-                            const canvasGrande = document.createElement('canvas');
-                            canvasGrande.width = img.width;
-                            canvasGrande.height = img.height;
-                            const ctxGrande = canvasGrande.getContext('2d');
-                            ctxGrande.drawImage(img, 0, 0);
-                            
-                            // Pequeña: 300x250
-                            const canvasPequena = document.createElement('canvas');
-                            canvasPequena.width = 300;
-                            canvasPequena.height = 250;
-                            const ctxPequena = canvasPequena.getContext('2d');
-                            ctxPequena.drawImage(img, 0, 0, 300, 250);
-                            
-                            // Convertir a blob webp
-                            const blobGrande = await new Promise((resolveBlob, rejectBlob) => {
-                                canvasGrande.toBlob((blob) => blob ? resolveBlob(blob) : rejectBlob(new Error('Error grande')), 'image/webp', 0.9);
-                            });
-                            
-                            const blobPequena = await new Promise((resolveBlob, rejectBlob) => {
-                                canvasPequena.toBlob((blob) => blob ? resolveBlob(blob) : rejectBlob(new Error('Error pequeña')), 'image/webp', 0.9);
-                            });
-                            
-                            // Subir ambas versiones
-                            const formDataGrande = new FormData();
-                            formDataGrande.append('imagen', blobGrande, `${nombreBase}-${timestamp}.webp`);
-                            formDataGrande.append('carpeta', carpeta);
-                            formDataGrande.append('_token', '{{ csrf_token() }}');
-                            
-                            const formDataPequena = new FormData();
-                            formDataPequena.append('imagen', blobPequena, `${nombreBase}-${timestamp}-thumbnail.webp`);
-                            formDataPequena.append('carpeta', carpeta);
-                            formDataPequena.append('_token', '{{ csrf_token() }}');
-                            
-                            const [resGrande, resPequena] = await Promise.all([
-                                fetch('{{ route("admin.imagenes.subir-simple") }}', {
-                                    method: 'POST',
-                                    headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                                    body: formDataGrande
-                                }),
-                                fetch('{{ route("admin.imagenes.subir-simple") }}', {
-                                    method: 'POST',
-                                    headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                                    body: formDataPequena
-                                })
-                            ]);
-                            
-                            const dataGrande = await resGrande.json();
-                            const dataPequena = await resPequena.json();
-                            
-                            if (dataGrande.success && dataPequena.success) {
-                                imagenesGrandes.push(dataGrande.data.ruta_relativa);
-                                imagenesPequenas.push(dataPequena.data.ruta_relativa);
-                                resolve();
-                            } else {
-                                throw new Error(dataGrande.message || dataPequena.message || 'Error al subir');
+
+                (async function() {
+                    try {
+                        const img = await new Promise(function(resolve, reject) {
+                            const im = new Image();
+                            im.crossOrigin = 'anonymous';
+                            im.onload = function() { resolve(im); };
+                            im.onerror = function() { reject(new Error('Error al cargar la imagen desde Amazon')); };
+                            im.src = urlProxy;
+                        });
+                        const canvasGrande = document.createElement('canvas');
+                        canvasGrande.width = img.width;
+                        canvasGrande.height = img.height;
+                        canvasGrande.getContext('2d').drawImage(img, 0, 0);
+                        const canvasPequena = document.createElement('canvas');
+                        canvasPequena.width = 300;
+                        canvasPequena.height = 250;
+                        canvasPequena.getContext('2d').drawImage(img, 0, 0, 300, 250);
+                        const blobGrande = await new Promise(function(resolveBlob, rejectBlob) {
+                            canvasGrande.toBlob(function(b) { b ? resolveBlob(b) : rejectBlob(new Error('Error grande')); }, 'image/webp', 0.9);
+                        });
+                        const blobPequena = await new Promise(function(resolveBlob, rejectBlob) {
+                            canvasPequena.toBlob(function(b) { b ? resolveBlob(b) : rejectBlob(new Error('Error pequeña')); }, 'image/webp', 0.9);
+                        });
+                        const formDataGrande = new FormData();
+                        formDataGrande.append('imagen', blobGrande, `${nombreBase}-${timestamp}.webp`);
+                        formDataGrande.append('carpeta', carpeta);
+                        formDataGrande.append('_token', '{{ csrf_token() }}');
+                        const formDataPequena = new FormData();
+                        formDataPequena.append('imagen', blobPequena, `${nombreBase}-${timestamp}-thumbnail.webp`);
+                        formDataPequena.append('carpeta', carpeta);
+                        formDataPequena.append('_token', '{{ csrf_token() }}');
+                        const onProg = (pct) => {
+                            const el = document.getElementById('kp-prog-prd-' + uploadId);
+                            if (el) el.style.width = pct + '%';
+                        };
+                        const { dataG, dataP } = await window.__kpSubirParejaConProgreso(
+                            '{{ route("admin.imagenes.subir-simple") }}',
+                            formDataGrande,
+                            formDataPequena,
+                            '{{ csrf_token() }}',
+                            onProg,
+                            uploadsPendientesProducto,
+                            uploadId
+                        );
+                        if (dataG.success && dataP.success) {
+                            const ix = imagenesGrandes.indexOf(pendingPath);
+                            if (ix !== -1) {
+                                imagenesGrandes[ix] = dataG.data.ruta_relativa;
+                                imagenesPequenas[ix] = dataP.data.ruta_relativa;
                             }
-                        } catch (error) {
-                            console.error('Error al procesar imagen:', error);
-                            reject(error);
+                            renderizarImagenes();
+                        } else {
+                            throw new Error(dataG.message || dataP.message || 'Error al subir');
                         }
-                    };
-                    
-                    img.onerror = function() {
-                        reject(new Error('Error al cargar la imagen desde Amazon'));
-                    };
-                    
-                    img.src = urlProxy;
-                });
-            }
-            
-            // Ocultar indicador de progreso y restaurar botón
-            loadingDiv.classList.add('hidden');
-            btnGuardar.disabled = false;
-            btnGuardar.textContent = 'Guardar';
-            
+                    } catch (error) {
+                        console.error('Error al procesar imagen Amazon:', error);
+                        quitarPlaceholderProducto(pendingPath);
+                        alert('Error al subir una imagen de Amazon: ' + error.message);
+                    }
+                })();
+            });
+
             renderizarImagenes();
-            cerrarModalAñadirImagen();
-            
+            prepararModalAñadirImagenParaOtraProducto('amazon');
+            cargarCarpetasModal();
+
         } catch (error) {
             console.error('Error al guardar imágenes:', error);
-            
-            // Restaurar botón y ocultar progreso en caso de error
-            const loadingDiv = document.getElementById('loading-amazon-nueva');
-            const btnGuardar = document.getElementById('btn-guardar-nueva');
-            loadingDiv.classList.add('hidden');
-            btnGuardar.disabled = false;
-            btnGuardar.textContent = 'Guardar';
-            
             alert('Error al guardar las imágenes: ' + error.message);
         }
     });
@@ -7490,114 +8224,107 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Procesar archivo nuevo
-    async function procesarArchivoNuevo(file) {
+    function quitarPlaceholderProducto(pendingPath) {
+        const ix = imagenesGrandes.indexOf(pendingPath);
+        if (ix !== -1) {
+            imagenesGrandes.splice(ix, 1);
+            imagenesPequenas.splice(ix, 1);
+            renderizarImagenes();
+        }
+    }
+
+    // Procesar archivo nuevo (subida en segundo plano)
+    function procesarArchivoNuevo(file) {
         const carpeta = document.getElementById('carpeta-subir-nueva').value;
         if (!carpeta) {
             alert('Por favor selecciona una carpeta primero.');
             return;
         }
-        
         if (!file.type.startsWith('image/')) {
             alert('Por favor selecciona un archivo de imagen válido.');
             return;
         }
-        
         if (file.size > 5 * 1024 * 1024) {
             alert('La imagen es demasiado grande. Máximo 5MB.');
             return;
         }
-        
-        document.getElementById('nombre-archivo-nueva').textContent = 'Subiendo...';
-        
-        try {
-            // Cargar imagen y procesar con canvas
-            const img = new Image();
-            img.crossOrigin = 'anonymous';
-            
-            img.onload = async function() {
+        const uploadId = Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+        const pendingPath = KP_PENDING_PRD + uploadId;
+        imagenesGrandes.push(pendingPath);
+        imagenesPequenas.push(pendingPath);
+        renderizarImagenes();
+        document.getElementById('nombre-archivo-nueva').textContent = file.name || '';
+        prepararModalAñadirImagenParaOtraProducto('subir');
+        cargarCarpetasModal();
+
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        const urlRevoke = URL.createObjectURL(file);
+        img.onload = function() {
+            URL.revokeObjectURL(urlRevoke);
+            (async function() {
                 try {
-                    // Grande: tamaño original
                     const canvasGrande = document.createElement('canvas');
                     canvasGrande.width = img.width;
                     canvasGrande.height = img.height;
-                    const ctxGrande = canvasGrande.getContext('2d');
-                    ctxGrande.drawImage(img, 0, 0);
-                    
-                    // Pequeña: 300x250
+                    canvasGrande.getContext('2d').drawImage(img, 0, 0);
                     const canvasPequena = document.createElement('canvas');
                     canvasPequena.width = 300;
                     canvasPequena.height = 250;
-                    const ctxPequena = canvasPequena.getContext('2d');
-                    ctxPequena.drawImage(img, 0, 0, 300, 250);
-                    
-                    // Convertir a blob webp
+                    canvasPequena.getContext('2d').drawImage(img, 0, 0, 300, 250);
                     const blobGrande = await new Promise((resolve, reject) => {
                         canvasGrande.toBlob((blob) => blob ? resolve(blob) : reject(new Error('Error grande')), 'image/webp', 0.9);
                     });
-                    
                     const blobPequena = await new Promise((resolve, reject) => {
                         canvasPequena.toBlob((blob) => blob ? resolve(blob) : reject(new Error('Error pequeña')), 'image/webp', 0.9);
                     });
-                    
                     const slugInput = document.querySelector('input[name="slug"]');
                     const nombreBase = slugInput ? slugInput.value.trim() : 'imagen';
                     const timestamp = Date.now();
-                    
-                    // Subir ambas
                     const formDataGrande = new FormData();
                     formDataGrande.append('imagen', blobGrande, `${nombreBase}-${timestamp}.webp`);
                     formDataGrande.append('carpeta', carpeta);
                     formDataGrande.append('_token', '{{ csrf_token() }}');
-                    
                     const formDataPequena = new FormData();
                     formDataPequena.append('imagen', blobPequena, `${nombreBase}-${timestamp}-thumbnail.webp`);
                     formDataPequena.append('carpeta', carpeta);
                     formDataPequena.append('_token', '{{ csrf_token() }}');
-                    
-                    const [resGrande, resPequena] = await Promise.all([
-                        fetch('{{ route("admin.imagenes.subir-simple") }}', {
-                            method: 'POST',
-                            headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                            body: formDataGrande
-                        }),
-                        fetch('{{ route("admin.imagenes.subir-simple") }}', {
-                            method: 'POST',
-                            headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                            body: formDataPequena
-                        })
-                    ]);
-                    
-                    const dataGrande = await resGrande.json();
-                    const dataPequena = await resPequena.json();
-                    
-                    if (dataGrande.success && dataPequena.success) {
-                        imagenesGrandes.push(dataGrande.data.ruta_relativa);
-                        imagenesPequenas.push(dataPequena.data.ruta_relativa);
+                    const onProg = (pct) => {
+                        const el = document.getElementById('kp-prog-prd-' + uploadId);
+                        if (el) el.style.width = pct + '%';
+                    };
+                    const { dataG, dataP } = await window.__kpSubirParejaConProgreso(
+                        '{{ route("admin.imagenes.subir-simple") }}',
+                        formDataGrande,
+                        formDataPequena,
+                        '{{ csrf_token() }}',
+                        onProg,
+                        uploadsPendientesProducto,
+                        uploadId
+                    );
+                    if (dataG.success && dataP.success) {
+                        const ix = imagenesGrandes.indexOf(pendingPath);
+                        if (ix !== -1) {
+                            imagenesGrandes[ix] = dataG.data.ruta_relativa;
+                            imagenesPequenas[ix] = dataP.data.ruta_relativa;
+                        }
                         renderizarImagenes();
-                        cerrarModalAñadirImagen();
                     } else {
-                        throw new Error(dataGrande.message || dataPequena.message || 'Error al subir');
+                        throw new Error(dataG.message || dataP.message || 'Error al subir');
                     }
                 } catch (error) {
                     console.error('Error:', error);
-                    alert(`Error al procesar la imagen: ${error.message}`);
-                    document.getElementById('nombre-archivo-nueva').textContent = '';
+                    quitarPlaceholderProducto(pendingPath);
+                    alert('Error al procesar la imagen: ' + error.message);
                 }
-            };
-            
-            img.onerror = function() {
-                alert('Error al cargar la imagen. Por favor, verifica que sea un formato válido.');
-                document.getElementById('nombre-archivo-nueva').textContent = '';
-            };
-            
-            img.src = URL.createObjectURL(file);
-            
-        } catch (error) {
-            console.error('Error:', error);
-            alert(`Error al subir la imagen: ${error.message}`);
-            document.getElementById('nombre-archivo-nueva').textContent = '';
-        }
+            })();
+        };
+        img.onerror = function() {
+            URL.revokeObjectURL(urlRevoke);
+            quitarPlaceholderProducto(pendingPath);
+            alert('Error al cargar la imagen. Por favor, verifica que sea un formato válido.');
+        };
+        img.src = urlRevoke;
     }
     
     // Configurar descarga desde URL (continuará en siguiente parte debido a límite de tamaño)
@@ -7680,6 +8407,32 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
+        if (tabId === 'tab-interna-nueva') {
+            const contInt = document.getElementById('filas-interna-nueva-producto');
+            const filas = contInt ? contInt.querySelectorAll('.kp-fila-interna-nueva') : [];
+            if (!filas.length) {
+                alert('Selecciona imágenes en la galería o añade al menos una fila con rutas.');
+                return;
+            }
+            for (let i = 0; i < filas.length; i++) {
+                const rG = (filas[i].querySelector('.kp-interna-nueva-g') && filas[i].querySelector('.kp-interna-nueva-g').value || '').trim();
+                const rP = (filas[i].querySelector('.kp-interna-nueva-p') && filas[i].querySelector('.kp-interna-nueva-p').value || '').trim();
+                if (!rG) {
+                    alert('Fila ' + (i + 1) + ': indica la ruta de la imagen grande.');
+                    return;
+                }
+                if (!rP) {
+                    alert('Fila ' + (i + 1) + ': indica la ruta de la imagen pequeña (miniatura).');
+                    return;
+                }
+                imagenesGrandes.push(rG);
+                imagenesPequenas.push(rP);
+            }
+            renderizarImagenes();
+            prepararModalAñadirImagenParaOtraProducto('interna');
+            return;
+        }
+        
         if (tabId === 'tab-subir-nueva') {
             // Ya se procesa en procesarArchivoNuevo
             // Solo verificar que hay archivo seleccionado
@@ -7687,31 +8440,32 @@ document.addEventListener('DOMContentLoaded', function() {
                 alert('Por favor selecciona una imagen primero.');
                 return;
             }
-        } else {
-            // Procesar desde URL con recorte
-            if (!cropperNueva || !carpetaActualNueva) {
-                alert('Por favor descarga y recorta la imagen primero.');
-                return;
-            }
-            
-            await procesarImagenRecortadaNueva();
+            return;
         }
+        // Procesar desde URL con recorte
+        if (!cropperNueva || !carpetaActualNueva) {
+            alert('Por favor descarga y recorta la imagen primero.');
+            return;
+        }
+        await procesarImagenRecortadaNueva();
     });
     
-    // Procesar imagen recortada desde URL
+    // Procesar imagen recortada desde URL (subida en segundo plano)
     async function procesarImagenRecortadaNueva() {
         const canvasOriginal = cropperNueva.getCroppedCanvas({
             imageSmoothingEnabled: true,
             imageSmoothingQuality: 'high'
         });
-        
         if (!canvasOriginal) {
             alert('Error al recortar la imagen');
             return;
         }
-        
+        const carpetaUp = carpetaActualNueva;
+        if (!carpetaUp) {
+            alert('Selecciona una carpeta primero.');
+            return;
+        }
         try {
-            // Grande: tamaño original (obtener dimensiones originales del canvas recortado)
             const canvasGrande = document.createElement('canvas');
             canvasGrande.width = canvasOriginal.width;
             canvasGrande.height = canvasOriginal.height;
@@ -7719,8 +8473,6 @@ document.addEventListener('DOMContentLoaded', function() {
             ctxGrande.fillStyle = '#ffffff';
             ctxGrande.fillRect(0, 0, canvasGrande.width, canvasGrande.height);
             ctxGrande.drawImage(canvasOriginal, 0, 0);
-            
-            // Pequeña: 300x250
             const canvasPequena = document.createElement('canvas');
             canvasPequena.width = 300;
             canvasPequena.height = 250;
@@ -7728,58 +8480,66 @@ document.addEventListener('DOMContentLoaded', function() {
             ctxPequena.fillStyle = '#ffffff';
             ctxPequena.fillRect(0, 0, canvasPequena.width, canvasPequena.height);
             ctxPequena.drawImage(canvasOriginal, 0, 0, 300, 250);
-            
-            // Convertir a blob webp
             const blobGrande = await new Promise((resolve, reject) => {
                 canvasGrande.toBlob((blob) => blob ? resolve(blob) : reject(new Error('Error grande')), 'image/webp', 0.9);
             });
-            
             const blobPequena = await new Promise((resolve, reject) => {
                 canvasPequena.toBlob((blob) => blob ? resolve(blob) : reject(new Error('Error pequeña')), 'image/webp', 0.9);
             });
-            
+            const uploadId = Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+            const pendingPath = KP_PENDING_PRD + uploadId;
+            imagenesGrandes.push(pendingPath);
+            imagenesPequenas.push(pendingPath);
+            renderizarImagenes();
+            prepararModalAñadirImagenParaOtraProducto('url');
+            cargarCarpetasModal();
+
             const slugInput = document.querySelector('input[name="slug"]');
             const nombreBase = slugInput ? slugInput.value.trim() : 'imagen';
             const timestamp = Date.now();
-            
-            // Subir ambas
             const formDataGrande = new FormData();
             formDataGrande.append('imagen', blobGrande, `${nombreBase}-${timestamp}.webp`);
-            formDataGrande.append('carpeta', carpetaActualNueva);
+            formDataGrande.append('carpeta', carpetaUp);
             formDataGrande.append('_token', '{{ csrf_token() }}');
-            
             const formDataPequena = new FormData();
             formDataPequena.append('imagen', blobPequena, `${nombreBase}-${timestamp}-thumbnail.webp`);
-            formDataPequena.append('carpeta', carpetaActualNueva);
+            formDataPequena.append('carpeta', carpetaUp);
             formDataPequena.append('_token', '{{ csrf_token() }}');
-            
-            const [resGrande, resPequena] = await Promise.all([
-                fetch('{{ route("admin.imagenes.subir-simple") }}', {
-                    method: 'POST',
-                    headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                    body: formDataGrande
-                }),
-                fetch('{{ route("admin.imagenes.subir-simple") }}', {
-                    method: 'POST',
-                    headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                    body: formDataPequena
-                })
-            ]);
-            
-            const dataGrande = await resGrande.json();
-            const dataPequena = await resPequena.json();
-            
-            if (dataGrande.success && dataPequena.success) {
-                imagenesGrandes.push(dataGrande.data.ruta_relativa);
-                imagenesPequenas.push(dataPequena.data.ruta_relativa);
-                renderizarImagenes();
-                cerrarModalAñadirImagen();
-            } else {
-                throw new Error(dataGrande.message || dataPequena.message || 'Error al subir');
-            }
+
+            (async function() {
+                try {
+                    const onProg = (pct) => {
+                        const el = document.getElementById('kp-prog-prd-' + uploadId);
+                        if (el) el.style.width = pct + '%';
+                    };
+                    const { dataG, dataP } = await window.__kpSubirParejaConProgreso(
+                        '{{ route("admin.imagenes.subir-simple") }}',
+                        formDataGrande,
+                        formDataPequena,
+                        '{{ csrf_token() }}',
+                        onProg,
+                        uploadsPendientesProducto,
+                        uploadId
+                    );
+                    if (dataG.success && dataP.success) {
+                        const ix = imagenesGrandes.indexOf(pendingPath);
+                        if (ix !== -1) {
+                            imagenesGrandes[ix] = dataG.data.ruta_relativa;
+                            imagenesPequenas[ix] = dataP.data.ruta_relativa;
+                        }
+                        renderizarImagenes();
+                    } else {
+                        throw new Error(dataG.message || dataP.message || 'Error al subir');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    quitarPlaceholderProducto(pendingPath);
+                    alert('Error al procesar la imagen: ' + error.message);
+                }
+            })();
         } catch (error) {
             console.error('Error:', error);
-            alert(`Error al procesar la imagen: ${error.message}`);
+            alert('Error al procesar la imagen: ' + error.message);
         }
     }
     
@@ -7787,6 +8547,53 @@ document.addEventListener('DOMContentLoaded', function() {
     function actualizarCamposOcultos() {
         document.getElementById('imagenes-grandes-json').value = JSON.stringify(imagenesGrandes);
         document.getElementById('imagenes-pequenas-json').value = JSON.stringify(imagenesPequenas);
+    }
+
+    function kpRutaEsPendienteProducto(r) {
+        return typeof r === 'string' && r.indexOf(KP_PENDING_PRD) === 0;
+    }
+
+    function kpHayPendienteEnJsonEspecificacionesInternas() {
+        const input = document.getElementById('categoria_especificaciones_internas_elegidas_input');
+        if (!input || !input.value) return false;
+        try {
+            const esp = JSON.parse(input.value);
+            const keys = Object.keys(esp);
+            for (let k = 0; k < keys.length; k++) {
+                const arr = esp[keys[k]];
+                if (!Array.isArray(arr)) continue;
+                for (let i = 0; i < arr.length; i++) {
+                    const item = arr[i];
+                    if (item && typeof item === 'object' && item.img && Array.isArray(item.img)) {
+                        for (let j = 0; j < item.img.length; j++) {
+                            if (kpRutaEsPendienteProducto(item.img[j])) return true;
+                        }
+                    }
+                }
+            }
+        } catch (err) {}
+        return false;
+    }
+
+    function kpHayImagenesSubiendoEnFormularioProducto() {
+        if (imagenesGrandes.some(kpRutaEsPendienteProducto) || imagenesPequenas.some(kpRutaEsPendienteProducto)) {
+            return true;
+        }
+        return kpHayPendienteEnJsonEspecificacionesInternas();
+    }
+
+    window.kpHayImagenesSubiendoEnFormularioProducto = kpHayImagenesSubiendoEnFormularioProducto;
+
+    const formBloqueoSubidasImagen = document.querySelector('form');
+    if (formBloqueoSubidasImagen) {
+        formBloqueoSubidasImagen.addEventListener('submit', function(e) {
+            if (kpHayImagenesSubiendoEnFormularioProducto()) {
+                e.preventDefault();
+                alert('Espera a que terminen de subirse las imágenes (miniaturas con «Cargando imagen…» o barra de progreso) antes de guardar el producto.');
+                const cont = document.getElementById('imagenes-container');
+                if (cont) cont.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }, true);
     }
     
     // Inicializar
@@ -8203,12 +9010,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     datos = parsed._producto.filtros;
                 }
                 // Obtener columnas guardadas (pueden estar en _columnas o en _esColumna dentro de cada filtro)
-                if (parsed && parsed._columnas && Array.isArray(parsed._columnas)) {
-                    // Compatibilidad: puede venir como ["id"] o [{id:"id", c:0}]
-                    columnasGuardadas = parsed._columnas
-                        .map(v => (v && typeof v === 'object' && !Array.isArray(v)) ? v.id : v)
-                        .filter(v => (typeof v === 'string' || typeof v === 'number'))
-                        .map(v => String(v));
+                // _columnas puede ser lista o mapa { idPrincipal: sublineaId }
+                if (parsed && parsed._columnas) {
+                    if (Array.isArray(parsed._columnas)) {
+                        columnasGuardadas = parsed._columnas
+                            .map(v => (v && typeof v === 'object' && !Array.isArray(v)) ? v.id : v)
+                            .filter(v => (typeof v === 'string' || typeof v === 'number'))
+                            .map(v => String(v));
+                    } else if (typeof parsed._columnas === 'object') {
+                        columnasGuardadas = Object.keys(parsed._columnas)
+                            .filter(k => k && !String(k).startsWith('_'))
+                            .map(k => String(k));
+                    }
                 }
                 // Obtener formatos guardados
                 if (parsed && parsed._formatos && typeof parsed._formatos === 'object') {
@@ -8232,7 +9045,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (datos && datos.length > 0) {
             datos.forEach((filtro) => {
                 // Verificar si es columna: primero en _columnas, luego en _esColumna
-                const esColumna = columnasGuardadas.includes(filtro.id) || filtro._esColumna === true;
+                const esColumna = columnasGuardadas.includes(String(filtro.id)) || filtro._esColumna === true;
                 // Obtener formato guardado para esta línea principal
                 const formatoGuardado = (typeof formatosGuardados[filtro.id] === 'string') ? formatosGuardados[filtro.id] : 'texto';
                 crearLineaPrincipalProducto(filtro.texto || '', filtro.importante || false, filtro.subprincipales || [], filtro.id || null, filtro.slug || null, esColumna, formatoGuardado);
@@ -8887,11 +9700,24 @@ document.addEventListener('DOMContentLoaded', function() {
             return out;
         };
 
+        const normalizarColumnasListaCompleto = (raw) => {
+            if (raw == null) return [];
+            if (Array.isArray(raw)) {
+                return normalizarArrayIds(raw);
+            }
+            if (typeof raw === 'object') {
+                return Object.keys(raw)
+                    .filter(k => k && !String(k).startsWith('_'))
+                    .map(k => String(k));
+            }
+            return [];
+        };
+
         if (especificacionesCompletas._orden) {
             especificacionesCompletas._orden = normalizarArrayIds(especificacionesCompletas._orden);
         }
         if (especificacionesCompletas._columnas) {
-            especificacionesCompletas._columnas = normalizarArrayIds(especificacionesCompletas._columnas);
+            especificacionesCompletas._columnas = normalizarColumnasListaCompleto(especificacionesCompletas._columnas);
         }
         if (especificacionesCompletas._formatos) {
             especificacionesCompletas._formatos = normalizarFormatosMap(especificacionesCompletas._formatos);
@@ -9036,25 +9862,42 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Si es unidadUnica, guardar orden y columnas (combinando con las de categoría)
         if (esUnidadUnica) {
-            const lineasPrincipales = Array.from(container.querySelectorAll('.linea-principal-producto'));
-            const orden = lineasPrincipales.map(linea => linea.dataset.idUnico);
-            especificacionesCompletas._orden = orden;
-            
-            // Obtener columnas del producto (solo las marcadas actualmente)
-            const columnasCheckboxes = container.querySelectorAll('.columna-oferta-producto-checkbox:checked');
-            const columnasProducto = Array.from(columnasCheckboxes).map(cb => cb.dataset.principalId);
-            
-            // Obtener columnas de categoría (del contenedor de categoría, solo las marcadas actualmente)
+            const lineasPrincipalesProducto = Array.from(container.querySelectorAll('.linea-principal-producto'));
+            const ordenProducto = lineasPrincipalesProducto.map(linea => String(linea.dataset.idUnico));
+
             const contenedorCategoria = document.querySelector('#especificaciones-principales-container');
+            const categoriaUiLista = contenedorCategoria && contenedorCategoria.querySelector('.linea-principal-especificaciones');
+
+            // Columnas marcadas en líneas propias del producto (DOM)
+            const columnasCheckboxes = container.querySelectorAll('.columna-oferta-producto-checkbox:checked');
+            const columnasProducto = Array.from(columnasCheckboxes).map(cb => String(cb.dataset.principalId));
+
+            const idsProducto = new Set(filtros.map(f => String(f.id)));
+            const prevColumnasArr = Array.isArray(especificacionesCompletas._columnas)
+                ? especificacionesCompletas._columnas.map(String)
+                : [];
+
             let columnasCategoria = [];
-            if (contenedorCategoria) {
+            if (categoriaUiLista) {
                 const columnasCheckboxesCategoria = contenedorCategoria.querySelectorAll('.columna-oferta-checkbox:checked');
-                columnasCategoria = Array.from(columnasCheckboxesCategoria).map(cb => cb.dataset.principalId);
+                columnasCategoria = Array.from(columnasCheckboxesCategoria).map(cb => String(cb.dataset.principalId));
+            } else {
+                // La UI de categoría aún no está montada (p. ej. al cargar con _producto.filtros vacío):
+                // conservar en _columnas los ids de categoría ya guardados; no sustituir por [].
+                columnasCategoria = prevColumnasArr.filter(id => !idsProducto.has(String(id)));
             }
-            
-            // Combinar solo las columnas actualmente marcadas: categoría + producto, eliminando duplicados
+
             const todasLasColumnas = [...new Set([...columnasCategoria, ...columnasProducto])];
             especificacionesCompletas._columnas = todasLasColumnas;
+
+            // _orden: igual que en actualizarEspecificacionesElegidas — orden de líneas de categoría en el DOM
+            if (categoriaUiLista) {
+                const lineasCat = Array.from(contenedorCategoria.querySelectorAll('.linea-principal-especificaciones'));
+                especificacionesCompletas._orden = lineasCat.map(linea => String(linea.dataset.principalId));
+            } else if (ordenProducto.length > 0) {
+                especificacionesCompletas._orden = ordenProducto;
+            }
+            // Si no hay UI de categoría ni líneas de producto, no reasignar _orden (sigue el JSON ya parseado)
         }
         
         // Guardar el JSON completo

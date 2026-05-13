@@ -12,17 +12,32 @@ use App\Models\UrlDescartada;
 use App\Services\ConsultarNeoCifrado;
 use App\Services\LimpiarUrlDeTiendas;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
 class NeoController extends Controller
 {
+    /** Máximo de filas neo revisadas (más recientes primero) para coincidencia parcial sobre la URL descifrada (campo url v2). */
+    private const NEO_INDEX_BUSQUEDA_PARCIAL_MAX_FILAS = 35000;
+
+    /** Tope de IDs devueltos (exactos por índice + parciales) para acotar memoria y paginación. */
+    private const NEO_INDEX_BUSQUEDA_MAX_RESULTADOS = 2000;
+
     /**
      * Vista crear ofertas en masa desde neo: muestra cantidad de filas neo con aniadida=no
      * y permite cargar URLs por producto (neo con aniadida=no agrupados por producto_id).
      */
     public function crearMasivo()
     {
-        $totalNeoAniadidaNo = Neo::where('aniadida', 'no')->count();
+        $totalNeoAniadidaNo = Neo::where('aniadida', 'no')
+            ->where(function ($q) {
+                $q->whereNull('tienda_id')
+                    ->orWhereDoesntHave('tienda', function ($tq) {
+                        $tq->where('mostrar_tienda', 'no')
+                            ->where('scrapear', 'no');
+                    });
+            })
+            ->count();
         $totalNeoAniadidaNoSinUrl = Neo::where('aniadida', 'no')
             ->where(function ($q) {
                 $q->whereNull('url_cipher')->orWhere('url_cipher', '');
@@ -62,14 +77,33 @@ class NeoController extends Controller
     /**
      * Productos que tienen al menos una fila en neo con aniadida=no (agrupados por producto_id).
      * Para el botón "Producto" en crear-masivo neo.
+     *
+     * Query (checkboxes independientes):
+     * - mostrar_si=1 y mostrar_no=0: solo neo con tienda_id no nulo y tienda mostrar_tienda=si (por defecto si no se envía nada).
+     * - mostrar_si=0 y mostrar_no=1: solo neo cuyo tienda_id está en tienda_ids[] (cada id debe ser tienda mostrar_tienda=no). Sin ids: ningún resultado.
+     * - ambos 1 o ninguno 1: sin filtrar por mostrar_tienda (incluye neo sin tienda_id).
+     * - mostrar_si=0, mostrar_no=0 y mostrar_null=1: solo filas neo con tienda_id nulo (exclusivo).
+     * - mostrar_null=1 junto con solo «Sí» o solo «No» (y tiendas): además incluye filas con tienda_id nulo (OR).
+     * Compat: solo_tiendas_mostrar_si (1 = solo sí; 0 = sin filtro como ambos checks).
+     * Respuesta: { productos: [...], filas_neo_tienda_id_null: N } (N = total filas neo sin tienda con URL y producto; el listado sigue el filtro).
      */
-    public function productosConNeoAniadidaNo()
+    public function productosConNeoAniadidaNo(Request $request)
     {
-        $grupos = Neo::where('aniadida', 'no')
+        $filasNeoTiendaIdNull = Neo::where('aniadida', 'no')
             ->whereNotNull('url_cipher')
             ->where('url_cipher', '!=', '')
             ->whereNotNull('producto_id')
-            ->selectRaw('producto_id, count(*) as total')
+            ->whereNull('tienda_id')
+            ->count();
+
+        $q = Neo::where('aniadida', 'no')
+            ->whereNotNull('url_cipher')
+            ->where('url_cipher', '!=', '')
+            ->whereNotNull('producto_id');
+
+        $this->aplicarFiltroMostrarTiendaNeoCrearMasivoProducto($q, $request);
+
+        $grupos = $q->selectRaw('producto_id, count(*) as total')
             ->groupBy('producto_id')
             ->get();
 
@@ -90,19 +124,27 @@ class NeoController extends Controller
             ];
         })->values();
 
-        return response()->json($lista);
+        return response()->json([
+            'productos' => $lista,
+            'filas_neo_tienda_id_null' => $filasNeoTiendaIdNull,
+        ]);
     }
 
     /**
      * URLs de filas neo con aniadida=no para un producto_id, y datos del producto para mismo_producto.
+     *
+     * @see productosConNeoAniadidaNo() mismos parámetros mostrar_si / mostrar_no, mostrar_null y tienda_ids[] (solo modo mostrar no).
      */
-    public function urlsPorProducto(int $productoId)
+    public function urlsPorProducto(Request $request, int $productoId)
     {
-        $urls = Neo::where('aniadida', 'no')
+        $q = Neo::where('aniadida', 'no')
             ->where('producto_id', $productoId)
             ->whereNotNull('url_cipher')
-            ->where('url_cipher', '!=', '')
-            ->get()
+            ->where('url_cipher', '!=', '');
+
+        $this->aplicarFiltroMostrarTiendaNeoCrearMasivoProducto($q, $request);
+
+        $urls = $q->get()
             ->map(fn (Neo $neo) => trim((string) $neo->url))
             ->filter(fn (string $url) => $url !== '')
             ->values()
@@ -125,6 +167,135 @@ class NeoController extends Controller
             'urls' => $urls,
             'producto' => $productoParaVista,
         ]);
+    }
+
+    /**
+     * Listado de tiendas con mostrar_tienda=no para el modal producto (checkboxes).
+     */
+    public function tiendasMostrarNoCrearMasivoModalProducto()
+    {
+        $lista = Tienda::query()
+            ->where('mostrar_tienda', 'no')
+            ->orderBy('nombre')
+            ->get(['id', 'nombre'])
+            ->map(fn (Tienda $t) => [
+                'id' => $t->id,
+                'nombre' => $t->nombre,
+            ])
+            ->values();
+
+        return response()->json($lista);
+    }
+
+    /**
+     * Filtro tienda en crear-masivo (modal producto / urls por producto):
+     * - Solo null: mostrar_si=0, mostrar_no=0, mostrar_null=1 → solo tienda_id nulo.
+     * - Solo «Sí»: tienda mostrar_tienda=si; con mostrar_null además OR tienda_id nulo.
+     * - Solo «No»: tienda_ids con mostrar no; con mostrar_null además OR tienda_id nulo.
+     * - Ambos sí y no o ninguno (sin null): sin filtrar por tienda.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<\App\Models\Neo>  $query
+     */
+    private function aplicarFiltroMostrarTiendaNeoCrearMasivoProducto($query, Request $request): void
+    {
+        if ($request->query('mostrar_si') !== null || $request->query('mostrar_no') !== null) {
+            $chkSi = $this->queryCheckboxMostrarTiendaVerdadero($request, 'mostrar_si');
+            $chkNo = $this->queryCheckboxMostrarTiendaVerdadero($request, 'mostrar_no');
+        } elseif ($request->has('solo_tiendas_mostrar_si')) {
+            if ($request->boolean('solo_tiendas_mostrar_si')) {
+                $chkSi = true;
+                $chkNo = false;
+            } else {
+                $chkSi = true;
+                $chkNo = true;
+            }
+        } else {
+            $chkSi = true;
+            $chkNo = false;
+        }
+
+        $chkNull = $request->query('mostrar_null') !== null
+            && $this->queryCheckboxMostrarTiendaVerdadero($request, 'mostrar_null');
+
+        if ($chkNull && !$chkSi && !$chkNo) {
+            $query->whereNull('tienda_id');
+
+            return;
+        }
+
+        if (($chkSi && $chkNo) || (!$chkSi && !$chkNo)) {
+            return;
+        }
+
+        if ($chkSi && !$chkNo) {
+            $idsSi = Tienda::query()->where('mostrar_tienda', 'si')->select('id');
+            $query->where(function ($w) use ($idsSi, $chkNull) {
+                $w->where(function ($w2) use ($idsSi) {
+                    $w2->whereNotNull('tienda_id')->whereIn('tienda_id', $idsSi);
+                });
+                if ($chkNull) {
+                    $w->orWhereNull('tienda_id');
+                }
+            });
+
+            return;
+        }
+
+        $ids = $this->idsTiendasMostrarNoSeleccionadasCrearMasivo($request);
+        if ($ids === []) {
+            $query->whereRaw('0 = 1');
+
+            return;
+        }
+
+        $query->where(function ($w) use ($ids, $chkNull) {
+            $w->whereIn('tienda_id', $ids);
+            if ($chkNull) {
+                $w->orWhereNull('tienda_id');
+            }
+        });
+    }
+
+    /**
+     * Ids recibidos en tienda_ids / tienda_ids[] que existen y tienen mostrar_tienda=no.
+     *
+     * @return list<int>
+     */
+    private function idsTiendasMostrarNoSeleccionadasCrearMasivo(Request $request): array
+    {
+        $raw = $request->input('tienda_ids', []);
+        if (! is_array($raw)) {
+            $raw = $raw !== null && $raw !== '' ? [(string) $raw] : [];
+        }
+        $candidatos = array_values(array_unique(array_filter(
+            array_map(static fn ($v) => (int) $v, $raw),
+            static fn (int $id) => $id > 0
+        )));
+        if ($candidatos === []) {
+            return [];
+        }
+
+        return Tienda::query()
+            ->where('mostrar_tienda', 'no')
+            ->whereIn('id', $candidatos)
+            ->pluck('id')
+            ->all();
+    }
+
+    /**
+     * Parámetros GET mostrar_si / mostrar_no: 1/true/yes/on = marcado; 0 o ausente en el otro = no.
+     */
+    private function queryCheckboxMostrarTiendaVerdadero(Request $request, string $key): bool
+    {
+        $v = $request->query($key);
+        if ($v === null) {
+            return false;
+        }
+        if (is_bool($v)) {
+            return $v;
+        }
+
+        return in_array(strtolower(trim((string) $v)), ['1', 'true', 'yes', 'on'], true);
     }
 
     /**
@@ -176,6 +347,44 @@ class NeoController extends Controller
     }
 
     /**
+     * Lista JSON de tiendas con conteos neo: incluye flags y deja al final las marcadas no mostrar / no scrapear.
+     */
+    private function listaTiendasNeoDesdeGrupos($grupos)
+    {
+        $tiendas = Tienda::whereIn('id', $grupos->pluck('tienda_id'))
+            ->get(['id', 'nombre', 'mostrar_tienda', 'scrapear'])
+            ->keyBy('id');
+
+        $lista = $grupos->map(function ($g) use ($tiendas) {
+            $t = $tiendas->get($g->tienda_id);
+            $mostrar = $t ? (string) ($t->mostrar_tienda ?? 'si') : 'si';
+            $scrapearVal = $t ? (string) ($t->scrapear ?? 'si') : 'si';
+            $depriorizada = ($mostrar === 'no' || $scrapearVal === 'no');
+
+            return [
+                'tienda_id' => $g->tienda_id,
+                'nombre' => $t ? $t->nombre : 'Tienda #' . $g->tienda_id,
+                'count' => (int) $g->total,
+                'mostrar_tienda' => $mostrar,
+                'scrapear' => $scrapearVal,
+                '_sort_depriorizada' => $depriorizada ? 1 : 0,
+            ];
+        });
+
+        return $lista->sort(function ($a, $b) {
+            if ($a['_sort_depriorizada'] !== $b['_sort_depriorizada']) {
+                return $a['_sort_depriorizada'] <=> $b['_sort_depriorizada'];
+            }
+
+            return strcasecmp($a['nombre'] ?? '', $b['nombre'] ?? '');
+        })->values()->map(function ($row) {
+            unset($row['_sort_depriorizada']);
+
+            return $row;
+        });
+    }
+
+    /**
      * Tiendas pendientes (aniadida=no) para una categoría concreta.
      */
     public function tiendasPorCategoria(int $categoriaId)
@@ -189,20 +398,7 @@ class NeoController extends Controller
             ->groupBy('tienda_id')
             ->get();
 
-        $tiendas = Tienda::whereIn('id', $grupos->pluck('tienda_id'))
-            ->get(['id', 'nombre'])
-            ->keyBy('id');
-
-        $lista = $grupos->map(function ($g) use ($tiendas) {
-            $t = $tiendas->get($g->tienda_id);
-            return [
-                'tienda_id' => $g->tienda_id,
-                'nombre' => $t ? $t->nombre : 'Tienda #' . $g->tienda_id,
-                'count' => (int) $g->total,
-            ];
-        })->values();
-
-        return response()->json($lista);
+        return response()->json($this->listaTiendasNeoDesdeGrupos($grupos));
     }
 
     /**
@@ -238,20 +434,7 @@ class NeoController extends Controller
             ->groupBy('tienda_id')
             ->get();
 
-        $tiendas = Tienda::whereIn('id', $grupos->pluck('tienda_id'))
-            ->get(['id', 'nombre'])
-            ->keyBy('id');
-
-        $lista = $grupos->map(function ($g) use ($tiendas) {
-            $t = $tiendas->get($g->tienda_id);
-            return [
-                'tienda_id' => $g->tienda_id,
-                'nombre' => $t ? $t->nombre : 'Tienda #' . $g->tienda_id,
-                'count' => (int) $g->total,
-            ];
-        })->values();
-
-        return response()->json($lista);
+        return response()->json($this->listaTiendasNeoDesdeGrupos($grupos));
     }
 
     /**
@@ -322,40 +505,151 @@ class NeoController extends Controller
     }
 
     /**
-     * Listado de registros de la tabla neo con búsqueda por url/neo y filtro por aniadida (si/no).
+     * Listado de registros de la tabla neo con búsqueda solo por URL (url_lookup / URL descifrada) y filtro por aniadida (si/no).
      * Por defecto solo se muestran las que tienen aniadida=no.
      * Si se marca "Sí", se muestran ambas. Si hay búsqueda, se muestran ambas.
      */
     public function index(Request $request)
     {
-        $perPage = $request->input('perPage', 20);
+        $perPage = (int) $request->input('perPage', 20);
+        $perPage = in_array($perPage, [20, 50, 100, 200], true) ? $perPage : 20;
         $busqueda = $request->input('busqueda');
+        $busquedaTrim = is_string($busqueda) ? trim($busqueda) : '';
         $aniadida = $request->input('aniadida', ['no']);
+        $neoBusquedaAviso = null;
 
         // Si hay búsqueda, mostrar tanto si como no
-        if ($busqueda !== null && $busqueda !== '') {
+        if ($busquedaTrim !== '') {
             $aniadidaParaVista = ['si', 'no'];
+            $resultado = $this->neoIdsOrdenadosBusquedaUrl($busquedaTrim);
+            $neoBusquedaAviso = $resultado['aviso'];
+            $ids = $resultado['ids'];
+            $page = LengthAwarePaginator::resolveCurrentPage();
+            $total = count($ids);
+            $offset = max(0, ($page - 1) * $perPage);
+            $slice = array_slice($ids, $offset, $perPage);
+            $items = $slice === []
+                ? collect()
+                : Neo::with(['producto', 'tienda', 'categoria'])
+                    ->whereIn('id', $slice)
+                    ->get()
+                    ->sortBy(fn (Neo $neo) => array_search($neo->id, $slice, true))
+                    ->values();
+
+            $neos = new LengthAwarePaginator(
+                $items,
+                $total,
+                $perPage,
+                $page,
+                [
+                    'path' => $request->url(),
+                    'pageName' => 'page',
+                ]
+            );
+            $neos->withQueryString();
         } else {
             $aniadidaParaVista = is_array($aniadida) ? $aniadida : [$aniadida];
+
+            $neos = Neo::with(['producto', 'tienda', 'categoria'])
+                ->when(count($aniadidaParaVista) > 0, function ($query) use ($aniadidaParaVista) {
+                    $query->whereIn('aniadida', $aniadidaParaVista);
+                })
+                ->orderBy('created_at', 'desc')
+                ->paginate($perPage)
+                ->withQueryString();
         }
 
-        $neos = Neo::with(['producto', 'tienda', 'categoria'])
-            ->when($busqueda, function ($query, $busqueda) {
-                $busqueda = trim($busqueda);
-                $lookup = app(ConsultarNeoCifrado::class)->hashLookup($busqueda);
-                $query->where(function ($q) use ($lookup) {
-                    $q->where('neo_lookup', $lookup)
-                        ->orWhere('url_lookup', $lookup);
-                });
-            })
-            ->when(!$busqueda && count($aniadidaParaVista) > 0, function ($query) use ($aniadidaParaVista) {
-                $query->whereIn('aniadida', $aniadidaParaVista);
-            })
-            ->orderBy('created_at', 'desc')
-            ->paginate($perPage)
-            ->withQueryString();
+        return view('admin.neo.index', compact('neos', 'perPage', 'aniadidaParaVista', 'neoBusquedaAviso'));
+    }
 
-        return view('admin.neo.index', compact('neos', 'perPage', 'aniadidaParaVista'));
+    /**
+     * IDs de neo que coinciden con la búsqueda: exactos por url_lookup (todo el histórico)
+     * y parciales por subcadena en la URL descifrada (solo entre las filas más recientes, ver constantes).
+     *
+     * @return array{ids: array<int>, aviso: ?string}
+     */
+    private function neoIdsOrdenadosBusquedaUrl(string $trimmed): array
+    {
+        if ($trimmed === '') {
+            return ['ids' => [], 'aviso' => null];
+        }
+
+        $cifrado = app(ConsultarNeoCifrado::class);
+        $lookups = [];
+        $h = $cifrado->hashLookup($trimmed);
+        if ($h !== '') {
+            $lookups[] = $h;
+        }
+        if (preg_match('#(https?://|www\.)#i', $trimmed)) {
+            try {
+                $limpia = app(LimpiarUrlDeTiendas::class)->limpiar($trimmed);
+                if ($limpia !== '' && $limpia !== $trimmed) {
+                    $h2 = $cifrado->hashLookup($limpia);
+                    if ($h2 !== '' && !in_array($h2, $lookups, true)) {
+                        $lookups[] = $h2;
+                    }
+                }
+            } catch (\Throwable) {
+            }
+        }
+
+        $exact = collect();
+        if ($lookups !== []) {
+            $exact = Neo::query()
+                ->whereIn('url_lookup', $lookups)
+                ->orderByDesc('created_at')
+                ->get(['id', 'created_at']);
+        }
+
+        $needle = mb_strtolower($trimmed, 'UTF-8');
+        $exactIds = $exact->pluck('id')->flip()->all();
+
+        $porParcial = [];
+        $filasEscaneadas = 0;
+        $topeEscaneoAlcanzado = false;
+
+        foreach (Neo::query()->orderByDesc('created_at')->cursor() as $neo) {
+            if (++$filasEscaneadas > self::NEO_INDEX_BUSQUEDA_PARCIAL_MAX_FILAS) {
+                $topeEscaneoAlcanzado = true;
+                break;
+            }
+
+            if (isset($exactIds[$neo->id])) {
+                continue;
+            }
+
+            $urlPlain = (string) $neo->url;
+            if ($urlPlain !== '' && mb_strpos(mb_strtolower($urlPlain, 'UTF-8'), $needle, 0, 'UTF-8') !== false) {
+                $porParcial[] = ['id' => (int) $neo->id, 'created_at' => $neo->created_at];
+            }
+        }
+
+        $merged = $exact
+            ->map(fn ($r) => ['id' => (int) $r->id, 'created_at' => $r->created_at])
+            ->concat(collect($porParcial))
+            ->unique('id')
+            ->sortByDesc(function (array $row) {
+                $ts = $row['created_at'] ?? null;
+
+                return $ts instanceof \DateTimeInterface ? $ts->getTimestamp() : 0;
+            })
+            ->values();
+
+        $capados = $merged->count() > self::NEO_INDEX_BUSQUEDA_MAX_RESULTADOS;
+        $ids = $merged->take(self::NEO_INDEX_BUSQUEDA_MAX_RESULTADOS)->pluck('id')->all();
+
+        $partes = [];
+        if ($topeEscaneoAlcanzado) {
+            $partes[] = 'La coincidencia parcial solo ha revisado las '.number_format(self::NEO_INDEX_BUSQUEDA_PARCIAL_MAX_FILAS, 0, ',', '.').' filas más recientes (por fecha de creación). Las coincidencias exactas por URL siguen buscándose en todo el histórico mediante el índice.';
+        }
+        if ($capados) {
+            $partes[] = 'Se muestran como máximo '.self::NEO_INDEX_BUSQUEDA_MAX_RESULTADOS.' resultados; acota la búsqueda si hace falta.';
+        }
+
+        return [
+            'ids' => $ids,
+            'aviso' => $partes === [] ? null : implode(' ', $partes),
+        ];
     }
 
     /**

@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\DB;
  * Si detecta "Consigue un regalo con la compra de este artículo", puede marcar +Juego (y aviso),
  * salvo que en el bloque de ficha titulado exactamente "Promociones" (no "Promociones y descuentos"
  * del menú) haya enlaces href con cupon-eneba o textos como "te la instalamos gratis",
- * "Consigue hasta 25 euros".
+ * "Consigue hasta 25 euros", "cartera de Steam".
  */
 class CoolmodController extends PlantillaTiendaController
 {
@@ -21,6 +21,7 @@ class CoolmodController extends PlantillaTiendaController
     private const FRAGMENTOS_PROMOCIONES_IMPIDEN_PLUS_JUEGO = [
         'te la instalamos gratis',
         'consigue hasta 25 euros',
+        'cartera de steam',
     ];
 
     public function obtenerPrecio($url, $variante = null, $tienda = null, $oferta = null): JsonResponse

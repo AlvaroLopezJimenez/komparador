@@ -28,8 +28,8 @@ class BixotoController extends PlantillaTiendaController
                 $oferta->update(['mostrar' => 'no']);
 
                 DB::table('avisos')->insert([
-                    'texto_aviso'    => 'SIN STOCK 1A VEZ - GENERADO AUTOMATICAMENTE',
-                    'fecha_aviso'    => now()->addDay(),
+                    'texto_aviso'    => 'Sin Stock 1a vez - GENERADO AUTOMATICAMENTE',
+                    'fecha_aviso'    => now()->addDays(4),
                     'user_id'        => 1,
                     'avisoable_type' => OfertaProducto::class,
                     'avisoable_id'   => $oferta->id,
@@ -54,11 +54,20 @@ class BixotoController extends PlantillaTiendaController
     }
 
     /**
-     * Stub de sin stock (pendiente de definir patron exacto).
+     * Sin stock si no aparece en el HTML el marcador de disponible:
+     * <span class="... icon-check ..."></span>Disponible</p>
+     * El sufijo scoped (sv-*) puede variar; fallback a la cadena exacta con sv-1crakpk.
      */
     private function esSinStock(string $html): bool
     {
-        return false;
+        $tieneDisponible =
+            (bool) preg_match(
+                '~<span[^>]*\bclass=(["\'])[^"\']*\bicon-check\b[^"\']*\1[^>]*>\s*</span>\s*Disponible\s*</p>~i',
+                $html
+            )
+            || strpos($html, '<span class="icon icon-check sv-1crakpk"></span>Disponible</p>') !== false;
+
+        return !$tieneDisponible;
     }
 
     /**

@@ -761,6 +761,7 @@ class OfertasController extends Controller
             }
 
             $tienda = $this->detectarTiendaPorUrl($urlParaMostrar, $todasLasTiendas);
+            $item['envio_sugerido'] = null;
             if ($tienda) {
                 $item['tienda'] = [
                     'id' => $tienda->id,
@@ -771,6 +772,10 @@ class OfertasController extends Controller
                     'mostrar_tienda' => $tienda->mostrar_tienda ?? 'si',
                     'scrapear' => $tienda->scrapear ?? 'si',
                 ];
+                [$envioCalc, $envioPlaceholderGratis] = $this->calcularEnvioDesdeTienda($tienda);
+                if (! $envioPlaceholderGratis && is_numeric($envioCalc) && (float) $envioCalc > 0) {
+                    $item['envio_sugerido'] = round((float) $envioCalc, 2);
+                }
             } else {
                 $item['error'] = ($item['error'] ?? '') . ' Tienda no detectada.';
             }
@@ -783,8 +788,21 @@ class OfertasController extends Controller
                         $item['especificaciones'] = $productoUnico['especificaciones'] ?? null;
                         $item['tiene_especificaciones'] = $productoUnico['tiene_especificaciones'] ?? false;
                         $item['productos_candidatos'] = [$productoUnico];
-                        if ($mismoProductoEspecs !== null) {
-                            $item['especificaciones_marcadas'] = $mismoProductoEspecs;
+                        // Igual que sin producto fijo: pre-marcar desde el slug de la URL; lo del panel (especificaciones_internas) gana por grupo si ya viene marcado.
+                        $especsMarcadas = $mismoProductoEspecs !== null ? $mismoProductoEspecs : [];
+                        $especsDesdeUrl = $this->detectarEspecificacionesProductoDesdeUrl($productoUnico, $urlParaBuscar);
+                        foreach ($especsDesdeUrl as $pid => $subs) {
+                            $pid = (string) $pid;
+                            if ($pid === '' || $pid === '_columnas' || !is_array($subs)) {
+                                continue;
+                            }
+                            $yaMarcado = isset($especsMarcadas[$pid]) && is_array($especsMarcadas[$pid]) && $especsMarcadas[$pid] !== [];
+                            if (!$yaMarcado) {
+                                $especsMarcadas[$pid] = $subs;
+                            }
+                        }
+                        if ($especsMarcadas !== []) {
+                            $item['especificaciones_marcadas'] = $especsMarcadas;
                         }
                     } else {
                         $item['error'] = ($item['error'] ?? '') . ' Producto no encontrado.';
@@ -1324,6 +1342,7 @@ Responde ÚNICAMENTE con el JSON.";
             'tienda_id' => 'required|exists:tiendas,id',
             'especificaciones_internas' => 'nullable|string',
             'generar_sin_precio' => 'nullable|boolean',
+            'envio' => 'nullable|numeric',
         ]);
 
         $url = trim($request->url);
@@ -1384,8 +1403,20 @@ Responde ÚNICAMENTE con el JSON.";
             }
         }
 
-        [$envio, $envioPlaceholderGratis] = $this->calcularEnvioDesdeTienda($tienda);
-        $envioFinal = $envioPlaceholderGratis ? null : (is_numeric($envio) ? round((float) $envio, 2) : null);
+        if ($request->has('envio')) {
+            $rawEnvio = $request->input('envio');
+            if ($rawEnvio === null || $rawEnvio === '') {
+                $envioFinal = null;
+            } elseif (is_numeric($rawEnvio)) {
+                $v = round((float) $rawEnvio, 2);
+                $envioFinal = $v > 0 ? $v : null;
+            } else {
+                $envioFinal = null;
+            }
+        } else {
+            [$envio, $envioPlaceholderGratis] = $this->calcularEnvioDesdeTienda($tienda);
+            $envioFinal = $envioPlaceholderGratis ? null : (is_numeric($envio) ? round((float) $envio, 2) : null);
+        }
         $comoScrapear = $this->obtenerComoScrapearTienda($tienda);
         $frecuenciaMinutos = $this->obtenerFrecuenciaMasComunTienda($tiendaId);
 

@@ -25,6 +25,21 @@
             $inicioCalendario = $inicioMes->copy()->startOfWeek(\Carbon\Carbon::MONDAY);
             $finCalendario = $finMes->copy()->endOfWeek(\Carbon\Carbon::SUNDAY);
             $diasSemana = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+
+            /*
+             * Datos mostrados en esta vista: si hay una ejecución cargada, el log guardado en BD
+             * es la fuente de verdad (incluye neo_backfill_tienda_por_url y futuras claves).
+             * Si no hay ejecución seleccionada, se usan los valores que ya pasó la ruta (típicamente vacíos).
+             */
+            $logNeoObjetivos = (!empty($ejecucion) && is_array($ejecucion->log ?? null)) ? $ejecucion->log : [];
+            $total_filas_neo = (int) ($logNeoObjetivos['total_filas_neo'] ?? $total_filas_neo ?? 0);
+            $resultados = $logNeoObjetivos['resultados'] ?? $resultados ?? [];
+            $total_filas_categoria_tienda = (int) ($logNeoObjetivos['total_filas_categoria_tienda'] ?? $total_filas_categoria_tienda ?? 0);
+            $filas_sin_tienda_aviso = (int) ($logNeoObjetivos['filas_sin_tienda_aviso'] ?? $filas_sin_tienda_aviso ?? 0);
+            $resultados_categoria = $logNeoObjetivos['resultados_categoria'] ?? $resultados_categoria ?? [];
+            $resultados_categoria_tienda_detalle = $logNeoObjetivos['resultados_categoria_tienda_detalle'] ?? $resultados_categoria_tienda_detalle ?? [];
+            $resultados_categoria_tienda = $logNeoObjetivos['resultados_categoria_tienda'] ?? $resultados_categoria_tienda ?? [];
+            $neo_backfill_tienda_por_url = $logNeoObjetivos['neo_backfill_tienda_por_url'] ?? $neo_backfill_tienda_por_url ?? null;
         @endphp
 
         <details class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
@@ -120,7 +135,7 @@
             </div>
         </div>
 
-        @if (isset($ejecucion))
+        @if (!empty($ejecucion))
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border-l-4 border-blue-500">
                 <p class="text-sm text-gray-600 dark:text-gray-400">
                     <strong>Viendo ejecución #{{ $ejecucion->id }}</strong>
@@ -133,10 +148,21 @@
                 <p class="mt-2">
                     <a href="{{ route('admin.ejecuciones.neo-objetivos', ['fecha' => $fechaSeleccionada->toDateString(), 'mes' => $mesSeleccionado->format('Y-m')]) }}" class="text-blue-600 dark:text-blue-400 hover:underline">Volver al listado de ejecuciones</a>
                 </p>
+                @if (is_array($neo_backfill_tienda_por_url ?? null))
+                    @php $nbHdr = $neo_backfill_tienda_por_url; @endphp
+                    <p class="mt-3 text-sm text-gray-700 dark:text-gray-300 border-t border-blue-200 dark:border-blue-800 pt-3">
+                        <span class="font-medium text-gray-800 dark:text-gray-200">Backfill tienda en neo (al final de cada ejecución del cron):</span>
+                        revisadas <strong>{{ (int) ($nbHdr['revisadas'] ?? 0) }}</strong>,
+                        tienda asignada <strong>{{ (int) ($nbHdr['actualizadas'] ?? 0) }}</strong>,
+                        sin host <strong>{{ (int) ($nbHdr['sin_tienda_detectada'] ?? 0) }}</strong>,
+                        URL vacía al descifrar <strong>{{ (int) ($nbHdr['url_descifrada_vacia'] ?? 0) }}</strong>,
+                        errores <strong>{{ (int) ($nbHdr['errores'] ?? 0) }}</strong>
+                    </p>
+                @endif
             </div>
 
             @php
-                $logEjecucion = is_array($ejecucion->log ?? null) ? $ejecucion->log : [];
+                $logEjecucion = $logNeoObjetivos;
                 $estadoEjecucion = $logEjecucion['estado'] ?? null;
                 $pasoActual = $logEjecucion['paso_actual'] ?? null;
                 $pasosEjecucion = is_array($logEjecucion['pasos'] ?? null) ? $logEjecucion['pasos'] : [];
@@ -520,12 +546,13 @@
             @endforeach
         @endif
 
-        @if (isset($ejecucion))
+        @if (!empty($ejecucion))
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-blue-200 dark:border-blue-800">
                 <h3 class="font-semibold text-base mb-2">Descifrar</h3>
                 <p class="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                    Las URLs del log se guardan como tokens <code class="text-xs bg-gray-100 dark:bg-gray-700 px-1 rounded">encv1:…</code> (mismo cifrado que la columna <code class="text-xs">neo</code>).
-                    Escribe el mismo valor que usa la app para cifrar neo: variable de entorno <code class="text-xs">SIGNED_URLS_SECRET</code> (según <code class="text-xs">config('anti-scraping.neoobjetivo_url_secret')</code>; si no está definida, suele usarse <code class="text-xs">APP_KEY</code>).
+                    Las URLs nuevas del log se guardan como tokens <code class="text-xs bg-gray-100 dark:bg-gray-700 px-1 rounded">neov2:…</code> (cifrado reversible).
+                    Para descifrarlas escribe el valor de <code class="text-xs">NEO_ENCRYPT_KEY</code> (según <code class="text-xs">config('anti-scraping.neo_encrypt_key')</code>).
+                    También se soportan logs antiguos en formato <code class="text-xs">encv1:…</code> (con <code class="text-xs">SIGNED_URLS_SECRET</code> / <code class="text-xs">APP_KEY</code>).
                     Los logs antiguos con texto <code class="text-xs">[oculto hash=…]</code> o <code class="text-xs">[url oculta …]</code> no contienen tokens descifrables.
                 </p>
                 <div class="flex flex-wrap items-center gap-2">
@@ -546,12 +573,31 @@
                 <p id="decrypt-status" class="text-xs text-gray-500 mt-2"></p>
             </div>
         @endif
+
+        @if (isset($neo_backfill_tienda_por_url) && is_array($neo_backfill_tienda_por_url))
+            @php $nbT = $neo_backfill_tienda_por_url; @endphp
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border-l-4 border-indigo-500 mt-4">
+                <h2 class="font-semibold text-lg mb-2">Neo: tienda por URL (al final del cron)</h2>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                    Se ejecuta siempre al terminar la pasada, aunque no hubiera filas <code class="text-xs">neoobjetivo</code> que procesar o no entrara rama Neo ni categoría-tienda.
+                </p>
+                <p class="text-sm text-gray-700 dark:text-gray-300">
+                    Filas <code class="text-xs">neo</code> sin <code class="text-xs">tienda_id</code> con <code class="text-xs">url_cipher</code> y <code class="text-xs">url_lookup</code>:
+                    revisadas <strong>{{ (int) ($nbT['revisadas'] ?? 0) }}</strong>,
+                    <span class="text-green-700 dark:text-green-400">tienda asignada</span> <strong>{{ (int) ($nbT['actualizadas'] ?? 0) }}</strong>,
+                    sin coincidencia de host <strong>{{ (int) ($nbT['sin_tienda_detectada'] ?? 0) }}</strong>,
+                    URL vacía al descifrar <strong>{{ (int) ($nbT['url_descifrada_vacia'] ?? 0) }}</strong>,
+                    errores <strong>{{ (int) ($nbT['errores'] ?? 0) }}</strong>
+                </p>
+            </div>
+        @endif
         </div>
     </div>
 
     <script>
-        const ENC_PREFIX = 'encv1:';
-        const ENC_REGEX = /encv1:[A-Za-z0-9+/=]+/g;
+        const ENC_PREFIX_V1 = 'encv1:';
+        const ENC_PREFIX_V2 = 'neov2:';
+        const ENC_REGEX = /(encv1|neov2):[A-Za-z0-9+/=]+/g;
 
         function base64ToBytes(base64) {
             const binary = atob(base64);
@@ -569,32 +615,58 @@
         }
 
         async function decryptEncToken(token, secret) {
-            if (!token || !token.startsWith(ENC_PREFIX)) {
+            if (!token || (!token.startsWith(ENC_PREFIX_V1) && !token.startsWith(ENC_PREFIX_V2))) {
                 return token;
             }
 
-            const payloadB64 = token.slice(ENC_PREFIX.length);
-            const payload = base64ToBytes(payloadB64);
-            if (payload.length <= 16) {
-                throw new Error('Payload inválido');
-            }
-
-            const iv = payload.slice(0, 16);
-            const cipherBytes = payload.slice(16);
             const keyBytes = await sha256Bytes(secret);
-            const cryptoKey = await crypto.subtle.importKey(
-                'raw',
-                keyBytes,
-                { name: 'AES-CBC' },
-                false,
-                ['decrypt']
-            );
+            const payloadB64 = token.slice(token.indexOf(':') + 1);
+            const payload = base64ToBytes(payloadB64);
+            let plainBuffer;
 
-            const plainBuffer = await crypto.subtle.decrypt(
-                { name: 'AES-CBC', iv },
-                cryptoKey,
-                cipherBytes
-            );
+            if (token.startsWith(ENC_PREFIX_V2)) {
+                // neov2: iv(12) + tag(16) + ciphertext (AES-256-GCM)
+                if (payload.length <= 28) {
+                    throw new Error('Payload neov2 inválido');
+                }
+                const iv = payload.slice(0, 12);
+                const tag = payload.slice(12, 28);
+                const cipherBytes = payload.slice(28);
+                const cipherAndTag = new Uint8Array(cipherBytes.length + tag.length);
+                cipherAndTag.set(cipherBytes, 0);
+                cipherAndTag.set(tag, cipherBytes.length);
+                const cryptoKey = await crypto.subtle.importKey(
+                    'raw',
+                    keyBytes,
+                    { name: 'AES-GCM' },
+                    false,
+                    ['decrypt']
+                );
+                plainBuffer = await crypto.subtle.decrypt(
+                    { name: 'AES-GCM', iv, tagLength: 128 },
+                    cryptoKey,
+                    cipherAndTag
+                );
+            } else {
+                // encv1: iv(16) + ciphertext (AES-256-CBC)
+                if (payload.length <= 16) {
+                    throw new Error('Payload encv1 inválido');
+                }
+                const iv = payload.slice(0, 16);
+                const cipherBytes = payload.slice(16);
+                const cryptoKey = await crypto.subtle.importKey(
+                    'raw',
+                    keyBytes,
+                    { name: 'AES-CBC' },
+                    false,
+                    ['decrypt']
+                );
+                plainBuffer = await crypto.subtle.decrypt(
+                    { name: 'AES-CBC', iv },
+                    cryptoKey,
+                    cipherBytes
+                );
+            }
 
             return new TextDecoder().decode(plainBuffer);
         }
@@ -640,7 +712,7 @@
 
             for (const node of textNodes) {
                 const original = node.nodeValue || '';
-                if (!original.includes(ENC_PREFIX)) continue;
+                if (!original.includes(ENC_PREFIX_V1) && !original.includes(ENC_PREFIX_V2)) continue;
                 const replaced = await replaceEncryptedTokens(original, secret);
                 if (replaced !== original) {
                     node.nodeValue = replaced;
@@ -652,23 +724,25 @@
 
             const attrs = ['href', 'title', 'data-url'];
             for (const attr of attrs) {
-                const elements = root.querySelectorAll(`[${attr}*="${ENC_PREFIX}"]`);
-                for (const el of elements) {
-                    const original = el.getAttribute(attr) || '';
-                    if (!original.includes(ENC_PREFIX)) continue;
-                    const replaced = await replaceEncryptedTokens(original, secret);
-                    if (replaced !== original) {
-                        el.setAttribute(attr, replaced);
-                        cambios++;
-                    } else {
-                        fallos++;
+                for (const prefix of [ENC_PREFIX_V1, ENC_PREFIX_V2]) {
+                    const elements = root.querySelectorAll(`[${attr}*="${prefix}"]`);
+                    for (const el of elements) {
+                        const original = el.getAttribute(attr) || '';
+                        if (!original.includes(ENC_PREFIX_V1) && !original.includes(ENC_PREFIX_V2)) continue;
+                        const replaced = await replaceEncryptedTokens(original, secret);
+                        if (replaced !== original) {
+                            el.setAttribute(attr, replaced);
+                            cambios++;
+                        } else {
+                            fallos++;
+                        }
                     }
                 }
             }
 
             if (status) {
                 if (cambios === 0) {
-                    status.textContent = 'No se ha sustituido ningún token encv1. Revisa la clave, o este log es antiguo (formato sin cifrado reversible).';
+                    status.textContent = 'No se ha sustituido ningún token neov2/encv1. Revisa la clave, o este log es antiguo (formato sin cifrado reversible).';
                 } else {
                     status.textContent = `Descifrado completado. Fragmentos actualizados: ${cambios}. Sin cambio o error al descifrar: ${fallos}.`;
                 }

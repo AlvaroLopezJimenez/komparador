@@ -42,6 +42,28 @@ class LifeinformaticaController extends PlantillaTiendaController
             return response()->json(['success' => false, 'error' => 'Producto sin stock']);
         }
 
+        if ($this->esPagina404($html)) {
+            if ($oferta && $oferta instanceof OfertaProducto) {
+                $oferta->update(['mostrar' => 'no']);
+
+                DB::table('avisos')->insert([
+                    'texto_aviso'     => '404 - 1a vez',
+                    'fecha_aviso'     => now()->addHour(),
+                    'user_id'         => 1,
+                    'avisoable_type'  => OfertaProducto::class,
+                    'avisoable_id'    => $oferta->id,
+                    'oculto'          => 0,
+                    'created_at'      => now(),
+                    'updated_at'      => now(),
+                ]);
+            }
+
+            return response()->json([
+                'success' => false,
+                'error'   => 'Producto no encontrado (página 404)',
+            ]);
+        }
+
         if ($this->esReacondicionadoH1($html)) {
             if ($oferta && $oferta instanceof OfertaProducto) {
                 $oferta->update(['mostrar' => 'no']);
@@ -79,6 +101,17 @@ class LifeinformaticaController extends PlantillaTiendaController
     {
         // Ej.: <p class="disponibilidad not_stock ..."> — "Pendiente de reposición" viene en el layout y no basta.
         return str_contains($html, 'disponibilidad not_stock');
+    }
+
+    /**
+     * Página de error: <h1 class="text-xs-left">Página no encontrada</h1>
+     */
+    private function esPagina404(string $html): bool
+    {
+        return (bool) preg_match(
+            '~<h1[^>]*\bclass=(["\'])[^"\']*\btext-xs-left\b[^"\']*\1[^>]*>\s*Página no encontrada\s*</h1>~iu',
+            $html
+        );
     }
 
     /**

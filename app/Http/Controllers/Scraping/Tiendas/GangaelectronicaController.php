@@ -54,11 +54,12 @@ class GangaelectronicaController extends PlantillaTiendaController
     }
 
     /**
-     * Stub de sin stock (pendiente de definir patron exacto).
+     * En Gangaelectronica se considera sin stock cuando desaparece
+     * el bloque/encabezado "PRODUCTOS RELACIONADOS" en la ficha.
      */
     private function esSinStock(string $html): bool
     {
-        return false;
+        return stripos($html, 'PRODUCTOS RELACIONADOS') === false;
     }
 
     /**

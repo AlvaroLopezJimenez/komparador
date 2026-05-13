@@ -151,7 +151,7 @@ Route::middleware(['security.headers', 'block.public.deletes'])->prefix('scrapin
 });
 
 // Rutas para alertas de precio
-Route::middleware(['security.headers', 'block.public.deletes', 'throttle:3,1'])->prefix('alertas')->name('alertas.')->group(function () {
+Route::middleware(['security.headers', 'block.public.deletes', 'throttle:4,1'])->prefix('alertas')->name('alertas.')->group(function () {
     Route::post('/guardar', [App\Http\Controllers\AlertaPrecioController::class, 'guardarAlerta'])->name('guardar');
     Route::post('/guardar-categoria', [App\Http\Controllers\AlertaPrecioController::class, 'guardarAlertaCategoria'])->name('guardar-categoria');
 });
@@ -415,6 +415,7 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
             'resultados_categoria'         => $log['resultados_categoria'] ?? [],
             'resultados_categoria_tienda_detalle' => $log['resultados_categoria_tienda_detalle'] ?? [],
             'resultados_categoria_tienda'  => $log['resultados_categoria_tienda'] ?? [],
+            'neo_backfill_tienda_por_url'  => $log['neo_backfill_tienda_por_url'] ?? null,
             'ejecucion_id'                 => $ejecucion?->id,
             'ejecucion'                    => $ejecucion,
             'ejecuciones'                  => $ejecuciones,
@@ -494,6 +495,7 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
 
     Route::get('neo/crear-masivo', [NeoController::class, 'crearMasivo'])->name('neo.crear-masivo');
     Route::get('neo/crear-masivo/productos', [NeoController::class, 'productosConNeoAniadidaNo'])->name('neo.crear-masivo.productos');
+    Route::get('neo/crear-masivo/tiendas-mostrar-no', [NeoController::class, 'tiendasMostrarNoCrearMasivoModalProducto'])->name('neo.crear-masivo.tiendas-mostrar-no');
     Route::get('neo/crear-masivo/urls-por-producto/{productoId}', [NeoController::class, 'urlsPorProducto'])->name('neo.crear-masivo.urls-por-producto');
     Route::get('neo/crear-masivo/categorias', [NeoController::class, 'categoriasConNeoAniadidaNo'])->name('neo.crear-masivo.categorias');
     Route::get('neo/crear-masivo/urls-por-categoria/{categoriaId}', [NeoController::class, 'urlsPorCategoria'])->name('neo.crear-masivo.urls-por-categoria');
@@ -598,9 +600,13 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
 
     //Listar ofertas de una tienda en especifico
     Route::get('tiendas/{tienda}/ofertas', [TiendaController::class, 'ofertas'])->name('tiendas.ofertas');
-    
+    Route::get('tiendas/{tienda}/ofertas/resumen-envio', [TiendaController::class, 'resumenEnvioOfertasTienda'])->name('tiendas.ofertas.resumen-envio');
+    Route::post('tiendas/{tienda}/ofertas/modificar-envio-masivo', [TiendaController::class, 'modificarEnvioOfertasMasivo'])->name('tiendas.ofertas.modificar-envio-masivo');
+
     // Gestión de tiempos de actualización de ofertas por tienda (DEBE IR ANTES de la ruta dinámica {tienda})
     Route::get('tiendas/tiempos-actualizacion', [TiendaController::class, 'tiemposActualizacion'])->name('tiendas.tiempos-actualizacion');
+    Route::get('tiendas/urls-por-categoria', [TiendaController::class, 'urlsPorCategoria'])->name('tiendas.urls-por-categoria');
+    Route::post('tiendas/urls-por-categoria/guardar', [TiendaController::class, 'guardarUrlPorCategoria'])->name('tiendas.urls-por-categoria.guardar');
     Route::get('tiendas/{tienda}/desglose-tiempos', [TiendaController::class, 'obtenerDesgloseTiempos'])->name('tiendas.desglose-tiempos');
     Route::post('tiendas/{tienda}/actualizar-tiempos', [TiendaController::class, 'actualizarTiempos'])->name('tiendas.actualizar-tiempos');
     

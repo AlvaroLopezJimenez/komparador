@@ -70,6 +70,8 @@
                         <td class="px-6 py-4">{{ $tienda->puntuacion }}</td>
                         <td class="px-6 py-4">{{ $tienda->ofertas_count }}</td>
                         <td class="px-6 py-4 text-right">
+                            <a href="{{ $tienda->url }}" target="_blank" rel="noopener noreferrer"
+                                class="text-green-500 hover:underline mr-4">Ir</a>
                             <a href="{{ route('admin.tiendas.ofertas', $tienda) }}"
                                 class="text-purple-500 hover:underline mr-4">Ofertas</a>
                             <a href="{{ route('admin.tiendas.edit', $tienda) }}"

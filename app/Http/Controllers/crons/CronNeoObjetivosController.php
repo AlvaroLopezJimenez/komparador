@@ -12,6 +12,7 @@ use App\Models\Tienda;
 use App\Models\UrlDescartada;
 use App\Models\User;
 use App\Http\Controllers\Scraping\PeticionApiHTMLController;
+use App\Services\ConsultarNeoCifrado;
 use App\Services\LimpiarUrlDeTiendas;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -44,6 +45,11 @@ class CronNeoObjetivosController extends Controller
      * false: comportamiento anterior (hasta 5 candidatas globales y se reparte rama Neo vs categoría/tienda).
      */
     private const NEO_CRON_EXCLUIR_RAMA_NEO_DEL_CUPO = false;
+    /**
+     * true: en este cron solo se consideran neoobjetivos de tiendas (tienda_id con valor) con visitada > 7 días.
+     * false: comportamiento normal (sin exigir tienda_id en el filtro inicial).
+     */
+    private const SOLO_EJECUTAR_NEOOBJETIVO_DE_TIENDAS = true;
 
     private const VPS_URL = 'http://51.38.184.245/sacar-ofertas-idea';
     private const VPS_REDIRECCION_URL = 'http://51.38.184.245/redireccion';
@@ -106,6 +112,7 @@ class CronNeoObjetivosController extends Controller
                 'resultados_categoria'         => $log['resultados_categoria'] ?? [],
                 'resultados_categoria_tienda_detalle' => $log['resultados_categoria_tienda_detalle'] ?? [],
                 'resultados_categoria_tienda'  => $log['resultados_categoria_tienda'] ?? [],
+                'neo_backfill_tienda_por_url'  => $log['neo_backfill_tienda_por_url'] ?? null,
                 'ejecucion_id'                 => $ejecucion->id,
                 'ejecucion'                    => $ejecucion,
                 'ejecuciones'                  => $ejecuciones,
@@ -134,9 +141,13 @@ class CronNeoObjetivosController extends Controller
 
         try {
         // Cargar todas las candidatas antiguas, normalizar "No encontrado" y luego escoger 5 más antiguas válidas.
-        $filasNeoCandidatas = Neoobjetivo::query()
-            ->where('visitada', '<', now()->subDays(7))
-            ->get();
+        $soloTiendasActiva = self::SOLO_EJECUTAR_NEOOBJETIVO_DE_TIENDAS;
+        $queryFilasNeo = Neoobjetivo::query()
+            ->where('visitada', '<', now()->subDays(7));
+        if ($soloTiendasActiva) {
+            $queryFilasNeo->whereNotNull('tienda_id');
+        }
+        $filasNeoCandidatas = $queryFilasNeo->get();
 
         $fechaNoEncontrado = now()->setYear(3999);
         $noEncontradoMarcadas = 0;
@@ -168,6 +179,7 @@ class CronNeoObjetivosController extends Controller
             ->values();
 
         $this->actualizarEjecucionPaso($ejecucion, 'filtrado_neo', [
+            'solo_ejecutar_neoobjetivo_de_tiendas_activa' => $soloTiendasActiva,
             'total_filas_candidatas' => $filasNeoCandidatas->count(),
             'total_no_encontrado_marcadas_3999' => $noEncontradoMarcadas,
             'total_filas_validas_antes_excluir_rama_neo' => $totalFilasValidasAntesExcluirRamaNeo,
@@ -476,10 +488,12 @@ class CronNeoObjetivosController extends Controller
                 $numeroUrlCategoria++;
                 $redireccionesCategoria[] = $this->procesarUrlCategoria($urlProducto, $neo, $numeroUrlCategoria);
             }
-            $neo->update(['visitada' => now()]);
 
             if (count($todasLasUrlsExtraidas) === 0) {
-                $this->crearAvisoNoProductosCategoriaNeoObjetivo($neo->id, $tienda->nombre, $neo->categoria?->nombre, $url);
+                $this->registrarOActualizarAvisoNoProductosCategoriaNeoObjetivo($neo->id, $tienda->nombre, $neo->categoria?->nombre, $url);
+            } else {
+                $neo->update(['visitada' => now()]);
+                $this->eliminarAvisoNoProductosCategoriaNeoObjetivoSiExiste($neo->id, $tienda->nombre, $neo->categoria?->nombre, $url);
             }
 
             $resultadosRamaCategoriaTienda[] = [
@@ -514,6 +528,12 @@ class CronNeoObjetivosController extends Controller
             }
         }
 
+        // Siempre al final del cron (haya o no filas neoobjetivo / rama Neo / categoría-tienda): rellenar tienda_id en neo.
+        $statsNeoBackfillTienda = $this->rellenarTiendaIdNeoSinTiendaDesdeUrlDescifrada();
+        $this->actualizarEjecucionPaso($ejecucion, 'neo_tienda_por_url_backfill', array_merge($statsNeoBackfillTienda, [
+            'detalle' => 'Fin de ejecución: neo sin tienda_id con url_cipher/url_lookup → tienda por host (crear-masivo / ofertas). Independiente de ramas neoobjetivo.',
+        ]));
+
         $logEjecucion = [
             'estado'                       => 'ok',
             'paso_actual'                  => 'finalizado',
@@ -524,6 +544,7 @@ class CronNeoObjetivosController extends Controller
             'resultados_categoria'        => $resultadosCategoria,
             'resultados_categoria_tienda_detalle' => $resultadosRamaCategoriaTiendaDetalle,
             'resultados_categoria_tienda' => $resultadosRamaCategoriaTienda,
+            'neo_backfill_tienda_por_url' => $statsNeoBackfillTienda,
         ];
         $logEjecucion = $this->sanitizarLogUrls($logEjecucion);
         $totalFilas = $filas->count() + $filasRamaCategoriaTienda->count();
@@ -1201,9 +1222,14 @@ class CronNeoObjetivosController extends Controller
             return $url;
         }
 
-        $secret = (string) config('anti-scraping.neo_lookup_key', '');
-        if ($secret !== '') {
-            return Neo::encryptedNeoForLookup($url);
+        // Guardar en log con cifrado reversible (neov2) para poder descifrar en panel con NEO_ENCRYPT_KEY.
+        $secretCifrado = (string) config('anti-scraping.neo_encrypt_key', '');
+        if ($secretCifrado !== '') {
+            try {
+                return app(ConsultarNeoCifrado::class)->cifrarParaGuardar($url);
+            } catch (\Throwable $e) {
+                // Fallback a hash si por cualquier motivo falla el cifrado (no bloquear ejecución del cron).
+            }
         }
 
         $hash = substr(hash('sha256', $url), 0, 12);
@@ -1851,37 +1877,175 @@ class CronNeoObjetivosController extends Controller
     }
 
     /**
-     * Crea un aviso interno cuando se ejecuta el sacar productos de una categoría (rama categoría/tienda)
-     * y no se encuentran productos. No crea si ya existe un aviso igual (mismo texto, fecha en los últimos 7 días).
+     * Tras la rama categoría/tienda del cron: filas neo sin tienda_id pero con URL cifrada v2
+     * se descifran, se limpian como en productos y se asigna tienda por host (igual que crear-masivo).
      *
-     * @param int $neoobjetivoId
-     * @param string $tiendaNombre
-     * @param string|null $categoriaNombre nombre de la categoría, o null para usar la URL
-     * @param string $url URL de la categoría
+     * @return array{revisadas: int, actualizadas: int, sin_tienda_detectada: int, url_descifrada_vacia: int, errores: int}
      */
-    private function crearAvisoNoProductosCategoriaNeoObjetivo(int $neoobjetivoId, string $tiendaNombre, ?string $categoriaNombre, string $url): void
+    private function rellenarTiendaIdNeoSinTiendaDesdeUrlDescifrada(): array
+    {
+        $stats = [
+            'revisadas' => 0,
+            'actualizadas' => 0,
+            'sin_tienda_detectada' => 0,
+            'url_descifrada_vacia' => 0,
+            'errores' => 0,
+        ];
+
+        $tiendas = Tienda::select('id', 'nombre', 'url')->orderBy('nombre')->get();
+        $limpiarUrl = app(LimpiarUrlDeTiendas::class);
+
+        Neo::query()
+            ->whereNull('tienda_id')
+            ->whereNotNull('url_cipher')
+            ->where('url_cipher', '!=', '')
+            ->whereNotNull('url_lookup')
+            ->where('url_lookup', '!=', '')
+            ->orderBy('id')
+            ->chunkById(200, function ($neos) use ($tiendas, $limpiarUrl, &$stats) {
+                foreach ($neos as $neo) {
+                    $stats['revisadas']++;
+                    try {
+                        $url = trim((string) $neo->url);
+                        if ($url === '') {
+                            $stats['url_descifrada_vacia']++;
+                            continue;
+                        }
+                        $urlParaTienda = $limpiarUrl->limpiar($url);
+                        $tienda = $this->detectarTiendaPorUrl($urlParaTienda, $tiendas);
+                        if ($tienda === null) {
+                            $stats['sin_tienda_detectada']++;
+                            continue;
+                        }
+                        $neo->tienda_id = $tienda->id;
+                        $neo->save();
+                        $stats['actualizadas']++;
+                    } catch (\Throwable $e) {
+                        $stats['errores']++;
+                    }
+                }
+            });
+
+        return $stats;
+    }
+
+    /**
+     * Texto base del aviso (sin sufijo de intentos) cuando categoría/tienda no devuelve URLs de producto.
+     */
+    private function textoBaseAvisoNoProductosCategoriaNeoObjetivo(string $tiendaNombre, ?string $categoriaNombre, string $url): string
     {
         $categoriaIdentificador = $categoriaNombre !== null && $categoriaNombre !== ''
             ? $categoriaNombre
             : mb_substr($url, 0, 500);
-        $textoAviso = sprintf(
+
+        return sprintf(
             'La tienda %s se ha ejecutado el sacar los productos de la categoría %s y no se han encontrado productos.',
             $tiendaNombre,
             $categoriaIdentificador
         );
-        if ($this->existeAvisoInternoIgual($textoAviso)) {
+    }
+
+    private function sufijoIntentosAvisoNoProductosCategoria(int $intentos): string
+    {
+        return $intentos === 1
+            ? ' - Intentos: 1 vez'
+            : ' - Intentos: ' . $intentos . ' veces';
+    }
+
+    /**
+     * Busca aviso existente (formato nuevo con avisoable_id = neoobjetivo o legado id 0 con mismo texto base).
+     */
+    private function buscarAvisoSinProductosCategoriaNeoobjetivo(int $neoobjetivoId, string $textoBase): ?Aviso
+    {
+        $porNeoId = Aviso::where('avisoable_type', 'Interno')
+            ->where('avisoable_id', $neoobjetivoId)
+            ->where('texto_aviso', 'like', 'La tienda %no se han encontrado productos%')
+            ->orderByDesc('id')
+            ->first();
+        if ($porNeoId !== null) {
+            return $porNeoId;
+        }
+
+        $likeConIntentos = str_replace(['\\', '%', '_'], ['\\\\', '\%', '\_'], $textoBase) . ' - Intentos:%';
+
+        return Aviso::where('avisoable_type', 'Interno')
+            ->where('avisoable_id', 0)
+            ->where(function ($q) use ($textoBase, $likeConIntentos) {
+                $q->where('texto_aviso', $textoBase)
+                    ->orWhere('texto_aviso', 'like', $likeConIntentos);
+            })
+            ->orderByDesc('id')
+            ->first();
+    }
+
+    /**
+     * Cuenta de intentos siguiente al actualizar un aviso cuyo texto ya incluye o no el sufijo - Intentos:.
+     */
+    private function siguienteConteoIntentosAvisoNoProductos(string $textoActual, string $textoBase): int
+    {
+        if (preg_match('/-\s*Intentos:\s*(\d+)\s*vece?s?\s*$/iu', $textoActual, $m)) {
+            return (int) $m[1] + 1;
+        }
+
+        if ($textoActual === $textoBase) {
+            return 2;
+        }
+
+        return 1;
+    }
+
+    /**
+     * Registra o actualiza el aviso cuando no hay URLs de producto: contador de intentos.
+     * Si el aviso ya existía, no se toca fecha_aviso (para que el panel pueda mostrarlo al cumplirse).
+     * Si es nuevo, fecha_aviso a 4 horas vista. No actualiza visitada en neoobjetivo (lo hace el llamador solo si hay URLs).
+     */
+    private function registrarOActualizarAvisoNoProductosCategoriaNeoObjetivo(int $neoobjetivoId, string $tiendaNombre, ?string $categoriaNombre, string $url): void
+    {
+        $textoBase = $this->textoBaseAvisoNoProductosCategoriaNeoObjetivo($tiendaNombre, $categoriaNombre, $url);
+        $existente = $this->buscarAvisoSinProductosCategoriaNeoobjetivo($neoobjetivoId, $textoBase);
+
+        if ($existente !== null) {
+            $intentos = $this->siguienteConteoIntentosAvisoNoProductos($existente->texto_aviso, $textoBase);
+            $existente->update([
+                'texto_aviso'  => $textoBase . $this->sufijoIntentosAvisoNoProductosCategoria($intentos),
+                'avisoable_id' => $neoobjetivoId,
+            ]);
+
             return;
         }
 
-        $fechaAviso = now();
+        $fechaAviso = now()->addHours(4);
+        $textoAviso = $textoBase . $this->sufijoIntentosAvisoNoProductosCategoria(1);
         Aviso::create([
             'texto_aviso'    => $textoAviso,
             'fecha_aviso'    => $fechaAviso,
             'user_id'        => $this->userIdParaAvisosInternos(),
             'avisoable_type' => 'Interno',
-            'avisoable_id'   => 0,
+            'avisoable_id'   => $neoobjetivoId,
             'oculto'         => false,
         ]);
+    }
+
+    /**
+     * Elimina el aviso de “sin productos en categoría” si la extracción vuelve a funcionar.
+     */
+    private function eliminarAvisoNoProductosCategoriaNeoObjetivoSiExiste(int $neoobjetivoId, string $tiendaNombre, ?string $categoriaNombre, string $url): void
+    {
+        $textoBase = $this->textoBaseAvisoNoProductosCategoriaNeoObjetivo($tiendaNombre, $categoriaNombre, $url);
+        $likeConIntentos = str_replace(['\\', '%', '_'], ['\\\\', '\%', '\_'], $textoBase) . ' - Intentos:%';
+
+        Aviso::where('avisoable_type', 'Interno')
+            ->where('avisoable_id', $neoobjetivoId)
+            ->where('texto_aviso', 'like', 'La tienda %no se han encontrado productos%')
+            ->delete();
+
+        Aviso::where('avisoable_type', 'Interno')
+            ->where('avisoable_id', 0)
+            ->where(function ($q) use ($textoBase, $likeConIntentos) {
+                $q->where('texto_aviso', $textoBase)
+                    ->orWhere('texto_aviso', 'like', $likeConIntentos);
+            })
+            ->delete();
     }
 
     /**

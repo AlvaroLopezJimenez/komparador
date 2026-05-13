@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Scraping\Tiendas;
 
 use App\Http\Controllers\Scraping\Tiendas\PlantillaTiendaController;
+use App\Models\OfertaProducto;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 
 class ClarelController extends PlantillaTiendaController
 {
@@ -25,6 +27,28 @@ class ClarelController extends PlantillaTiendaController
         }
 
         $html = html_entity_decode((string)$resultado['html'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        if ($this->esPaginaProductoNoEncontradoClarel($html)) {
+            if ($oferta && $oferta instanceof OfertaProducto) {
+                $oferta->update(['mostrar' => 'no']);
+
+                DB::table('avisos')->insertGetId([
+                    'texto_aviso'    => 'PRODUCTO NO ENCONTRADO (404) - 1a vez a 4 días - Generado Automáticamente',
+                    'fecha_aviso'    => now()->addDays(4),
+                    'user_id'        => 1,
+                    'avisoable_type' => OfertaProducto::class,
+                    'avisoable_id'   => $oferta->id,
+                    'oculto'         => 0,
+                    'created_at'     => now(),
+                    'updated_at'     => now(),
+                ]);
+            }
+
+            return response()->json([
+                'success' => false,
+                'error'   => 'Producto no encontrado (página 404)',
+            ]);
+        }
 
         // Intentar extraer el precio del span con clase unit_price
         $precio = $this->extraerPrecioUnitPrice($html);
@@ -61,6 +85,21 @@ class ClarelController extends PlantillaTiendaController
         }
 
         return null;
+    }
+
+    /**
+     * Página de producto retirado / no encontrado en Clarel.
+     */
+    private function esPaginaProductoNoEncontradoClarel(string $html): bool
+    {
+        $fraseCompleta = 'No encontramos lo que estás buscando. Pero... ¡no te preocupes! Tenemos solución para todo :)';
+        if (strpos($html, $fraseCompleta) !== false) {
+            return true;
+        }
+
+        // Fallback si el HTML escapa o trocea el texto (p. ej. el emoticono)
+        return strpos($html, 'No encontramos lo que estás buscando') !== false
+            && strpos($html, 'Tenemos solución para todo') !== false;
     }
 
     /**

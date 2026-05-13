@@ -41,30 +41,6 @@
         }
     }
 
-    if (!function_exists('contarAvisosPorTipo')) {
-        function contarAvisosPorTipo($avisos) {
-        $conteo = [
-            'productos' => 0,
-            'ofertas' => 0,
-            'chollos' => 0,
-            'correos' => 0,
-            'internos' => 0,
-        ];
-
-        foreach ($avisos as $aviso) {
-            $tipo = obtenerTipoAviso($aviso);
-            if (!isset($conteo[$tipo])) {
-                $conteo[$tipo] = 0;
-            }
-            $conteo[$tipo]++;
-        }
-
-        $conteo['todos'] = method_exists($avisos, 'count') ? $avisos->count() : (is_countable($avisos) ? count($avisos) : 0);
-
-        return $conteo;
-        }
-    }
-
     /**
      * Obtiene la primera oferta de un producto consultando la tabla producto_oferta_mas_barata_por_producto
      * Consulta el oferta_id desde la tabla y luego obtiene todos los datos de la oferta desde la tabla de ofertas
@@ -426,6 +402,16 @@
             </div>
             <div class="flex items-center space-x-3">
                 <form method="GET" class="flex flex-col items-start gap-3 md:flex-row md:items-center">
+                    @if(($vencidosTipo ?? 'todos') !== 'todos')
+                        <input type="hidden" name="vencidos_tipo" value="{{ $vencidosTipo }}">
+                    @endif
+                    @if(($pendientesTipo ?? 'todos') !== 'todos')
+                        <input type="hidden" name="pendientes_tipo" value="{{ $pendientesTipo }}">
+                    @endif
+                    @if(($ocultosTipo ?? 'todos') !== 'todos')
+                        <input type="hidden" name="ocultos_tipo" value="{{ $ocultosTipo }}">
+                    @endif
+                    <input type="hidden" name="avisos_tab" value="{{ $avisosTab ?? 'vencidos' }}">
                     <select name="perPage" class="border px-3 py-2 rounded text-sm bg-gray-700 text-gray-200 border-gray-600">
                         @foreach ([10, 20, 50, 100] as $option)
                             <option value="{{ $option }}" {{ (int) $perPage === $option ? 'selected' : '' }}>
@@ -448,11 +434,43 @@
             </div>
         </div>
 
+        @php
+            $avisosTabActual = $avisosTab ?? 'vencidos';
+            $vencidosTipoActual = $vencidosTipo ?? 'todos';
+            $pendientesTipoActual = $pendientesTipo ?? 'todos';
+            $ocultosTipoActual = $ocultosTipo ?? 'todos';
+            $avisosSubTabsLabels = [
+                'todos' => 'Todos',
+                'productos' => 'Productos',
+                'ofertas' => 'Ofertas',
+                'chollos' => 'Chollos',
+                'correos' => 'Correos',
+                'internos' => 'Internos',
+            ];
+            $avisosIndexLink = function (string $tabDestino, string $claveSubtab) use ($perPage, $vencidosTipoActual, $pendientesTipoActual, $ocultosTipoActual) {
+                $params = [
+                    'perPage' => $perPage,
+                    'avisos_tab' => $tabDestino,
+                    'vencidos_tipo' => $tabDestino === 'vencidos' ? $claveSubtab : $vencidosTipoActual,
+                    'pendientes_tipo' => $tabDestino === 'pendientes' ? $claveSubtab : $pendientesTipoActual,
+                    'ocultos_tipo' => $tabDestino === 'ocultos' ? $claveSubtab : $ocultosTipoActual,
+                ];
+                return route('admin.avisos.index', array_filter($params, function ($v, $k) {
+                    if (in_array($k, ['vencidos_tipo', 'pendientes_tipo', 'ocultos_tipo'], true) && $v === 'todos') {
+                        return false;
+                    }
+                    return $v !== null && $v !== '';
+                }, ARRAY_FILTER_USE_BOTH));
+            };
+            $claseSubtabActiva = 'inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md border border-pink-500 text-pink-400 bg-gray-700 transition-colors';
+            $claseSubtabInactiva = 'inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md border border-gray-600 text-gray-300 hover:border-pink-500 hover:text-pink-500 transition-colors';
+        @endphp
+
         <!-- Pestañas -->
         <div class="mb-6">
             <div class="border-b border-gray-200 dark:border-gray-700">
                 <nav class="-mb-px flex space-x-8">
-                    <button id="tab-vencidos" class="tab-button active py-2 px-1 border-b-2 border-pink-500 font-medium text-sm text-pink-600 dark:text-pink-400">
+                    <button type="button" id="tab-vencidos" class="tab-button {{ $avisosTabActual === 'vencidos' ? 'active py-2 px-1 border-b-2 border-pink-500 font-medium text-sm text-pink-600 dark:text-pink-400' : 'py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300' }}">
                         Avisos Vencidos
                         @if($totalVencidos > 0)
                             <span class="ml-2 bg-red-100 text-red-800 text-xs font-medium px-2.5 py-0.5 rounded-full dark:bg-red-900 dark:text-red-300">
@@ -460,7 +478,7 @@
                             </span>
                         @endif
                     </button>
-                    <button id="tab-pendientes" class="tab-button py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300">
+                    <button type="button" id="tab-pendientes" class="tab-button {{ $avisosTabActual === 'pendientes' ? 'active py-2 px-1 border-b-2 border-pink-500 font-medium text-sm text-pink-600 dark:text-pink-400' : 'py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300' }}">
                         Avisos Pendientes
                         @if($totalPendientes > 0)
                             <span class="ml-2 bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full dark:bg-blue-900 dark:text-blue-300">
@@ -468,7 +486,7 @@
                             </span>
                         @endif
                     </button>
-                    <button id="tab-ocultos" class="tab-button py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300">
+                    <button type="button" id="tab-ocultos" class="tab-button {{ $avisosTabActual === 'ocultos' ? 'active py-2 px-1 border-b-2 border-pink-500 font-medium text-sm text-pink-600 dark:text-pink-400' : 'py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300' }}">
                         Avisos Ocultos
                         @if($totalOcultos > 0)
                             <span class="ml-2 bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-0.5 rounded-full dark:bg-gray-900 dark:text-gray-300">
@@ -481,35 +499,23 @@
         </div>
 
         <!-- Contenido de pestañas -->
-        <div id="content-vencidos" class="tab-content">
-            @php
-                $conteoTiposVencidos = contarAvisosPorTipo($avisosVencidos);
-                $subTabs = [
-                    'todos' => 'Todos',
-                    'productos' => 'Productos',
-                    'ofertas' => 'Ofertas',
-                    'chollos' => 'Chollos',
-                    'correos' => 'Correos',
-                    'internos' => 'Internos',
-                ];
-            @endphp
+        <div id="content-vencidos" class="tab-content{{ $avisosTabActual !== 'vencidos' ? ' hidden' : '' }}">
             <div class="mb-4">
                 <div class="flex flex-wrap gap-2">
-                    @foreach($subTabs as $clave => $label)
+                    @foreach($avisosSubTabsLabels as $clave => $label)
                         @php
-                            $count = $conteoTiposVencidos[$clave] ?? 0;
+                            $count = $conteosTiposVencidos[$clave] ?? 0;
+                            $esActiva = $vencidosTipoActual === $clave;
                         @endphp
-                        <button
-                            type="button"
-                            class="subtab-button inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md border border-gray-600 text-gray-300 hover:border-pink-500 hover:text-pink-500 transition-colors"
-                            data-tabla="vencidos"
-                            data-subtab="{{ $clave }}"
+                        <a
+                            href="{{ $avisosIndexLink('vencidos', $clave) }}"
+                            class="{{ $esActiva ? $claseSubtabActiva : $claseSubtabInactiva }}"
                         >
                             <span>{{ $label }}</span>
                             @if($clave !== 'todos')
                                 <span class="ml-1 text-[11px] text-gray-400">({{ $count }})</span>
                             @endif
-                        </button>
+                        </a>
                     @endforeach
                 </div>
             </div>
@@ -898,27 +904,23 @@
             </div>
         </div>
 
-        <div id="content-pendientes" class="tab-content hidden">
-            @php
-                $conteoTiposPendientes = contarAvisosPorTipo($avisosPendientes);
-            @endphp
+        <div id="content-pendientes" class="tab-content{{ $avisosTabActual !== 'pendientes' ? ' hidden' : '' }}">
             <div class="mb-4">
                 <div class="flex flex-wrap gap-2">
-                    @foreach($subTabs as $clave => $label)
+                    @foreach($avisosSubTabsLabels as $clave => $label)
                         @php
-                            $count = $conteoTiposPendientes[$clave] ?? 0;
+                            $count = $conteosTiposPendientes[$clave] ?? 0;
+                            $esActiva = $pendientesTipoActual === $clave;
                         @endphp
-                        <button
-                            type="button"
-                            class="subtab-button inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md border border-gray-600 text-gray-300 hover:border-pink-500 hover:text-pink-500 transition-colors"
-                            data-tabla="pendientes"
-                            data-subtab="{{ $clave }}"
+                        <a
+                            href="{{ $avisosIndexLink('pendientes', $clave) }}"
+                            class="{{ $esActiva ? $claseSubtabActiva : $claseSubtabInactiva }}"
                         >
                             <span>{{ $label }}</span>
                             @if($clave !== 'todos')
                                 <span class="ml-1 text-[11px] text-gray-400">({{ $count }})</span>
                             @endif
-                        </button>
+                        </a>
                     @endforeach
                 </div>
             </div>
@@ -1233,27 +1235,23 @@
             </div>
         </div>
 
-        <div id="content-ocultos" class="tab-content hidden">
-            @php
-                $conteoTiposOcultos = contarAvisosPorTipo($avisosOcultos);
-            @endphp
+        <div id="content-ocultos" class="tab-content{{ $avisosTabActual !== 'ocultos' ? ' hidden' : '' }}">
             <div class="mb-4">
                 <div class="flex flex-wrap gap-2">
-                    @foreach($subTabs as $clave => $label)
+                    @foreach($avisosSubTabsLabels as $clave => $label)
                         @php
-                            $count = $conteoTiposOcultos[$clave] ?? 0;
+                            $count = $conteosTiposOcultos[$clave] ?? 0;
+                            $esActiva = $ocultosTipoActual === $clave;
                         @endphp
-                        <button
-                            type="button"
-                            class="subtab-button inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md border border-gray-600 text-gray-300 hover:border-pink-500 hover:text-pink-500 transition-colors"
-                            data-tabla="ocultos"
-                            data-subtab="{{ $clave }}"
+                        <a
+                            href="{{ $avisosIndexLink('ocultos', $clave) }}"
+                            class="{{ $esActiva ? $claseSubtabActiva : $claseSubtabInactiva }}"
                         >
                             <span>{{ $label }}</span>
                             @if($clave !== 'todos')
                                 <span class="ml-1 text-[11px] text-gray-400">({{ $count }})</span>
                             @endif
-                        </button>
+                        </a>
                     @endforeach
                 </div>
             </div>
@@ -1680,170 +1678,78 @@
         document.addEventListener('DOMContentLoaded', function() {
             const tabButtons = document.querySelectorAll('.tab-button');
             const tabContents = document.querySelectorAll('.tab-content');
-            const subtabButtons = document.querySelectorAll('.subtab-button');
+            const inputAvisosTabForm = document.querySelector('form[method="GET"] input[name="avisos_tab"]');
 
-            // Funciones para guardar y restaurar el estado
-            const guardarEstadoPestañas = (tabla, subtab) => {
-                const estado = {
+            const guardarEstadoPestañaPrincipal = (tabla) => {
+                localStorage.setItem('avisos-estado-tab', JSON.stringify({
                     tabla: tabla,
-                    subtab: subtab,
-                    timestamp: Date.now() // Guardar marca de tiempo actual
-                };
-                localStorage.setItem('avisos-estado', JSON.stringify(estado));
+                    timestamp: Date.now()
+                }));
             };
 
-            const restaurarEstadoPestañas = () => {
-                const estadoGuardado = localStorage.getItem('avisos-estado');
-                
-                // Si no hay estado guardado, usar valores por defecto
+            const restaurarEstadoPestañaPrincipal = () => {
+                const estadoGuardado = localStorage.getItem('avisos-estado-tab');
                 if (!estadoGuardado) {
-                    return { tabla: 'vencidos', subtab: 'todos', valido: false };
+                    return { tabla: @json($avisosTabActual), valido: false };
                 }
-
                 try {
                     const estado = JSON.parse(estadoGuardado);
                     const ahora = Date.now();
                     const tiempoTranscurrido = ahora - (estado.timestamp || 0);
-                    const unaHoraEnMs = 60 * 60 * 1000; // 1 hora en milisegundos
-
-                    // Si ha pasado más de una hora, usar valores por defecto
+                    const unaHoraEnMs = 60 * 60 * 1000;
                     if (tiempoTranscurrido > unaHoraEnMs) {
-                        // Limpiar el estado expirado
-                        localStorage.removeItem('avisos-estado');
-                        return { tabla: 'vencidos', subtab: 'todos', valido: false };
+                        localStorage.removeItem('avisos-estado-tab');
+                        return { tabla: @json($avisosTabActual), valido: false };
                     }
-
-                    // El estado es válido (menos de una hora)
                     return {
-                        tabla: estado.tabla || 'vencidos',
-                        subtab: estado.subtab || 'todos',
+                        tabla: estado.tabla || @json($avisosTabActual),
                         valido: true
                     };
                 } catch (e) {
-                    // Si hay error al parsear, usar valores por defecto
-                    localStorage.removeItem('avisos-estado');
-                    return { tabla: 'vencidos', subtab: 'todos', valido: false };
+                    localStorage.removeItem('avisos-estado-tab');
+                    return { tabla: @json($avisosTabActual), valido: false };
                 }
             };
 
-            const activarSubtab = (tabla, subtab, guardarEstado = true) => {
-                const container = document.getElementById(`content-${tabla}`);
-                if (!container) {
-                    return;
-                }
-
-                const botones = container.querySelectorAll('.subtab-button');
-                botones.forEach(btn => {
-                    btn.classList.remove('active-subtab', 'border-pink-500', 'text-pink-400', 'bg-gray-700');
-                    btn.classList.add('border-gray-600', 'text-gray-300');
+            const activarPestañaPrincipal = (target, guardarEstado = true) => {
+                tabButtons.forEach(btn => {
+                    btn.classList.remove('active', 'border-pink-500', 'text-pink-600', 'dark:text-pink-400');
+                    btn.classList.add('border-transparent', 'text-gray-500', 'dark:text-gray-400');
                 });
-
-                const botonActivo = container.querySelector(`.subtab-button[data-subtab="${subtab}"]`);
-                if (botonActivo) {
-                    botonActivo.classList.add('active-subtab', 'border-pink-500', 'text-pink-400', 'bg-gray-700');
-                    botonActivo.classList.remove('border-gray-600', 'text-gray-300');
+                const btnActivo = document.getElementById('tab-' + target);
+                if (btnActivo) {
+                    btnActivo.classList.add('active', 'border-pink-500', 'text-pink-600', 'dark:text-pink-400');
+                    btnActivo.classList.remove('border-transparent', 'text-gray-500', 'dark:text-gray-400');
                 }
-
-                const filas = container.querySelectorAll('tbody .subtab-row');
-                let visibles = 0;
-                filas.forEach(fila => {
-                    const tipo = fila.dataset.tipo || 'internos';
-                    const mostrar = subtab === 'todos' || tipo === subtab;
-                    fila.classList.toggle('hidden', !mostrar);
-                    if (mostrar) {
-                        visibles++;
-                    }
+                tabContents.forEach(content => {
+                    content.classList.add('hidden');
                 });
-
-                const mensajeFiltrado = container.querySelector('.mensaje-sin-avisos-filtrado');
-                if (mensajeFiltrado) {
-                    if (filas.length === 0) {
-                        mensajeFiltrado.classList.add('hidden');
-                    } else {
-                        mensajeFiltrado.classList.toggle('hidden', visibles > 0);
-                    }
+                const cont = document.getElementById('content-' + target);
+                if (cont) {
+                    cont.classList.remove('hidden');
                 }
-
-                // Guardar estado si se solicita
+                if (inputAvisosTabForm) {
+                    inputAvisosTabForm.value = target;
+                }
                 if (guardarEstado) {
-                    guardarEstadoPestañas(tabla, subtab);
+                    guardarEstadoPestañaPrincipal(target);
                 }
             };
 
             tabButtons.forEach(button => {
                 button.addEventListener('click', function() {
-                    const target = this.id === 'tab-vencidos' ? 'vencidos' : 
-                                 this.id === 'tab-pendientes' ? 'pendientes' : 'ocultos';
-                    
-                    // Actualizar botones
-                    tabButtons.forEach(btn => {
-                        btn.classList.remove('active', 'border-pink-500', 'text-pink-600', 'dark:text-pink-400');
-                        btn.classList.add('border-transparent', 'text-gray-500', 'dark:text-gray-400');
-                    });
-                    this.classList.add('active', 'border-pink-500', 'text-pink-600', 'dark:text-pink-400');
-                    this.classList.remove('border-transparent', 'text-gray-500', 'dark:text-gray-400');
-                    
-                    // Mostrar contenido
-                    tabContents.forEach(content => {
-                        content.classList.add('hidden');
-                    });
-                    document.getElementById(`content-${target}`).classList.remove('hidden');
-
-                    // Si cambiamos de pestaña principal, usar la subpestaña guardada para esa pestaña solo si es válida
-                    const estadoGuardado = restaurarEstadoPestañas();
-                    const subtabAUsar = (estadoGuardado.valido && estadoGuardado.tabla === target) 
-                        ? estadoGuardado.subtab 
-                        : 'todos';
-                    activarSubtab(target, subtabAUsar);
+                    const target = this.id === 'tab-vencidos' ? 'vencidos' :
+                        (this.id === 'tab-pendientes' ? 'pendientes' : 'ocultos');
+                    activarPestañaPrincipal(target, true);
                 });
             });
 
-            subtabButtons.forEach(button => {
-                button.addEventListener('click', function(event) {
-                    event.stopPropagation();
-                    const tabla = this.dataset.tabla;
-                    const subtab = this.dataset.subtab;
-                    activarSubtab(tabla, subtab);
-                });
-            });
-
-            // Restaurar estado guardado al cargar la página
-            const estadoGuardado = restaurarEstadoPestañas();
-            
-            // Solo usar el estado guardado si es válido (menos de una hora)
-            if (estadoGuardado.valido) {
-                const tablaInicial = estadoGuardado.tabla;
-                const subtabInicial = estadoGuardado.subtab;
-
-                // Activar la pestaña principal guardada directamente
-                const tabButtonInicial = document.getElementById(`tab-${tablaInicial}`);
-                if (tabButtonInicial) {
-                    // Actualizar botones de pestañas principales
-                    tabButtons.forEach(btn => {
-                        btn.classList.remove('active', 'border-pink-500', 'text-pink-600', 'dark:text-pink-400');
-                        btn.classList.add('border-transparent', 'text-gray-500', 'dark:text-gray-400');
-                    });
-                    tabButtonInicial.classList.add('active', 'border-pink-500', 'text-pink-600', 'dark:text-pink-400');
-                    tabButtonInicial.classList.remove('border-transparent', 'text-gray-500', 'dark:text-gray-400');
-                    
-                    // Mostrar contenido de la pestaña
-                    tabContents.forEach(content => {
-                        content.classList.add('hidden');
-                    });
-                    const contenidoInicial = document.getElementById(`content-${tablaInicial}`);
-                    if (contenidoInicial) {
-                        contenidoInicial.classList.remove('hidden');
-                    }
-
-                    // Activar la subpestaña guardada (sin guardar para evitar actualizar el timestamp)
-                    activarSubtab(tablaInicial, subtabInicial, false);
-                } else {
-                    // Si no existe la pestaña, usar la primera pestaña (vencidos) con subpestaña 'todos'
-                    activarSubtab('vencidos', 'todos', false);
-                }
+            const estadoGuardado = restaurarEstadoPestañaPrincipal();
+            const tabDesdeServidor = @json($avisosTabActual);
+            if (!window.location.search.includes('avisos_tab=') && estadoGuardado.valido && ['vencidos', 'pendientes', 'ocultos'].includes(estadoGuardado.tabla)) {
+                activarPestañaPrincipal(estadoGuardado.tabla, false);
             } else {
-                // Estado expirado o no válido, usar valores por defecto
-                activarSubtab('vencidos', 'todos', false);
+                activarPestañaPrincipal(tabDesdeServidor, false);
             }
         });
 
