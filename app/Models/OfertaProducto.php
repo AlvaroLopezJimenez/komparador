@@ -91,4 +91,9 @@ class OfertaProducto extends Model
     {
         return $this->belongsTo(Chollo::class);
     }
+
+    public function avisos()
+    {
+        return $this->morphMany(Aviso::class, 'avisoable');
+    }
 }

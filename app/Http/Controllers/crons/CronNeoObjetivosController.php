@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Http\Controllers\Scraping\PeticionApiHTMLController;
 use App\Services\ConsultarNeoCifrado;
 use App\Services\LimpiarUrlDeTiendas;
+use App\Services\NeoProgramaExternoRamaNeoUrlNormalizer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\DB;
@@ -1983,7 +1984,7 @@ class CronNeoObjetivosController extends Controller
      */
     private function siguienteConteoIntentosAvisoNoProductos(string $textoActual, string $textoBase): int
     {
-        if (preg_match('/-\s*Intentos:\s*(\d+)\s*vece?s?\s*$/iu', $textoActual, $m)) {
+        if (preg_match('/-\s*Intentos:\s*(\d+)\s*(?:vez|veces)\s*$/iu', $textoActual, $m)) {
             return (int) $m[1] + 1;
         }
 
@@ -2124,5 +2125,358 @@ class CronNeoObjetivosController extends Controller
         }
 
         return $mensaje;
+    }
+
+    /**
+     * Programa externo (HTML obtenido con navegador local): una página de categoría por llamada.
+     * Usa el mismo controlador de tienda y procesarUrlCategoria que el cron (rama categoría/tienda).
+     *
+     * @param int $urlsProductoAcumuladoAntes URLs de producto extraídas en páginas anteriores de esta misma sesión (programa externo); 0 en la primera página.
+     * @return array{
+     *   ok: bool,
+     *   http_code: int,
+     *   error?: string,
+     *   neoobjetivo_id?: int,
+     *   tienda_id?: int,
+     *   tienda_nombre?: string,
+     *   tipo_listado?: string,
+     *   url_pagina_procesada?: string,
+     *   urls_productos?: array,
+     *   urls_productos_count?: int,
+     *   siguiente_url?: string|null,
+     *   redirecciones?: array,
+     *   urls_productos_skipped_count?: int,
+     *   urls_productos_insertadas_count?: int,
+     *   urls_productos_actualizadas_neo_count?: int,
+     *   urls_productos_error_count?: int,
+     *   visitada_actualizada?: bool,
+     *   aviso_sin_productos_registrado?: bool,
+     *   total_urls_producto_sesion?: int
+     * }
+     */
+    public function procesarHtmlCategoriaTiendaProgramaExterno(
+        int $neoobjetivoId,
+        string $urlPagina,
+        string $html,
+        int $urlsProductoAcumuladoAntes = 0,
+    ): array {
+        $urlPagina = trim($urlPagina);
+        $html = (string) $html;
+
+        $neo = Neoobjetivo::with(['categoria', 'tienda'])->find($neoobjetivoId);
+        if (!$neo) {
+            return ['ok' => false, 'http_code' => 404, 'error' => 'No se encontró neoobjetivo con el id indicado.'];
+        }
+        if ($neo->tienda_id === null) {
+            return ['ok' => false, 'http_code' => 422, 'error' => 'Este neoobjetivo no tiene tienda_id (no es categoría/tienda).'];
+        }
+        $urlListado = trim((string) $neo->url);
+        if ($urlListado === '' || strtolower($urlListado) === 'no encontrado') {
+            return ['ok' => false, 'http_code' => 422, 'error' => 'URL de listado vacía o inválida en neoobjetivo.'];
+        }
+        if (NeoProgramaExternoRamaNeoUrlNormalizer::esRamaNeoObjetivoUrl($urlListado)) {
+            return ['ok' => false, 'http_code' => 422, 'error' => 'La fila corresponde a la rama Neo (Idealo), no a categoría en tienda.'];
+        }
+
+        $tienda = $neo->tienda ?? Tienda::find($neo->tienda_id);
+        if (!$tienda) {
+            $this->crearAvisoTiendaNoEncontradaNeoObjetivo($neo->id);
+
+            return ['ok' => false, 'http_code' => 422, 'error' => 'No existe la tienda asociada al neoobjetivo.'];
+        }
+
+        $nombreControlador = $this->normalizarNombreTienda($tienda->nombre);
+        $claseControlador = "App\\Http\\Controllers\\Scraping\\Tiendas\\{$nombreControlador}Controller";
+        if (!class_exists($claseControlador)) {
+            $this->crearAvisoControladorNoEncontradoNeoObjetivo($neo->id, $tienda->nombre);
+
+            return [
+                'ok'    => false,
+                'http_code' => 422,
+                'error' => 'No existe controlador de scraping para esta tienda: ' . $nombreControlador . 'Controller',
+            ];
+        }
+
+        $controladorTienda = new $claseControlador();
+        $tipoListado = $controladorTienda->tipoListadoCategoria();
+        if ($tipoListado === null || !in_array($tipoListado, ['sitemap', 'paginacion', 'mostrar_mas'], true)) {
+            $this->crearAvisoSinTipoListadoNeoObjetivo($neo->id, $tienda->nombre, $tipoListado);
+
+            return [
+                'ok'            => false,
+                'http_code'     => 422,
+                'error'         => 'tipoListadoCategoria() no válido o no soportado para esta tienda.',
+                'tipo_listado'  => $tipoListado,
+            ];
+        }
+
+        $urlsPagina = [];
+        $siguienteUrl = null;
+        try {
+            if ($tipoListado === 'sitemap') {
+                $urlsPagina = $controladorTienda->urlsProductosDesdeSitemap($html);
+                $siguienteUrl = null;
+            } elseif ($tipoListado === 'paginacion') {
+                $extraccion = $controladorTienda->extraerProductosYSiguientePagina($html, $urlPagina);
+                $urlsPagina = $extraccion['urls_productos'] ?? [];
+                $siguienteUrl = isset($extraccion['siguiente_url']) && $extraccion['siguiente_url'] !== ''
+                    ? $extraccion['siguiente_url']
+                    : null;
+            } else {
+                $urlsPagina = $controladorTienda->urlsProductosDesdeHtmlMostrarMas($html);
+                $siguienteUrl = null;
+            }
+        } catch (\Throwable $e) {
+            return [
+                'ok'            => false,
+                'http_code'     => 422,
+                'error'         => 'Error al extraer URLs del HTML: ' . $e->getMessage(),
+                'tipo_listado'  => $tipoListado,
+            ];
+        }
+
+        $redirecciones = [];
+        $numeroUrl = 0;
+        foreach ($urlsPagina as $urlProducto) {
+            $numeroUrl++;
+            $redirecciones[] = $this->procesarUrlCategoria($urlProducto, $neo, $numeroUrl);
+        }
+
+        $skippedCount = 0;
+        $insertadasCount = 0;
+        $actualizadasTiendaCount = 0;
+        $urlErroresCount = 0;
+        foreach ($redirecciones as $r) {
+            if (!is_array($r)) {
+                continue;
+            }
+            if (!empty($r['error'])) {
+                $urlErroresCount++;
+                continue;
+            }
+            if (!empty($r['skipped'])) {
+                $skippedCount++;
+                continue;
+            }
+            if (!empty($r['success'])) {
+                $af = (string) ($r['accion_final'] ?? '');
+                if (str_contains($af, 'Actualizada fila neo existente')) {
+                    $actualizadasTiendaCount++;
+                } else {
+                    $insertadasCount++;
+                }
+            }
+        }
+
+        $haySiguiente = $siguienteUrl !== null && $siguienteUrl !== '';
+        $visitadaActualizada = false;
+        $avisoSinProductos = false;
+        $antes = max(0, $urlsProductoAcumuladoAntes);
+        $totalSesion = $antes + count($urlsPagina);
+
+        if (!$haySiguiente) {
+            $puedeSerListadoVacio = $this->esUrlPaginaRelacionadaConListadoNeoobjetivo($urlPagina, $urlListado);
+            if ($totalSesion === 0 && $puedeSerListadoVacio) {
+                $this->registrarOActualizarAvisoNoProductosCategoriaNeoObjetivo($neo->id, $tienda->nombre, $neo->categoria?->nombre, $urlListado);
+                $avisoSinProductos = true;
+            } elseif ($totalSesion > 0) {
+                $this->eliminarAvisoNoProductosCategoriaNeoObjetivoSiExiste($neo->id, $tienda->nombre, $neo->categoria?->nombre, $urlListado);
+                $neo->update(['visitada' => now()]);
+                $visitadaActualizada = true;
+            } else {
+                $neo->update(['visitada' => now()]);
+                $visitadaActualizada = true;
+            }
+        }
+
+        return [
+            'ok'                          => true,
+            'http_code'                   => 200,
+            'neoobjetivo_id'              => $neo->id,
+            'tienda_id'                   => $tienda->id,
+            'tienda_nombre'               => $tienda->nombre,
+            'tipo_listado'                => $tipoListado,
+            'url_pagina_procesada'        => $urlPagina,
+            'urls_productos'              => $urlsPagina,
+            'urls_productos_count'        => count($urlsPagina),
+            'siguiente_url'               => $siguienteUrl,
+            'redirecciones'               => $redirecciones,
+            'urls_productos_skipped_count' => $skippedCount,
+            'urls_productos_insertadas_count' => $insertadasCount,
+            'urls_productos_actualizadas_neo_count' => $actualizadasTiendaCount,
+            'urls_productos_error_count'  => $urlErroresCount,
+            'visitada_actualizada'        => $visitadaActualizada,
+            'aviso_sin_productos_registrado' => $avisoSinProductos,
+            'total_urls_producto_sesion'  => $totalSesion,
+        ];
+    }
+
+    /**
+     * Persiste en ejecuciones_global (mismo nombre que el cron) el resumen y el log en texto del programa externo,
+     * para que aparezca en el panel «Ejecuciones / Neo objetivos» como una ejecución más.
+     *
+     * @param  array{
+     *   modo: 'rama_neo'|'categoria_tienda',
+     *   estadisticas?: array<string, int|float>,
+     *   lineas_log?: list<string>,
+     *   estado?: 'ok'|'error',
+     *   inicio_unix?: int|float,
+     *   error_mensaje?: string
+     * }  $data
+     * @return array{ok: bool, http_code: int, ejecucion_id?: int, error?: string}
+     */
+    public function registrarEjecucionProgramaExternoNeo(array $data): array
+    {
+        $modo = $data['modo'] ?? '';
+        if (!in_array($modo, ['rama_neo', 'categoria_tienda'], true)) {
+            return ['ok' => false, 'http_code' => 422, 'error' => 'modo debe ser rama_neo o categoria_tienda.'];
+        }
+
+        $estado = $data['estado'] ?? 'ok';
+        if (!in_array($estado, ['ok', 'error'], true)) {
+            $estado = 'ok';
+        }
+
+        $statsIn = isset($data['estadisticas']) && is_array($data['estadisticas']) ? $data['estadisticas'] : [];
+        $allowedKeys = [
+            'fichas_procesadas', 'leadouts_encontrados', 'urls_visitadas', 'urls_guardadas', 'urls_actualizadas', 'errores',
+            'paginas_listado_visitadas', 'urls_producto_extraidas', 'urls_ya_en_neo', 'urls_insertadas_neo',
+            'urls_actualizadas_neo_tienda', 'urls_error_procesamiento_neo',
+        ];
+        $stats = [];
+        foreach ($allowedKeys as $k) {
+            if (!array_key_exists($k, $statsIn)) {
+                continue;
+            }
+            $v = $statsIn[$k];
+            if (is_numeric($v)) {
+                $stats[$k] = (int) $v;
+            }
+        }
+
+        $lineas = [];
+        if (isset($data['lineas_log']) && is_array($data['lineas_log'])) {
+            foreach ($data['lineas_log'] as $ln) {
+                if (count($lineas) >= 1500) {
+                    break;
+                }
+                if (!is_string($ln)) {
+                    continue;
+                }
+                $lineas[] = Str::limit($ln, 1000, '…');
+            }
+        }
+
+        $inicioUnix = $data['inicio_unix'] ?? null;
+        $inicio = (is_numeric($inicioUnix) && (float) $inicioUnix > 0)
+            ? \Carbon\Carbon::createFromTimestamp((int) $inicioUnix)
+            : now();
+
+        $total = (int) ($stats['fichas_procesadas'] ?? 0);
+        $totalErrores = (int) ($stats['errores'] ?? 0);
+        $guardNeo = (int) ($stats['urls_guardadas'] ?? 0) + (int) ($stats['urls_actualizadas'] ?? 0);
+        $totalGuardado = $guardNeo;
+        if ($modo === 'categoria_tienda') {
+            $insNeo = (int) ($stats['urls_insertadas_neo'] ?? 0);
+            $updTienda = (int) ($stats['urls_actualizadas_neo_tienda'] ?? 0);
+            $catWrites = $insNeo + $updTienda;
+            if ($catWrites > 0) {
+                $totalGuardado = $catWrites;
+            } elseif ($totalGuardado === 0) {
+                $totalGuardado = (int) ($stats['leadouts_encontrados'] ?? 0);
+            }
+        }
+
+        $nombreEjecucion = 'cron_neo_objetivos';
+
+        $logEjecucion = [
+            'estado'                       => $estado,
+            'paso_actual'                  => 'finalizado',
+            'origen'                       => 'programa_externo',
+            'total_filas_neo'              => 0,
+            'total_filas_categoria_tienda' => 0,
+            'filas_sin_tienda_aviso'       => 0,
+            'resultados'                   => [],
+            'resultados_categoria'         => [],
+            'resultados_categoria_tienda_detalle' => [],
+            'resultados_categoria_tienda'  => [],
+            'programa_externo'            => [
+                'modo'          => $modo,
+                'estadisticas'  => $stats,
+                'lineas_log'    => $lineas,
+            ],
+            'pasos'                        => [
+                [
+                    'momento'  => now()->toDateTimeString(),
+                    'paso'     => 'finalizado',
+                    'detalle'  => 'Programa externo Neo: ejecución registrada vía API (mismo listado que el cron).',
+                    'contexto' => [
+                        'modo' => $modo,
+                    ],
+                ],
+            ],
+        ];
+
+        if ($modo === 'rama_neo') {
+            $logEjecucion['total_filas_neo'] = (int) ($stats['fichas_procesadas'] ?? 0);
+        } elseif ($modo === 'categoria_tienda') {
+            $logEjecucion['total_filas_categoria_tienda'] = (int) ($stats['fichas_procesadas'] ?? 0);
+        }
+
+        if ($estado === 'error' && !empty($data['error_mensaje'])) {
+            $logEjecucion['error'] = [
+                'mensaje' => Str::limit((string) $data['error_mensaje'], 2000),
+                'tipo'    => 'programa_externo',
+            ];
+        }
+
+        $logEjecucion = $this->sanitizarLogUrls($logEjecucion);
+
+        try {
+            $ejecucion = EjecucionGlobal::create([
+                'inicio'         => $inicio,
+                'fin'            => now(),
+                'nombre'         => $nombreEjecucion,
+                'total'          => $total,
+                'total_guardado' => $totalGuardado,
+                'total_errores'  => $totalErrores,
+                'log'            => $logEjecucion,
+            ]);
+        } catch (\Throwable $e) {
+            return [
+                'ok'         => false,
+                'http_code'  => 500,
+                'error'      => 'No se pudo guardar la ejecución: ' . $e->getMessage(),
+            ];
+        }
+
+        $this->eliminarEjecucionesAntiguas($nombreEjecucion);
+
+        return [
+            'ok'            => true,
+            'http_code'     => 200,
+            'ejecucion_id'  => $ejecucion->id,
+        ];
+    }
+
+    /**
+     * True si la URL de la petición corresponde al listado base del neoobjetivo (primera página o variante con query).
+     * Evita registrar aviso "sin productos" en una última página vacía de paginación.
+     */
+    private function esUrlPaginaRelacionadaConListadoNeoobjetivo(string $urlPagina, string $urlListadoNeoobjetivo): bool
+    {
+        $a = preg_replace('#\#.*$#', '', mb_strtolower(rtrim(trim($urlPagina), '/')));
+        $b = preg_replace('#\#.*$#', '', mb_strtolower(rtrim(trim($urlListadoNeoobjetivo), '/')));
+        if ($a === $b) {
+            return true;
+        }
+        if ($b !== '' && str_starts_with($a, $b . '?')) {
+            return true;
+        }
+        if ($b !== '' && str_starts_with($a, $b . '&')) {
+            return true;
+        }
+
+        return $b !== '' && str_starts_with($a, $b);
     }
 }

@@ -3,11 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Crons\CronNeoObjetivosController;
 use App\Models\Neo;
 use App\Models\Neoobjetivo;
 use App\Models\OfertaProducto;
-use App\Models\Tienda;
 use App\Models\UrlDescartada;
 use App\Services\ConsultarNeoCifrado;
 use App\Services\LimpiarUrlDeTiendas;
@@ -15,11 +13,10 @@ use App\Services\NeoProgramaExternoRamaNeoUrlNormalizer;
 use DateTimeInterface;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Str;
 
 /**
- * API exclusiva del programa externo del flujo Neo (rama Neo Idealo + categorías en tienda + sincronización).
- * No ejecuta el cron; delega la lógica de categoría/tienda en CronNeoObjetivosController::procesarHtmlCategoriaTiendaProgramaExterno.
+ * API exclusiva del programa externo del flujo Neo (rama Neo + sincronización).
+ * No modifica ni invoca el cron; replica reglas de negocio alineadas con él.
  */
 class NeoApiProgramaExternoController extends Controller
 {
@@ -68,166 +65,6 @@ class NeoApiProgramaExternoController extends Controller
             'total'        => count($out),
             'neoobjetivos' => $out,
         ]);
-    }
-
-    /**
-     * GET neoobjetivos de categoría en tienda: tienda_id rellenado, visitada &gt; 7 días, no rama Neo (Idealo).
-     *
-     * Query: limite (1–500, default 200)
-     */
-    public function neoobjetivosCategoriaTiendaPendientes(Request $request): JsonResponse
-    {
-        $limite = min(500, max(1, (int) $request->query('limite', 200)));
-
-        $candidatas = Neoobjetivo::query()
-            ->with('tienda')
-            ->where('visitada', '<', now()->subDays(7))
-            ->whereNotNull('tienda_id')
-            ->whereNotNull('url_cipher')
-            ->where('url_cipher', '!=', '')
-            ->orderBy('visitada')
-            ->limit(max($limite * 5, 500))
-            ->get();
-
-        $out = [];
-        foreach ($candidatas as $n) {
-            if (count($out) >= $limite) {
-                break;
-            }
-            $url = trim((string) $n->url);
-            if ($url === '' || strtolower($url) === 'no encontrado') {
-                continue;
-            }
-            if (NeoProgramaExternoRamaNeoUrlNormalizer::esRamaNeoObjetivoUrl($url)) {
-                continue;
-            }
-            $metaListado = $this->metadatosListadoCategoriaDesdeTienda($n->tienda);
-            $out[] = array_merge([
-                'id'            => $n->id,
-                'url'           => $url,
-                'visitada'      => $n->visitada?->format(DateTimeInterface::ATOM),
-                'oferta_id'     => $n->oferta_id,
-                'producto_id'   => $n->producto_id,
-                'categoria_id'  => $n->categoria_id,
-                'tienda_id'     => $n->tienda_id,
-            ], $metaListado);
-        }
-
-        return response()->json([
-            'ok'           => true,
-            'total'        => count($out),
-            'neoobjetivos' => $out,
-        ]);
-    }
-
-    /**
-     * POST: HTML de una página de categoría (obtenido en el navegador del programa externo).
-     * Extrae URLs de producto y siguiente página con el controlador de la tienda; guarda en neo como el cron.
-     *
-     * Body: neoobjetivo_id (int), url_pagina (string), html (string),
-     * opcional urls_producto_acumulado_antes (int ≥0): URLs de producto ya extraídas en páginas anteriores de la misma sesión (paginación en el programa externo), para alinear con el cron si toda la sesión queda en 0.
-     */
-    public function procesarHtmlCategoriaTienda(Request $request): JsonResponse
-    {
-        $data = $request->validate([
-            'neoobjetivo_id' => ['required', 'integer', 'min:1'],
-            'url_pagina'     => ['required', 'string', 'max:2048'],
-            'html'           => ['required', 'string', 'max:12000000'],
-            'urls_producto_acumulado_antes' => ['sometimes', 'integer', 'min:0', 'max:500000'],
-        ]);
-
-        $result = app(CronNeoObjetivosController::class)->procesarHtmlCategoriaTiendaProgramaExterno(
-            (int) $data['neoobjetivo_id'],
-            trim((string) $data['url_pagina']),
-            (string) $data['html'],
-            (int) ($data['urls_producto_acumulado_antes'] ?? 0),
-        );
-
-        $http = (int) ($result['http_code'] ?? 500);
-        unset($result['http_code']);
-
-        $ok = !empty($result['ok']);
-
-        return response()->json($result, $ok ? 200 : $http);
-    }
-
-    /**
-     * POST: al terminar una corrida del programa externo (rama Neo o categoría/tienda), guarda log y contadores
-     * en ejecuciones_global con el mismo nombre que el cron, para el panel «Ejecuciones / Neo objetivos».
-     *
-     * Body: modo (rama_neo|categoria_tienda), lineas_log (array de strings, máx. 1500),
-     * opcional estadisticas (fichas_procesadas, leadouts_encontrados, …), estado (ok|error),
-     * inicio_unix (epoch segundos al iniciar la corrida), error_mensaje.
-     */
-    public function registrarEjecucionFin(Request $request): JsonResponse
-    {
-        // ConvertEmptyStringsToNull convierte "" en null y rompe lineas_log.* string; normalizar antes de validar.
-        $rawLineas = $request->input('lineas_log');
-        if (!is_array($rawLineas)) {
-            return response()->json([
-                'ok'    => false,
-                'error' => 'lineas_log debe ser un array.',
-            ], 422);
-        }
-        $lineasNorm = [];
-        foreach ($rawLineas as $ln) {
-            if ($ln === null) {
-                $lineasNorm[] = '';
-            } elseif (is_string($ln)) {
-                $lineasNorm[] = $ln;
-            } elseif (is_scalar($ln)) {
-                $lineasNorm[] = (string) $ln;
-            } else {
-                $lineasNorm[] = json_encode($ln, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
-            }
-        }
-        $request->merge(['lineas_log' => $lineasNorm]);
-
-        $data = $request->validate([
-            'modo'            => ['required', 'string', 'in:rama_neo,categoria_tienda'],
-            'lineas_log'      => ['required', 'array', 'max:1500'],
-            'lineas_log.*'    => ['string', 'max:1000'],
-            'estadisticas'    => ['sometimes', 'array', 'max:30'],
-            'estado'          => ['sometimes', 'string', 'in:ok,error'],
-            'inicio_unix'     => ['sometimes', 'numeric', 'min:946684800', 'max:4102444800'],
-            'error_mensaje'   => ['sometimes', 'string', 'max:2000'],
-        ]);
-        $estadisticasRaw = $request->input('estadisticas', []);
-        $estadisticas = [];
-        if (is_array($estadisticasRaw)) {
-            $allowed = [
-                'fichas_procesadas', 'leadouts_encontrados', 'urls_visitadas', 'urls_guardadas', 'urls_actualizadas', 'errores',
-                'paginas_listado_visitadas', 'urls_producto_extraidas', 'urls_ya_en_neo', 'urls_insertadas_neo',
-                'urls_actualizadas_neo_tienda', 'urls_error_procesamiento_neo',
-            ];
-            foreach ($allowed as $k) {
-                if (!array_key_exists($k, $estadisticasRaw)) {
-                    continue;
-                }
-                $v = $estadisticasRaw[$k];
-                if (is_numeric($v)) {
-                    $estadisticas[$k] = (int) $v;
-                }
-            }
-        }
-
-        $payload = [
-            'modo'         => $data['modo'],
-            'lineas_log'   => $data['lineas_log'],
-            'estadisticas' => $estadisticas,
-            'estado'       => $data['estado'] ?? 'ok',
-            'inicio_unix'  => $data['inicio_unix'] ?? null,
-            'error_mensaje' => $data['error_mensaje'] ?? null,
-        ];
-
-        $result = app(CronNeoObjetivosController::class)->registrarEjecucionProgramaExternoNeo($payload);
-
-        $http = (int) ($result['http_code'] ?? 500);
-        unset($result['http_code']);
-
-        $ok = !empty($result['ok']);
-
-        return response()->json($result, $ok ? 200 : $http);
     }
 
     /**
@@ -557,63 +394,5 @@ class NeoApiProgramaExternoController extends Controller
         }
 
         return 'no';
-    }
-
-    /**
-     * Misma normalización que CronNeoObjetivosController::normalizarNombreTienda().
-     */
-    private function normalizarNombreTiendaParaClaseScraping(string $tienda): string
-    {
-        $normalizado = strtolower($tienda);
-        $normalizado = Str::ascii($normalizado);
-        $normalizado = preg_replace('/[^a-z0-9]/', '', $normalizado);
-
-        return ucfirst($normalizado);
-    }
-
-    /**
-     * @return array{
-     *     tipo_listado_categoria: 'paginacion'|'sitemap'|'mostrar_mas'|null,
-     *     selector_cargar_mas: string|null,
-     *     tienda_nombre: string|null
-     * }
-     */
-    private function metadatosListadoCategoriaDesdeTienda(?Tienda $tienda): array
-    {
-        $base = [
-            'tipo_listado_categoria' => null,
-            'selector_cargar_mas'   => null,
-            'tienda_nombre'         => null,
-        ];
-        if ($tienda === null) {
-            return $base;
-        }
-        $nombreTienda = trim((string) $tienda->nombre);
-        $base['tienda_nombre'] = $nombreTienda !== '' ? $nombreTienda : null;
-        if ($nombreTienda === '') {
-            return $base;
-        }
-        $nombreControlador = $this->normalizarNombreTiendaParaClaseScraping($nombreTienda);
-        $clase = "App\\Http\\Controllers\\Scraping\\Tiendas\\{$nombreControlador}Controller";
-        if (!class_exists($clase)) {
-            return $base;
-        }
-        try {
-            $ctrl = new $clase();
-            $tipo = $ctrl->tipoListadoCategoria();
-            if ($tipo === null || !in_array($tipo, ['sitemap', 'paginacion', 'mostrar_mas'], true)) {
-                return $base;
-            }
-            $base['tipo_listado_categoria'] = $tipo;
-            if ($tipo === 'mostrar_mas') {
-                $sel = $ctrl->selectorCargarMasParaVps();
-                $trim = $sel !== null ? trim($sel) : '';
-                $base['selector_cargar_mas'] = $trim !== '' ? $trim : null;
-            }
-        } catch (\Throwable) {
-            return $base;
-        }
-
-        return $base;
     }
 }

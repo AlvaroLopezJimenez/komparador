@@ -356,6 +356,9 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
     Route::patch('profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
+    Route::patch('alertas-precio/{alerta}', [App\Http\Controllers\AlertaPrecioController::class, 'adminActualizarPrecio'])->name('alertas-precio.update');
+    Route::delete('alertas-precio/{alerta}', [App\Http\Controllers\AlertaPrecioController::class, 'adminEliminar'])->name('alertas-precio.destroy');
+
     // Ejecuciones: vista de resultados (neo objetivos) sin ejecutar el cron
     Route::get('ejecuciones/neo-objetivos', function (Request $request) {
         $nombreEjecucion = 'cron_neo_objetivos';
@@ -766,7 +769,7 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
         Route::delete('/{aviso}', [AvisoController::class, 'destroy'])->name('destroy');
         Route::post('/{aviso}/aplazar', [AvisoController::class, 'aplazar'])->name('aplazar');
         Route::post('/{aviso}/correo/enviar', [AvisoController::class, 'enviarAvisoCorreo'])->name('correo.enviar');
-        Route::post('/{aviso}/correo/aplazar-7-dias', [AvisoController::class, 'aplazarCorreoSieteDias'])->name('correo.aplazar-7-dias');
+        Route::post('/{aviso}/correo/no-enviar', [AvisoController::class, 'descartarAvisoCorreoSinEnviar'])->name('correo.no-enviar');
         Route::post('/marcar-envio-comprobado', [AvisoController::class, 'marcarEnvioComprobado'])->name('marcar.envio.comprobado');
         Route::post('/{aviso}/gestionar-oferta-resucitada', [AvisoController::class, 'gestionarOfertaResucitada'])->name('gestionar.oferta.resucitada');
         Route::get('/elemento', [AvisoController::class, 'getAvisosElemento'])->name('get.elemento');

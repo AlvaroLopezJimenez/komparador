@@ -25,6 +25,17 @@ class ComprobarOfertasApiController extends Controller
         ]);
 
         $oferta = OfertaProducto::with(['producto', 'tienda'])->findOrFail($request->oferta_id);
+
+        if ($oferta->chollo_id !== null) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Las ofertas vinculadas a un chollo no se procesan en este panel',
+                'oferta_id' => $oferta->id,
+                'url' => $oferta->url,
+                'producto_nombre' => $oferta->producto->nombre ?? 'Sin nombre',
+                'mostrar' => $oferta->mostrar,
+            ]);
+        }
         
         try {
             // Verificar que la tienda tenga una API configurada
@@ -66,7 +77,8 @@ class ComprobarOfertasApiController extends Controller
             // Establecer timeout para evitar que se cuelgue
             set_time_limit(30); // 30 segundos máximo
             
-            $response = $scrapingController->obtenerPrecio($scrapingRequest, $oferta);
+            // Sin $oferta: no crear avisos de sin stock ni cambiar mostrar automáticamente
+            $response = $scrapingController->obtenerPrecio($scrapingRequest);
             
             // Si la respuesta no es válida, devolver error
             if (!$response || !method_exists($response, 'getData')) {
@@ -265,48 +277,67 @@ class ComprobarOfertasApiController extends Controller
      */
     public function buscarOfertas(Request $request)
     {
-        $request->validate([
-            'tienda' => 'required|string',
-            'mostrar' => 'required|in:si,no',
-            'limite_ofertas' => 'nullable|integer|min:1',
-            'tiempo_entre_peticiones' => 'required|integer|min:1|max:60'
-        ]);
+        try {
+            $request->validate([
+                'tienda' => 'required|string',
+                'mostrar' => 'required|in:si,no',
+                'limite_ofertas' => 'nullable|integer|min:1|max:5000',
+                'tiempo_entre_peticiones' => 'required|integer|min:1|max:60',
+            ]);
 
-        $tienda = $request->input('tienda');
-        $mostrar = $request->input('mostrar');
-        $limiteOfertas = $request->input('limite_ofertas');
-        $tiempoEntrePeticiones = $request->input('tiempo_entre_peticiones');
+            $tienda = $request->input('tienda');
+            $mostrar = $request->input('mostrar');
+            $limiteOfertas = $request->input('limite_ofertas');
+            $tiempoEntrePeticiones = $request->input('tiempo_entre_peticiones');
 
-        // Obtener ofertas según los criterios
-        $query = OfertaProducto::with(['producto', 'tienda'])
-            ->whereHas('tienda', function($q) use ($tienda) {
-                $q->where('nombre', $tienda);
-            })
-            ->where('mostrar', $mostrar);
+            $query = OfertaProducto::query()
+                ->select(['id', 'producto_id', 'url', 'mostrar', 'anotaciones_internas'])
+                ->whereNull('chollo_id')
+                ->where('mostrar', $mostrar)
+                ->whereHas('tienda', fn ($q) => $q->where('nombre', $tienda))
+                ->with(['producto:id,nombre'])
+                ->withExists(['avisos as tiene_avisos' => fn ($q) => $q->where('oculto', false)])
+                ->orderBy('id');
 
-        if ($limiteOfertas) {
-            $query->limit($limiteOfertas);
+            if ($limiteOfertas) {
+                $query->limit($limiteOfertas);
+            }
+
+            $ofertas = $query->get()->map(function ($oferta) {
+                return [
+                    'id' => $oferta->id,
+                    'producto_id' => $oferta->producto_id,
+                    'url' => $oferta->url,
+                    'mostrar' => $oferta->mostrar,
+                    'anotaciones_internas' => $oferta->anotaciones_internas,
+                    'tiene_avisos' => (bool) $oferta->tiene_avisos,
+                    'producto' => [
+                        'nombre' => $oferta->producto->nombre ?? 'Sin nombre',
+                    ],
+                ];
+            })->values()->all();
+
+            return response()->json([
+                'success' => true,
+                'ofertas' => $ofertas,
+                'total' => count($ofertas),
+                'tienda' => $tienda,
+                'mostrar' => $mostrar,
+                'limite_ofertas' => $limiteOfertas,
+                'tiempo_entre_peticiones' => $tiempoEntrePeticiones,
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            Log::error('Error en buscarOfertas (test-bulk): ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Error al buscar ofertas: ' . $e->getMessage(),
+            ], 500);
         }
-
-        $ofertas = $query->get();
-
-        // Añadir información de avisos a cada oferta
-        foreach ($ofertas as $oferta) {
-            $oferta->tiene_avisos = \App\Models\Aviso::where('avisoable_type', 'App\Models\OfertaProducto')
-                ->where('avisoable_id', $oferta->id)
-                ->where('oculto', false)
-                ->exists();
-        }
-
-        return response()->json([
-            'success' => true,
-            'ofertas' => $ofertas,
-            'total' => $ofertas->count(),
-            'tienda' => $tienda,
-            'mostrar' => $mostrar,
-            'limite_ofertas' => $limiteOfertas,
-            'tiempo_entre_peticiones' => $tiempoEntrePeticiones
-        ]);
     }
 
     /**

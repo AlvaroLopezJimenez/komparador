@@ -59,6 +59,7 @@
                                         <option value="amazonApi">Amazon Product Advertising API</option>
                                         <option value="amazonProductInfo">Amazon Product Info API - RapidAPI</option>
                                         <option value="amazonPricing">Amazon Pricing And Product Info API - RapidAPI</option>
+                                        <option value="navegadorLocal">Navegador local (programa externo)</option>
                                     </select>
                                 </div>
                             </div>

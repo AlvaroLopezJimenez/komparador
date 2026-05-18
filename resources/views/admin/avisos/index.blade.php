@@ -844,7 +844,7 @@
                                                 class="px-3 py-1 text-sm bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors">
                                                 Enviar correo
                                             </button>
-                                            <button onclick="aplazarAvisoCorreoSieteDias({{ $aviso->id }})" 
+                                            <button onclick="descartarAvisoCorreoSinEnviar({{ $aviso->id }})" 
                                                 class="px-3 py-1 text-sm bg-yellow-600 hover:bg-yellow-700 text-white rounded-md transition-colors">
                                                 No enviar
                                             </button>
@@ -1175,7 +1175,7 @@
                                                 class="px-3 py-1 text-sm bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors">
                                                 Enviar correo
                                             </button>
-                                            <button onclick="aplazarAvisoCorreoSieteDias({{ $aviso->id }})" 
+                                            <button onclick="descartarAvisoCorreoSinEnviar({{ $aviso->id }})" 
                                                 class="px-3 py-1 text-sm bg-yellow-600 hover:bg-yellow-700 text-white rounded-md transition-colors">
                                                 No enviar
                                             </button>
@@ -1506,7 +1506,7 @@
                                                 class="px-3 py-1 text-sm bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors">
                                                 Enviar correo
                                             </button>
-                                            <button onclick="aplazarAvisoCorreoSieteDias({{ $aviso->id }})" 
+                                            <button onclick="descartarAvisoCorreoSinEnviar({{ $aviso->id }})" 
                                                 class="px-3 py-1 text-sm bg-yellow-600 hover:bg-yellow-700 text-white rounded-md transition-colors">
                                                 No enviar
                                             </button>
@@ -2578,8 +2578,8 @@
             }
         }
 
-        function aplazarAvisoCorreoSieteDias(avisoId) {
-            fetch(`/panel-privado/avisos/${avisoId}/correo/aplazar-7-dias`, {
+        function descartarAvisoCorreoSinEnviar(avisoId) {
+            fetch(`/panel-privado/avisos/${avisoId}/correo/no-enviar`, {
                 method: 'POST',
                 headers: {
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
@@ -2592,10 +2592,10 @@
                     window.location.reload();
                     return;
                 }
-                alert(data.message || 'No se pudo aplazar el aviso');
+                alert(data.message || 'No se pudo descartar el aviso');
             })
             .catch(() => {
-                alert('Error al aplazar el aviso');
+                alert('Error al descartar el aviso');
             });
         }
 

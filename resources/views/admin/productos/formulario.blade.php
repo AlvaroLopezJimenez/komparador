@@ -17,7 +17,7 @@
         </div>
     </x-slot>
 
-    <div class="max-w-5xl mx-auto py-10 px-4 space-y-8 bg-gray-50 dark:bg-gray-900 rounded-lg shadow-md">
+    <div class="max-w-5xl mx-auto py-10 px-4 space-y-8 bg-gray-50 dark:bg-gray-900 rounded-lg shadow-md form-container">
 
         <form method="POST" enctype="multipart/form-data"
             action="{{ $producto ? route('admin.productos.update', $producto) : route('admin.productos.store') }}">
@@ -123,9 +123,9 @@
                 <legend class="text-lg font-semibold text-gray-700 dark:text-gray-200">Información general</legend>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
+                    <div id="campo-nombre-sticky">
                         <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">Nombre *</label>
-                        <input type="text" name="nombre" value="{{ old('nombre', $producto->nombre ?? '') }}"
+                        <input type="text" name="nombre" id="input_nombre" value="{{ old('nombre', $producto->nombre ?? '') }}"
                             class="w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border @error('nombre') border-red-500 @enderror">
                         @error('nombre') <p class="text-red-500 text-sm mt-1">{{ $message }}</p> @enderror
                     </div>
@@ -601,7 +601,7 @@
             </div>
 
             <div class="flex justify-between items-center mt-8">
-                {{-- A├æADIR OFERTA --}}
+                {{-- AÑADIR OFERTA --}}
                 @if ($producto && $producto->id)
                 <a href="{{ route('admin.ofertas.create', ['producto' => $producto->id]) }}"
                     target="_blank"
@@ -611,14 +611,30 @@
                 @endif
 
                 {{-- BOTÓN GUARDAR --}}
-                <button type="submit"
-                    class="inline-flex items-center bg-pink-600 hover:bg-pink-700 text-white font-semibold text-base px-6 py-3 rounded-md shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500">
-                    Guardar producto
-                </button>
+                <div id="btn_guardar_wrapper" class="ml-auto">
+                    <button type="submit" id="btn_guardar"
+                        class="inline-flex items-center bg-pink-600 hover:bg-pink-700 text-white font-semibold text-base px-6 py-3 rounded-md shadow-lg transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                        Guardar producto
+                    </button>
+                </div>
             </div>
 
 
         </form>
+
+        {{-- Barra nombre fija (viewport completo al hacer scroll) --}}
+        <div id="barra-nombre-fija" class="hidden fixed top-0 left-0 right-0 z-40 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-md" aria-hidden="true">
+            <div class="max-w-5xl mx-auto px-4 py-3">
+                <label for="input_nombre_fijo" class="block mb-1 font-medium text-gray-700 dark:text-gray-200">Nombre *</label>
+                <input type="text" id="input_nombre_fijo" autocomplete="off"
+                    class="w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-pink-500">
+            </div>
+        </div>
+
+        {{-- Botón guardar flotante (cuando el original no está en pantalla) --}}
+        <button type="button" id="btn_guardar_fijo" class="hidden fixed bottom-4 right-4 z-40 inline-flex items-center bg-pink-600 hover:bg-pink-700 text-white font-semibold text-base px-6 py-3 rounded-md shadow-lg transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500 disabled:opacity-50 disabled:cursor-not-allowed">
+            Guardar producto
+        </button>
 
             {{-- Modal para crear/editar aviso --}}
             <div id="modal-aviso" class="hidden fixed inset-0 bg-transparent flex items-center justify-center z-50 p-4">
@@ -1383,6 +1399,47 @@
             </div>
         </div>
     </div>
+
+    <style>
+        .form-container {
+            padding-bottom: 80px;
+        }
+
+        #barra-nombre-fija:not(.hidden) {
+            animation: barra-nombre-entrada 0.2s ease-out;
+        }
+
+        @keyframes barra-nombre-entrada {
+            from { transform: translateY(-100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        #btn_guardar_fijo:not(.hidden) {
+            backdrop-filter: blur(8px);
+            background-color: rgba(219, 39, 119, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 20px rgba(219, 39, 119, 0.35);
+        }
+
+        #btn_guardar_fijo:not(.hidden):hover:not(:disabled) {
+            background-color: rgba(190, 24, 93, 0.95);
+            transform: translateY(-1px);
+        }
+
+        #btn_guardar_fijo:disabled {
+            background-color: rgba(156, 163, 175, 0.85) !important;
+            transform: none;
+        }
+
+        @media (max-width: 768px) {
+            #btn_guardar_fijo:not(.hidden) {
+                bottom: 1rem;
+                right: 1rem;
+                padding: 0.75rem 1.5rem;
+                font-size: 0.875rem;
+            }
+        }
+    </style>
 
     {{-- SCRIPTS --}}
     <script>
@@ -2517,7 +2574,7 @@
 
         // Función para actualizar el estado del botón de guardar
         function actualizarBotonGuardar(habilitado, mensaje) {
-            const btnGuardar = document.querySelector('button[type="submit"]');
+            const btnGuardar = document.getElementById('btn_guardar');
             if (!btnGuardar) return;
 
             // Si se pide habilitar, comprobar también validación Neo (al menos un campo con URL o "No encontrado", y ningún campo con valor inválido)
@@ -7003,7 +7060,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     const slugInput = document.getElementById('slug');
     const validationMessage = document.getElementById('slug_validation_message');
-    const btnGuardar = document.querySelector('button[type="submit"]');
+    const btnGuardar = document.getElementById('btn_guardar');
     
     // Si no estamos en el formulario de productos, salir
     if (!slugInput || !validationMessage || !btnGuardar) {
@@ -9922,7 +9979,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const checkboxNoAñadir = document.getElementById('no_anadir_especificaciones');
         if (checkboxNoAñadir && checkboxNoAñadir.checked) {
             // Si está marcado, no validar y habilitar el botón
-            const btnGuardar = document.querySelector('button[type="submit"]');
+            const btnGuardar = document.getElementById('btn_guardar');
             if (btnGuardar) {
                 btnGuardar.disabled = false;
                 btnGuardar.classList.remove('opacity-50', 'cursor-not-allowed', 'bg-gray-400');
@@ -9946,7 +10003,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Si no hay líneas principales, no hay nada que validar
         if (lineasPrincipales.length === 0) {
-            const btnGuardar = document.querySelector('button[type="submit"]');
+            const btnGuardar = document.getElementById('btn_guardar');
             if (btnGuardar) {
                 btnGuardar.disabled = false;
                 btnGuardar.classList.remove('opacity-50', 'cursor-not-allowed', 'bg-gray-400');
@@ -9974,7 +10031,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         // Actualizar estado del botón de guardar
-        const btnGuardar = document.querySelector('button[type="submit"]');
+        const btnGuardar = document.getElementById('btn_guardar');
         if (btnGuardar) {
             if (!todasRellenadas) {
                 btnGuardar.disabled = true;
@@ -10055,6 +10112,95 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    // Barra nombre y botón guardar fijos en el viewport
+    (function initFijosFormularioProducto() {
+        const inputNombre = document.getElementById('input_nombre');
+        const inputNombreFijo = document.getElementById('input_nombre_fijo');
+        const barraNombreFija = document.getElementById('barra-nombre-fija');
+        const campoNombre = document.getElementById('campo-nombre-sticky');
+        const btnGuardar = document.getElementById('btn_guardar');
+        const btnGuardarFijo = document.getElementById('btn_guardar_fijo');
+
+        if (inputNombre && inputNombreFijo && barraNombreFija && campoNombre) {
+            let sincronizandoNombre = false;
+
+            const syncNombreAFijo = () => {
+                if (sincronizandoNombre) return;
+                sincronizandoNombre = true;
+                inputNombreFijo.value = inputNombre.value;
+                inputNombreFijo.className = inputNombre.className;
+                sincronizandoNombre = false;
+            };
+
+            const syncNombreAOriginal = () => {
+                if (sincronizandoNombre) return;
+                sincronizandoNombre = true;
+                inputNombre.value = inputNombreFijo.value;
+                inputNombre.dispatchEvent(new Event('input', { bubbles: true }));
+                sincronizandoNombre = false;
+            };
+
+            inputNombre.addEventListener('input', syncNombreAFijo);
+            inputNombreFijo.addEventListener('input', syncNombreAOriginal);
+
+            const observerNombre = new IntersectionObserver((entries) => {
+                const visible = entries[0].isIntersecting;
+                if (!visible) {
+                    syncNombreAFijo();
+                    barraNombreFija.classList.remove('hidden');
+                    barraNombreFija.setAttribute('aria-hidden', 'false');
+                } else {
+                    barraNombreFija.classList.add('hidden');
+                    barraNombreFija.setAttribute('aria-hidden', 'true');
+                }
+            }, { threshold: 0, rootMargin: '-1px 0px 0px 0px' });
+
+            observerNombre.observe(campoNombre);
+        }
+
+        if (btnGuardar && btnGuardarFijo) {
+            const clasesFijas = ['fixed', 'bottom-4', 'right-4', 'z-40', 'shadow-lg'];
+
+            const syncBtnGuardarFijo = () => {
+                btnGuardarFijo.disabled = btnGuardar.disabled;
+                btnGuardarFijo.textContent = btnGuardar.textContent;
+                btnGuardarFijo.className = btnGuardar.className;
+                clasesFijas.forEach(c => btnGuardarFijo.classList.add(c));
+            };
+
+            btnGuardarFijo.addEventListener('click', () => {
+                if (!btnGuardar.disabled) {
+                    btnGuardar.click();
+                }
+            });
+
+            const observerGuardar = new IntersectionObserver((entries) => {
+                const visible = entries[0].isIntersecting;
+                if (visible) {
+                    btnGuardarFijo.classList.add('hidden');
+                } else {
+                    syncBtnGuardarFijo();
+                    btnGuardarFijo.classList.remove('hidden');
+                }
+            }, { threshold: 0 });
+
+            observerGuardar.observe(btnGuardar);
+
+            const mutObserver = new MutationObserver(() => {
+                if (!btnGuardarFijo.classList.contains('hidden')) {
+                    syncBtnGuardarFijo();
+                }
+            });
+            mutObserver.observe(btnGuardar, {
+                attributes: true,
+                attributeFilter: ['disabled', 'class'],
+                childList: true,
+                characterData: true,
+                subtree: true
+            });
+        }
+    })();
 });
 </script>
 

@@ -1317,6 +1317,66 @@
       color: #64748b !important;
     }
 
+    /* Panel admin: desplegable de alertas de precio */
+    #admin-alertas-menu {
+      min-width: 28rem;
+      width: min(100vw - 2rem, 36rem);
+    }
+    #admin-alertas-menu .admin-alerta-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 0.5rem;
+      align-items: end;
+    }
+    #admin-alertas-menu .admin-alerta-precio {
+      display: block;
+      width: 100% !important;
+      min-width: 0;
+      max-width: none !important;
+      box-sizing: border-box;
+      padding: 0.4rem 0.75rem;
+      font-size: 0.95rem;
+      font-variant-numeric: tabular-nums;
+      color: #fff;
+      background: #111827;
+      border: 1px solid #4b5563;
+      border-radius: 0.25rem;
+    }
+    #admin-alertas-menu .admin-alerta-precio:focus {
+      outline: none;
+      border-color: #e97b11;
+    }
+    #admin-alertas-menu .admin-alerta-precio::-webkit-outer-spin-button,
+    #admin-alertas-menu .admin-alerta-precio::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    #admin-alertas-menu .admin-alerta-precio {
+      -moz-appearance: textfield;
+      appearance: textfield;
+    }
+
+    /* Botón editar oferta en listado (solo se renderiza si hay sesión admin) */
+    #x6 .product-card-outer .admin-oferta-editar {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2rem;
+      height: 2rem;
+      border-radius: 0;
+      background: #374151;
+      color: #fff;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+      transition: background-color 0.15s ease;
+    }
+    #x6 .product-card-outer .admin-oferta-editar:hover {
+      background: #4b5563;
+      color: #fff;
+    }
+    #x6 .product-card-outer .product-card {
+      padding-right: 2.75rem;
+    }
+
     .kk-u-alert button[type="submit"] {
       border-radius: 10px !important;
       background: linear-gradient(135deg, var(--kk-u-brand) 0%, #f59e0b 100%) !important;
@@ -1400,9 +1460,6 @@
   {{-- BARRA DE ADMINISTRACIÓN (solo si está logueado) --}}
   @auth
   @php
-    // Obtener todas las ofertas del producto para el desplegable
-    $todasLasOfertas = $producto->ofertas()->orderBy('id')->get();
-
     $correoAlertasAdmin = 'alvarolopezjimenez91@gmail.com';
     $alertasPrecioAdmin = \App\Models\CorreoAvisoPrecio::query()
         ->where('correo', $correoAlertasAdmin)
@@ -1429,30 +1486,62 @@
         Ofertas
       </a>
 
+
+      {{-- Botón Añadir oferta --}}
+      <a href="{{ route('admin.ofertas.create', ['producto' => $producto->id]) }}" 
+         target="_blank"
+         class="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded transition-colors">
+        + Añadir oferta
+      </a>
+
       {{-- Alertas de precio (correo fijo) --}}
       <div class="relative" id="admin-alertas-dropdown">
         <button id="admin-alertas-btn" type="button"
                 class="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded transition-colors flex items-center gap-1">
-          Alertas ({{ $numAlertasPrecioAdmin }})
+          Alertas (<span id="admin-alertas-count">{{ $numAlertasPrecioAdmin }}</span>)
           <svg id="admin-alertas-icon" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
           </svg>
         </button>
         <div id="admin-alertas-menu"
-             class="absolute top-full left-0 mt-1 bg-gray-800 rounded shadow-lg min-w-[280px] max-w-md hidden z-[60]">
-          <div class="py-1 max-h-96 overflow-y-auto">
+             class="absolute top-full left-0 mt-1 bg-gray-800 rounded shadow-lg hidden z-[60]">
+          <div id="admin-alertas-list" class="py-1 max-h-96 overflow-y-auto">
             @forelse($alertasPrecioAdmin as $alertaAdmin)
               @php
                 $especsLegibles = $alertaPrecioController->especificacionesAgrupadasLegibles($alertaAdmin);
               @endphp
-              <div class="px-4 py-3 border-b border-gray-700 last:border-b-0 text-left">
-                <div class="font-medium text-white">
-                  Precio límite: {{ number_format($alertaAdmin->precio_limite, 2, ',', '.') }} €
+              <div class="admin-alerta-item px-4 py-3 border-b border-gray-700 last:border-b-0 text-left"
+                   data-alert-id="{{ $alertaAdmin->id }}">
+                <div class="admin-alerta-row">
+                  <div>
+                    <label class="block text-xs text-gray-400 mb-1">Precio límite (€)</label>
+                    <input type="number"
+                           step="0.01"
+                           min="0"
+                           class="admin-alerta-precio"
+                           value="{{ number_format($alertaAdmin->precio_limite, 2, '.', '') }}">
+                  </div>
+                  <div class="flex gap-1 flex-shrink-0 pb-0.5">
+                    <button type="button"
+                            class="admin-alerta-guardar w-8 h-8 rounded-none flex items-center justify-center bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
+                            title="Guardar precio">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                      </svg>
+                    </button>
+                    <button type="button"
+                            class="admin-alerta-eliminar w-8 h-8 rounded-none flex items-center justify-center bg-red-600 hover:bg-red-500 text-white transition-colors"
+                            title="Eliminar alerta">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                      </svg>
+                    </button>
+                  </div>
                 </div>
                 @if($alertaAdmin->confirmado === 'si')
-                  <div class="text-xs text-green-400 mt-0.5">Confirmada</div>
+                  <div class="text-xs text-green-400 mt-1.5">Confirmada</div>
                 @else
-                  <div class="text-xs text-amber-300 mt-0.5">Pendiente de confirmación</div>
+                  <div class="text-xs text-amber-300 mt-1.5">Pendiente de confirmación</div>
                 @endif
                 @if(!empty($especsLegibles))
                   <ul class="mt-2 text-xs text-gray-300 space-y-1 list-none pl-0">
@@ -1468,47 +1557,13 @@
                 @endif
               </div>
             @empty
-              <div class="px-4 py-2 text-gray-400">
+              <div id="admin-alertas-empty" class="px-4 py-2 text-gray-400">
                 No hay avisos para este producto con {{ $correoAlertasAdmin }}
               </div>
             @endforelse
           </div>
         </div>
       </div>
-
-      {{-- Desplegable de ofertas --}}
-      <div class="relative" id="admin-ofertas-dropdown">
-        <button id="admin-ofertas-btn" 
-                class="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded transition-colors flex items-center gap-1">
-          Editar ofertas
-          <svg id="admin-ofertas-icon" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-          </svg>
-        </button>
-        <div id="admin-ofertas-menu" 
-             class="absolute top-full left-0 mt-1 bg-gray-800 rounded shadow-lg min-w-[250px] hidden">
-          <div class="py-1 max-h-96 overflow-y-auto">
-            @forelse($todasLasOfertas as $oferta)
-              <a href="{{ route('admin.ofertas.edit', $oferta) }}" 
-                 target="_blank"
-                 class="block px-4 py-2 hover:bg-gray-700 transition-colors">
-                Id {{ $oferta->id }}
-              </a>
-            @empty
-              <div class="px-4 py-2 text-gray-400">
-                No hay ofertas
-              </div>
-            @endforelse
-          </div>
-        </div>
-      </div>
-
-      {{-- Botón Añadir oferta --}}
-      <a href="{{ route('admin.ofertas.create', ['producto' => $producto->id]) }}" 
-         target="_blank"
-         class="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded transition-colors">
-        + Añadir oferta
-      </a>
 
       {{-- Botón Estadísticas (a la derecha) --}}
       <a href="{{ route('admin.productos.estadisticas', $producto) }}" 
@@ -1519,7 +1574,7 @@
     </div>
   </div>
   <script>
-    {{-- Mejorar el comportamiento del desplegable (ofertas y alertas) --}}
+    {{-- Mejorar el comportamiento del desplegable de alertas --}}
     document.addEventListener('DOMContentLoaded', function() {
       function setupAdminDropdown(btnId, menuId, iconId, dropdownId) {
         const btn = document.getElementById(btnId);
@@ -1561,8 +1616,116 @@
         });
       }
       setupAdminDropdown('admin-alertas-btn', 'admin-alertas-menu', 'admin-alertas-icon', 'admin-alertas-dropdown');
-      setupAdminDropdown('admin-ofertas-btn', 'admin-ofertas-menu', 'admin-ofertas-icon', 'admin-ofertas-dropdown');
+
+      const adminAlertasCsrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+      const adminAlertasBaseUrl = @json(url('/panel-privado/alertas-precio'));
+      const adminAlertasCorreo = @json($correoAlertasAdmin);
+
+      function actualizarContadorAlertasAdmin() {
+        const countEl = document.getElementById('admin-alertas-count');
+        const items = document.querySelectorAll('.admin-alerta-item');
+        if (countEl) countEl.textContent = String(items.length);
+        const list = document.getElementById('admin-alertas-list');
+        const empty = document.getElementById('admin-alertas-empty');
+        if (list && !empty && items.length === 0) {
+          const msg = document.createElement('div');
+          msg.id = 'admin-alertas-empty';
+          msg.className = 'px-4 py-2 text-gray-400';
+          msg.textContent = 'No hay avisos para este producto con ' + adminAlertasCorreo;
+          list.appendChild(msg);
+        }
+      }
+
+      function setupAdminAlertasAcciones() {
+        document.querySelectorAll('.admin-alerta-item').forEach(function(item) {
+          const alertId = item.dataset.alertId;
+          const input = item.querySelector('.admin-alerta-precio');
+          const btnGuardar = item.querySelector('.admin-alerta-guardar');
+          const btnEliminar = item.querySelector('.admin-alerta-eliminar');
+          if (!alertId || !input || !btnGuardar || !btnEliminar) return;
+
+          [btnGuardar, btnEliminar, input].forEach(function(el) {
+            el.addEventListener('click', function(e) { e.stopPropagation(); });
+          });
+
+          btnGuardar.addEventListener('click', async function() {
+            const precio = parseFloat(String(input.value).replace(',', '.'));
+            if (Number.isNaN(precio) || precio < 0) {
+              alert('Introduce un precio válido.');
+              return;
+            }
+            btnGuardar.disabled = true;
+            btnGuardar.classList.add('opacity-50');
+            try {
+              const res = await fetch(adminAlertasBaseUrl + '/' + alertId, {
+                method: 'PATCH',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/json',
+                  'X-CSRF-TOKEN': adminAlertasCsrf,
+                },
+                body: JSON.stringify({ precio_limite: precio }),
+              });
+              const data = await res.json().catch(function() { return {}; });
+              if (!res.ok || !data.success) {
+                throw new Error(data.message || 'No se pudo guardar el precio.');
+              }
+              input.classList.add('ring-2', 'ring-emerald-500');
+              setTimeout(function() {
+                input.classList.remove('ring-2', 'ring-emerald-500');
+              }, 1200);
+            } catch (err) {
+              alert(err.message || 'Error al guardar.');
+            } finally {
+              btnGuardar.disabled = false;
+              btnGuardar.classList.remove('opacity-50');
+            }
+          });
+
+          btnEliminar.addEventListener('click', async function() {
+            if (!confirm('¿Eliminar esta alerta de precio? Esta acción no se puede deshacer.')) {
+              return;
+            }
+            btnEliminar.disabled = true;
+            btnEliminar.classList.add('opacity-50');
+            try {
+              const res = await fetch(adminAlertasBaseUrl + '/' + alertId, {
+                method: 'DELETE',
+                headers: {
+                  'Accept': 'application/json',
+                  'X-CSRF-TOKEN': adminAlertasCsrf,
+                },
+              });
+              const data = await res.json().catch(function() { return {}; });
+              if (!res.ok || !data.success) {
+                throw new Error(data.message || 'No se pudo eliminar la alerta.');
+              }
+              item.remove();
+              actualizarContadorAlertasAdmin();
+            } catch (err) {
+              alert(err.message || 'Error al eliminar.');
+              btnEliminar.disabled = false;
+              btnEliminar.classList.remove('opacity-50');
+            }
+          });
+        });
+      }
+
+      setupAdminAlertasAcciones();
     });
+  </script>
+  <script>
+    (function() {
+      const adminOfertaEditBase = @json(url('/panel-privado/ofertas'));
+      window._aoe1 = function(ofertaId) {
+        if (!ofertaId) return '';
+        const url = adminOfertaEditBase + '/' + ofertaId + '/edit';
+        return '<a href="' + url + '" target="_blank" rel="noopener" class="admin-oferta-editar" title="Editar oferta" onclick="event.stopPropagation();">' +
+          '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">' +
+          '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>' +
+          '</svg></a>';
+      };
+    })();
   </script>
   @endauth
 
@@ -4810,6 +4973,10 @@
                 }
                 
                 html += `
+                  @auth
+                  <div class="product-card-outer relative">
+                    <div class="admin-oferta-editar-slot absolute right-2 top-1/2 -translate-y-1/2 z-20">${window._aoe1(primeraOferta.id)}</div>
+                  @endauth
                   <a href="${primeraOferta.url}" target="_blank" rel="sponsored noopener noreferrer" class="product-card block bg-white rounded-lg shadow py-2 px-4 sm:px-6 grid ${gridColsMovil} ${gridCols} gap-2 sm:gap-4 sm:items-center card-hover hover:shadow-md">
                     <div class="logo flex items-center justify-center divider min-w-0 overflow-hidden ${ordenLogo}">
                       <img src="${primeraOferta.logo}" loading="lazy" alt="${primeraOferta.nombre}" class="w-full max-w-[130px] sm:h-[45px] h-[36px] object-contain">
@@ -4859,6 +5026,9 @@
                       ${botonHtml}
                     </div>
                   </a>
+                  @auth
+                  </div>
+                  @endauth
                 `;
                 
                 if (esMejorOferta) {
@@ -5015,6 +5185,10 @@
                   }
                   
                   html += `
+                    @auth
+                    <div class="product-card-outer relative">
+                      <div class="admin-oferta-editar-slot absolute right-2 top-1/2 -translate-y-1/2 z-20">${window._aoe1(itemGrupo.id)}</div>
+                    @endauth
                     <a href="${itemGrupo.url}" target="_blank" rel="sponsored noopener noreferrer" class="product-card block bg-white rounded-lg shadow py-2 px-4 sm:px-6 grid ${gridColsMovil} ${gridCols} gap-2 sm:gap-4 sm:items-center card-hover hover:shadow-md">
                       <div class="logo flex items-center justify-center divider min-w-0 overflow-hidden ${ordenLogo}">
                         <img src="${itemGrupo.logo}" loading="lazy" alt="${itemGrupo.nombre}" class="w-full max-w-[130px] sm:h-[45px] h-[36px] object-contain">
@@ -5116,6 +5290,9 @@
                   }
                       </div>
                     </a>
+                    @auth
+                    </div>
+                    @endauth
                   `;
                     });
                   
@@ -5256,6 +5433,10 @@
                 }
                 
                 html += `
+                  @auth
+                  <div class="product-card-outer relative">
+                    <div class="admin-oferta-editar-slot absolute right-2 top-1/2 -translate-y-1/2 z-20">${window._aoe1(item.id)}</div>
+                  @endauth
                   <a href="${item.url}" target="_blank" rel="sponsored noopener noreferrer" class="product-card block bg-white rounded-lg shadow py-2 px-4 sm:px-6 grid ${gridColsMovil} ${gridCols} gap-2 sm:gap-4 sm:items-center card-hover hover:shadow-md">
                     <div class="logo flex items-center justify-center divider min-w-0 overflow-hidden ${ordenLogo}">
                       <img src="${item.logo}" loading="lazy" alt="${item.nombre}" class="w-full max-w-[130px] sm:h-[45px] h-[36px] object-contain">
@@ -5305,6 +5486,9 @@
                       ${botonHtml}
                     </div>
                   </a>
+                  @auth
+                  </div>
+                  @endauth
                 `;
                 
                 ofertasRenderizadas.push({

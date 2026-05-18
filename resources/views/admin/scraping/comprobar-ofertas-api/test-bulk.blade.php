@@ -13,7 +13,10 @@
         <!-- Panel de Control -->
         <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 border border-gray-200 dark:border-gray-700">
             <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-4">Configuración de Testing Masivo</h3>
-            <p class="text-gray-600 dark:text-gray-400 mb-6">Configura los criterios para buscar ofertas y ejecutar pruebas masivas de API.</p>
+            <p class="text-gray-600 dark:text-gray-400 mb-2">Configura los criterios para buscar ofertas y ejecutar pruebas masivas de API.</p>
+            <p class="text-sm text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg px-4 py-3 mb-6">
+                Solo se incluyen ofertas sin chollo vinculado. La comprobación no crea avisos de sin stock ni cambia el estado «mostrar» automáticamente.
+            </p>
             
             <form id="formConfiguracion" class="space-y-4">
                 @csrf
@@ -49,10 +52,10 @@
                         <label for="limite_ofertas" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Límite de Ofertas (opcional)
                         </label>
-                        <input type="number" id="limite_ofertas" name="limite_ofertas" min="1"
+                        <input type="number" id="limite_ofertas" name="limite_ofertas" min="1" max="5000"
                             class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
                             placeholder="Dejar vacío para todas las ofertas">
-                        <p class="text-xs text-gray-500 mt-1">Deja vacío para procesar todas las ofertas que cumplan los criterios</p>
+                        <p class="text-xs text-gray-500 mt-1">Deja vacío para traer todas las ofertas que cumplan los criterios (máx. 5000)</p>
                     </div>
                     
                     <div>
@@ -106,11 +109,20 @@
                     </div>
                 </div>
                 
-                <div class="flex gap-4">
+                <div class="flex flex-wrap items-end gap-4">
                     <button type="button" id="btnEjecutarTodo"
                         class="bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-3 rounded-md shadow-md transition">
                         ▶️ Ejecutar Todo
                     </button>
+                    <div>
+                        <label for="limite_comprobar_ejecucion" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Nº ofertas a comprobar
+                        </label>
+                        <input type="number" id="limite_comprobar_ejecucion" name="limite_comprobar_ejecucion" min="1"
+                            class="w-36 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 dark:bg-gray-700 dark:text-white"
+                            placeholder="Todas">
+                        <p class="text-xs text-gray-500 mt-1">Vacío = todas las encontradas</p>
+                    </div>
                     <button type="button" id="btnPausar" onclick="pausarEjecucion()"
                         class="bg-yellow-600 hover:bg-yellow-700 text-white font-semibold px-6 py-3 rounded-md shadow-md transition hidden">
                         ⏸️ Pausar
@@ -169,6 +181,7 @@
 
     <script>
         let ofertasEncontradas = [];
+        let ofertasParaEjecutar = [];
         let ofertasProcesadas = 0;
         let ofertasConPrecio = 0;
         let ofertasConError = 0;
@@ -176,10 +189,41 @@
         let ejecutando = false;
         let pausado = false;
 
+        function headersJson() {
+            return {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                'X-Requested-With': 'XMLHttpRequest',
+            };
+        }
+
+        async function parseJsonResponse(response) {
+            const text = await response.text();
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                const preview = text.substring(0, 200).replace(/\s+/g, ' ').trim();
+                throw new Error(`Respuesta no JSON (HTTP ${response.status}): ${preview || response.statusText}`);
+            }
+        }
+
+        function ofertasAProcesar() {
+            const limite = document.getElementById('limite_comprobar_ejecucion').value.trim();
+            if (!limite) {
+                return ofertasEncontradas;
+            }
+            const n = parseInt(limite, 10);
+            if (isNaN(n) || n < 1) {
+                return ofertasEncontradas;
+            }
+            return ofertasEncontradas.slice(0, n);
+        }
+
         document.getElementById('btnBuscarOfertas').addEventListener('click', buscarOfertas);
         document.getElementById('btnEjecutarTodo').addEventListener('click', ejecutarTodo);
 
-        function buscarOfertas() {
+        async function buscarOfertas() {
             const tienda = document.getElementById('tienda').value;
             const mostrar = document.getElementById('mostrar').value;
             const limiteOfertas = document.getElementById('limite_ofertas').value;
@@ -197,35 +241,36 @@
             document.getElementById('loadingBusqueda').classList.remove('hidden');
             document.getElementById('infoOfertas').classList.add('hidden');
             
-            // Realizar petición AJAX
-            fetch('{{ route("admin.scraping.comprobar-ofertas-api.buscar") }}', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                },
-                body: JSON.stringify({
-                    tienda: tienda,
-                    mostrar: mostrar,
-                    limite_ofertas: limiteOfertas,
-                    tiempo_entre_peticiones: tiempoEntrePeticiones
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
+            const body = {
+                tienda: tienda,
+                mostrar: mostrar,
+                tiempo_entre_peticiones: tiempoEntrePeticiones,
+            };
+            if (limiteOfertas) {
+                body.limite_ofertas = parseInt(limiteOfertas, 10);
+            }
+
+            try {
+                const response = await fetch('{{ route("admin.scraping.comprobar-ofertas-api.buscar") }}', {
+                    method: 'POST',
+                    headers: headersJson(),
+                    body: JSON.stringify(body),
+                });
+                const data = await parseJsonResponse(response);
                 document.getElementById('loadingBusqueda').classList.add('hidden');
-                
-                if (data.success) {
-                    ofertasEncontradas = data.ofertas;
-                    mostrarInfoOfertas(data);
-                } else {
-                    mostrarError('Error al buscar ofertas: ' + (data.error || 'Error desconocido'));
+
+                if (!response.ok || !data.success) {
+                    mostrarError('Error al buscar ofertas: ' + (data.error || data.message || `HTTP ${response.status}`));
+                    return;
                 }
-            })
-            .catch(error => {
+
+                ofertasEncontradas = data.ofertas || [];
+                ofertasParaEjecutar = [];
+                mostrarInfoOfertas(data);
+            } catch (error) {
                 document.getElementById('loadingBusqueda').classList.add('hidden');
-                mostrarError('Error de conexión: ' + error.message);
-            });
+                mostrarError(error.message);
+            }
         }
 
         function mostrarInfoOfertas(data) {
@@ -237,7 +282,9 @@
         }
 
         function ejecutarTodo() {
-            if (ofertasEncontradas.length === 0) {
+            ofertasParaEjecutar = ofertasAProcesar();
+
+            if (ofertasParaEjecutar.length === 0) {
                 alert('No hay ofertas para procesar.');
                 return;
             }
@@ -266,14 +313,14 @@
         }
 
         function procesarSiguienteOferta() {
-            if (!ejecutando || pausado || ofertasProcesadas >= ofertasEncontradas.length) {
-                if (ofertasProcesadas >= ofertasEncontradas.length) {
+            if (!ejecutando || pausado || ofertasProcesadas >= ofertasParaEjecutar.length) {
+                if (ofertasProcesadas >= ofertasParaEjecutar.length) {
                     finalizarEjecucion();
                 }
                 return;
             }
             
-            const oferta = ofertasEncontradas[ofertasProcesadas];
+            const oferta = ofertasParaEjecutar[ofertasProcesadas];
             procesarOferta(oferta);
         }
 
@@ -289,21 +336,19 @@
             // Realizar petición AJAX con timeout
             fetch('{{ route("admin.scraping.comprobar-ofertas-api.procesar") }}', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                },
+                headers: headersJson(),
                 body: JSON.stringify({
                     oferta_id: oferta.id
                 }),
                 signal: controller.signal
             })
-            .then(response => {
+            .then(async response => {
                 clearTimeout(timeoutId);
-                if (!response.ok) {
+                const data = await parseJsonResponse(response);
+                if (!response.ok && !data.error) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
-                return response.json();
+                return data;
             })
             .then(data => {
                 ofertasProcesadas++;
@@ -472,7 +517,7 @@
             document.getElementById('totalErrores').textContent = ofertasConError;
             
             // Calcular tiempo restante
-            const ofertasRestantes = ofertasEncontradas.length - ofertasProcesadas;
+            const ofertasRestantes = ofertasParaEjecutar.length - ofertasProcesadas;
             const tiempoRestante = ofertasRestantes * tiempoEntrePeticiones;
             document.getElementById('tiempoRestante').textContent = tiempoRestante > 0 ? `${tiempoRestante}s` : '-';
         }
@@ -511,6 +556,7 @@
             document.getElementById('listaResultados').innerHTML = '';
             
             ofertasEncontradas = [];
+            ofertasParaEjecutar = [];
             ofertasProcesadas = 0;
             ofertasConPrecio = 0;
             ofertasConError = 0;
@@ -584,21 +630,18 @@
             
             fetch('{{ route("admin.scraping.comprobar-ofertas-api.guardar-precio") }}', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                },
+                headers: headersJson(),
                 body: JSON.stringify({
                     oferta_id: ofertaId,
                     precio: precio
                 })
             })
-            .then(response => {
-                console.log('Respuesta recibida:', response.status, response.statusText);
-                if (!response.ok) {
+            .then(async response => {
+                const data = await parseJsonResponse(response);
+                if (!response.ok && !data.error) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
-                return response.json();
+                return data;
             })
             .then(data => {
                 console.log('Datos recibidos:', data);
@@ -662,15 +705,18 @@
             // Realizar petición para obtener avisos
             fetch('{{ route("admin.scraping.comprobar-ofertas-api.avisos") }}', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                },
+                headers: headersJson(),
                 body: JSON.stringify({
                     oferta_id: ofertaId
                 })
             })
-            .then(response => response.json())
+            .then(async response => {
+                const data = await parseJsonResponse(response);
+                if (!response.ok && !data.success) {
+                    throw new Error(data.error || `HTTP ${response.status}`);
+                }
+                return data;
+            })
             .then(data => {
                 // Restaurar botón
                 botonAvisos.innerHTML = originalContent;

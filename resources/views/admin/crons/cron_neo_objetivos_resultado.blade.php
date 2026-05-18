@@ -216,12 +216,48 @@
             @endif
         @endif
 
+        @if (!empty($ejecucion) && (($logNeoObjetivos['origen'] ?? '') === 'programa_externo'))
+            @php
+                $pe = is_array($logNeoObjetivos['programa_externo'] ?? null) ? $logNeoObjetivos['programa_externo'] : [];
+                $peModo = $pe['modo'] ?? '—';
+                $peStats = is_array($pe['estadisticas'] ?? null) ? $pe['estadisticas'] : [];
+                $peLineas = is_array($pe['lineas_log'] ?? null) ? $pe['lineas_log'] : [];
+            @endphp
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border-l-4 border-indigo-500">
+                <h2 class="font-semibold text-lg mb-2">Programa externo Neo</h2>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                    Esta ejecución se registró desde el programa de escritorio (mismo histórico que el cron).
+                    Modo: <strong>{{ $peModo }}</strong>
+                </p>
+                @if (!empty($peStats))
+                    <div class="text-sm text-gray-700 dark:text-gray-300 mb-3 overflow-x-auto">
+                        <table class="min-w-full border border-gray-200 dark:border-gray-600 text-left">
+                            <tbody>
+                                @foreach ($peStats as $k => $v)
+                                    <tr class="border-b border-gray-100 dark:border-gray-700">
+                                        <td class="py-1 pr-4 font-medium text-gray-500 dark:text-gray-400">{{ $k }}</td>
+                                        <td class="py-1">{{ $v }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+                @if (!empty($peLineas))
+                    <h3 class="font-semibold text-base mb-1">Log del programa</h3>
+                    <pre class="text-xs whitespace-pre-wrap break-words max-h-[32rem] overflow-y-auto p-3 bg-gray-100 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-600">{{ implode("\n", array_map(static fn ($ln) => is_string($ln) ? $ln : '', $peLineas)) }}</pre>
+                @endif
+            </div>
+        @endif
+
+        @if (($logNeoObjetivos['origen'] ?? '') !== 'programa_externo')
         <p class="text-gray-600 dark:text-gray-400">
             Filas con visitada &gt; 7 días y URL de rama «neo»: <strong>{{ $total_filas_neo }}</strong>
         </p>
+        @endif
 
         {{-- Rama categoria_tienda --}}
-        @if (isset($total_filas_categoria_tienda) && (int) $total_filas_categoria_tienda > 0)
+        @if (($logNeoObjetivos['origen'] ?? '') !== 'programa_externo' && isset($total_filas_categoria_tienda) && (int) $total_filas_categoria_tienda > 0)
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border-l-4 border-amber-500">
                 <h2 class="font-semibold text-lg mb-2">Rama categoria_tienda</h2>
                 <p class="text-sm text-gray-600 dark:text-gray-400">
@@ -417,6 +453,7 @@
             </div>
         @endif
 
+        @if (($logNeoObjetivos['origen'] ?? '') !== 'programa_externo')
         @if (empty($resultados))
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
                 <p class="text-gray-600 dark:text-gray-400">No se encontraron URLs para procesar o no se realizó ninguna petición al VPS.</p>
@@ -545,6 +582,7 @@
                 </div>
             @endforeach
         @endif
+        @endif
 
         @if (!empty($ejecucion))
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-blue-200 dark:border-blue-800">
@@ -574,7 +612,7 @@
             </div>
         @endif
 
-        @if (isset($neo_backfill_tienda_por_url) && is_array($neo_backfill_tienda_por_url))
+        @if (($logNeoObjetivos['origen'] ?? '') !== 'programa_externo' && isset($neo_backfill_tienda_por_url) && is_array($neo_backfill_tienda_por_url))
             @php $nbT = $neo_backfill_tienda_por_url; @endphp
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border-l-4 border-indigo-500 mt-4">
                 <h2 class="font-semibold text-lg mb-2">Neo: tienda por URL (al final del cron)</h2>

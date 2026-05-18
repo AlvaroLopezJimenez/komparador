@@ -50,6 +50,17 @@ Route::get('/precios-historicos/{productoId}', [App\Http\Controllers\ProductoCon
 // Programa externo Neo (token NEO_API_PROGRAMA_EXTERNO: Bearer o cabecera X-Neo-Programa-Token)
 Route::middleware(['neo.programa.externo', 'throttle:120,1'])->prefix('neo-programa-externo')->group(function () {
     Route::get('/neoobjetivos-rama-neo', [App\Http\Controllers\Api\NeoApiProgramaExternoController::class, 'neoobjetivosRamaNeoPendientes']);
+    Route::get('/neoobjetivos-categoria-tienda', [App\Http\Controllers\Api\NeoApiProgramaExternoController::class, 'neoobjetivosCategoriaTiendaPendientes']);
+    Route::post('/procesar-html-categoria-tienda', [App\Http\Controllers\Api\NeoApiProgramaExternoController::class, 'procesarHtmlCategoriaTienda']);
+    Route::post('/registrar-ejecucion-fin', [App\Http\Controllers\Api\NeoApiProgramaExternoController::class, 'registrarEjecucionFin']);
     Route::post('/comprobar-neo-neo', [App\Http\Controllers\Api\NeoApiProgramaExternoController::class, 'comprobarExisteNeoNeo']);
     Route::post('/sincronizar-neo', [App\Http\Controllers\Api\NeoApiProgramaExternoController::class, 'sincronizarNeo']);
+});
+
+// Programa externo scraping ofertas (navegador local; mismo token NEO_API_PROGRAMA_EXTERNO)
+Route::middleware(['neo.programa.externo', 'throttle:120,1'])->prefix('scraping-programa-externo')->group(function () {
+    Route::get('/ofertas-pendientes', [App\Http\Controllers\Api\ApiProgramaExternoController::class, 'ofertasPendientes']);
+    Route::get('/probar-conexion', [App\Http\Controllers\Api\ApiProgramaExternoController::class, 'probarConexion']);
+    Route::post('/procesar-html-oferta', [App\Http\Controllers\Api\ApiProgramaExternoController::class, 'procesarHtmlOferta']);
+    Route::post('/registrar-ejecucion-fin', [App\Http\Controllers\Api\ApiProgramaExternoController::class, 'registrarEjecucionFin']);
 });

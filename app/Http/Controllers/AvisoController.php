@@ -733,8 +733,16 @@ class AvisoController extends Controller
         }
     }
 
-    public function aplazarCorreoSieteDias(Aviso $aviso)
+    /**
+     * «No enviar»: no manda correo, actualiza ultimo_envio_correo de la suscripción
+     * (misma lógica que antes salvo el aplazamiento) y elimina el aviso.
+     */
+    public function descartarAvisoCorreoSinEnviar(Aviso $aviso)
     {
+        if ($aviso->user_id !== auth()->id() && auth()->id() !== 1) {
+            abort(403, 'No tienes permisos para gestionar este aviso');
+        }
+
         if ($aviso->avisoable_type !== CorreoAvisoPrecio::class) {
             return response()->json([
                 'success' => false,
@@ -754,12 +762,11 @@ class AvisoController extends Controller
         $suscripcion->ultimo_envio_correo = now();
         $suscripcion->save();
 
-        $aviso->fecha_aviso = now()->addDays(7);
-        $aviso->save();
+        $aviso->delete();
 
         return response()->json([
             'success' => true,
-            'message' => 'Aviso aplazado 7 días correctamente'
+            'message' => 'Aviso eliminado sin enviar correo'
         ]);
     }
 

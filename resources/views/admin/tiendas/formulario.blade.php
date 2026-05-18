@@ -167,6 +167,9 @@
                             <option value="amazonPricing" {{ old('api', $tienda->api) == 'amazonPricing' ? 'selected' : '' }}>
                                 Amazon Pricing And Product Info API - RapidAPI
                             </option>
+                            <option value="navegadorLocal" {{ old('api', $tienda->api) == 'navegadorLocal' ? 'selected' : '' }}>
+                                Navegador local (programa externo)
+                            </option>
                         </select>
                         @error('api')
                         <p class="text-sm text-red-500 mt-1">{{ $message }}</p>

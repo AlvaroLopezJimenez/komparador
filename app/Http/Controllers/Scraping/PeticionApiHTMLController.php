@@ -8,6 +8,9 @@ use Illuminate\Support\Facades\Http;
 
 class PeticionApiHTMLController extends Controller
 {
+    /** HTML enviado por el programa externo (una petición por oferta). */
+    private static ?string $htmlInyectado = null;
+
     /** PROVEEDOR PREFERIDO: 'bright_unlocker' | 'scrapingant' | 'scrapestack' */
     private $apiProveedorPreferido;
 
@@ -60,6 +63,16 @@ class PeticionApiHTMLController extends Controller
     private $cloudflareAccountId;
     private $cloudflareApiToken;
 
+    public static function setHtmlInyectado(?string $html): void
+    {
+        self::$htmlInyectado = $html;
+    }
+
+    public static function clearHtmlInyectado(): void
+    {
+        self::$htmlInyectado = null;
+    }
+
     public function __construct()
     {
         $this->apiProveedorPreferido = env('SCRAPING_PROVEEDOR_PREFERIDO', 'bright_unlocker');
@@ -99,6 +112,24 @@ class PeticionApiHTMLController extends Controller
      */
     public function obtenerHTML(string $url, ?string $forzarProveedor = null, ?string $apiTienda = null, ?string $vpsCargarMasSelector = null): array
     {
+        if (self::$htmlInyectado !== null && self::$htmlInyectado !== '') {
+            $html = self::$htmlInyectado;
+            self::$htmlInyectado = null;
+
+            return [
+                'success'   => true,
+                'html'      => "<!-- PROVEEDOR: NAVEGADOR_LOCAL -->\n" . $html,
+                'proveedor' => 'navegador_local',
+            ];
+        }
+
+        if ($apiTienda && strtolower($apiTienda) === 'navegadorlocal') {
+            return [
+                'success' => false,
+                'error'   => 'Esta tienda usa navegador local; el HTML debe enviarse desde el programa externo (API scraping-programa-externo).',
+            ];
+        }
+
         $host = strtolower(parse_url($url, PHP_URL_HOST) ?: '');
 
         if ($apiTienda) {
@@ -1187,6 +1218,7 @@ class PeticionApiHTMLController extends Controller
         $k = strtolower($apiTienda);
 
         if ($k === 'aliexpressopen') return 'aliexpress_open';
+        if ($k === 'navegadorlocal') return 'navegador_local';
         if ($k === 'cloudflare') return 'cloudflare';
         if ($k === 'amazonapi') return 'amazon_api';
         if ($k === 'amazonproductinfo') return 'amazon_product_info';

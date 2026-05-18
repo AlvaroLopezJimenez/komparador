@@ -54,20 +54,31 @@ class BixotoController extends PlantillaTiendaController
     }
 
     /**
-     * Sin stock si no aparece en el HTML el marcador de disponible:
-     * <span class="... icon-check ..."></span>Disponible</p>
-     * El sufijo scoped (sv-*) puede variar; fallback a la cadena exacta con sv-1crakpk.
+     * Sin stock si no aparece el marcador de ficha: <span>Disponible</span>
+     * (solo ese texto dentro del span; no cuenta "Envío express disponible" en otros nodos).
+     * Fallback legacy: <span class="... icon-check ..."></span>Disponible</p>
      */
     private function esSinStock(string $html): bool
     {
-        $tieneDisponible =
-            (bool) preg_match(
+        return !$this->tieneMarcadorDisponibleBixoto($html);
+    }
+
+    private function tieneMarcadorDisponibleBixoto(string $html): bool
+    {
+        if (preg_match('~<span[^>]*>\s*Disponible\s*</span>~i', $html)) {
+            return true;
+        }
+
+        if (
+            preg_match(
                 '~<span[^>]*\bclass=(["\'])[^"\']*\bicon-check\b[^"\']*\1[^>]*>\s*</span>\s*Disponible\s*</p>~i',
                 $html
             )
-            || strpos($html, '<span class="icon icon-check sv-1crakpk"></span>Disponible</p>') !== false;
+        ) {
+            return true;
+        }
 
-        return !$tieneDisponible;
+        return strpos($html, '<span class="icon icon-check sv-1crakpk"></span>Disponible</p>') !== false;
     }
 
     /**

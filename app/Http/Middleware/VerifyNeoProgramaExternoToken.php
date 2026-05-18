@@ -15,12 +15,14 @@ class VerifyNeoProgramaExternoToken
             abort(503, 'Token programa externo Neo no configurado.');
         }
 
-        $token = $request->bearerToken();
-        if ($token === null || $token === '') {
-            $token = (string) $request->header('X-Neo-Programa-Token', '');
-        }
+        $bearer = $request->bearerToken();
+        $bearer = $bearer !== null ? trim((string) $bearer) : '';
+        $xNeo = trim((string) $request->header('X-Neo-Programa-Token', ''));
 
-        if ($token === '' || !hash_equals($expected, $token)) {
+        // Válido si coincide el Bearer o la cabecera X (Cloudflare/proxies a veces alteran Authorization).
+        $okBearer = $bearer !== '' && hash_equals($expected, $bearer);
+        $okX = $xNeo !== '' && hash_equals($expected, $xNeo);
+        if (!$okBearer && !$okX) {
             abort(401, 'No autorizado.');
         }
 

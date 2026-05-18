@@ -1237,6 +1237,39 @@ Este correo es solo para notificaciones de precios. No será utilizado para publ
     }
 
     /**
+     * Actualizar precio límite de una alerta (panel admin en comparador).
+     */
+    public function adminActualizarPrecio(Request $request, CorreoAvisoPrecio $alerta)
+    {
+        $validated = $request->validate([
+            'precio_limite' => 'required|numeric|min:0',
+        ]);
+
+        $alerta->update([
+            'precio_limite' => $validated['precio_limite'],
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'precio_limite' => number_format((float) $alerta->precio_limite, 2, ',', '.'),
+            'message' => 'Precio actualizado correctamente.',
+        ]);
+    }
+
+    /**
+     * Eliminar una alerta de precio (panel admin en comparador).
+     */
+    public function adminEliminar(CorreoAvisoPrecio $alerta)
+    {
+        $alerta->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Alerta eliminada correctamente.',
+        ]);
+    }
+
+    /**
      * Obtener la unidad de medida formateada
      */
     private function obtenerUnidadMedida($unidadDeMedida)
