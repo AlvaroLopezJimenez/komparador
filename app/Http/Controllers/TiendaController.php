@@ -19,16 +19,34 @@ class TiendaController extends Controller
     public function index(Request $request)
     {
         $perPage = $request->input('perPage', 25);
+        $mostrar = $request->input('mostrar', ['si']);
+        $mostrarParaVista = $mostrar;
 
-        $query = \App\Models\Tienda::withCount('ofertas');
+        $query = \App\Models\Tienda::withCount([
+            'ofertas',
+            'ofertas as ofertas_mostrar_si_count' => function ($q) {
+                $q->where('mostrar', 'si');
+            },
+        ]);
 
         if ($request->filled('buscar')) {
             $query->where('nombre', 'like', '%' . $request->buscar . '%');
         }
 
+        if (!empty($mostrar)) {
+            $query->whereIn('mostrar_tienda', $mostrar);
+        }
+
         $tiendas = $query->paginate($perPage)->appends($request->query());
 
-        return view('admin.tiendas.index', compact('tiendas', 'perPage'));
+        $tiendasSinNeoobjetivoPorCategoria = $this->obtenerTiendasVisiblesConCategoriasSinNeoobjetivo();
+
+        return view('admin.tiendas.index', compact(
+            'tiendas',
+            'perPage',
+            'mostrarParaVista',
+            'tiendasSinNeoobjetivoPorCategoria'
+        ));
     }
 
     /**
@@ -40,8 +58,7 @@ class TiendaController extends Controller
         return view('admin.tiendas.formulario', [
             'tienda' => new Tienda(),
             'categorias' => $categorias,
-            'urlsCategoria' => collect(),
-            'visitadasCategoria' => collect(),
+            'neoobjetivosPorCategoria' => collect(),
             'tipoListadoCategoria' => null,
             'mensajeControlador' => null,
             'mensajeTipoListado' => null,
@@ -76,7 +93,7 @@ class TiendaController extends Controller
             'frecuencia_minima_unidad' => 'required|in:minutos,horas,dias',
             'frecuencia_maxima_valor' => 'required|numeric|min:0.1',
             'frecuencia_maxima_unidad' => 'required|in:minutos,horas,dias',
-            'visitada_categoria.*' => 'nullable|date',
+            'urls_categoria.*.*.visitada' => 'nullable|date',
         ]);
         
         // Convertir frecuencia mínima a minutos
@@ -169,11 +186,9 @@ class TiendaController extends Controller
             ->whereNull('producto_id')
             ->get();
 
-        $urlsCategoria = $neoobjetivosCategoria->pluck('url', 'categoria_id');
-        $visitadasCategoria = $neoobjetivosCategoria
-            ->mapWithKeys(function ($neo) {
-                return [$neo->categoria_id => optional($neo->visitada)?->format('Y-m-d\TH:i')];
-            });
+        $neoobjetivosPorCategoria = $neoobjetivosCategoria
+            ->sortBy('id')
+            ->groupBy('categoria_id');
 
         $mensajeControlador = null;
         $tipoListadoCategoria = null;
@@ -249,8 +264,7 @@ class TiendaController extends Controller
         }
 
         return view('admin.tiendas.formulario', compact(
-            'tienda', 'categorias', 'urlsCategoria',
-            'visitadasCategoria',
+            'tienda', 'categorias', 'neoobjetivosPorCategoria',
             'tipoListadoCategoria', 'mensajeControlador', 'mensajeTipoListado',
             'categoriasSinNeoobjetivo', 'categoriasAncestrosSinNeo',
             'conteoTotalOfertas'
@@ -284,7 +298,7 @@ class TiendaController extends Controller
             'frecuencia_minima_unidad' => 'required|in:minutos,horas,dias',
             'frecuencia_maxima_valor' => 'required|numeric|min:0.1',
             'frecuencia_maxima_unidad' => 'required|in:minutos,horas,dias',
-            'visitada_categoria.*' => 'nullable|date',
+            'urls_categoria.*.*.visitada' => 'nullable|date',
         ]);
         
         // Convertir frecuencia mínima a minutos
@@ -352,7 +366,7 @@ class TiendaController extends Controller
             ->selectRaw('productos.categoria_id as cat_id')
             ->distinct()
             ->pluck('cat_id');
-        $urlsEnviadas = $request->has('urls_categoria') ? collect(array_keys(array_filter($request->input('urls_categoria', [])))) : collect();
+        $urlsEnviadas = $this->categoriasConUrlEnRequest($request);
         $categoriasConNeoobjetivoActual = Neoobjetivo::where('tienda_id', $tienda->id)
             ->whereNull('oferta_id')
             ->whereNull('producto_id')
@@ -383,47 +397,204 @@ class TiendaController extends Controller
     }
 
     /**
-     * Guarda o actualiza en Neoobjetivo las URLs por categoría (solo tienda_id + categoria_id, resto null).
-     * visitada = 7 días antes del momento de guardar; si ya existe el registro se actualiza, no se crea uno nuevo.
+     * IDs de categorías con al menos una URL de listado rellena en el formulario.
+     */
+    private function categoriasConUrlEnRequest(Request $request): \Illuminate\Support\Collection
+    {
+        $urlsPorCategoria = $request->input('urls_categoria', []);
+        if (!is_array($urlsPorCategoria)) {
+            return collect();
+        }
+
+        $categorias = collect();
+        foreach ($urlsPorCategoria as $categoriaId => $lineas) {
+            if (!is_array($lineas)) {
+                continue;
+            }
+            foreach ($lineas as $linea) {
+                if (!is_array($linea)) {
+                    continue;
+                }
+                $url = is_string($linea['url'] ?? null) ? trim($linea['url']) : '';
+                if ($url !== '') {
+                    $categorias->push((int) $categoriaId);
+                    break;
+                }
+            }
+        }
+
+        return $categorias->unique()->values();
+    }
+
+    /**
+     * Guarda o actualiza en Neoobjetivo las URLs por categoría (varias filas por categoría posibles).
      */
     private function guardarUrlsCategoriaNeoobjetivo(Request $request, Tienda $tienda): void
     {
-        $urls = $request->input('urls_categoria', []);
-        $visitadas = $request->input('visitada_categoria', []);
-        if (!is_array($urls)) {
+        $urlsPorCategoria = $request->input('urls_categoria', []);
+        if (!is_array($urlsPorCategoria)) {
             return;
         }
-        foreach ($urls as $categoriaId => $url) {
-            $url = is_string($url) ? trim($url) : '';
-            if ($url === '') {
+
+        foreach ($urlsPorCategoria as $categoriaId => $lineas) {
+            if (!is_array($lineas)) {
                 continue;
             }
 
-            $visitada = now()->subDays(7);
-            $visitadaInput = $visitadas[$categoriaId] ?? null;
-            if (is_string($visitadaInput) && trim($visitadaInput) !== '') {
-                try {
-                    $visitada = Carbon::parse($visitadaInput);
-                } catch (\Throwable $e) {
-                    $visitada = now()->subDays(7);
-                }
-            }
+            $categoriaId = (int) $categoriaId;
+            $idsMantener = [];
 
-            Neoobjetivo::updateOrCreate(
-                [
+            foreach ($lineas as $linea) {
+                if (!is_array($linea)) {
+                    continue;
+                }
+
+                $url = is_string($linea['url'] ?? null) ? trim($linea['url']) : '';
+                if ($url === '') {
+                    continue;
+                }
+
+                $visitada = $this->parsearVisitadaCategoria($linea['visitada'] ?? null);
+                $neoId = !empty($linea['id']) ? (int) $linea['id'] : null;
+
+                if ($neoId) {
+                    $neo = Neoobjetivo::where('id', $neoId)
+                        ->where('tienda_id', $tienda->id)
+                        ->where('categoria_id', $categoriaId)
+                        ->whereNull('oferta_id')
+                        ->whereNull('producto_id')
+                        ->first();
+
+                    if ($neo) {
+                        $neo->update([
+                            'url' => $url,
+                            'visitada' => $visitada,
+                            'oferta_id' => null,
+                            'producto_id' => null,
+                        ]);
+                        $idsMantener[] = $neo->id;
+                        continue;
+                    }
+                }
+
+                $neo = Neoobjetivo::create([
                     'tienda_id' => $tienda->id,
-                    'categoria_id' => (int) $categoriaId,
+                    'categoria_id' => $categoriaId,
                     'oferta_id' => null,
                     'producto_id' => null,
-                ],
-                [
                     'url' => $url,
                     'visitada' => $visitada,
-                    'oferta_id' => null,
-                    'producto_id' => null,
-                ]
-            );
+                ]);
+                $idsMantener[] = $neo->id;
+            }
+
+            $query = Neoobjetivo::where('tienda_id', $tienda->id)
+                ->where('categoria_id', $categoriaId)
+                ->whereNull('oferta_id')
+                ->whereNull('producto_id');
+
+            if (count($idsMantener) > 0) {
+                $query->whereNotIn('id', $idsMantener);
+            }
+
+            $query->delete();
         }
+    }
+
+    private function parsearVisitadaCategoria(mixed $visitadaInput): Carbon
+    {
+        if (is_string($visitadaInput) && trim($visitadaInput) !== '') {
+            try {
+                return Carbon::parse($visitadaInput);
+            } catch (\Throwable $e) {
+                // fallback
+            }
+        }
+
+        return now()->subDays(7);
+    }
+
+    /**
+     * Tiendas visibles con categorías que tienen ofertas activas pero sin URL de listado en Neoobjetivo.
+     *
+     * @return list<array{tienda: Tienda, categorias: \Illuminate\Support\Collection<int, Categoria>}>
+     */
+    private function obtenerTiendasVisiblesConCategoriasSinNeoobjetivo(): array
+    {
+        $tiendasVisibles = Tienda::query()
+            ->where('mostrar_tienda', 'si')
+            ->orderBy('nombre')
+            ->get(['id', 'nombre']);
+
+        if ($tiendasVisibles->isEmpty()) {
+            return [];
+        }
+
+        $tiendaIds = $tiendasVisibles->pluck('id');
+
+        $categoriasRequeridasPorTienda = OfertaProducto::query()
+            ->join('productos', 'ofertas_producto.producto_id', '=', 'productos.id')
+            ->whereIn('ofertas_producto.tienda_id', $tiendaIds)
+            ->where('ofertas_producto.mostrar', 'si')
+            ->whereNotNull('productos.categoria_id')
+            ->selectRaw('ofertas_producto.tienda_id as tienda_id, productos.categoria_id as categoria_id')
+            ->distinct()
+            ->get()
+            ->groupBy('tienda_id')
+            ->map(fn ($filas) => $filas->pluck('categoria_id')->unique()->values());
+
+        $categoriasConNeoPorTienda = Neoobjetivo::query()
+            ->whereIn('tienda_id', $tiendaIds)
+            ->whereNull('oferta_id')
+            ->whereNull('producto_id')
+            ->selectRaw('tienda_id, categoria_id')
+            ->distinct()
+            ->get()
+            ->groupBy('tienda_id')
+            ->map(fn ($filas) => $filas->pluck('categoria_id')->unique()->values());
+
+        $categoriaIdsSinNeo = collect();
+        $avisos = [];
+
+        foreach ($tiendasVisibles as $tienda) {
+            $requeridas = $categoriasRequeridasPorTienda->get($tienda->id, collect());
+            if ($requeridas->isEmpty()) {
+                continue;
+            }
+
+            $conNeo = $categoriasConNeoPorTienda->get($tienda->id, collect());
+            $sinNeoIds = $requeridas->diff($conNeo)->values();
+
+            if ($sinNeoIds->isEmpty()) {
+                continue;
+            }
+
+            $categoriaIdsSinNeo = $categoriaIdsSinNeo->merge($sinNeoIds);
+            $avisos[] = [
+                'tienda' => $tienda,
+                'categoria_ids' => $sinNeoIds,
+            ];
+        }
+
+        if ($avisos === []) {
+            return [];
+        }
+
+        $nombresCategorias = Categoria::query()
+            ->whereIn('id', $categoriaIdsSinNeo->unique()->values())
+            ->orderBy('nombre')
+            ->get(['id', 'nombre'])
+            ->keyBy('id');
+
+        return array_map(function (array $aviso) use ($nombresCategorias) {
+            $aviso['categorias'] = $aviso['categoria_ids']
+                ->map(fn ($id) => $nombresCategorias->get($id))
+                ->filter()
+                ->values();
+            unset($aviso['categoria_ids']);
+
+            return $aviso;
+        }, $avisos);
     }
 
     /**

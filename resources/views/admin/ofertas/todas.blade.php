@@ -24,6 +24,10 @@
                 class="bg-pink-500 text-white px-4 py-2 rounded hover:bg-pink-600">
                 Crear masivo Neo
             </a>
+            <a href="{{ route('admin.neo.crear-masivo-ia') }}"
+                class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">
+                IA
+            </a>
             <a href="{{ route('admin.neo.index') }}"
                 class="bg-pink-500 text-white px-4 py-2 rounded hover:bg-pink-600">
                 Listado Neo

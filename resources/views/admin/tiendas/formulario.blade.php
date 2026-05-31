@@ -60,7 +60,7 @@
                     <div>
                         <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">Envío normal</label>
                         <input type="text" name="envio_normal"
-                            value="{{ old('envio_normal', $tienda->envio_normal) }}" required
+                            value="{{ old('envio_normal', $tienda->envio_normal) }}"
                             class="w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border">
                     </div>
 
@@ -349,17 +349,54 @@
                     </p>
                 @endif
 
+                <p class="text-sm text-gray-500 dark:text-gray-400">Puedes añadir varias URLs de listado por categoría con los botones + y −.</p>
+
+                <style>
+                    .url-categoria-linea-grid {
+                        display: grid;
+                        width: 100%;
+                        align-items: center;
+                        column-gap: 0.5rem;
+                        row-gap: 0.25rem;
+                        grid-template-columns: 1.75rem 14rem minmax(0, 1fr) 13rem 1.75rem 1.75rem;
+                    }
+                </style>
+
                 <div id="arbol-urls-categoria" class="space-y-3">
                     @php
-                        $urlsCategoria = $urlsCategoria ?? collect();
-                        $visitadasCategoria = $visitadasCategoria ?? collect();
+                        $neoobjetivosPorCategoria = $neoobjetivosPorCategoria ?? collect();
                         $categoriasSinNeoobjetivo = $categoriasSinNeoobjetivo ?? collect();
                         $categoriasAncestrosSinNeo = $categoriasAncestrosSinNeo ?? collect();
                         $conteoTotalOfertas = $conteoTotalOfertas ?? [];
-                        $renderCategorias = function($categorias, $urlsCategoria, $visitadasCategoria, $categoriasSinNeoobjetivo, $categoriasAncestrosSinNeo, $conteoTotalOfertas, $nivel = 0, $padreId = null) use (&$renderCategorias) {
+                        $renderCategorias = function($categorias, $neoobjetivosPorCategoria, $categoriasSinNeoobjetivo, $categoriasAncestrosSinNeo, $conteoTotalOfertas, $nivel = 0) use (&$renderCategorias) {
                             foreach ($categorias as $categoria) {
-                                $valor = old("urls_categoria.{$categoria->id}", $urlsCategoria[$categoria->id] ?? '');
-                                $visitadaValor = old("visitada_categoria.{$categoria->id}", $visitadasCategoria[$categoria->id] ?? '');
+                                $oldLineas = old("urls_categoria.{$categoria->id}");
+                                if (is_array($oldLineas)) {
+                                    $lineasUrl = collect($oldLineas)->values()->map(function ($linea) {
+                                        return [
+                                            'id' => is_array($linea) ? ($linea['id'] ?? '') : '',
+                                            'url' => is_array($linea) ? ($linea['url'] ?? '') : '',
+                                            'visitada' => is_array($linea) ? ($linea['visitada'] ?? '') : '',
+                                        ];
+                                    });
+                                } else {
+                                    $neos = $neoobjetivosPorCategoria->get($categoria->id, collect());
+                                    if ($neos->isEmpty()) {
+                                        $lineasUrl = collect([['id' => '', 'url' => '', 'visitada' => '']]);
+                                    } else {
+                                        $lineasUrl = $neos->map(function ($neo) {
+                                            return [
+                                                'id' => $neo->id,
+                                                'url' => $neo->url ?? '',
+                                                'visitada' => $neo->visitada ? $neo->visitada->format('Y-m-d\TH:i') : '',
+                                            ];
+                                        })->values();
+                                    }
+                                }
+                                if ($lineasUrl->isEmpty()) {
+                                    $lineasUrl = collect([['id' => '', 'url' => '', 'visitada' => '']]);
+                                }
+
                                 $hasChildren = $categoria->children && $categoria->children->count();
                                 $margin = $nivel * 4;
                                 $sinNeo = $categoriasSinNeoobjetivo->contains($categoria->id);
@@ -369,43 +406,55 @@
 
                     <div
                         class="js-categoria-row ml-{{ $margin }} {{ $sinNeo ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded p-2' : '' }}"
+                        data-categoria-id="{{ $categoria->id }}"
                         data-sin-neo-inicial="{{ $sinNeo ? '1' : '0' }}"
                         x-data="{ open{{ $categoria->id }}: false }"
                     >
-                        <div class="flex items-center gap-2">
-                            @if($hasChildren)
-                                <button type="button"
-                                    @click="open{{ $categoria->id }} = !open{{ $categoria->id }}"
-                                    class="w-7 h-7 flex items-center justify-center text-white bg-pink-600 hover:bg-pink-700 rounded-full transition"
-                                    :aria-label="open{{ $categoria->id }} ? 'Contraer' : 'Expandir'">
-                                    <span x-text="open{{ $categoria->id }} ? '-' : '+'"></span>
-                                </button>
-                            @else
-                                <span class="w-7 h-7 inline-block"></span>
-                            @endif
-
-                            <label class="flex items-center gap-2 text-sm font-medium flex-1 min-w-0">
-                                <span class="js-categoria-nombre flex-shrink-0 {{ $sinNeo ? 'text-red-700 dark:text-red-300' : ($esAncestro ? 'text-red-600 dark:text-red-400' : 'text-gray-800 dark:text-gray-200') }}">{{ $categoria->nombre }} <span class="text-gray-500 dark:text-gray-400 font-normal">({{ $numOfertas }})</span></span>
-                                <input
-                                    type="url"
-                                    name="urls_categoria[{{ $categoria->id }}]"
-                                    data-id="{{ $categoria->id }}"
-                                    placeholder="https://..."
-                                    class="url-categoria-input js-url-categoria flex-1 min-w-0 px-2 py-1 bg-gray-100 dark:bg-gray-700 text-white border rounded {{ $sinNeo ? 'border-red-500' : '' }}"
-                                    value="{{ $valor }}"
-                                >
+                        <div class="js-urls-categoria-lineas space-y-2 w-full" data-categoria-id="{{ $categoria->id }}" data-siguiente-indice="{{ $lineasUrl->count() }}">
+                            @php foreach ($lineasUrl as $idx => $linea): @endphp
+                            <div class="js-url-categoria-linea url-categoria-linea-grid">
+                                @if($idx === 0)
+                                    @if($hasChildren)
+                                        <button type="button"
+                                            @click="open{{ $categoria->id }} = !open{{ $categoria->id }}"
+                                            class="w-7 h-7 justify-self-center flex items-center justify-center text-white bg-pink-600 hover:bg-pink-700 rounded-full transition shrink-0"
+                                            :aria-label="open{{ $categoria->id }} ? 'Contraer' : 'Expandir'">
+                                            <span x-text="open{{ $categoria->id }} ? '-' : '+'"></span>
+                                        </button>
+                                    @else
+                                        <span class="w-7 h-7 block shrink-0" aria-hidden="true"></span>
+                                    @endif
+                                    <span class="js-categoria-nombre text-sm font-medium leading-tight break-words {{ $sinNeo ? 'text-red-700 dark:text-red-300' : ($esAncestro ? 'text-red-600 dark:text-red-400' : 'text-gray-800 dark:text-gray-200') }}">{{ $categoria->nombre }} <span class="text-gray-500 dark:text-gray-400 font-normal">({{ $numOfertas }})</span></span>
+                                @else
+                                    <span class="w-7 h-7 block shrink-0" aria-hidden="true"></span>
+                                    <span class="block" aria-hidden="true"></span>
+                                @endif
+                                <div class="min-w-0">
+                                    <input type="hidden" name="urls_categoria[{{ $categoria->id }}][{{ $idx }}][id]" value="{{ $linea['id'] }}">
+                                    <input
+                                        type="url"
+                                        name="urls_categoria[{{ $categoria->id }}][{{ $idx }}][url]"
+                                        data-id="{{ $categoria->id }}"
+                                        placeholder="https://..."
+                                        class="url-categoria-input js-url-categoria w-full px-2 py-1 bg-gray-100 dark:bg-gray-700 text-white border rounded {{ $sinNeo ? 'border-red-500' : '' }}"
+                                        value="{{ $linea['url'] }}"
+                                    >
+                                </div>
                                 <input
                                     type="datetime-local"
-                                    name="visitada_categoria[{{ $categoria->id }}]"
-                                    class="w-52 max-w-full px-2 py-1 bg-gray-100 dark:bg-gray-700 text-white border rounded text-sm"
-                                    value="{{ $visitadaValor }}"
+                                    name="urls_categoria[{{ $categoria->id }}][{{ $idx }}][visitada]"
+                                    class="js-visitada-categoria w-full min-w-0 px-2 py-1 bg-gray-100 dark:bg-gray-700 text-white border rounded text-sm"
+                                    value="{{ $linea['visitada'] }}"
                                 >
-                            </label>
+                                <button type="button" class="btn-eliminar-url-categoria w-7 h-7 flex items-center justify-center bg-red-500 hover:bg-red-600 text-white rounded text-sm shrink-0" title="Eliminar línea">−</button>
+                                <button type="button" class="btn-añadir-url-categoria w-7 h-7 flex items-center justify-center bg-green-500 hover:bg-green-600 text-white rounded text-sm shrink-0" title="Añadir línea debajo">+</button>
+                            </div>
+                            @php endforeach; @endphp
                         </div>
 
                         @if ($hasChildren)
                             <div class="space-y-2 mt-2 ml-4" x-show="open{{ $categoria->id }}" x-cloak>
-                                @php $renderCategorias($categoria->children, $urlsCategoria, $visitadasCategoria, $categoriasSinNeoobjetivo, $categoriasAncestrosSinNeo, $conteoTotalOfertas, $nivel + 1, $categoria->id); @endphp
+                                @php $renderCategorias($categoria->children, $neoobjetivosPorCategoria, $categoriasSinNeoobjetivo, $categoriasAncestrosSinNeo, $conteoTotalOfertas, $nivel + 1); @endphp
                             </div>
                         @endif
                     </div>
@@ -413,9 +462,90 @@
                     @php
                             }
                         };
-                        $renderCategorias($categorias, $urlsCategoria, $visitadasCategoria, $categoriasSinNeoobjetivo, $categoriasAncestrosSinNeo, $conteoTotalOfertas);
+                        $renderCategorias($categorias, $neoobjetivosPorCategoria, $categoriasSinNeoobjetivo, $categoriasAncestrosSinNeo, $conteoTotalOfertas);
                     @endphp
                 </div>
+
+                <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    const arbol = document.getElementById('arbol-urls-categoria');
+                    if (!arbol) return;
+
+                    function siguienteIndice(contenedor) {
+                        const actual = parseInt(contenedor.dataset.siguienteIndice || '0', 10);
+                        contenedor.dataset.siguienteIndice = String(actual + 1);
+                        return actual;
+                    }
+
+                    function crearLineaUrlCategoria(contenedor, categoriaId, idx, url = '', visitada = '', neoId = '') {
+                        const div = document.createElement('div');
+                        div.className = 'js-url-categoria-linea url-categoria-linea-grid';
+                        const filaCategoria = contenedor.closest('.js-categoria-row');
+                        const sinNeo = filaCategoria && filaCategoria.dataset.sinNeoInicial === '1';
+                        const borderUrl = sinNeo ? 'border-red-500' : '';
+                        const urlEsc = url.replace(/"/g, '&quot;');
+
+                        div.innerHTML = `
+                            <span class="w-7 h-7 block shrink-0" aria-hidden="true"></span>
+                            <span class="block" aria-hidden="true"></span>
+                            <div class="min-w-0">
+                                <input type="hidden" name="urls_categoria[${categoriaId}][${idx}][id]" value="${neoId}">
+                                <input type="url" name="urls_categoria[${categoriaId}][${idx}][url]" data-id="${categoriaId}" placeholder="https://..."
+                                    class="url-categoria-input js-url-categoria w-full px-2 py-1 bg-gray-100 dark:bg-gray-700 text-white border rounded ${borderUrl}" value="${urlEsc}">
+                            </div>
+                            <input type="datetime-local" name="urls_categoria[${categoriaId}][${idx}][visitada]"
+                                class="js-visitada-categoria w-full min-w-0 px-2 py-1 bg-gray-100 dark:bg-gray-700 text-white border rounded text-sm" value="${visitada}">
+                            <button type="button" class="btn-eliminar-url-categoria w-7 h-7 flex items-center justify-center bg-red-500 hover:bg-red-600 text-white rounded text-sm shrink-0" title="Eliminar línea">−</button>
+                            <button type="button" class="btn-añadir-url-categoria w-7 h-7 flex items-center justify-center bg-green-500 hover:bg-green-600 text-white rounded text-sm shrink-0" title="Añadir línea debajo">+</button>
+                        `;
+
+                        const urlInput = div.querySelector('.js-url-categoria');
+                        if (urlInput) {
+                            urlInput.addEventListener('input', function() {
+                                document.dispatchEvent(new CustomEvent('url-categoria-cambiada'));
+                            });
+                            urlInput.addEventListener('change', function() {
+                                document.dispatchEvent(new CustomEvent('url-categoria-cambiada'));
+                            });
+                        }
+
+                        return div;
+                    }
+
+                    arbol.addEventListener('click', function(e) {
+                        const btnAñadir = e.target.closest('.btn-añadir-url-categoria');
+                        const btnEliminar = e.target.closest('.btn-eliminar-url-categoria');
+                        if (!btnAñadir && !btnEliminar) return;
+
+                        const linea = e.target.closest('.js-url-categoria-linea');
+                        const contenedor = e.target.closest('.js-urls-categoria-lineas');
+                        if (!linea || !contenedor) return;
+
+                        const categoriaId = contenedor.dataset.categoriaId;
+
+                        if (btnAñadir) {
+                            const idx = siguienteIndice(contenedor);
+                            const nuevaLinea = crearLineaUrlCategoria(contenedor, categoriaId, idx);
+                            linea.insertAdjacentElement('afterend', nuevaLinea);
+                            nuevaLinea.querySelector('.js-url-categoria')?.focus();
+                            return;
+                        }
+
+                        const lineas = contenedor.querySelectorAll('.js-url-categoria-linea');
+                        if (lineas.length <= 1) {
+                            linea.querySelector('.js-url-categoria').value = '';
+                            linea.querySelector('input[type="hidden"]')?.setAttribute('value', '');
+                            const visitada = linea.querySelector('.js-visitada-categoria');
+                            if (visitada) visitada.value = '';
+                            document.dispatchEvent(new CustomEvent('url-categoria-cambiada'));
+                            return;
+                        }
+
+                        linea.remove();
+                        document.dispatchEvent(new CustomEvent('url-categoria-cambiada'));
+                    });
+                });
+                </script>
             </fieldset>
 
 
@@ -517,13 +647,18 @@
                     var hayFilasConIncidencia = filasCategorias.length > 0;
 
                     function filaTieneUrl(fila) {
-                        var input = fila.querySelector('.js-url-categoria');
-                        return !!(input && input.value && input.value.trim() !== '');
+                        var inputs = fila.querySelectorAll('.js-url-categoria');
+                        for (var j = 0; j < inputs.length; j++) {
+                            if (inputs[j].value && inputs[j].value.trim() !== '') {
+                                return true;
+                            }
+                        }
+                        return false;
                     }
 
                     function aplicarEstadoVisualFila(fila, resuelta) {
                         var nombre = fila.querySelector('.js-categoria-nombre');
-                        var input = fila.querySelector('.js-url-categoria');
+                        var inputs = fila.querySelectorAll('.js-url-categoria');
 
                         if (resuelta) {
                             fila.classList.remove('bg-red-50', 'dark:bg-red-900/20', 'border', 'border-red-200', 'dark:border-red-800', 'rounded', 'p-2');
@@ -531,20 +666,22 @@
                                 nombre.classList.remove('text-red-700', 'dark:text-red-300');
                                 nombre.classList.add('text-gray-800', 'dark:text-gray-200');
                             }
-                            if (input) {
+                            inputs.forEach(function(input) {
                                 input.classList.remove('border-red-500');
-                            }
+                            });
                         } else {
                             fila.classList.add('bg-red-50', 'dark:bg-red-900/20', 'border', 'border-red-200', 'dark:border-red-800', 'rounded', 'p-2');
                             if (nombre) {
                                 nombre.classList.add('text-red-700', 'dark:text-red-300');
                                 nombre.classList.remove('text-gray-800', 'dark:text-gray-200');
                             }
-                            if (input) {
+                            inputs.forEach(function(input) {
                                 input.classList.add('border-red-500');
-                            }
+                            });
                         }
                     }
+
+                    var arbolUrls;
 
                     function quedanRojas() {
                         if (!hayFilasConIncidencia) return false;
@@ -567,19 +704,34 @@
                         }
                     }
 
+                    function refrescarFila(fila) {
+                        aplicarEstadoVisualFila(fila, filaTieneUrl(fila));
+                        actualizarBoton();
+                    }
+
                     filasCategorias.forEach(function(fila) {
-                        var input = fila.querySelector('.js-url-categoria');
-                        if (!input) return;
-
-                        function refrescarFila() {
-                            aplicarEstadoVisualFila(fila, filaTieneUrl(fila));
-                            actualizarBoton();
-                        }
-
-                        input.addEventListener('input', refrescarFila);
-                        input.addEventListener('change', refrescarFila);
-                        refrescarFila();
+                        refrescarFila(fila);
                     });
+
+                    document.addEventListener('url-categoria-cambiada', function() {
+                        filasCategorias.forEach(refrescarFila);
+                    });
+
+                    arbolUrls = document.getElementById('arbol-urls-categoria');
+                    if (arbolUrls) {
+                        arbolUrls.addEventListener('input', function(e) {
+                            if (e.target.classList.contains('js-url-categoria')) {
+                                var fila = e.target.closest('.js-categoria-row');
+                                if (fila) refrescarFila(fila);
+                            }
+                        });
+                        arbolUrls.addEventListener('change', function(e) {
+                            if (e.target.classList.contains('js-url-categoria')) {
+                                var fila = e.target.closest('.js-categoria-row');
+                                if (fila) refrescarFila(fila);
+                            }
+                        });
+                    }
 
                     checkbox.addEventListener('change', actualizarBoton);
                     actualizarBoton();

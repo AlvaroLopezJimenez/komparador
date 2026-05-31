@@ -154,16 +154,18 @@ public function todasCategorias()
     // $categoriasPadre -> $c1, $subcategorias -> $sc1, $productos -> $pr1, $ultimosProductos -> $up1, $preciosHot -> $ph1
     // categoriaActual -> ca1, breadcrumb -> b1
     $c1 = Categoria::whereNull('parent_id')
+        ->visibles()
         ->with(['subcategorias' => function ($query) {
-            $query->orderBy('nombre');
+            $query->visibles()->orderBy('nombre');
         }])
         ->orderBy('nombre')
         ->get();
 
     // Generar lista completa de subcategorías hijas para la vista
     $sc1 = Categoria::whereIn('parent_id', $c1->pluck('id'))
+        ->visibles()
         ->with(['subcategorias' => function ($query) {
-            $query->orderBy('nombre');
+            $query->visibles()->orderBy('nombre');
         }])
         ->orderBy('clicks', 'desc')
         ->get();
@@ -202,7 +204,7 @@ public function todasCategorias()
 {
     // $categoriaActual -> $ca1
     $ca1 = Categoria::where('slug', $slug)->first();
-    if (!$ca1) {
+    if (!$ca1 || $ca1->mostrar !== 'si') {
         return redirect()->route('categorias.todas');
     }
 
@@ -221,8 +223,9 @@ public function todasCategorias()
     // SUBCATEGORÍAS
     // $subcategorias -> $sc1
     $sc1 = Categoria::where('parent_id', $ca1->id)
+        ->visibles()
         ->with(['subcategorias' => function ($query) {
-            $query->orderBy('nombre');
+            $query->visibles()->orderBy('nombre');
         }])
         ->orderBy('clicks', 'desc')
         ->get();

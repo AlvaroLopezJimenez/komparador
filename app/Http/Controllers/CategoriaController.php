@@ -13,8 +13,37 @@ class CategoriaController extends Controller
     {
         $todasCategorias = Categoria::orderBy('nombre')->get();
         $categoriasRaiz = Categoria::categoriasRaizConConteosAdministracion();
+        $categoriasSinImagen = $this->obtenerCategoriasSinImagen();
 
-        return view('admin.categorias.index', compact('todasCategorias', 'categoriasRaiz'));
+        return view('admin.categorias.index', compact('todasCategorias', 'categoriasRaiz', 'categoriasSinImagen'));
+    }
+
+    /**
+     * Categorías sin ruta de imagen configurada (para aviso en el listado admin).
+     *
+     * @return \Illuminate\Support\Collection<int, array{categoria: Categoria, ruta: string}>
+     */
+    private function obtenerCategoriasSinImagen()
+    {
+        return Categoria::query()
+            ->where(function ($q) {
+                $q->whereNull('imagen')
+                    ->orWhere('imagen', '')
+                    ->orWhereRaw("TRIM(imagen) = ''");
+            })
+            ->orderBy('nombre')
+            ->get()
+            ->map(function (Categoria $categoria) {
+                $ruta = collect($categoria->obtenerBreadcrumb())
+                    ->pluck('nombre')
+                    ->join(' › ');
+
+                return [
+                    'categoria' => $categoria,
+                    'ruta' => $ruta !== '' ? $ruta : $categoria->nombre,
+                ];
+            })
+            ->values();
     }
 
     public function create()
@@ -61,6 +90,7 @@ class CategoriaController extends Controller
             'slug' => 'nullable|string|max:255',
             'parent_id' => 'nullable|exists:categorias,id',
             'imagen' => 'nullable|string|max:255',
+            'mostrar' => 'required|in:si,no',
             'especificaciones_internas' => 'nullable|string',
             'info_adicional_chatgpt' => 'nullable|string',
         ], [
@@ -86,6 +116,7 @@ class CategoriaController extends Controller
             'slug' => $slug,
             'parent_id' => $request->parent_id,
             'imagen' => $request->imagen,
+            'mostrar' => $request->mostrar,
             'especificaciones_internas' => $especificacionesInternas,
             'info_adicional_chatgpt' => $request->info_adicional_chatgpt,
         ]);
@@ -107,6 +138,7 @@ class CategoriaController extends Controller
             'slug' => 'nullable|string|max:255',
             'parent_id' => 'nullable|exists:categorias,id',
             'imagen' => 'nullable|string|max:255',
+            'mostrar' => 'required|in:si,no',
             'especificaciones_internas' => 'nullable|string',
             'info_adicional_chatgpt' => 'nullable|string',
         ]);
@@ -132,6 +164,7 @@ class CategoriaController extends Controller
             'slug' => $slug,
             'parent_id' => $request->parent_id,
             'imagen' => $request->imagen,
+            'mostrar' => $request->mostrar,
             'especificaciones_internas' => $especificacionesInternas,
             'info_adicional_chatgpt' => $request->info_adicional_chatgpt,
         ]);

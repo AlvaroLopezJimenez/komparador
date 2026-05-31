@@ -281,6 +281,121 @@ class ImagenController extends Controller
     }
 
     /**
+     * Listar imágenes recientes de todo el almacén (pestaña Interna Global).
+     */
+    public function ultimasGlobales(Request $request)
+    {
+        try {
+            $limit = min(60, max(1, (int) $request->input('limit', 15)));
+            $offset = max(0, (int) $request->input('offset', 0));
+            $q = trim((string) $request->input('q', ''));
+            $tokens = $this->parseTokensBusquedaImagen($q);
+
+            $extensionesValidas = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+            $imagenes = [];
+
+            foreach (Storage::disk('web_images')->allFiles() as $rutaRelativa) {
+                $nombre = basename($rutaRelativa);
+                if (stripos($nombre, '-thumbnail') !== false) {
+                    continue;
+                }
+
+                $extension = strtolower(pathinfo($nombre, PATHINFO_EXTENSION));
+                if (!in_array($extension, $extensionesValidas, true)) {
+                    continue;
+                }
+
+                if ($tokens && !$this->rutaImagenCoincideTokens($rutaRelativa, $tokens)) {
+                    continue;
+                }
+
+                $rutaPequena = $this->inferirRutaThumbnail($rutaRelativa);
+                if (!Storage::disk('web_images')->exists($rutaPequena)) {
+                    $rutaPequena = $rutaRelativa;
+                }
+
+                $imagenes[] = [
+                    'nombre' => $nombre,
+                    'ruta' => $rutaRelativa,
+                    'ruta_grande' => $rutaRelativa,
+                    'ruta_pequena' => $rutaPequena,
+                    'url' => Storage::disk('web_images')->url($rutaRelativa),
+                    'url_pequena' => Storage::disk('web_images')->url($rutaPequena),
+                    'fecha_modificacion' => Storage::disk('web_images')->lastModified($rutaRelativa),
+                ];
+            }
+
+            usort($imagenes, function ($a, $b) {
+                return $b['fecha_modificacion'] <=> $a['fecha_modificacion'];
+            });
+
+            $total = count($imagenes);
+            $pagina = array_slice($imagenes, $offset, $limit);
+
+            return response()->json([
+                'success' => true,
+                'data' => array_values($pagina),
+                'total' => $total,
+                'offset' => $offset,
+                'limit' => $limit,
+                'has_more' => ($offset + $limit) < $total,
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Error en ultimasGlobales: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al listar imágenes: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    private function parseTokensBusquedaImagen(string $q): array
+    {
+        if ($q === '') {
+            return [];
+        }
+
+        $tokens = [];
+        foreach (preg_split('/\s+/u', $q, -1, PREG_SPLIT_NO_EMPTY) ?: [] as $t) {
+            $t = trim(trim($t), '-');
+            if ($t !== '') {
+                $tokens[] = $t;
+            }
+        }
+
+        return array_values(array_unique($tokens));
+    }
+
+    private function rutaImagenCoincideTokens(string $ruta, array $tokens): bool
+    {
+        $haystack = mb_strtolower($ruta . ' ' . basename($ruta));
+        foreach ($tokens as $token) {
+            if (!str_contains($haystack, mb_strtolower($token))) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function inferirRutaThumbnail(string $rutaGrande): string
+    {
+        $lastDot = strrpos($rutaGrande, '.');
+        if ($lastDot === false) {
+            return $rutaGrande . '-thumbnail';
+        }
+
+        $base = substr($rutaGrande, 0, $lastDot);
+        $ext = substr($rutaGrande, $lastDot);
+        if (str_ends_with($base, '-thumbnail')) {
+            return $rutaGrande;
+        }
+
+        return $base . '-thumbnail' . $ext;
+    }
+
+    /**
      * Obtener las carpetas de imágenes disponibles
      */
     public function carpetasDisponibles()

@@ -56,17 +56,18 @@ class CasekingController extends PlantillaTiendaController
     }
 
     /**
-     * Bloque bonus-products + "Regalo incluido con este artículo" → +Juego, salvo exclusiones
-     * por palabras clave en el texto del bloque (véase bonusProductsCasekingExcluyeMasJuegoPorPalabrasClave).
+     * Bloque bonus-products + "Regalo incluido con este artículo" → +Juego si hay al menos un
+     * ítem listado que no sea cupón digital genérico (tarjeta Steam, msi.com, etc.).
+     * No se comprueba el nombre del juego (cambia cada mes).
      */
     private function detectarYGuardarDescuentoJuegoCaseking(string $html, OfertaProducto $oferta): void
     {
         $textoBonus = $this->extraerTextoBloqueBonusProducts($html);
         $regaloIncluidoDetectado = $this->detectarBloqueRegaloIncluido($html, $textoBonus);
-        $excluirPorPalabrasClave = $textoBonus !== '' && $this->bonusProductsCasekingExcluyeMasJuegoPorPalabrasClave($textoBonus);
+        $tieneRegaloJuegoValido = $this->casekingBonusTieneAlgunRegaloJuegoNoExcluido($html);
 
         $descuentoAnterior = $oferta->descuentos;
-        $descuentoNuevo = ($regaloIncluidoDetectado && !$excluirPorPalabrasClave) ? '+Juego' : null;
+        $descuentoNuevo = ($regaloIncluidoDetectado && $tieneRegaloJuegoValido) ? '+Juego' : null;
 
         if ($descuentoNuevo !== null) {
             \Log::info('CasekingController - Regalo incluido detectado (+Juego):', [
@@ -125,13 +126,11 @@ class CasekingController extends PlantillaTiendaController
     /** Texto visible del primer div.bonus-products (prioridad al buscar la frase "Regalo incluido…"). */
     private function extraerTextoBloqueBonusProducts(string $html): string
     {
-        $prev = libxml_use_internal_errors(true);
-        $dom = new \DOMDocument();
-        @$dom->loadHTML('<?xml encoding="UTF-8">' . $html);
-        libxml_clear_errors();
-        libxml_use_internal_errors($prev);
+        $xp = $this->crearXPathDesdeHtml($html);
+        if ($xp === null) {
+            return '';
+        }
 
-        $xp = new \DOMXPath($dom);
         $nodes = $xp->query("//*[contains(concat(' ', normalize-space(@class), ' '), ' bonus-products ')]");
         if ($nodes === false || $nodes->length === 0) {
             return '';
@@ -143,14 +142,132 @@ class CasekingController extends PlantillaTiendaController
     }
 
     /**
-     * Palabras en el texto del bloque bonus-products que descartan +Juego (códigos promocionales, etc.).
-     * Añadir aquí más cadenas según haga falta.
+     * +Juego si algún ítem del bloque no encaja con patrones de cupón digital (monedero/tarjeta).
+     * Si no hay líneas de producto, se evalúa el texto completo del bloque.
      */
-    private function bonusProductsCasekingExcluyeMasJuegoPorPalabrasClave(string $textoBloqueBonus): bool
+    private function casekingBonusTieneAlgunRegaloJuegoNoExcluido(string $html): bool
     {
-        $t = mb_strtolower($textoBloqueBonus, 'UTF-8');
+        $items = $this->extraerTextosItemsRegaloBonusProducts($html);
 
-        return str_contains($t, 'steam') || str_contains($t, 'msi.com');
+        if ($items !== []) {
+            foreach ($items as $item) {
+                if (!$this->esItemCuponDigitalExcluidoDeMasJuego($item)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        $textoBonus = $this->extraerTextoBloqueBonusProducts($html);
+        if ($textoBonus === '') {
+            return true;
+        }
+
+        return !$this->esItemCuponDigitalExcluidoDeMasJuego($textoBonus);
+    }
+
+    /**
+     * Nombres de cada regalo listado en bonus-products (alt de imagen o último span de la fila).
+     *
+     * @return array<int, string>
+     */
+    private function extraerTextosItemsRegaloBonusProducts(string $html): array
+    {
+        $xp = $this->crearXPathDesdeHtml($html);
+        if ($xp === null) {
+            return [];
+        }
+
+        $items = [];
+        $bonusQuery = "//*[contains(concat(' ', normalize-space(@class), ' '), ' bonus-products ')]";
+
+        $imgs = $xp->query($bonusQuery . '//img[@alt]');
+        if ($imgs !== false) {
+            foreach ($imgs as $img) {
+                $alt = trim((string) $img->getAttribute('alt'));
+                if ($alt !== '') {
+                    $items[] = $alt;
+                }
+            }
+        }
+
+        $rows = $xp->query(
+            $bonusQuery
+            . "//span[contains(concat(' ', normalize-space(@class), ' '), ' d-flex ')]"
+            . "[contains(concat(' ', normalize-space(@class), ' '), ' align-items-center ')]"
+        );
+        if ($rows !== false) {
+            foreach ($rows as $row) {
+                $spans = $row->getElementsByTagName('span');
+                for ($i = $spans->length - 1; $i >= 0; $i--) {
+                    $txt = trim(preg_replace('/\s+/u', ' ', $spans->item($i)->textContent ?? ''));
+                    if ($txt !== '' && !preg_match('/^\d+\s*x$/iu', $txt)) {
+                        $items[] = $txt;
+                        break;
+                    }
+                }
+            }
+        }
+
+        $unicos = [];
+        foreach ($items as $item) {
+            $clave = mb_strtolower($item, 'UTF-8');
+            if (!isset($unicos[$clave])) {
+                $unicos[$clave] = $item;
+            }
+        }
+
+        return array_values($unicos);
+    }
+
+    private function crearXPathDesdeHtml(string $html): ?\DOMXPath
+    {
+        $prev = libxml_use_internal_errors(true);
+        $dom = new \DOMDocument();
+        @$dom->loadHTML('<?xml encoding="UTF-8">' . $html);
+        libxml_clear_errors();
+        libxml_use_internal_errors($prev);
+
+        return new \DOMXPath($dom);
+    }
+
+    /**
+     * Patrones de cupón digital / monedero en Caseking (no dependen del título del juego).
+     * Añadir aquí más regex si aparecen nuevos tipos de promo fijos.
+     *
+     * @return array<int, string>
+     */
+    private function patronesCasekingCuponDigitalSinJuego(): array
+    {
+        return [
+            '/steam\s*card/iu',
+            '/tarjeta\s+steam/iu',
+            '/gift\s*card/iu',
+            '/tarjeta\s+regalo/iu',
+            '/wallet\s+steam/iu',
+            '/monedero\s+steam/iu',
+            '/msi\.com/iu',
+            '/\beneba\b/iu',
+            '/a\s+trav[eé]s\s+(?:de\s+)?msi/iu',
+        ];
+    }
+
+    /** true = solo cupón digital; no cuenta para +Juego (el nombre del juego puede ser cualquiera). */
+    private function esItemCuponDigitalExcluidoDeMasJuego(string $textoItem): bool
+    {
+        $textoItem = trim($textoItem);
+        if ($textoItem === '') {
+            return true;
+        }
+
+        foreach ($this->patronesCasekingCuponDigitalSinJuego() as $patron) {
+            if (preg_match($patron, $textoItem)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function esSinStock(string $html): bool

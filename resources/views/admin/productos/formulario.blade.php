@@ -45,7 +45,20 @@
                 <!-- Contenido pestaña Buscador -->
                 <div id="content-buscador-categoria" class="tab-content-categoria space-y-4">
                     <div>
-                        <label class="block mb-2 font-medium text-gray-700 dark:text-gray-200">Buscar categoría</label>
+                        <div class="flex flex-wrap items-center gap-y-2 mb-2">
+                            <label for="categoria-buscador-input" class="font-medium text-gray-700 dark:text-gray-200 shrink-0">Buscar categoría</label>
+                            @if(!empty($categoriasRecientes ?? []))
+                            <div id="categoria-buscador-recientes" class="flex flex-wrap items-center gap-1.5 flex-1 min-w-0 ml-4 sm:ml-6">
+                                @foreach($categoriasRecientes as $catReciente)
+                                <button type="button"
+                                    class="kp-categoria-reciente-btn text-xs px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:border-blue-400 dark:hover:border-blue-500 truncate max-w-[11rem]"
+                                    data-id="{{ $catReciente['id'] }}"
+                                    data-nombre="{{ e($catReciente['nombre']) }}"
+                                    title="{{ e($catReciente['nombre']) }}">{{ $catReciente['nombre'] }}</button>
+                                @endforeach
+                            </div>
+                            @endif
+                        </div>
                         <div class="relative">
                             <input type="text" id="categoria-buscador-input"
                                 class="w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -166,8 +179,9 @@
 
 
                     <div class="md:col-span-2 flex gap-2">
-                        <button type="button" id="rellenar-info-automatica" 
-                            class="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                        <button type="button" id="rellenar-info-automatica" disabled
+                            class="bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold px-4 py-2 rounded-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                            title="Selecciona una categoría antes de rellenar automáticamente">
                             <span id="btn-text">Rellenar información automáticamente</span>
                             <span id="btn-loading" class="hidden">
                                 <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -1049,6 +1063,95 @@
     </div>
 
     {{-- MODAL PARA AÑADIR NUEVA IMAGEN --}}
+    <style>
+        .kp-modal-img-tabs__nav {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.25rem;
+            padding: 0.35rem;
+            background: #f3f4f6;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+        }
+        .dark .kp-modal-img-tabs__nav {
+            background: #1f2937;
+            border-color: #4b5563;
+        }
+        .kp-modal-img-tab {
+            flex: 1 1 auto;
+            min-width: max(6.5rem, fit-content);
+            padding: 0.5rem 0.75rem;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            line-height: 1.25;
+            text-align: center;
+            color: #4b5563;
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 0.375rem;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: background-color 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+        }
+        .dark .kp-modal-img-tab {
+            color: #9ca3af;
+        }
+        .kp-modal-img-tab:hover:not(.kp-modal-img-tab--active) {
+            background: #e5e7eb;
+            color: #374151;
+        }
+        .dark .kp-modal-img-tab:hover:not(.kp-modal-img-tab--active) {
+            background: #374151;
+            color: #e5e7eb;
+        }
+        .kp-modal-img-tab--active {
+            background: #fff;
+            color: #1d4ed8;
+            border-color: #93c5fd;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            font-weight: 600;
+        }
+        .dark .kp-modal-img-tab--active {
+            background: #111827;
+            color: #93c5fd;
+            border-color: #3b82f6;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+        }
+        .kp-modal-img-tab:focus-visible {
+            outline: 2px solid #3b82f6;
+            outline-offset: 2px;
+        }
+        .kp-ig-cell {
+            position: relative;
+        }
+        .kp-ig-btn-ampliar {
+            line-height: 0;
+            z-index: 30;
+            background-color: #2563eb;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+        }
+        .kp-ig-btn-ampliar:hover {
+            background-color: #1d4ed8;
+        }
+        .kp-ig-btn-ampliar svg {
+            width: 0.8rem;
+            height: 0.8rem;
+            display: block;
+        }
+        #kp-ig-preview-overlay {
+            z-index: 99999;
+        }
+        #kp-ig-preview-overlay img {
+            max-width: min(96vw, 1200px);
+            max-height: 90vh;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+        }
+    </style>
+
     <div id="modal-añadir-imagen" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
         <div class="bg-white dark:bg-gray-900 rounded-lg p-6 max-w-4xl w-full relative shadow-xl overflow-y-auto max-h-[90vh]">
             <button onclick="cerrarModalAñadirImagen()" class="absolute top-3 right-4 text-xl text-gray-800 dark:text-gray-100 hover:text-gray-600 dark:hover:text-gray-300">×</button>
@@ -1057,19 +1160,22 @@
             </div>
             
             <!-- Pestañas dentro del modal -->
-            <div class="border-b border-gray-200 dark:border-gray-600 mb-4">
-                <nav class="-mb-px flex space-x-8" aria-label="Tabs">
-                    <button type="button" id="tab-url-nueva" class="tab-modal border-b-2 border-blue-500 py-2 px-1 text-sm font-medium text-blue-600 dark:text-blue-400">
+            <div class="kp-modal-img-tabs mb-4" role="tablist" aria-label="Origen de la imagen">
+                <nav class="kp-modal-img-tabs__nav">
+                    <button type="button" id="tab-url-nueva" class="tab-modal kp-modal-img-tab kp-modal-img-tab--active" role="tab" aria-selected="true">
                         Descargar desde URL
                     </button>
-                    <button type="button" id="tab-subir-nueva" class="tab-modal border-b-2 border-transparent py-2 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300">
+                    <button type="button" id="tab-subir-nueva" class="tab-modal kp-modal-img-tab" role="tab" aria-selected="false">
                         Subir imagen
                     </button>
-                    <button type="button" id="tab-amazon-nueva" class="tab-modal border-b-2 border-transparent py-2 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300">
+                    <button type="button" id="tab-amazon-nueva" class="tab-modal kp-modal-img-tab" role="tab" aria-selected="false">
                         Amazon
                     </button>
-                    <button type="button" id="tab-interna-nueva" class="tab-modal border-b-2 border-transparent py-2 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300">
-                        Interna
+                    <button type="button" id="tab-interna-nueva" class="tab-modal kp-modal-img-tab" role="tab" aria-selected="false">
+                        Interna producto
+                    </button>
+                    <button type="button" id="tab-interna-global-nueva" class="tab-modal kp-modal-img-tab" role="tab" aria-selected="false">
+                        Interna Global
                     </button>
                 </nav>
             </div>
@@ -1134,7 +1240,7 @@
 
             <!-- Contenido pestaña Amazon -->
             <div id="content-amazon-nueva" class="tab-content-modal space-y-4 hidden">
-                <div>
+                <div id="amazon-busqueda-nueva">
                     <label class="block mb-2 text-sm text-gray-600 dark:text-gray-400">URL del producto de Amazon</label>
                     <div class="flex gap-2">
                         <input type="url" id="url-amazon-nueva" class="flex-1 px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border text-sm" placeholder="https://www.amazon.es/dp/XXXXXXXXXX">
@@ -1161,11 +1267,23 @@
                         </select>
                     </div>
                 </div>
+
+                <!-- Área de recorte Amazon -->
+                <div id="area-recorte-amazon-nueva" class="hidden space-y-4">
+                    <p id="progreso-recorte-amazon-nueva" class="text-sm font-semibold text-gray-700 dark:text-gray-200"></p>
+                    <div>
+                        <h4 class="text-md font-semibold text-gray-700 dark:text-gray-200 mb-2">Recortar imagen</h4>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mb-2">Selecciona el área que deseas mantener.</p>
+                        <div id="contenedor-cropper-amazon-nueva" style="max-width: 650px; max-height: 450px; margin: 0 auto; overflow: hidden;">
+                            <img id="imagen-recortar-amazon-nueva" src="" alt="Imagen a recortar" style="display: block; max-width: 100%; height: auto;">
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <!-- Contenido pestaña Interna (rutas ya existentes en almacenamiento) -->
+            <!-- Contenido pestaña Interna producto -->
             <div id="content-interna-nueva" class="tab-content-modal space-y-4 hidden">
-                <p class="text-sm text-gray-600 dark:text-gray-400">Elige imágenes ya subidas en este producto (galería del principal y de especificaciones internas de categoría y producto). Clic de nuevo para quitar. El orden de selección es el de guardado. Puedes editar las rutas en cada fila.</p>
+                <p class="text-sm text-gray-600 dark:text-gray-400">Puedes marcar <strong class="font-medium">varias imágenes</strong>. Las que ya están en el producto se ven en gris con × para quitarlas. <strong class="font-medium">Guardar</strong> cierra el modal.</p>
                 <div class="border border-gray-200 dark:border-gray-600 rounded-lg p-3 bg-gray-50/80 dark:bg-gray-800/40">
                     <p class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Galería (vista con miniatura si existe)</p>
                     <div id="galeria-imgs-interna-nueva" class="grid gap-px max-h-44 overflow-y-auto p-0 min-h-[2rem] w-full" style="grid-template-columns: repeat(5, minmax(0, 1fr)); grid-auto-rows: minmax(0, auto);"></div>
@@ -1176,6 +1294,33 @@
                     <div id="filas-interna-nueva-producto" class="space-y-3"></div>
                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">Tip: también puedes usar el botón «Añadir fila vacía» y pegar rutas a mano.</p>
                     <button type="button" id="btn-interna-nueva-anadir-fila-vacia" class="mt-2 text-sm text-blue-600 dark:text-blue-400 hover:underline">Añadir fila vacía</button>
+                </div>
+            </div>
+
+            <div id="content-interna-global-nueva" class="tab-content-modal space-y-4 hidden" data-kp-ig-prefix="nueva">
+                <p class="text-sm text-gray-600 dark:text-gray-400">
+                    Imágenes recientes de todo el almacén. Pulsa una palabra del nombre del producto para añadirla al buscador. Haz clic en una miniatura para marcarla o desmarcarla. Usa el icono de ampliar (esquina superior derecha) para ver la imagen en tamaño original. Pulsa <strong class="font-medium">Guardar</strong> al terminar.
+                </p>
+                <div class="kp-ig-panel border border-gray-200 dark:border-gray-600 rounded-lg p-3 bg-gray-50/80 dark:bg-gray-800/40 space-y-3" data-kp-ig-panel="nueva">
+                    <div class="kp-ig-seleccion border border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-white/70 dark:bg-gray-900/50">
+                        <p class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Seleccionadas para guardar</p>
+                        <div class="kp-ig-seleccion-resumen text-xs text-gray-500 dark:text-gray-400">Ninguna imagen seleccionada.</div>
+                    </div>
+                    <div>
+                        <p class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Palabras del nombre del producto</p>
+                        <div class="kp-ig-palabras flex flex-wrap gap-1.5 min-h-[1.25rem]"></div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Buscar por nombre de archivo</label>
+                        <input type="text" class="kp-ig-buscador w-full px-3 py-1.5 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ej: dodot talla 4" autocomplete="off" />
+                    </div>
+                    <div>
+                        <p class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Últimas imágenes añadidas</p>
+                        <p class="kp-ig-cargando text-xs text-gray-500 dark:text-gray-400 hidden">Cargando imágenes…</p>
+                        <div class="kp-ig-grid grid gap-1 w-full min-h-[2rem]" style="grid-template-columns: repeat(5, minmax(0, 1fr));"></div>
+                        <p class="kp-ig-vacio text-xs text-gray-500 dark:text-gray-400 mt-2 hidden">No hay imágenes que coincidan con la búsqueda.</p>
+                        <button type="button" class="kp-ig-cargar-mas mt-3 w-full text-sm py-2 rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 hidden">Cargar más</button>
+                    </div>
                 </div>
             </div>
 
@@ -1268,19 +1413,22 @@
             </div>
             
             <!-- Pestañas dentro del modal -->
-            <div class="border-b border-gray-200 dark:border-gray-600 mb-4">
-                <nav class="-mb-px flex space-x-8" aria-label="Tabs">
-                    <button type="button" id="tab-url-sublinea" class="tab-modal-sublinea border-b-2 border-blue-500 py-2 px-1 text-sm font-medium text-blue-600 dark:text-blue-400">
+            <div class="kp-modal-img-tabs mb-4" role="tablist" aria-label="Origen de la imagen">
+                <nav class="kp-modal-img-tabs__nav">
+                    <button type="button" id="tab-url-sublinea" class="tab-modal-sublinea kp-modal-img-tab kp-modal-img-tab--active" role="tab" aria-selected="true">
                         Descargar desde URL
                     </button>
-                    <button type="button" id="tab-subir-sublinea" class="tab-modal-sublinea border-b-2 border-transparent py-2 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300">
+                    <button type="button" id="tab-subir-sublinea" class="tab-modal-sublinea kp-modal-img-tab" role="tab" aria-selected="false">
                         Subir imagen
                     </button>
-                    <button type="button" id="tab-amazon-sublinea" class="tab-modal-sublinea border-b-2 border-transparent py-2 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300">
+                    <button type="button" id="tab-amazon-sublinea" class="tab-modal-sublinea kp-modal-img-tab" role="tab" aria-selected="false">
                         Amazon
                     </button>
-                    <button type="button" id="tab-interna-sublinea" class="tab-modal-sublinea border-b-2 border-transparent py-2 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300">
-                        Interna
+                    <button type="button" id="tab-interna-sublinea" class="tab-modal-sublinea kp-modal-img-tab" role="tab" aria-selected="false">
+                        Interna producto
+                    </button>
+                    <button type="button" id="tab-interna-global-sublinea" class="tab-modal-sublinea kp-modal-img-tab" role="tab" aria-selected="false">
+                        Interna Global
                     </button>
                 </nav>
             </div>
@@ -1345,7 +1493,7 @@
 
             <!-- Contenido pestaña Amazon -->
             <div id="content-amazon-sublinea" class="tab-content-modal-sublinea space-y-4 hidden">
-                <div>
+                <div id="amazon-busqueda-sublinea">
                     <label class="block mb-2 text-sm text-gray-600 dark:text-gray-400">URL del producto de Amazon</label>
                     <div class="flex gap-2">
                         <input type="url" id="url-amazon-sublinea" class="flex-1 px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border text-sm" placeholder="https://www.amazon.es/dp/XXXXXXXXXX">
@@ -1372,11 +1520,23 @@
                         </select>
                     </div>
                 </div>
+
+                <!-- Área de recorte Amazon -->
+                <div id="area-recorte-amazon-sublinea" class="hidden space-y-4">
+                    <p id="progreso-recorte-amazon-sublinea" class="text-sm font-semibold text-gray-700 dark:text-gray-200"></p>
+                    <div>
+                        <h4 class="text-md font-semibold text-gray-700 dark:text-gray-200 mb-2">Recortar imagen</h4>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mb-2">Selecciona el área que deseas mantener.</p>
+                        <div id="contenedor-cropper-amazon-sublinea" style="max-width: 650px; max-height: 450px; margin: 0 auto; overflow: hidden;">
+                            <img id="imagen-recortar-amazon-sublinea" src="" alt="Imagen a recortar" style="display: block; max-width: 100%; height: auto;">
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Contenido pestaña Interna sublínea -->
             <div id="content-interna-sublinea" class="tab-content-modal-sublinea space-y-4 hidden">
-                <p class="text-sm text-gray-600 dark:text-gray-400">Imágenes ya subidas en este producto (principal y especificaciones). Solo se guarda la ruta <strong class="font-medium">grande</strong> por fila; la pequeña es referencia y vista previa.</p>
+                <p class="text-sm text-gray-600 dark:text-gray-400">Puedes marcar <strong class="font-medium">varias imágenes</strong> (clic en cada una). Las ya asignadas a esta opción se ven en gris con × para quitarlas. <strong class="font-medium">Guardar</strong> cierra el modal y guarda la lista (solo ruta grande).</p>
                 <div class="border border-gray-200 dark:border-gray-600 rounded-lg p-3 bg-gray-50/80 dark:bg-gray-800/40">
                     <p class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Galería</p>
                     <div id="galeria-imgs-interna-sublinea" class="grid gap-px max-h-44 overflow-y-auto p-0 min-h-[2rem] w-full" style="grid-template-columns: repeat(5, minmax(0, 1fr)); grid-auto-rows: minmax(0, auto);"></div>
@@ -1386,6 +1546,33 @@
                     <p class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Rutas grandes a añadir (orden = orden de guardado)</p>
                     <div id="filas-interna-sublinea" class="space-y-3"></div>
                     <button type="button" id="btn-interna-sublinea-anadir-fila-vacia" class="mt-2 text-sm text-blue-600 dark:text-blue-400 hover:underline">Añadir fila vacía</button>
+                </div>
+            </div>
+
+            <div id="content-interna-global-sublinea" class="tab-content-modal-sublinea space-y-4 hidden" data-kp-ig-prefix="sublinea">
+                <p class="text-sm text-gray-600 dark:text-gray-400">
+                    Imágenes recientes de todo el almacén. Pulsa una palabra del nombre del producto para añadirla al buscador. Haz clic en una miniatura para marcarla o desmarcarla. Usa el icono de ampliar (esquina superior derecha) para ver la imagen en tamaño original. Pulsa <strong class="font-medium">Guardar</strong> al terminar.
+                </p>
+                <div class="kp-ig-panel border border-gray-200 dark:border-gray-600 rounded-lg p-3 bg-gray-50/80 dark:bg-gray-800/40 space-y-3" data-kp-ig-panel="sublinea">
+                    <div class="kp-ig-seleccion border border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-white/70 dark:bg-gray-900/50">
+                        <p class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Seleccionadas para guardar</p>
+                        <div class="kp-ig-seleccion-resumen text-xs text-gray-500 dark:text-gray-400">Ninguna imagen seleccionada.</div>
+                    </div>
+                    <div>
+                        <p class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Palabras del nombre del producto</p>
+                        <div class="kp-ig-palabras flex flex-wrap gap-1.5 min-h-[1.25rem]"></div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Buscar por nombre de archivo</label>
+                        <input type="text" class="kp-ig-buscador w-full px-3 py-1.5 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ej: dodot talla 4" autocomplete="off" />
+                    </div>
+                    <div>
+                        <p class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Últimas imágenes añadidas</p>
+                        <p class="kp-ig-cargando text-xs text-gray-500 dark:text-gray-400 hidden">Cargando imágenes…</p>
+                        <div class="kp-ig-grid grid gap-1 w-full min-h-[2rem]" style="grid-template-columns: repeat(5, minmax(0, 1fr));"></div>
+                        <p class="kp-ig-vacio text-xs text-gray-500 dark:text-gray-400 mt-2 hidden">No hay imágenes que coincidan con la búsqueda.</p>
+                        <button type="button" class="kp-ig-cargar-mas mt-3 w-full text-sm py-2 rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 hidden">Cargar más</button>
+                    </div>
                 </div>
             </div>
 
@@ -1681,6 +1868,7 @@
             // Configurar buscador de categorías (con delay para asegurar que el DOM esté listo)
             setTimeout(() => {
                 configurarBuscadorCategorias();
+                configurarBotonesCategoriasRecientesBuscador();
             }, 100);
 
             // Configurar validación del formulario
@@ -1761,6 +1949,28 @@
             
             // Actualizar el indicador del botón agregar
             actualizarIndicadorBotonAgregar();
+        }
+
+        function configurarBotonesCategoriasRecientesBuscador() {
+            const cont = document.getElementById('categoria-buscador-recientes');
+            if (!cont || cont.dataset.kpRecientesCfg === '1') {
+                return;
+            }
+            cont.dataset.kpRecientesCfg = '1';
+            cont.addEventListener('click', function(e) {
+                const btn = e.target.closest('.kp-categoria-reciente-btn');
+                if (!btn) {
+                    return;
+                }
+                e.preventDefault();
+                const id = btn.dataset.id;
+                const nombre = btn.dataset.nombre;
+                if (!id || !nombre) {
+                    return;
+                }
+                cambiarPestaña('buscador');
+                seleccionarCategoriaBuscador({ id: id, nombre: nombre });
+            });
         }
 
         // Función para configurar el buscador de categorías
@@ -3723,6 +3933,478 @@
         let categoriasActualesEspecificaciones = [];
         let indiceSeleccionadoCategoriaEspecificaciones = -1;
 
+        function kpNormalizarTextoCoincidencia(texto) {
+            return String(texto || '')
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/[\u00A0\u202F\u2007\u2009]/g, ' ')
+                .toLowerCase()
+                .trim();
+        }
+
+        /** Unifica comas/puntos decimales (también unicode) entre dígitos: 4,4 → 4.4 */
+        function kpNormalizarSeparadoresDecimales(texto) {
+            return kpNormalizarTextoCoincidencia(texto).replace(
+                /(\d)\s*[,.\uFF0C\u201A]\s*(\d)/g,
+                '$1.$2'
+            );
+        }
+
+        function kpObtenerTextoSublineaEspecificacion(checkbox) {
+            if (!checkbox) return '';
+            const label = checkbox.closest('label');
+            const desdeSpan = label?.querySelector('span')?.textContent?.trim() || '';
+            if (desdeSpan) return desdeSpan;
+            return checkbox.dataset.sublineaTexto || '';
+        }
+
+        function kpEscaparRegexCoincidencia(s) {
+            return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }
+
+        function kpGenerarVariantesCoincidencia(textoOpcion) {
+            const base = kpNormalizarTextoCoincidencia(textoOpcion);
+            const set = new Set();
+            if (!base) return [];
+            set.add(base);
+            const conPunto = kpNormalizarSeparadoresDecimales(textoOpcion);
+            set.add(conPunto);
+            set.add(kpQuitarCerosDecimalesFinales(conPunto));
+            set.add(conPunto.replace(/(\d)\.(\d)/g, '$1,$2'));
+            return Array.from(set).filter((v) => v.length > 0);
+        }
+
+        /** 4.40 → 4.4, 4,40 → 4.4 (tras normalizar separador decimal) */
+        function kpQuitarCerosDecimalesFinales(texto) {
+            return String(texto || '')
+                .replace(/(\d+\.\d*?)0+$/g, '$1')
+                .replace(/(\d+)\.$/g, '$1');
+        }
+
+        function kpExtraerValoresDecimales(texto) {
+            const norm = kpNormalizarSeparadoresDecimales(texto);
+            const valores = [];
+            const re = /\d+\.\d+/g;
+            let m;
+            while ((m = re.exec(norm)) !== null) {
+                const n = parseFloat(m[0]);
+                if (!Number.isNaN(n)) valores.push(n);
+            }
+            return valores;
+        }
+
+        function kpCoincidenValoresDecimales(token, texto) {
+            const valoresToken = kpExtraerValoresDecimales(token);
+            if (valoresToken.length === 0) return false;
+            const valoresTexto = kpExtraerValoresDecimales(texto);
+            if (valoresTexto.length === 0) return false;
+            return valoresToken.some((a) =>
+                valoresTexto.some((b) => Math.abs(a - b) < 1e-9)
+            );
+        }
+
+        function kpTokenCoincideConTextoOpcion(token, texto) {
+            if (!token || !texto) return false;
+
+            const tokenNorm = kpNormalizarSeparadoresDecimales(token);
+            const textoNorm = kpNormalizarSeparadoresDecimales(texto);
+            const tokenSinCeros = kpQuitarCerosDecimalesFinales(tokenNorm);
+            const textoSinCeros = kpQuitarCerosDecimalesFinales(textoNorm);
+
+            if (kpCoincidenValoresDecimales(token, texto)) {
+                return true;
+            }
+
+            if (tokenNorm.length >= 1 && textoNorm.includes(tokenNorm)) {
+                return true;
+            }
+
+            if (
+                tokenSinCeros.length >= 1 &&
+                (textoNorm.includes(tokenSinCeros) || textoSinCeros.includes(tokenSinCeros))
+            ) {
+                return true;
+            }
+
+            if (tokenNorm.length >= 2 && textoNorm.length >= 1 && tokenNorm.includes(textoNorm)) {
+                return true;
+            }
+
+            const variantesToken = kpGenerarVariantesCoincidencia(token);
+            const variantesTexto = kpGenerarVariantesCoincidencia(texto);
+
+            for (const vt of variantesToken) {
+                if (vt.length < 1) continue;
+                for (const vx of variantesTexto) {
+                    if (vx.includes(vt) || (vt.length >= 2 && vt.includes(vx))) {
+                        return true;
+                    }
+                }
+            }
+
+            const textosAmplios = [kpNormalizarTextoCoincidencia(texto), textoNorm];
+            for (const vt of variantesToken) {
+                if (vt.length < 1) continue;
+                for (const tx of textosAmplios) {
+                    if (tx.includes(vt)) return true;
+                }
+                const escaped = kpEscaparRegexCoincidencia(vt);
+                const regex = new RegExp(
+                    `(?:^|[^a-z0-9])${escaped}(?:[^a-z0-9]|$)`,
+                    'i'
+                );
+                for (const tx of textosAmplios) {
+                    if (regex.test(tx)) return true;
+                }
+            }
+
+            return false;
+        }
+
+        function kpCoincideEnNombre(nombre, textoOpcion) {
+            return kpTokenCoincideConTextoOpcion(nombre, textoOpcion);
+        }
+
+        function kpGrupoEspecificacionesTieneSeleccion(principalId) {
+            return Array.from(document.querySelectorAll('.especificacion-checkbox'))
+                .some((checkbox) => String(checkbox.dataset.principalId) === String(principalId) && checkbox.checked);
+        }
+
+        function kpAplicarBordePendienteGrupo(linea, pendiente) {
+            if (!linea) return;
+
+            if (pendiente) {
+                linea.dataset.pendienteSinCoincidencia = '1';
+                linea.style.borderColor = '#facc15';
+                linea.style.boxShadow = '0 0 0 2px rgba(250, 204, 21, 0.45)';
+            } else {
+                delete linea.dataset.pendienteSinCoincidencia;
+                linea.style.borderColor = '';
+                linea.style.boxShadow = '';
+            }
+        }
+
+        function kpAplicarCoincidenciasDesdeNombre() {
+            const nombre = (
+                document.getElementById('input_nombre')?.value ||
+                document.querySelector('input[name="nombre"]')?.value ||
+                ''
+            ).trim();
+            const container = document.getElementById('especificaciones-principales-container');
+            if (!container) return;
+
+            container.querySelectorAll('.linea-principal-especificaciones').forEach((linea) => {
+                const principalId = linea.dataset.principalId;
+                const checkboxes = Array.from(
+                    linea.querySelectorAll('.especificacion-grupo-lista-opciones .especificacion-checkbox')
+                );
+
+                let mejorCheckbox = null;
+                let mejorLongitud = 0;
+
+                checkboxes.forEach((cb) => {
+                    const texto = kpObtenerTextoSublineaEspecificacion(cb);
+                    if (nombre && kpCoincideEnNombre(nombre, texto)) {
+                        const len = kpNormalizarTextoCoincidencia(texto).length;
+                        if (len > mejorLongitud) {
+                            mejorLongitud = len;
+                            mejorCheckbox = cb;
+                        }
+                    }
+                });
+
+                if (mejorCheckbox) {
+                    checkboxes.forEach((cb) => {
+                        const debeMarcar = cb === mejorCheckbox;
+                        if (cb.checked !== debeMarcar) {
+                            cb.checked = debeMarcar;
+                            cb.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                    });
+                    kpAplicarBordePendienteGrupo(linea, false);
+                } else if (nombre.length > 0) {
+                    const tieneSeleccion = kpGrupoEspecificacionesTieneSeleccion(principalId);
+                    kpAplicarBordePendienteGrupo(linea, !tieneSeleccion);
+                } else {
+                    kpAplicarBordePendienteGrupo(linea, false);
+                }
+            });
+        }
+
+        window.kpAplicarCoincidenciasDesdeNombre = kpAplicarCoincidenciasDesdeNombre;
+
+        function kpObtenerNombreProductoActual() {
+            return (
+                document.getElementById('input_nombre')?.value ||
+                document.querySelector('input[name="nombre"]')?.value ||
+                ''
+            ).trim();
+        }
+
+        function kpObtenerPalabrasNombreProducto() {
+            const nombre = kpObtenerNombreProductoActual();
+            if (!nombre) return [];
+
+            // Separar por espacios, /, | y ; — no por comas (3,9) ni puntos decimales (4.40)
+            const tokens = nombre
+                .split(/(?:\s+|\/|\||;)+/)
+                .map((p) => p.trim())
+                .filter(Boolean);
+
+            const visto = new Set();
+            const palabras = [];
+
+            tokens.forEach((token) => {
+                const limpia = token.replace(/^[^a-zA-Z0-9À-ÿ.,]+|[^a-zA-Z0-9À-ÿ.,]+$/gi, '');
+                if (!limpia) return;
+                const clave = limpia.toLowerCase();
+                if (visto.has(clave)) return;
+                visto.add(clave);
+                palabras.push(limpia);
+            });
+
+            return palabras;
+        }
+
+        window.kpObtenerPalabrasNombreProducto = kpObtenerPalabrasNombreProducto;
+
+        function kpEjecutarBusquedaGrupoEspecificaciones(input) {
+            if (!input) return;
+
+            const contenedor =
+                input.closest('#especificaciones-internas-contenido') ||
+                document.getElementById('especificaciones-internas-contenido');
+            const principalId = input.dataset.principalId;
+            const query = input.value.trim();
+            const resultados = contenedor?.querySelector(
+                `.especificacion-grupo-resultados[data-principal-id="${principalId}"]`
+            );
+            const linea = input.closest('.linea-principal-especificaciones');
+            const lista = linea?.querySelector('.especificacion-grupo-lista-opciones');
+            if (!resultados || !linea || !lista) return;
+
+            if (!query) {
+                kpRestaurarFilasGrupoEspecificaciones(linea);
+                return;
+            }
+
+            kpRestaurarFilasGrupoEspecificaciones(linea);
+
+            const tokensBusqueda = query.split(/\s+/).filter(Boolean);
+            const opciones = linea.querySelectorAll('.especificacion-opcion-fila');
+            let hayCoincidencias = false;
+
+            opciones.forEach((fila) => {
+                const cb = fila.querySelector('.especificacion-checkbox');
+                if (!cb) return;
+                const texto = kpObtenerTextoSublineaEspecificacion(cb);
+                const coincide = tokensBusqueda.some((token) =>
+                    kpTokenCoincideConTextoOpcion(token, texto)
+                );
+
+                if (coincide) {
+                    resultados.appendChild(fila);
+                    hayCoincidencias = true;
+                }
+            });
+
+            if (!hayCoincidencias) {
+                resultados.innerHTML =
+                    '<p class="text-xs text-gray-500 dark:text-gray-400 pl-1 py-2">Sin resultados</p>';
+            }
+
+            resultados.classList.remove('hidden');
+        }
+
+        function kpTokensBuscadorGrupo(valor) {
+            return String(valor || '')
+                .trim()
+                .split(/\s+/)
+                .filter(Boolean);
+        }
+
+        function kpMarcarBotonPalabraNombre(btn, activo) {
+            if (!btn) return;
+            const clasesActivo = [
+                'ring-2',
+                'ring-blue-500',
+                'border-blue-500',
+                'bg-blue-100',
+                'dark:bg-blue-900',
+                'dark:border-blue-400',
+                'font-semibold',
+            ];
+            if (activo) {
+                btn.classList.add(...clasesActivo);
+                btn.setAttribute('aria-pressed', 'true');
+            } else {
+                btn.classList.remove(...clasesActivo);
+                btn.setAttribute('aria-pressed', 'false');
+            }
+        }
+
+        function kpSincronizarBotonesPalabrasConBuscador(wrap) {
+            if (!wrap) return;
+            const input = wrap.querySelector('.especificacion-grupo-buscador');
+            const tokens = kpTokensBuscadorGrupo(input?.value || '');
+
+            wrap.querySelectorAll('.especificacion-palabra-nombre-btn').forEach((btn) => {
+                const palabra = btn.dataset.palabra || btn.textContent.trim();
+                const activo = tokens.some(
+                    (t) => t.toLowerCase() === palabra.toLowerCase()
+                );
+                kpMarcarBotonPalabraNombre(btn, activo);
+            });
+        }
+
+        function kpActualizarBotonesPalabrasNombreBuscadores(contenedor) {
+            const root =
+                contenedor ||
+                document.getElementById('especificaciones-internas-contenido');
+            if (!root) return;
+
+            const palabras = kpObtenerPalabrasNombreProducto();
+            root.querySelectorAll('.especificacion-grupo-palabras-nombre').forEach((bloque) => {
+                if (palabras.length === 0) {
+                    bloque.innerHTML = '';
+                    bloque.classList.add('hidden');
+                    return;
+                }
+
+                bloque.classList.remove('hidden');
+                bloque.innerHTML = palabras
+                    .map((palabra) => {
+                        const segura = String(palabra)
+                            .replace(/&/g, '&amp;')
+                            .replace(/</g, '&lt;')
+                            .replace(/"/g, '&quot;');
+                        return `<button type="button" class="especificacion-palabra-nombre-btn text-xs px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-blue-100 dark:hover:bg-blue-900 hover:border-blue-400 dark:hover:border-blue-500 transition-colors" data-palabra="${segura}" aria-pressed="false" title="Pulsar para buscar «${segura}»">${segura}</button>`;
+                    })
+                    .join('');
+
+                const wrap = bloque.closest('.especificacion-grupo-buscador-wrap');
+                kpSincronizarBotonesPalabrasConBuscador(wrap);
+            });
+        }
+
+        function kpConfigurarDelegacionPalabrasNombreBuscadores(contenedor) {
+            const root =
+                contenedor ||
+                document.getElementById('especificaciones-internas-contenido');
+            if (!root || root.dataset.palabrasNombreDelegacion === '1') return;
+
+            root.dataset.palabrasNombreDelegacion = '1';
+            root.addEventListener('click', (event) => {
+                const btn = event.target.closest('.especificacion-palabra-nombre-btn');
+                if (!btn) return;
+
+                const wrap = btn.closest('.especificacion-grupo-buscador-wrap');
+                const input = wrap?.querySelector('.especificacion-grupo-buscador');
+                if (!input) return;
+
+                const palabra = btn.dataset.palabra || btn.textContent.trim();
+                const estabaActivo = btn.getAttribute('aria-pressed') === 'true';
+                let tokens = kpTokensBuscadorGrupo(input.value);
+
+                if (estabaActivo) {
+                    tokens = tokens.filter((t) => t.toLowerCase() !== palabra.toLowerCase());
+                } else if (!tokens.some((t) => t.toLowerCase() === palabra.toLowerCase())) {
+                    tokens.push(palabra);
+                }
+
+                input.value = tokens.join(' ');
+                kpSincronizarBotonesPalabrasConBuscador(wrap);
+                kpEjecutarBusquedaGrupoEspecificaciones(input);
+                input.focus();
+            });
+        }
+
+        function kpRestaurarFilasGrupoEspecificaciones(linea) {
+            const lista = linea.querySelector('.especificacion-grupo-lista-opciones');
+            const resultados = linea.querySelector('.especificacion-grupo-resultados');
+            if (!lista) return;
+
+            const filas = [
+                ...lista.querySelectorAll('.especificacion-opcion-fila'),
+                ...(resultados ? resultados.querySelectorAll('.especificacion-opcion-fila') : []),
+            ];
+            filas.sort(
+                (a, b) =>
+                    Number(a.dataset.sublineaOrden || 0) - Number(b.dataset.sublineaOrden || 0)
+            );
+            filas.forEach((fila) => lista.appendChild(fila));
+
+            if (resultados) {
+                resultados.classList.add('hidden');
+                resultados.innerHTML = '';
+            }
+        }
+
+        function kpConfigurarBuscadoresGrupoEspecificaciones(contenedor) {
+            kpConfigurarDelegacionPalabrasNombreBuscadores(contenedor);
+
+            const buscadores = contenedor.querySelectorAll('.especificacion-grupo-buscador');
+            buscadores.forEach((input) => {
+                if (input.dataset.buscadorConfigurado === '1') return;
+                input.dataset.buscadorConfigurado = '1';
+
+                input.addEventListener('input', function () {
+                    kpSincronizarBotonesPalabrasConBuscador(
+                        this.closest('.especificacion-grupo-buscador-wrap')
+                    );
+                    kpEjecutarBusquedaGrupoEspecificaciones(this);
+                });
+            });
+
+            kpActualizarBotonesPalabrasNombreBuscadores(contenedor);
+        }
+
+        function kpInicializarCoincidenciasNombreProducto() {
+            const inputNombre = document.getElementById('input_nombre');
+            const inputNombreFijo = document.getElementById('input_nombre_fijo');
+            const handler = () => {
+                kpAplicarCoincidenciasDesdeNombre();
+                kpActualizarBotonesPalabrasNombreBuscadores();
+                if (typeof window.kpInternaGlobalRefrescarPalabras === 'function') {
+                    window.kpInternaGlobalRefrescarPalabras('nueva');
+                    window.kpInternaGlobalRefrescarPalabras('sublinea');
+                }
+            };
+
+            if (inputNombre && inputNombre.dataset.coincidenciasNombre !== '1') {
+                inputNombre.dataset.coincidenciasNombre = '1';
+                inputNombre.addEventListener('input', handler);
+            }
+            if (inputNombreFijo && inputNombreFijo.dataset.coincidenciasNombre !== '1') {
+                inputNombreFijo.dataset.coincidenciasNombre = '1';
+                inputNombreFijo.addEventListener('input', handler);
+            }
+
+            const contenedorEspecificaciones = document.getElementById('especificaciones-internas-contenido');
+            if (contenedorEspecificaciones && contenedorEspecificaciones.dataset.coincidenciasNombre !== '1') {
+                contenedorEspecificaciones.dataset.coincidenciasNombre = '1';
+                contenedorEspecificaciones.addEventListener('change', (event) => {
+                    if (!event.target.matches('.especificacion-checkbox')) return;
+
+                    const principalId = event.target.dataset.principalId;
+                    const linea = event.target.closest('.linea-principal-especificaciones');
+                    if (
+                        linea &&
+                        linea.dataset.pendienteSinCoincidencia === '1' &&
+                        kpGrupoEspecificacionesTieneSeleccion(principalId)
+                    ) {
+                        kpAplicarBordePendienteGrupo(linea, false);
+                    }
+                });
+            }
+
+            kpConfigurarDelegacionPalabrasNombreBuscadores();
+            kpActualizarBotonesPalabrasNombreBuscadores();
+            kpInicializarDelegacionEditoresGrupo();
+        }
+
+        document.addEventListener('DOMContentLoaded', kpInicializarCoincidenciasNombreProducto);
+
         // Función para buscar categorías en tiempo real
         async function buscarCategoriasEspecificaciones(query) {
             if (query.length < 2) {
@@ -3835,6 +4517,12 @@
                         }
                     }
                     
+                    window.kpEspecificacionesCategoriaState = {
+                        categoriaId: String(categoriaId),
+                        especificaciones,
+                        conteos: data.conteos_productos || {},
+                    };
+
                     // Mostrar los desplegables con checkboxes
                     mostrarDesplegablesEspecificacionesProducto(especificaciones, contenidoContainer, opcionesGuardadas);
                     seleccionContainer.classList.remove('hidden');
@@ -3844,6 +4532,599 @@
                 contenidoContainer.innerHTML = '<p class="text-red-500 text-sm">Error al cargar las especificaciones internas.</p>';
                 seleccionContainer.classList.remove('hidden');
             }
+        }
+        window.obtenerEspecificacionesInternas = obtenerEspecificacionesInternas;
+
+        window.kpEspecificacionesCategoriaState = {
+            categoriaId: null,
+            especificaciones: null,
+            conteos: {},
+        };
+
+        let kpEditorGrupoDelegacionLista = false;
+
+        function kpGenerarSlugEspecificaciones(texto) {
+            return String(texto || '')
+                .toLowerCase()
+                .trim()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-+|-+$/g, '');
+        }
+
+        function kpGenerarIdUnicoEspecificaciones() {
+            return Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+
+        function kpObtenerConteoSublinea(principalId, sublineaId) {
+            const conteos = window.kpEspecificacionesCategoriaState?.conteos || {};
+            const linea = conteos[String(principalId)];
+            if (!linea) return null;
+            const n = linea[String(sublineaId)];
+            return n !== undefined && n !== null ? n : null;
+        }
+
+        function kpEditorGrupoTieneCambiosPendientes(lineaPrincipal) {
+            return !!lineaPrincipal.querySelector(
+                '.btn-guardar-fila-editor:not(.hidden), .btn-guardar-fila-editor-principal:not(.hidden)'
+            );
+        }
+
+        function kpOcultarTodosGuardarFilaEditor(lineaPrincipal) {
+            lineaPrincipal
+                .querySelectorAll('.btn-guardar-fila-editor, .btn-guardar-fila-editor-principal')
+                .forEach((btn) => {
+                    btn.classList.add('hidden');
+                    btn.disabled = false;
+                    btn.textContent = 'Guardar';
+                });
+            delete lineaPrincipal.dataset.editorGrupoDirty;
+        }
+
+        function kpMarcarFilaEditorDirty(fila, dirty) {
+            const btn = fila.querySelector('.btn-guardar-fila-editor, .btn-guardar-fila-editor-principal');
+            if (btn) btn.classList.toggle('hidden', !dirty);
+            const linea = lineaPrincipalDesdeEditor(fila);
+            if (linea) {
+                linea.dataset.editorGrupoDirty = kpEditorGrupoTieneCambiosPendientes(linea) ? '1' : '0';
+            }
+        }
+
+        let kpEditorElementoArrastrado = null;
+
+        function kpConfigurarDragAndDropEditorFila(elemento) {
+            elemento.addEventListener('dragover', (e) => {
+                if (!kpEditorElementoArrastrado || kpEditorElementoArrastrado === elemento) return;
+                if (
+                    !kpEditorElementoArrastrado.classList.contains('editor-linea-intermedia') ||
+                    !elemento.classList.contains('editor-linea-intermedia')
+                ) {
+                    return;
+                }
+                if (kpEditorElementoArrastrado.parentNode !== elemento.parentNode) {
+                    e.dataTransfer.dropEffect = 'none';
+                    return;
+                }
+
+                e.preventDefault();
+                e.stopPropagation();
+                e.dataTransfer.dropEffect = 'move';
+
+                const parent = elemento.parentNode;
+                const rect = elemento.getBoundingClientRect();
+                const insertAfter = e.clientY > rect.top + rect.height / 2;
+                const siblings = Array.from(parent.children).filter((child) =>
+                    child.classList.contains('editor-linea-intermedia')
+                );
+                const currentIndex = siblings.indexOf(elemento);
+                const draggedIndex = siblings.indexOf(kpEditorElementoArrastrado);
+                if (draggedIndex === -1) return;
+                if (insertAfter && draggedIndex === currentIndex + 1) return;
+                if (!insertAfter && draggedIndex === currentIndex - 1) return;
+
+                if (insertAfter) {
+                    const nextSibling = elemento.nextSibling;
+                    if (nextSibling && nextSibling !== kpEditorElementoArrastrado) {
+                        parent.insertBefore(kpEditorElementoArrastrado, nextSibling);
+                    } else if (!nextSibling) {
+                        parent.appendChild(kpEditorElementoArrastrado);
+                    }
+                } else if (elemento !== kpEditorElementoArrastrado) {
+                    parent.insertBefore(kpEditorElementoArrastrado, elemento);
+                }
+            });
+
+            elemento.addEventListener('drop', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            });
+        }
+
+        function kpConfigurarDragAndDropEditorDesdeIcono(icono, fila) {
+            icono.addEventListener('dragstart', (e) => {
+                kpEditorElementoArrastrado = fila;
+                fila.style.opacity = '0.5';
+                e.dataTransfer.effectAllowed = 'move';
+                e.stopPropagation();
+            });
+
+            icono.addEventListener('dragend', (e) => {
+                fila.style.opacity = '1';
+                if (kpEditorElementoArrastrado) {
+                    kpMarcarFilaEditorDirty(kpEditorElementoArrastrado, true);
+                }
+                kpEditorElementoArrastrado = null;
+                e.stopPropagation();
+            });
+
+            icono.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            });
+
+            icono.addEventListener('drop', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            });
+
+            kpConfigurarDragAndDropEditorFila(fila);
+        }
+
+        function kpConfigurarDragAndDropEditorContenedor(contenedor) {
+            if (!contenedor || contenedor.dataset.dragEditorConfigurado === '1') return;
+            contenedor.dataset.dragEditorConfigurado = '1';
+
+            contenedor.addEventListener('dragover', (e) => {
+                if (!kpEditorElementoArrastrado) return;
+                if (!kpEditorElementoArrastrado.classList.contains('editor-linea-intermedia')) return;
+
+                const target = e.target;
+                if (target.classList.contains('editor-linea-intermedia')) return;
+                const parentElement = target.closest('.editor-linea-intermedia');
+                if (parentElement) return;
+
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+
+                const siblings = Array.from(contenedor.children).filter((child) =>
+                    child.classList.contains('editor-linea-intermedia')
+                );
+                if (!siblings.includes(kpEditorElementoArrastrado)) {
+                    const rect = contenedor.getBoundingClientRect();
+                    if (e.clientY > rect.top + rect.height * 0.7) {
+                        contenedor.appendChild(kpEditorElementoArrastrado);
+                    }
+                }
+            });
+
+            contenedor.addEventListener('drop', (e) => e.preventDefault());
+        }
+
+        function kpCrearFilaEditorIntermedia(container, texto = '', idUnico = null, productosCount = null) {
+            const idLinea = idUnico || kpGenerarIdUnicoEspecificaciones();
+            const contadorTexto =
+                productosCount !== null && productosCount !== undefined
+                    ? `(${productosCount} productos)`
+                    : '';
+
+            const div = document.createElement('div');
+            div.className =
+                'editor-linea-intermedia flex items-center gap-2 border-l-4 border-blue-400 pl-3 py-2 bg-blue-50 dark:bg-blue-900/20 rounded';
+            div.dataset.idUnico = idLinea;
+            div.draggable = false;
+            div.innerHTML = `
+                <div class="drag-handle-editor-intermedia cursor-move text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0" title="Arrastrar para reordenar" draggable="true">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"></path>
+                    </svg>
+                </div>
+                <input type="text" class="editor-intermedia-texto flex-1 min-w-0 px-3 py-2 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-200" placeholder="Nombre de la opción" value="${String(texto).replace(/"/g, '&quot;')}">
+                ${contadorTexto ? `<span class="text-sm text-gray-500 dark:text-gray-400 shrink-0">${contadorTexto}</span>` : ''}
+                <button type="button" class="btn-guardar-fila-editor hidden shrink-0 text-xs px-3 py-1 rounded bg-green-600 hover:bg-green-700 text-white font-medium disabled:opacity-50">Guardar</button>
+                <button type="button" class="btn-editor-eliminar-intermedia bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs shrink-0" title="Eliminar">−</button>
+                <button type="button" class="btn-editor-anadir-intermedia bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs shrink-0" title="Añadir debajo">+</button>
+            `;
+
+            container.appendChild(div);
+
+            const inputTexto = div.querySelector('.editor-intermedia-texto');
+            inputTexto.addEventListener('dragstart', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            });
+            inputTexto.addEventListener('input', () => kpMarcarFilaEditorDirty(div, true));
+
+            div.querySelector('.btn-editor-eliminar-intermedia').addEventListener('click', () => {
+                const linea = lineaPrincipalDesdeEditor(div);
+                const containerSub = div.parentElement;
+                if (containerSub.querySelectorAll('.editor-linea-intermedia').length <= 1) {
+                    alert('Debe quedar al menos una opción en el grupo.');
+                    return;
+                }
+                div.remove();
+                const filaPrincipalEditor = linea?.querySelector('.especificacion-grupo-editor-principal');
+                if (filaPrincipalEditor) kpMarcarFilaEditorDirty(filaPrincipalEditor, true);
+            });
+
+            div.querySelector('.btn-editor-anadir-intermedia').addEventListener('click', () => {
+                const linea = lineaPrincipalDesdeEditor(div);
+                const nueva = kpCrearFilaEditorIntermedia(container, '');
+                div.insertAdjacentElement('afterend', nueva);
+                kpMarcarFilaEditorDirty(nueva, true);
+            });
+
+            const dragHandle = div.querySelector('.drag-handle-editor-intermedia');
+            if (dragHandle) {
+                kpConfigurarDragAndDropEditorDesdeIcono(dragHandle, div);
+            }
+
+            return div;
+        }
+
+        function lineaPrincipalDesdeEditor(el) {
+            return el.closest('.linea-principal-especificaciones');
+        }
+
+        function kpRenderizarEditorGrupo(lineaPrincipal, filtro) {
+            const principalId = lineaPrincipal.dataset.principalId;
+            const editor = lineaPrincipal.querySelector('.especificacion-grupo-editor');
+            const containerSub = editor?.querySelector('.especificacion-grupo-editor-sublineas');
+            if (!editor || !containerSub) return;
+
+            const inputPrincipal = editor.querySelector('.editor-principal-texto');
+            const checkImportante = editor.querySelector('.editor-principal-importante');
+            if (inputPrincipal) inputPrincipal.value = filtro.texto || '';
+            if (checkImportante) checkImportante.checked = !!filtro.importante;
+
+            delete containerSub.dataset.dragEditorConfigurado;
+            containerSub.innerHTML = '';
+            const subprincipales = Array.isArray(filtro.subprincipales) ? filtro.subprincipales : [];
+            if (subprincipales.length === 0) {
+                kpCrearFilaEditorIntermedia(containerSub, '');
+            } else {
+                subprincipales.forEach((sub) => {
+                    kpCrearFilaEditorIntermedia(
+                        containerSub,
+                        sub.texto || '',
+                        sub.id || null,
+                        kpObtenerConteoSublinea(principalId, sub.id)
+                    );
+                });
+            }
+
+            kpConfigurarDragAndDropEditorContenedor(containerSub);
+            kpOcultarTodosGuardarFilaEditor(lineaPrincipal);
+
+            const filaPrincipalEditor = editor.querySelector('.especificacion-grupo-editor-principal');
+            if (inputPrincipal && !inputPrincipal.dataset.editorConfigurado) {
+                inputPrincipal.dataset.editorConfigurado = '1';
+                inputPrincipal.addEventListener('input', () => {
+                    if (filaPrincipalEditor) kpMarcarFilaEditorDirty(filaPrincipalEditor, true);
+                });
+            }
+            if (checkImportante && !checkImportante.dataset.editorConfigurado) {
+                checkImportante.dataset.editorConfigurado = '1';
+                checkImportante.addEventListener('change', () => {
+                    if (filaPrincipalEditor) kpMarcarFilaEditorDirty(filaPrincipalEditor, true);
+                });
+            }
+        }
+
+        function kpConstruirFiltroDesdeEditor(lineaPrincipal) {
+            const principalId = lineaPrincipal.dataset.principalId;
+            const editor = lineaPrincipal.querySelector('.especificacion-grupo-editor');
+            const texto = editor.querySelector('.editor-principal-texto')?.value.trim() || '';
+            const importante = editor.querySelector('.editor-principal-importante')?.checked || false;
+            const subprincipales = [];
+
+            editor.querySelectorAll('.editor-linea-intermedia').forEach((row) => {
+                const textoSub = row.querySelector('.editor-intermedia-texto')?.value.trim() || '';
+                const idUnico = row.dataset.idUnico;
+                if (textoSub && idUnico) {
+                    subprincipales.push({
+                        texto: textoSub,
+                        id: idUnico,
+                        slug: kpGenerarSlugEspecificaciones(textoSub),
+                    });
+                }
+            });
+
+            return {
+                id: principalId,
+                texto,
+                slug: kpGenerarSlugEspecificaciones(texto),
+                importante,
+                subprincipales,
+            };
+        }
+
+        function kpAbrirEditorGrupo(lineaPrincipal) {
+            if (!document.getElementById('categoria_especificaciones_id')?.value) {
+                alert('Selecciona primero la categoría para especificaciones internas.');
+                return;
+            }
+
+            const principalId = lineaPrincipal.dataset.principalId;
+            const state = window.kpEspecificacionesCategoriaState;
+            const filtro = state?.especificaciones?.filtros?.find(
+                (f) => String(f.id) === String(principalId)
+            );
+            if (!filtro) return;
+
+            const editor = lineaPrincipal.querySelector('.especificacion-grupo-editor');
+            const btnEditar = lineaPrincipal.querySelector('.btn-editar-grupo-especificaciones');
+
+            kpRenderizarEditorGrupo(lineaPrincipal, filtro);
+            const details = lineaPrincipal.querySelector('.especificacion-grupo-details');
+            if (details) details.classList.add('hidden');
+            if (editor) editor.classList.remove('hidden');
+            if (btnEditar) btnEditar.textContent = 'Ver opciones';
+            lineaPrincipal.dataset.modoEditorGrupo = '1';
+            kpOcultarTodosGuardarFilaEditor(lineaPrincipal);
+        }
+
+        function kpCerrarEditorGrupo(lineaPrincipal) {
+            const editor = lineaPrincipal.querySelector('.especificacion-grupo-editor');
+            const btnEditar = lineaPrincipal.querySelector('.btn-editar-grupo-especificaciones');
+            const details = lineaPrincipal.querySelector('.especificacion-grupo-details');
+
+            if (details) details.classList.remove('hidden');
+            if (editor) editor.classList.add('hidden');
+            if (btnEditar) btnEditar.textContent = 'Editar';
+            delete lineaPrincipal.dataset.modoEditorGrupo;
+            kpOcultarTodosGuardarFilaEditor(lineaPrincipal);
+        }
+
+        function kpObtenerSublineaIdDesdeBotonGuardarEditor(btnTrigger) {
+            if (!btnTrigger || btnTrigger.classList.contains('btn-guardar-fila-editor-principal')) {
+                return null;
+            }
+            const fila = btnTrigger.closest('.editor-linea-intermedia');
+            return fila?.dataset.idUnico || null;
+        }
+
+        function kpAñadirSublineaAEspecificacionesElegidas(opcionesGuardadas, principalId, sublineaId) {
+            if (!principalId || !sublineaId) return opcionesGuardadas;
+
+            const pid = String(principalId);
+            const sid = String(sublineaId);
+            const out = { ...opcionesGuardadas };
+            let arr = Array.isArray(out[pid]) ? [...out[pid]] : [];
+
+            const yaExiste = arr.some((item) => {
+                if (typeof item === 'string' || typeof item === 'number') {
+                    return String(item) === sid;
+                }
+                return item && item.id != null && String(item.id) === sid;
+            });
+
+            if (!yaExiste) {
+                arr.push({ id: sid });
+            }
+
+            out[pid] = arr;
+            return out;
+        }
+
+        function kpMarcarSublineaEspecificacionEnUI(principalId, sublineaId) {
+            const contenedor = document.getElementById('especificaciones-internas-contenido');
+            if (!contenedor || !principalId || !sublineaId) return false;
+
+            const checkbox = contenedor.querySelector(
+                `.especificacion-checkbox[data-principal-id="${principalId}"][data-sublinea-id="${sublineaId}"]`
+            );
+            if (!checkbox) return false;
+
+            if (!checkbox.checked) {
+                checkbox.checked = true;
+                checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+            } else {
+                actualizarEspecificacionesElegidas();
+                actualizarChipsSeleccionados();
+            }
+
+            return true;
+        }
+
+        function kpScrollAGrupoEspecificaciones(principalId) {
+            const contenedor = document.getElementById('especificaciones-internas-contenido');
+            if (!contenedor || !principalId) return;
+
+            const linea = contenedor.querySelector(
+                `.linea-principal-especificaciones[data-principal-id="${principalId}"]`
+            );
+            if (!linea) return;
+
+            const details = linea.querySelector('.especificacion-grupo-details');
+            if (details) {
+                details.removeAttribute('open');
+                details.classList.remove('hidden');
+            }
+
+            const editor = linea.querySelector('.especificacion-grupo-editor');
+            if (editor) editor.classList.add('hidden');
+
+            const btnEditar = linea.querySelector('.btn-editar-grupo-especificaciones');
+            if (btnEditar) btnEditar.textContent = 'Editar';
+
+            delete linea.dataset.modoEditorGrupo;
+
+            linea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            linea.classList.add('ring-2', 'ring-amber-400', 'ring-offset-2');
+            window.setTimeout(() => {
+                linea.classList.remove('ring-2', 'ring-amber-400', 'ring-offset-2');
+            }, 2200);
+        }
+
+        async function kpGuardarEditorGrupo(lineaPrincipal, btnTrigger = null) {
+            const categoriaId = document.getElementById('categoria_especificaciones_id')?.value;
+            if (!categoriaId) {
+                alert('Selecciona una categoría para especificaciones internas antes de guardar.');
+                return;
+            }
+
+            const principalId = lineaPrincipal.dataset.principalId;
+            const filtroEditado = kpConstruirFiltroDesdeEditor(lineaPrincipal);
+
+            if (!filtroEditado.texto) {
+                alert('El nombre del grupo no puede estar vacío.');
+                return;
+            }
+            if (filtroEditado.subprincipales.length === 0) {
+                alert('Añade al menos una opción al grupo.');
+                return;
+            }
+
+            const state = window.kpEspecificacionesCategoriaState;
+            let especificaciones = state?.especificaciones;
+            if (!especificaciones || !Array.isArray(especificaciones.filtros)) {
+                especificaciones = { filtros: [] };
+            }
+
+            const filtros = [...especificaciones.filtros];
+            const idx = filtros.findIndex((f) => String(f.id) === String(principalId));
+            if (idx >= 0) {
+                filtros[idx] = filtroEditado;
+            } else {
+                filtros.push(filtroEditado);
+            }
+
+            const btnGuardar = btnTrigger;
+            if (btnGuardar) {
+                btnGuardar.disabled = true;
+                btnGuardar.textContent = 'Guardando…';
+            }
+
+            try {
+                const response = await fetch(
+                    `/panel-privado/productos/categoria/${categoriaId}/especificaciones-internas`,
+                    {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            Accept: 'application/json',
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        },
+                        body: JSON.stringify({ especificaciones_internas: { filtros } }),
+                    }
+                );
+                const data = await response.json();
+
+                if (!response.ok) {
+                    const msg =
+                        data.message ||
+                        data.error ||
+                        (data.errors ? Object.values(data.errors).flat().join(' ') : null) ||
+                        'No se pudo guardar.';
+                    throw new Error(msg);
+                }
+
+                window.kpEspecificacionesCategoriaState = {
+                    categoriaId: String(categoriaId),
+                    especificaciones: data.especificaciones_internas,
+                    conteos: data.conteos_productos || {},
+                };
+
+                const sublineaIdGuardada = kpObtenerSublineaIdDesdeBotonGuardarEditor(btnTrigger);
+                const principalIdScroll = String(principalId);
+
+                const inputHidden = document.getElementById('categoria_especificaciones_internas_elegidas_input');
+                let opcionesGuardadas = {};
+                if (inputHidden?.value) {
+                    try {
+                        opcionesGuardadas = JSON.parse(inputHidden.value);
+                    } catch (e) {
+                        opcionesGuardadas = {};
+                    }
+                }
+
+                if (sublineaIdGuardada) {
+                    opcionesGuardadas = kpAñadirSublineaAEspecificacionesElegidas(
+                        opcionesGuardadas,
+                        principalIdScroll,
+                        sublineaIdGuardada
+                    );
+                    if (inputHidden) {
+                        inputHidden.value = JSON.stringify(opcionesGuardadas);
+                    }
+                }
+
+                const contenidoContainer = document.getElementById('especificaciones-internas-contenido');
+                if (contenidoContainer && data.especificaciones_internas) {
+                    mostrarDesplegablesEspecificacionesProducto(
+                        data.especificaciones_internas,
+                        contenidoContainer,
+                        opcionesGuardadas
+                    );
+                }
+
+                if (typeof kpAplicarCoincidenciasDesdeNombre === 'function') {
+                    kpAplicarCoincidenciasDesdeNombre();
+                }
+
+                if (sublineaIdGuardada) {
+                    kpMarcarSublineaEspecificacionEnUI(principalIdScroll, sublineaIdGuardada);
+                }
+
+                requestAnimationFrame(() => {
+                    kpScrollAGrupoEspecificaciones(principalIdScroll);
+                });
+            } catch (error) {
+                console.error(error);
+                alert('Error al guardar: ' + error.message);
+            } finally {
+                if (btnGuardar) {
+                    btnGuardar.disabled = false;
+                    btnGuardar.textContent = 'Guardar';
+                }
+            }
+        }
+
+        function kpInicializarDelegacionEditoresGrupo() {
+            if (kpEditorGrupoDelegacionLista) return;
+            kpEditorGrupoDelegacionLista = true;
+
+            const root = document.getElementById('especificaciones-internas-contenido');
+            if (!root) return;
+
+            root.addEventListener('click', (event) => {
+                const btnEditar = event.target.closest('.btn-editar-grupo-especificaciones');
+                const btnGuardar = event.target.closest(
+                    '.btn-guardar-fila-editor, .btn-guardar-fila-editor-principal'
+                );
+                const linea = (btnEditar || btnGuardar)?.closest('.linea-principal-especificaciones');
+                if (!linea) return;
+
+                if (btnGuardar) {
+                    event.preventDefault();
+                    kpGuardarEditorGrupo(linea, btnGuardar);
+                    return;
+                }
+
+                if (btnEditar) {
+                    event.preventDefault();
+                    if (linea.dataset.modoEditorGrupo === '1') {
+                        if (kpEditorGrupoTieneCambiosPendientes(linea)) {
+                            if (
+                                !confirm(
+                                    'Hay cambios sin guardar. ¿Cerrar el editor sin guardar?'
+                                )
+                            ) {
+                                return;
+                            }
+                        }
+                        kpCerrarEditorGrupo(linea);
+                    } else {
+                        kpAbrirEditorGrupo(linea);
+                    }
+                }
+            });
+        }
+
+        function kpInicializarEditoresGrupoEspecificaciones() {
+            kpInicializarDelegacionEditoresGrupo();
         }
 
         // Event listeners para el buscador de categorías (igual que productos relacionados)
@@ -3999,30 +5280,27 @@
                 
                 html += `<div class="linea-principal-especificaciones border border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-white dark:bg-gray-800" data-principal-id="${idPrincipal}" draggable="false">`;
                 
-                // Header de la línea principal con drag handle, checkbox columna (si es unidadUnica) y label
-                html += `<div class="flex items-center gap-3 mb-2">`;
+                // Cabecera del grupo, palabras del nombre y buscador
+                html += `<div class="especificacion-grupo-buscador-wrap mb-2" data-principal-id="${idPrincipal}">`;
+                html += `<div class="flex flex-wrap items-center gap-3 mb-2">`;
                 
-                // Icono de drag (solo si es unidadUnica)
                 if (esUnidadUnica) {
-                    html += `<div class="drag-handle-principal-especificaciones cursor-move text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" title="Arrastrar para reordenar" draggable="true">`;
+                    html += `<div class="drag-handle-principal-especificaciones cursor-move text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0" title="Arrastrar para reordenar" draggable="true">`;
                     html += `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">`;
                     html += `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"></path>`;
                     html += `</svg>`;
                     html += `</div>`;
                 }
                 
-                // Nombre de la línea principal y texto "Aplica Filtro Categoria" si es importante
-                html += `<label class="flex-1 block font-medium text-gray-700 dark:text-gray-200">${textoPrincipal}${filtro.importante ? ' <span class="text-yellow-600 dark:text-yellow-400">(Aplica Filtro Categoria)</span>' : ''}</label>`;
+                html += `<span class="font-medium text-gray-700 dark:text-gray-200 shrink-0">${textoPrincipal}</span>`;
+                html += `<div class="especificacion-grupo-palabras-nombre flex flex-wrap gap-1.5 flex-1 min-w-0 hidden" data-principal-id="${idPrincipal}"></div>`;
                 
-                // Checkbox "Columna oferta" (unidad única o si ya hay _columnas guardadas)
                 if (mostrarUIColumnaOferta) {
-                    html += `<div class="flex items-center gap-2">`;
+                    html += `<div class="flex items-center gap-2 shrink-0 ml-auto">`;
                     html += `<label class="flex items-center gap-1 cursor-pointer">`;
                     html += `<input type="checkbox" class="columna-oferta-checkbox rounded border-gray-300 text-orange-600 focus:ring-orange-500" data-principal-id="${idPrincipal}" ${esColumna ? 'checked' : ''}>`;
                     html += `<span class="text-xs text-gray-600 dark:text-gray-400 font-medium">Columna oferta</span>`;
                     html += `</label>`;
-                    
-                    // Icono de ayuda "?" con tooltip (click)
                     html += `<div class="relative">`;
                     html += `<button type="button" class="tooltip-btn text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-help focus:outline-none" aria-label="Ayuda" data-tooltip='Esto modificará las columnas de las ofertas listadas y se mostrarán las marcadas'>`;
                     html += `<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">`;
@@ -4034,11 +5312,14 @@
                 }
                 
                 html += `</div>`;
+                html += `<input type="text" class="especificacion-grupo-buscador w-full px-3 py-1.5 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500" data-principal-id="${idPrincipal}" placeholder="Buscar..." autocomplete="off">`;
+                html += `<div class="especificacion-grupo-resultados mt-2 space-y-2 pl-4 border-l-2 border-blue-400 dark:border-blue-500 hidden" data-principal-id="${idPrincipal}"></div>`;
+                html += `</div>`;
                 
-                // Desplegable
-                html += `<details class="mb-2">`;
-                html += `<summary class="cursor-pointer text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium">Seleccionar opciones</summary>`;
-                html += `<div class="mt-2 space-y-2 pl-4 border-l-2 border-gray-300 dark:border-gray-600">`;
+                html += `<div class="especificacion-grupo-opciones-toolbar relative mb-2">`;
+                html += `<details class="especificacion-grupo-details min-w-0 pr-40 sm:pr-44">`;
+                html += `<summary class="cursor-pointer text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium list-none [&::-webkit-details-marker]:hidden">Ver todas las opciones</summary>`;
+                html += `<div class="mt-2 space-y-2 pl-4 border-l-2 border-gray-300 dark:border-gray-600 especificacion-grupo-lista-opciones" data-principal-id="${idPrincipal}">`;
                 
                 subprincipales.forEach((sub, subIndex) => {
                     const idSublinea = sub.id;
@@ -4079,7 +5360,7 @@
                     // Leer texto alternativo guardado si existe
                     const textoAlternativo = sublineaData && sublineaData.textoAlternativo ? sublineaData.textoAlternativo : '';
                     
-                    html += `<div class="flex items-center gap-3 p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700">`;
+                    html += `<div class="especificacion-opcion-fila flex flex-wrap items-center gap-3 p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700" data-sublinea-id="${idSublinea}" data-sublinea-orden="${subIndex}">`;
                     html += `<label class="flex items-center gap-2 cursor-pointer flex-1">`;
                     html += `<input type="checkbox" class="especificacion-checkbox rounded border-gray-300 text-green-600 focus:ring-green-500" data-principal-id="${idPrincipal}" data-sublinea-id="${idSublinea}" data-sublinea-texto="${textoSublinea.replace(/"/g, '&quot;')}" ${isChecked ? 'checked' : ''}>`;
                     html += `<span class="text-sm text-gray-700 dark:text-gray-300">${textoSublinea}</span>`;
@@ -4162,6 +5443,19 @@
                 
                 html += `</div>`;
                 html += `</details>`;
+                html += `<div class="especificacion-grupo-opciones-acciones absolute right-0 top-0 z-10 flex items-center gap-2">`;
+                html += `<button type="button" class="btn-editar-grupo-especificaciones shrink-0 text-xs px-3 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-amber-50 dark:hover:bg-amber-900/30 shadow-sm" data-principal-id="${idPrincipal}">Editar</button>`;
+                html += `</div>`;
+                html += `</div>`;
+                html += `<div class="especificacion-grupo-editor hidden mb-3 p-4 border border-amber-300 dark:border-amber-600 rounded-lg bg-amber-50/50 dark:bg-amber-900/10" data-principal-id="${idPrincipal}">`;
+                html += `<p class="text-xs text-gray-600 dark:text-gray-400 mb-3">Edita las opciones de este grupo. Al guardar se actualizan las especificaciones internas de la categoría seleccionada arriba.</p>`;
+                html += `<div class="especificacion-grupo-editor-principal flex flex-wrap items-center gap-2 mb-3">`;
+                html += `<input type="text" class="editor-principal-texto flex-1 min-w-0 px-3 py-2 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-200" value="${String(textoPrincipal).replace(/"/g, '&quot;')}" placeholder="Nombre del grupo">`;
+                html += `<label class="flex items-center gap-1 text-sm text-gray-700 dark:text-gray-200 cursor-pointer shrink-0"><input type="checkbox" class="editor-principal-importante rounded border-gray-300 text-amber-600 focus:ring-amber-500" ${filtro.importante ? 'checked' : ''}><span>Importante</span></label>`;
+                html += `<button type="button" class="btn-guardar-fila-editor-principal hidden shrink-0 text-xs px-3 py-1 rounded bg-green-600 hover:bg-green-700 text-white font-medium disabled:opacity-50">Guardar</button>`;
+                html += `</div>`;
+                html += `<div class="especificacion-grupo-editor-sublineas space-y-2"></div>`;
+                html += `</div>`;
                 
                 // Contenedor para chips de opciones seleccionadas
                 html += `<div class="mt-2 flex flex-wrap gap-2 chips-container-${idPrincipal}">`;
@@ -4180,11 +5474,12 @@
                 });
                 
                 if (seleccionadas.length > 0) {
-                    seleccionadas.forEach(sub => {
-                        html += `<span class="inline-flex items-center gap-1 px-2 py-1 text-xs bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded">`;
-                        html += `<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>`;
-                        html += `<span>${sub.texto || '(Sin texto)'}</span>`;
-                        html += `</span>`;
+                    seleccionadas.forEach((sub) => {
+                        html += kpHtmlChipEspecificacionSeleccionada(
+                            idPrincipal,
+                            sub.id,
+                            sub.texto || '(Sin texto)'
+                        );
                     });
                 }
                 
@@ -4210,6 +5505,8 @@
             
             html += '</div>';
             contenedor.innerHTML = html;
+
+            kpInicializarDelegacionQuitarChipEspecificacion(contenedor);
             
             // Configurar drag and drop si es unidadUnica
             if (esUnidadUnica) {
@@ -4344,15 +5641,16 @@
                         }
                     }
                     
-                    // Si se desmarca, desmarcar también "Mostrar", "Oferta" y "Usar imágenes del producto"
+                    const textoAlternativoInput = contenedor.querySelector(`.texto-alternativo-sublinea-input[data-principal-id="${principalId}"][data-sublinea-id="${sublineaId}"]`);
+
+                    // Si se desmarca, desmarcar también "Mostrar", "Oferta", "Usar imágenes del producto" y limpiar texto alternativo
                     if (!this.checked) {
                         if (mostrarCheckbox) mostrarCheckbox.checked = false;
                         if (ofertaCheckbox) ofertaCheckbox.checked = false;
                         if (usarImagenesProductoCheckbox) usarImagenesProductoCheckbox.checked = false;
+                        if (textoAlternativoInput) textoAlternativoInput.value = '';
                     }
-                    
-                    // Habilitar/deshabilitar campo de texto alternativo si existe
-                    const textoAlternativoInput = contenedor.querySelector(`.texto-alternativo-sublinea-input[data-principal-id="${principalId}"][data-sublinea-id="${sublineaId}"]`);
+
                     if (textoAlternativoInput) {
                         textoAlternativoInput.disabled = !this.checked;
                     }
@@ -4362,7 +5660,7 @@
                     if (textoSublinea) {
                         resaltarBotonesPalabrasClave(textoSublinea, this.checked);
                     }
-                    
+
                     actualizarEspecificacionesElegidas();
                     actualizarVisibilidadFormatoVisualizacion(contenedor);
                 });
@@ -4463,6 +5761,9 @@
             
             // Configurar tooltips con click
             configurarTooltips(contenedor);
+
+            kpConfigurarBuscadoresGrupoEspecificaciones(contenedor);
+            kpInicializarEditoresGrupoEspecificaciones();
             
             // Configurar event listeners para botones de imágenes de sublíneas
             configurarBotonesImagenesSublineas(contenedor);
@@ -4472,6 +5773,10 @@
             
             // Actualizar JSON inicial
             actualizarEspecificacionesElegidas();
+
+            if (typeof kpAplicarCoincidenciasDesdeNombre === 'function') {
+                kpAplicarCoincidenciasDesdeNombre();
+            }
         }
         
         // Función para configurar tooltips con click
@@ -5133,6 +6438,182 @@
             }
             return [];
         }
+        function kpLeerImagenesSublineaJson(principalId, sublineaId) {
+            const inputHidden = document.getElementById('categoria_especificaciones_internas_elegidas_input');
+            if (!inputHidden || !inputHidden.value) return [];
+            try {
+                const especificaciones = JSON.parse(inputHidden.value);
+                const arr = especificaciones[principalId];
+                if (!Array.isArray(arr)) return [];
+                const sublineaData = arr.find(function(item) {
+                    if (typeof item === 'string' || typeof item === 'number') {
+                        return String(item) === String(sublineaId);
+                    }
+                    return item && item.id && String(item.id) === String(sublineaId);
+                });
+                if (sublineaData && sublineaData.img && Array.isArray(sublineaData.img)) {
+                    return sublineaData.img.slice();
+                }
+            } catch (e) {}
+            return [];
+        }
+        function kpNormalizarParDesdeRutaGrandeSublinea(rutaGrande) {
+            const g = (rutaGrande || '').trim();
+            const p = kpInferirRutaThumbnailSublinea(g);
+            return { rutaGrande: g, rutaPequena: p, thumbVisual: p || g };
+        }
+        function kpIndiceSeleccionInternaSublinea(pair) {
+            const key = kpPairKeyInternaSublinea(pair);
+            let ix = __kpInternaSublineaSelOrden.findIndex(function(x) {
+                return kpPairKeyInternaSublinea(x) === key;
+            });
+            if (ix !== -1) return ix;
+            if (pair.rutaGrande) {
+                ix = __kpInternaSublineaSelOrden.findIndex(function(x) {
+                    return x.rutaGrande && String(x.rutaGrande) === String(pair.rutaGrande);
+                });
+            }
+            return ix;
+        }
+        function kpRutasDesdeSeleccionInternaSublinea() {
+            const rutas = [];
+            __kpInternaSublineaSelOrden.forEach(function(pair) {
+                const r = (pair.rutaGrande || '').trim();
+                if (r && !kpEsRutaPendiente(r) && !rutas.includes(r)) rutas.push(r);
+            });
+            return rutas;
+        }
+        function kpRefrescarInternaSublineaDesdeGuardado() {
+            const pid = sublineaImagenesActual.principalId;
+            const sid = sublineaImagenesActual.sublineaId;
+            if (!pid || !sid) {
+                kpRenderGaleriaInternaSublinea();
+                return;
+            }
+            sublineaImagenesActual.imagenes = kpLeerImagenesSublineaJson(pid, sid);
+            kpCargarInternaSublineaDesdeContexto();
+        }
+        function kpCargarInternaSublineaDesdeContexto() {
+            kpLimpiarInternaSublineaUI();
+            const paths = sublineaImagenesActual.imagenes || [];
+            paths.forEach(function(ruta) {
+                if (!ruta || kpEsRutaPendiente(ruta)) return;
+                const pair = kpNormalizarParDesdeRutaGrandeSublinea(ruta);
+                __kpInternaSublineaSelOrden.push(pair);
+                kpAddFilaInternaSublinea(pair);
+            });
+            kpRenderGaleriaInternaSublinea();
+        }
+        function kpAsegurarSublineaMarcadaEnEspecificaciones(principalId, sublineaId) {
+            const cb = document.querySelector(
+                `.especificacion-checkbox[data-principal-id="${principalId}"][data-sublinea-id="${sublineaId}"]`
+            );
+            if (cb && !cb.checked) {
+                cb.checked = true;
+                cb.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        }
+        function kpActualizarContadorImagenesSublineaUI(principalId, sublineaId) {
+            const num = (sublineaImagenesActual.imagenes || []).length;
+            const btnVer = document.querySelector(
+                `.btn-ver-imagenes-sublinea[data-principal-id="${principalId}"][data-sublinea-id="${sublineaId}"]`
+            );
+            const btnAdd = document.querySelector(
+                `.btn-añadir-imagen-sublinea[data-principal-id="${principalId}"][data-sublinea-id="${sublineaId}"]`
+            );
+            if (btnVer) {
+                if (num > 0) {
+                    btnVer.textContent = num + ' img';
+                    btnVer.title = 'Ver ' + num + ' imagen' + (num > 1 ? 'es' : '');
+                    btnVer.classList.remove('hidden');
+                } else {
+                    btnVer.textContent = '0 img';
+                    btnVer.title = 'Ver imágenes';
+                }
+            }
+            if (btnAdd && num > 0) {
+                let btnVerExistente = btnVer;
+                if (!btnVerExistente || btnVerExistente.classList.contains('hidden')) {
+                    const fila = btnAdd.closest('.especificacion-opcion-fila');
+                    if (fila && !btnVerExistente) {
+                        const nuevoBtn = document.createElement('button');
+                        nuevoBtn.type = 'button';
+                        nuevoBtn.className =
+                            'btn-ver-imagenes-sublinea text-xs px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors';
+                        nuevoBtn.dataset.principalId = principalId;
+                        nuevoBtn.dataset.sublineaId = sublineaId;
+                        nuevoBtn.textContent = num + ' img';
+                        nuevoBtn.title = 'Ver ' + num + ' imagen' + (num > 1 ? 'es' : '');
+                        nuevoBtn.addEventListener('click', function() {
+                            abrirModalImagenesSublinea(principalId, sublineaId);
+                        });
+                        const wrapImg = btnAdd.parentElement;
+                        if (wrapImg) wrapImg.insertBefore(nuevoBtn, btnAdd);
+                    }
+                }
+            }
+            actualizarChipsSeleccionados();
+        }
+        function kpQuitarFilaInternaSublineaPorPair(pair) {
+            const cont = document.getElementById('filas-interna-sublinea');
+            if (!cont) return;
+            const b64 = kpStableB64InternaSub(kpPairKeyInternaSublinea(pair));
+            let hit = cont.querySelector('.kp-fila-interna-sublinea[data-pair-key="' + b64 + '"]');
+            if (!hit && pair.rutaGrande) {
+                cont.querySelectorAll('.kp-fila-interna-sublinea').forEach(function(row) {
+                    if (hit) return;
+                    const g = row.querySelector('.kp-interna-sub-g');
+                    if (g && String(g.value).trim() === String(pair.rutaGrande).trim()) hit = row;
+                });
+            }
+            if (hit) hit.remove();
+        }
+        function kpDescartarInternaSublineaSeleccion(pair, ev) {
+            if (ev) {
+                ev.preventDefault();
+                ev.stopPropagation();
+            }
+            const ix = kpIndiceSeleccionInternaSublinea(pair);
+            if (ix === -1) return;
+            __kpInternaSublineaSelOrden.splice(ix, 1);
+            kpQuitarFilaInternaSublineaPorPair(pair);
+            kpRenderGaleriaInternaSublinea();
+        }
+        function kpCrearCeldaGaleriaInternaMarcada(src, tituloDescartar, onDescartar) {
+            const wrap = document.createElement('div');
+            wrap.className =
+                'relative w-full aspect-square max-w-full border border-gray-300 dark:border-gray-500 rounded-sm overflow-hidden bg-gray-200/80 dark:bg-gray-700/80';
+            const img = document.createElement('img');
+            img.src = src;
+            img.className = 'w-full h-full object-cover block grayscale opacity-70';
+            img.alt = '';
+            wrap.appendChild(img);
+            const btnDescartar = document.createElement('button');
+            btnDescartar.type = 'button';
+            btnDescartar.className =
+                'absolute top-0.5 right-0.5 z-10 w-5 h-5 flex items-center justify-center rounded bg-red-600 hover:bg-red-700 text-white text-sm font-bold leading-none shadow-md';
+            btnDescartar.title = tituloDescartar;
+            btnDescartar.setAttribute('aria-label', tituloDescartar);
+            btnDescartar.textContent = '×';
+            btnDescartar.addEventListener('click', onDescartar);
+            wrap.appendChild(btnDescartar);
+            return wrap;
+        }
+        function kpCrearCeldaGaleriaInternaLibre(src, onSeleccionar) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className =
+                'relative w-full aspect-square max-w-full border border-gray-200 dark:border-gray-600 p-0 overflow-hidden rounded-sm transition hover:border-blue-400 dark:hover:border-blue-500';
+            const img = document.createElement('img');
+            img.src = src;
+            img.className = 'w-full h-full object-cover block pointer-events-none';
+            img.alt = '';
+            btn.appendChild(img);
+            btn.addEventListener('click', onSeleccionar);
+            return btn;
+        }
+        window.kpCrearCeldaGaleriaInternaMarcada = kpCrearCeldaGaleriaInternaMarcada;
+        window.kpCrearCeldaGaleriaInternaLibre = kpCrearCeldaGaleriaInternaLibre;
         function kpRenderGaleriaInternaSublinea() {
             const wrap = document.getElementById('galeria-imgs-interna-sublinea');
             const vac = document.getElementById('galeria-imgs-interna-sublinea-vacio');
@@ -5145,27 +6626,23 @@
             }
             if (vac) vac.classList.add('hidden');
             pairs.forEach(function(pair) {
-                const key = kpPairKeyInternaSublinea(pair);
-                const ord = __kpInternaSublineaSelOrden.findIndex(function(x) { return kpPairKeyInternaSublinea(x) === key; }) + 1;
+                const seleccionada = kpIndiceSeleccionInternaSublinea(pair) !== -1;
+                const src = kpUrlVistaDesdeRutaAlmacen(pair.thumbVisual || pair.rutaPequena || pair.rutaGrande);
                 const cell = document.createElement('div');
                 cell.className = 'min-w-0 w-full';
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.className = 'relative w-full aspect-square max-w-full border p-0 overflow-hidden rounded-sm transition ' + (ord ? 'border-blue-500 ring-1 ring-inset ring-blue-400/80 bg-blue-50/50 dark:bg-blue-900/30' : 'border-gray-200 dark:border-gray-600 hover:border-gray-400');
-                const src = kpUrlVistaDesdeRutaAlmacen(pair.thumbVisual || pair.rutaPequena || pair.rutaGrande);
-                const img = document.createElement('img');
-                img.src = src;
-                img.className = 'w-full h-full object-cover block pointer-events-none';
-                img.alt = '';
-                btn.appendChild(img);
-                if (ord) {
-                    const badge = document.createElement('span');
-                    badge.className = 'absolute -top-0.5 -right-0.5 min-w-3 h-3.5 px-0.5 flex items-center justify-center rounded-full bg-blue-600 text-white text-[8px] font-bold leading-none';
-                    badge.textContent = String(ord);
-                    btn.appendChild(badge);
+                if (seleccionada) {
+                    cell.appendChild(
+                        kpCrearCeldaGaleriaInternaMarcada(src, 'Quitar de esta opción', function(e) {
+                            kpDescartarInternaSublineaSeleccion(pair, e);
+                        })
+                    );
+                } else {
+                    cell.appendChild(
+                        kpCrearCeldaGaleriaInternaLibre(src, function() {
+                            kpToggleInternaSublineaSeleccion(pair);
+                        })
+                    );
                 }
-                btn.addEventListener('click', function() { kpToggleInternaSublineaSeleccion(pair); });
-                cell.appendChild(btn);
                 wrap.appendChild(cell);
             });
         }
@@ -5205,22 +6682,29 @@
             kpActualizarPreviewInputInterno(idn + '-p', idn + '-pp');
         }
         function kpToggleInternaSublineaSeleccion(pair) {
-            const key = kpPairKeyInternaSublinea(pair);
-            const ix = __kpInternaSublineaSelOrden.findIndex(function(x) { return kpPairKeyInternaSublinea(x) === key; });
-            const cont = document.getElementById('filas-interna-sublinea');
-            const b64 = kpStableB64InternaSub(key);
+            const ix = kpIndiceSeleccionInternaSublinea(pair);
             if (ix === -1) {
-                __kpInternaSublineaSelOrden.push({ rutaGrande: pair.rutaGrande, rutaPequena: pair.rutaPequena, thumbVisual: pair.thumbVisual });
+                __kpInternaSublineaSelOrden.push({
+                    rutaGrande: pair.rutaGrande,
+                    rutaPequena: pair.rutaPequena,
+                    thumbVisual: pair.thumbVisual,
+                });
                 kpAddFilaInternaSublinea(pair);
             } else {
                 __kpInternaSublineaSelOrden.splice(ix, 1);
-                if (cont) {
-                    const hit = cont.querySelector('.kp-fila-interna-sublinea[data-pair-key="' + b64 + '"]');
-                    if (hit) hit.remove();
-                }
+                kpQuitarFilaInternaSublineaPorPair(pair);
             }
             kpRenderGaleriaInternaSublinea();
+            if (typeof window.kpInternaGlobalRefrescarSeleccion === 'function') {
+                window.kpInternaGlobalRefrescarSeleccion('sublinea');
+            }
         }
+        window.kpToggleInternaSublineaSeleccion = kpToggleInternaSublineaSeleccion;
+        window.kpIndiceSeleccionInternaSublinea = kpIndiceSeleccionInternaSublinea;
+        window.kpRefrescarInternaSublineaDesdeGuardado = kpRefrescarInternaSublineaDesdeGuardado;
+        window.kpObtenerParesSeleccionInternaSublinea = function() {
+            return __kpInternaSublineaSelOrden.slice();
+        };
 
         function kpCancelarSubidaSublinea(uploadId) {
             const x = uploadsPendientesSublinea.get(uploadId);
@@ -5523,58 +7007,77 @@
         }
         
         // Guardar imágenes de sublínea en el JSON
-        function guardarImagenesSublinea() {
+        function guardarImagenesSublinea(opciones) {
+            opciones = opciones || {};
             const inputHidden = document.getElementById('categoria_especificaciones_internas_elegidas_input');
+            if (!inputHidden) return;
+
+            const principalId = sublineaImagenesActual.principalId;
+            const sublineaId = sublineaImagenesActual.sublineaId;
             let especificaciones = {};
-            
-            if (inputHidden && inputHidden.value) {
+
+            if (inputHidden.value) {
                 try {
                     especificaciones = JSON.parse(inputHidden.value);
                 } catch (e) {
                     console.error('Error al parsear especificaciones:', e);
                 }
             }
-            
-            if (!especificaciones[sublineaImagenesActual.principalId]) {
-                especificaciones[sublineaImagenesActual.principalId] = [];
+
+            if (!especificaciones[principalId]) {
+                especificaciones[principalId] = [];
             }
-            
-            // Buscar la sublínea en el array
-            const index = especificaciones[sublineaImagenesActual.principalId].findIndex(item => {
+
+            const imagenes = Array.isArray(sublineaImagenesActual.imagenes)
+                ? sublineaImagenesActual.imagenes.slice()
+                : [];
+
+            let index = especificaciones[principalId].findIndex(function(item) {
                 if (typeof item === 'string' || typeof item === 'number') {
-                    return String(item) === String(sublineaImagenesActual.sublineaId);
-                } else if (item && item.id) {
-                    return String(item.id) === String(sublineaImagenesActual.sublineaId);
+                    return String(item) === String(sublineaId);
                 }
-                return false;
+                return item && item.id && String(item.id) === String(sublineaId);
             });
-            
-            if (index !== -1) {
-                // Actualizar imágenes en el item existente
-                if (typeof especificaciones[sublineaImagenesActual.principalId][index] === 'object' && especificaciones[sublineaImagenesActual.principalId][index].id) {
-                    if (sublineaImagenesActual.imagenes.length > 0) {
-                        especificaciones[sublineaImagenesActual.principalId][index].img = sublineaImagenesActual.imagenes;
+
+            if (index === -1) {
+                const nuevo = { id: sublineaId };
+                if (imagenes.length > 0) nuevo.img = imagenes;
+                especificaciones[principalId].push(nuevo);
+            } else {
+                const item = especificaciones[principalId][index];
+                if (typeof item === 'string' || typeof item === 'number') {
+                    const nuevo = { id: sublineaId };
+                    if (imagenes.length > 0) nuevo.img = imagenes;
+                    especificaciones[principalId][index] = nuevo;
+                } else if (item && typeof item === 'object') {
+                    if (!item.id) item.id = sublineaId;
+                    if (imagenes.length > 0) {
+                        item.img = imagenes;
                     } else {
-                        delete especificaciones[sublineaImagenesActual.principalId][index].img;
+                        delete item.img;
                     }
                 }
             }
-            
+
             inputHidden.value = JSON.stringify(especificaciones, null, 0);
-            
-            // Recargar especificaciones para actualizar el contador
-            const categoriaId = document.getElementById('categoria_especificaciones_id').value;
-            if (categoriaId) {
-                obtenerEspecificacionesInternas(categoriaId);
+            kpAsegurarSublineaMarcadaEnEspecificaciones(principalId, sublineaId);
+            actualizarEspecificacionesElegidas();
+            kpActualizarContadorImagenesSublineaUI(principalId, sublineaId);
+
+            if (!opciones.omitirRecargaEspecificaciones) {
+                const categoriaId = document.getElementById('categoria_especificaciones_id')?.value;
+                if (categoriaId) {
+                    obtenerEspecificacionesInternas(categoriaId);
+                }
             }
         }
-        
+
         // Abrir modal para añadir imagen a sublínea
         function abrirModalAñadirImagenSublinea(principalId, sublineaId) {
             sublineaImagenesActual.principalId = principalId;
             sublineaImagenesActual.sublineaId = sublineaId;
+            sublineaImagenesActual.imagenes = kpLeerImagenesSublineaJson(principalId, sublineaId);
             document.getElementById('modal-añadir-imagen-sublinea').classList.remove('hidden');
-            kpRenderGaleriaInternaSublinea();
             cargarCarpetasModalSublinea();
             cambiarTabModalSublinea('url');
         }
@@ -5604,7 +7107,9 @@
             document.getElementById('imagenes-amazon-sublinea').classList.add('hidden');
             document.getElementById('grid-imagenes-amazon-sublinea').innerHTML = '';
             document.getElementById('area-recorte-sublinea').classList.add('hidden');
+            document.getElementById('area-recorte-amazon-sublinea').classList.add('hidden');
             imagenesAmazonSeleccionadasSublinea = [];
+            resetEstadoRecorteAmazonSublinea();
             if (cropperSublinea) {
                 cropperSublinea.destroy();
                 cropperSublinea = null;
@@ -5618,40 +7123,42 @@
             const tabUrl = document.getElementById('tab-url-sublinea');
             const tabAmazon = document.getElementById('tab-amazon-sublinea');
             const tabInterna = document.getElementById('tab-interna-sublinea');
+            const tabInternaGlobal = document.getElementById('tab-interna-global-sublinea');
             const contentSubir = document.getElementById('content-subir-sublinea');
             const contentUrl = document.getElementById('content-url-sublinea');
             const contentAmazon = document.getElementById('content-amazon-sublinea');
             const contentInterna = document.getElementById('content-interna-sublinea');
-            
-            // Resetear todas las pestañas
-            [tabUrl, tabSubir, tabAmazon, tabInterna].forEach(t => {
-                if (!t) return;
-                t.classList.remove('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
-                t.classList.add('border-transparent', 'text-gray-500');
-            });
-            [contentUrl, contentSubir, contentAmazon, contentInterna].forEach(c => {
+            const contentInternaGlobal = document.getElementById('content-interna-global-sublinea');
+            const allTabs = [tabUrl, tabSubir, tabAmazon, tabInterna, tabInternaGlobal];
+
+            [contentUrl, contentSubir, contentAmazon, contentInterna, contentInternaGlobal].forEach(c => {
                 if (c) c.classList.add('hidden');
             });
             
             if (tab === 'url') {
-                tabUrl.classList.add('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
-                tabUrl.classList.remove('border-transparent', 'text-gray-500');
+                window.kpModalImgTabSetActive(allTabs, tabUrl);
                 contentUrl.classList.remove('hidden');
             } else if (tab === 'subir') {
-                tabSubir.classList.add('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
-                tabSubir.classList.remove('border-transparent', 'text-gray-500');
+                window.kpModalImgTabSetActive(allTabs, tabSubir);
                 contentSubir.classList.remove('hidden');
             } else if (tab === 'amazon') {
-                tabAmazon.classList.add('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
-                tabAmazon.classList.remove('border-transparent', 'text-gray-500');
+                window.kpModalImgTabSetActive(allTabs, tabAmazon);
                 contentAmazon.classList.remove('hidden');
                 cargarCarpetasModalSublinea(); // Cargar carpetas cuando se abre la pestaña Amazon
             } else if (tab === 'interna' && tabInterna && contentInterna) {
-                tabInterna.classList.add('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
-                tabInterna.classList.remove('border-transparent', 'text-gray-500');
+                window.kpModalImgTabSetActive(allTabs, tabInterna);
                 contentInterna.classList.remove('hidden');
                 kpBindFilasInternaSublineaDelegation();
-                kpRenderGaleriaInternaSublinea();
+                kpRefrescarInternaSublineaDesdeGuardado();
+            } else if (tab === 'interna-global' && tabInternaGlobal && contentInternaGlobal) {
+                window.kpModalImgTabSetActive(allTabs, tabInternaGlobal);
+                contentInternaGlobal.classList.remove('hidden');
+                if (typeof window.kpRefrescarInternaSublineaDesdeGuardado === 'function') {
+                    window.kpRefrescarInternaSublineaDesdeGuardado();
+                }
+                if (typeof window.kpInternaGlobalAlActivar === 'function') {
+                    window.kpInternaGlobalAlActivar('sublinea');
+                }
             }
         }
         
@@ -5697,6 +7204,50 @@
             }
         }
         
+        function kpEscaparHtmlChipEspecificacion(texto) {
+            return String(texto || '(Sin texto)')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function kpHtmlChipEspecificacionSeleccionada(principalId, sublineaId, texto) {
+            const textoEsc = kpEscaparHtmlChipEspecificacion(texto);
+            const principalEsc = String(principalId).replace(/"/g, '&quot;');
+            const sublineaEsc = String(sublineaId).replace(/"/g, '&quot;');
+            return `<span class="inline-flex items-center gap-1 px-2 py-1 text-xs bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded" data-sublinea-id="${sublineaEsc}">
+                <svg class="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
+                <span>${textoEsc}</span>
+                <button type="button" class="btn-quitar-chip-especificacion shrink-0 rounded p-0.5 text-green-800 dark:text-green-200 hover:bg-green-300/60 dark:hover:bg-green-800 focus:outline-none leading-none font-bold" title="Quitar selección" aria-label="Quitar ${textoEsc}" data-principal-id="${principalEsc}" data-sublinea-id="${sublineaEsc}">×</button>
+            </span>`;
+        }
+
+        function kpDesmarcarSublineaEspecificacion(principalId, sublineaId) {
+            const contenedor = document.getElementById('especificaciones-internas-contenido');
+            if (!contenedor || !principalId || !sublineaId) return;
+
+            const checkbox = contenedor.querySelector(
+                `.especificacion-checkbox[data-principal-id="${principalId}"][data-sublinea-id="${sublineaId}"]`
+            );
+            if (!checkbox || !checkbox.checked) return;
+
+            checkbox.checked = false;
+            checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        function kpInicializarDelegacionQuitarChipEspecificacion(contenedor) {
+            if (!contenedor || contenedor.dataset.chipsQuitarDelegacion === '1') return;
+            contenedor.dataset.chipsQuitarDelegacion = '1';
+            contenedor.addEventListener('click', (event) => {
+                const btn = event.target.closest('.btn-quitar-chip-especificacion');
+                if (!btn) return;
+                event.preventDefault();
+                event.stopPropagation();
+                kpDesmarcarSublineaEspecificacion(btn.dataset.principalId, btn.dataset.sublineaId);
+            });
+        }
+
         // Función para actualizar los chips de opciones seleccionadas
         function actualizarChipsSeleccionados() {
             const inputHidden = document.getElementById('categoria_especificaciones_internas_elegidas_input');
@@ -5731,14 +7282,12 @@
                 // Buscar el contenedor de chips
                 const chipsContainer = contenedorPrincipal.querySelector(`.chips-container-${principalId}`);
                 if (chipsContainer) {
-                    // Actualizar chips
                     if (chipsSeleccionados.length > 0) {
-                        chipsContainer.innerHTML = chipsSeleccionados.map(sub => 
-                            `<span class="inline-flex items-center gap-1 px-2 py-1 text-xs bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded">
-                                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
-                                <span>${sub.texto}</span>
-                            </span>`
-                        ).join('');
+                        chipsContainer.innerHTML = chipsSeleccionados
+                            .map((sub) =>
+                                kpHtmlChipEspecificacionSeleccionada(principalId, sub.id, sub.texto)
+                            )
+                            .join('');
                     } else {
                         chipsContainer.innerHTML = '';
                     }
@@ -5896,6 +7445,8 @@
         document.getElementById('tab-url-sublinea').addEventListener('click', () => cambiarTabModalSublinea('url'));
         const tabInternaSubEl = document.getElementById('tab-interna-sublinea');
         if (tabInternaSubEl) tabInternaSubEl.addEventListener('click', () => cambiarTabModalSublinea('interna'));
+        const tabInternaGlobalSubEl = document.getElementById('tab-interna-global-sublinea');
+        if (tabInternaGlobalSubEl) tabInternaGlobalSubEl.addEventListener('click', () => cambiarTabModalSublinea('interna-global'));
         const btnInternaSubFilaVacia = document.getElementById('btn-interna-sublinea-anadir-fila-vacia');
         if (btnInternaSubFilaVacia) {
             btnInternaSubFilaVacia.addEventListener('click', function() {
@@ -5905,6 +7456,188 @@
         
         // ========== FUNCIONALIDAD AMAZON PARA MODAL SUBLÍNEA ==========
         let imagenesAmazonSeleccionadasSublinea = [];
+        let cropperAmazonSublinea = null;
+        let colaRecorteAmazonSublinea = [];
+        let totalRecorteAmazonSublinea = 0;
+        let carpetaActualAmazonSublinea = '';
+        let modoRecorteAmazonSublinea = false;
+
+        const kpOpcionesCropperAmazon = {
+            aspectRatio: NaN,
+            viewMode: 1,
+            dragMode: 'move',
+            autoCropArea: 0.8,
+            restore: false,
+            guides: true,
+            center: true,
+            highlight: false,
+            cropBoxMovable: true,
+            cropBoxResizable: true,
+            toggleDragModeOnDblclick: false,
+        };
+
+        function resetEstadoRecorteAmazonSublinea() {
+            colaRecorteAmazonSublinea = [];
+            totalRecorteAmazonSublinea = 0;
+            carpetaActualAmazonSublinea = '';
+            modoRecorteAmazonSublinea = false;
+            const area = document.getElementById('area-recorte-amazon-sublinea');
+            const busqueda = document.getElementById('amazon-busqueda-sublinea');
+            if (area) area.classList.add('hidden');
+            if (busqueda) busqueda.classList.remove('hidden');
+            if (cropperAmazonSublinea) {
+                cropperAmazonSublinea.destroy();
+                cropperAmazonSublinea = null;
+            }
+        }
+
+        function mostrarRecorteAmazonSublinea(urlImagen) {
+            const areaRecorte = document.getElementById('area-recorte-amazon-sublinea');
+            const img = document.getElementById('imagen-recortar-amazon-sublinea');
+            areaRecorte.classList.remove('hidden');
+            if (cropperAmazonSublinea) cropperAmazonSublinea.destroy();
+            const urlProxy = urlImagen.startsWith('http')
+                ? `{{ route('admin.imagenes.proxy') }}?url=${encodeURIComponent(urlImagen)}`
+                : urlImagen;
+            img.crossOrigin = 'anonymous';
+            img.src = urlProxy;
+            img.onload = function() {
+                if (cropperAmazonSublinea) cropperAmazonSublinea.destroy();
+                cropperAmazonSublinea = new Cropper(img, kpOpcionesCropperAmazon);
+            };
+            img.onerror = function() {
+                document.getElementById('error-amazon-sublinea').textContent = 'Error al cargar la imagen desde Amazon.';
+                document.getElementById('error-amazon-sublinea').classList.remove('hidden');
+                colaRecorteAmazonSublinea.shift();
+                mostrarSiguienteRecorteAmazonSublinea();
+            };
+        }
+
+        function mostrarSiguienteRecorteAmazonSublinea() {
+            if (!colaRecorteAmazonSublinea.length) {
+                resetEstadoRecorteAmazonSublinea();
+                prepararModalAnadirSublineaParaOtra('amazon');
+                cargarCarpetasModalSublinea();
+                return;
+            }
+            const actual = totalRecorteAmazonSublinea - colaRecorteAmazonSublinea.length + 1;
+            const progreso = document.getElementById('progreso-recorte-amazon-sublinea');
+            if (progreso) progreso.textContent = `Recortando imagen ${actual} de ${totalRecorteAmazonSublinea}`;
+            mostrarRecorteAmazonSublinea(colaRecorteAmazonSublinea[0].url);
+        }
+
+        function iniciarColaRecorteAmazonSublinea(carpeta) {
+            colaRecorteAmazonSublinea = imagenesAmazonSeleccionadasSublinea.slice();
+            totalRecorteAmazonSublinea = colaRecorteAmazonSublinea.length;
+            carpetaActualAmazonSublinea = carpeta;
+            modoRecorteAmazonSublinea = true;
+            document.getElementById('imagenes-amazon-sublinea').classList.add('hidden');
+            const busqueda = document.getElementById('amazon-busqueda-sublinea');
+            if (busqueda) busqueda.classList.add('hidden');
+            document.getElementById('error-amazon-sublinea').classList.add('hidden');
+            mostrarSiguienteRecorteAmazonSublinea();
+        }
+
+        async function procesarRecorteAmazonActualSublinea() {
+            if (!cropperAmazonSublinea || !carpetaActualAmazonSublinea) {
+                alert('Error al recortar la imagen.');
+                return;
+            }
+            const canvasOriginal = cropperAmazonSublinea.getCroppedCanvas({
+                imageSmoothingEnabled: true,
+                imageSmoothingQuality: 'high'
+            });
+            if (!canvasOriginal) {
+                alert('Error al recortar la imagen');
+                return;
+            }
+            colaRecorteAmazonSublinea.shift();
+            const carpetaUp = carpetaActualAmazonSublinea;
+            const slugInput = document.querySelector('input[name="slug"]');
+            const nombreBase = slugInput ? slugInput.value.trim() : 'imagen';
+            const uploadId = kpNuevoIdSubida();
+            const pendingPath = KP_PENDING_IMG + uploadId;
+            añadirImagenASublinea(pendingPath);
+            const verModalAbiertoSub = document.getElementById('modal-imagenes-sublinea') && !document.getElementById('modal-imagenes-sublinea').classList.contains('hidden');
+            if (verModalAbiertoSub) renderizarMiniaturasSublinea();
+
+            try {
+                const canvasGrande = document.createElement('canvas');
+                canvasGrande.width = canvasOriginal.width;
+                canvasGrande.height = canvasOriginal.height;
+                const ctxGrande = canvasGrande.getContext('2d');
+                ctxGrande.fillStyle = '#ffffff';
+                ctxGrande.fillRect(0, 0, canvasGrande.width, canvasGrande.height);
+                ctxGrande.drawImage(canvasOriginal, 0, 0);
+                const canvasPequena = document.createElement('canvas');
+                canvasPequena.width = 300;
+                canvasPequena.height = 250;
+                const ctxPequena = canvasPequena.getContext('2d');
+                ctxPequena.fillStyle = '#ffffff';
+                ctxPequena.fillRect(0, 0, canvasPequena.width, canvasPequena.height);
+                ctxPequena.drawImage(canvasOriginal, 0, 0, 300, 250);
+                const blobGrande = await new Promise(function(resolve, reject) {
+                    canvasGrande.toBlob(function(b) { b ? resolve(b) : reject(new Error('Error grande')); }, 'image/webp', 0.9);
+                });
+                const blobPequena = await new Promise(function(resolve, reject) {
+                    canvasPequena.toBlob(function(b) { b ? resolve(b) : reject(new Error('Error pequeña')); }, 'image/webp', 0.9);
+                });
+                const timestamp = Date.now();
+                const formDataGrande = new FormData();
+                formDataGrande.append('imagen', blobGrande, `${nombreBase}-${timestamp}.webp`);
+                formDataGrande.append('carpeta', carpetaUp);
+                formDataGrande.append('_token', '{{ csrf_token() }}');
+                const formDataPequena = new FormData();
+                formDataPequena.append('imagen', blobPequena, `${nombreBase}-${timestamp}-thumbnail.webp`);
+                formDataPequena.append('carpeta', carpetaUp);
+                formDataPequena.append('_token', '{{ csrf_token() }}');
+
+                (async function() {
+                    try {
+                        const onProg = function(pct) {
+                            const el = document.getElementById('kp-prog-sub-' + uploadId);
+                            if (el) el.style.width = pct + '%';
+                        };
+                        const { dataG, dataP } = await window.__kpSubirParejaConProgreso(
+                            '{{ route("admin.imagenes.subir-simple") }}',
+                            formDataGrande,
+                            formDataPequena,
+                            '{{ csrf_token() }}',
+                            onProg,
+                            uploadsPendientesSublinea,
+                            uploadId
+                        );
+                        if (dataG.success && dataP.success) {
+                            kpReemplazarRutaPendienteEnEspecificaciones(pendingPath, dataG.data.ruta_relativa);
+                        } else {
+                            throw new Error(dataG.message || dataP.message || 'Error al subir');
+                        }
+                    } catch (error) {
+                        console.error('Error al procesar imagen Amazon sublínea:', error);
+                        kpEliminarRutaPendienteDeEspecificaciones(pendingPath);
+                        const j = sublineaImagenesActual.imagenes.indexOf(pendingPath);
+                        if (j !== -1) {
+                            sublineaImagenesActual.imagenes.splice(j, 1);
+                            guardarImagenesSublinea();
+                        }
+                        renderizarMiniaturasSublinea();
+                        alert('Error al subir una imagen de Amazon: ' + error.message);
+                    }
+                })();
+            } catch (error) {
+                console.error('Error al procesar imagen Amazon sublínea:', error);
+                kpEliminarRutaPendienteDeEspecificaciones(pendingPath);
+                const j = sublineaImagenesActual.imagenes.indexOf(pendingPath);
+                if (j !== -1) {
+                    sublineaImagenesActual.imagenes.splice(j, 1);
+                    guardarImagenesSublinea();
+                }
+                renderizarMiniaturasSublinea();
+                alert('Error al procesar la imagen: ' + error.message);
+            }
+
+            mostrarSiguienteRecorteAmazonSublinea();
+        }
         
         // Limpiar URL vía servicio LimpiarUrlDeTiendas (compartido con ofertas)
         async function limpiarUrlAmazonViaApi(url) {
@@ -6098,9 +7831,14 @@
         
         // Guardar imágenes seleccionadas de Amazon en sublínea
         document.getElementById('btn-guardar-imagen-sublinea').addEventListener('click', async () => {
-            const tabActiva = document.querySelector('.tab-modal-sublinea.border-blue-500');
+            const tabActiva = document.querySelector('.tab-modal-sublinea.kp-modal-img-tab--active');
             if (!tabActiva || tabActiva.id !== 'tab-amazon-sublinea') {
                 return; // No es la pestaña de Amazon, dejar que el código existente maneje el guardado
+            }
+
+            if (modoRecorteAmazonSublinea) {
+                await procesarRecorteAmazonActualSublinea();
+                return;
             }
             
             if (imagenesAmazonSeleccionadasSublinea.length === 0) {
@@ -6114,94 +7852,8 @@
                 alert('Por favor, selecciona una carpeta');
                 return;
             }
-            
-            try {
-                const slugInput = document.querySelector('input[name="slug"]');
-                const nombreBase = slugInput ? slugInput.value.trim() : 'imagen';
-                const seleccionAmazonSub = imagenesAmazonSeleccionadasSublinea.slice();
-                const verModalAbiertoSub = document.getElementById('modal-imagenes-sublinea') && !document.getElementById('modal-imagenes-sublinea').classList.contains('hidden');
 
-                seleccionAmazonSub.forEach(function(imagen, i) {
-                    const uploadId = kpNuevoIdSubida();
-                    const pendingPath = KP_PENDING_IMG + uploadId;
-                    añadirImagenASublinea(pendingPath);
-
-                    const timestamp = Date.now() + i;
-                    const urlProxy = imagen.url.startsWith('http')
-                        ? `{{ route('admin.imagenes.proxy') }}?url=${encodeURIComponent(imagen.url)}`
-                        : imagen.url;
-
-                    (async function() {
-                        try {
-                            const img = await new Promise(function(resolve, reject) {
-                                const im = new Image();
-                                im.crossOrigin = 'anonymous';
-                                im.onload = function() { resolve(im); };
-                                im.onerror = function() { reject(new Error('Error al cargar la imagen desde Amazon')); };
-                                im.src = urlProxy;
-                            });
-                            const canvasGrande = document.createElement('canvas');
-                            canvasGrande.width = img.width;
-                            canvasGrande.height = img.height;
-                            canvasGrande.getContext('2d').drawImage(img, 0, 0);
-                            const canvasPequena = document.createElement('canvas');
-                            canvasPequena.width = 300;
-                            canvasPequena.height = 250;
-                            canvasPequena.getContext('2d').drawImage(img, 0, 0, 300, 250);
-                            const blobGrande = await new Promise(function(resolveBlob, rejectBlob) {
-                                canvasGrande.toBlob(function(b) { b ? resolveBlob(b) : rejectBlob(new Error('Error grande')); }, 'image/webp', 0.9);
-                            });
-                            const blobPequena = await new Promise(function(resolveBlob, rejectBlob) {
-                                canvasPequena.toBlob(function(b) { b ? resolveBlob(b) : rejectBlob(new Error('Error pequeña')); }, 'image/webp', 0.9);
-                            });
-                            const formDataGrande = new FormData();
-                            formDataGrande.append('imagen', blobGrande, `${nombreBase}-${timestamp}.webp`);
-                            formDataGrande.append('carpeta', carpeta);
-                            formDataGrande.append('_token', '{{ csrf_token() }}');
-                            const formDataPequena = new FormData();
-                            formDataPequena.append('imagen', blobPequena, `${nombreBase}-${timestamp}-thumbnail.webp`);
-                            formDataPequena.append('carpeta', carpeta);
-                            formDataPequena.append('_token', '{{ csrf_token() }}');
-                            const onProg = function(pct) {
-                                const el = document.getElementById('kp-prog-sub-' + uploadId);
-                                if (el) el.style.width = pct + '%';
-                            };
-                            const { dataG, dataP } = await window.__kpSubirParejaConProgreso(
-                                '{{ route("admin.imagenes.subir-simple") }}',
-                                formDataGrande,
-                                formDataPequena,
-                                '{{ csrf_token() }}',
-                                onProg,
-                                uploadsPendientesSublinea,
-                                uploadId
-                            );
-                            if (dataG.success && dataP.success) {
-                                kpReemplazarRutaPendienteEnEspecificaciones(pendingPath, dataG.data.ruta_relativa);
-                            } else {
-                                throw new Error(dataG.message || dataP.message || 'Error al subir');
-                            }
-                        } catch (error) {
-                            console.error('Error al procesar imagen Amazon sublínea:', error);
-                            kpEliminarRutaPendienteDeEspecificaciones(pendingPath);
-                            const j = sublineaImagenesActual.imagenes.indexOf(pendingPath);
-                            if (j !== -1) {
-                                sublineaImagenesActual.imagenes.splice(j, 1);
-                                guardarImagenesSublinea();
-                            }
-                            renderizarMiniaturasSublinea();
-                            alert('Error al subir una imagen de Amazon: ' + error.message);
-                        }
-                    })();
-                });
-
-                if (verModalAbiertoSub) renderizarMiniaturasSublinea();
-                prepararModalAnadirSublineaParaOtra('amazon');
-                cargarCarpetasModalSublinea();
-
-            } catch (error) {
-                console.error('Error al guardar imágenes:', error);
-                alert('Error al guardar las imágenes: ' + error.message);
-            }
+            iniciarColaRecorteAmazonSublinea(carpeta);
         });
         document.getElementById('tab-amazon-sublinea').addEventListener('click', () => cambiarTabModalSublinea('amazon'));
         
@@ -6410,7 +8062,7 @@
         
         // Event listener para guardar imagen desde URL
         document.getElementById('btn-guardar-imagen-sublinea').addEventListener('click', async () => {
-            const tabActiva = document.querySelector('.tab-modal-sublinea.border-blue-500');
+            const tabActiva = document.querySelector('.tab-modal-sublinea.kp-modal-img-tab--active');
             const tabId = tabActiva ? tabActiva.id : 'tab-url-sublinea';
             
             // Si es la pestaña de Amazon, el código de Amazon ya lo maneja, no hacer nada aquí
@@ -6418,27 +8070,32 @@
                 return;
             }
             
-            if (tabId === 'tab-interna-sublinea') {
-                const contIs = document.getElementById('filas-interna-sublinea');
-                const filasIs = contIs ? contIs.querySelectorAll('.kp-fila-interna-sublinea') : [];
-                if (!filasIs.length) {
-                    alert('Selecciona imágenes en la galería o añade al menos una fila con la ruta grande.');
-                    return;
+            if (tabId === 'tab-interna-sublinea' || tabId === 'tab-interna-global-sublinea') {
+                let rutas = kpRutasDesdeSeleccionInternaSublinea();
+                if (!rutas.length) {
+                    const contIs = document.getElementById('filas-interna-sublinea');
+                    const filasIs = contIs ? contIs.querySelectorAll('.kp-fila-interna-sublinea') : [];
+                    rutas = [];
+                    for (let i = 0; i < filasIs.length; i++) {
+                        const rG = (
+                            filasIs[i].querySelector('.kp-interna-sub-g') &&
+                            filasIs[i].querySelector('.kp-interna-sub-g').value
+                        ) || '';
+                        const rGt = rG.trim();
+                        if (!rGt) {
+                            alert('Fila ' + (i + 1) + ': indica la ruta de la imagen grande o quítala.');
+                            return;
+                        }
+                        if (!rutas.includes(rGt)) rutas.push(rGt);
+                    }
                 }
+                sublineaImagenesActual.imagenes = rutas;
+                guardarImagenesSublinea({ omitirRecargaEspecificaciones: true });
                 const verModalSub = document.getElementById('modal-imagenes-sublinea');
-                for (let i = 0; i < filasIs.length; i++) {
-                    const rG = (filasIs[i].querySelector('.kp-interna-sub-g') && filasIs[i].querySelector('.kp-interna-sub-g').value || '').trim();
-                    if (!rG) {
-                        alert('Fila ' + (i + 1) + ': indica la ruta de la imagen grande.');
-                        return;
-                    }
-                    añadirImagenASublinea(rG);
-                    if (verModalSub && !verModalSub.classList.contains('hidden')) {
-                        sublineaImagenesActual.imagenes.push(rG);
-                    }
+                if (verModalSub && !verModalSub.classList.contains('hidden')) {
+                    renderizarMiniaturasSublinea();
                 }
-                if (verModalSub && !verModalSub.classList.contains('hidden')) renderizarMiniaturasSublinea();
-                prepararModalAnadirSublineaParaOtra('interna');
+                cerrarModalAñadirImagenSublinea();
                 return;
             }
             
@@ -6781,14 +8438,37 @@
 
 {{-- SCRIPT PARA RELLENAR INFORMACIÓN AUTOMÁTICAMENTE --}}
     <script>
+        function kpObtenerCategoriaProductoAutocompletadoId() {
+            return document.getElementById('categoria-final')?.value || '';
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             const btnRellenar = document.getElementById('rellenar-info-automatica');
             const btnText = document.getElementById('btn-text');
             const btnLoading = document.getElementById('btn-loading');
             const progresoInfo = document.getElementById('progreso-info');
             const progresoTexto = document.getElementById('progreso-texto');
+            let rellenandoInfoAutomatica = false;
 
-            // Campos que deben estar vacíos para poder proceder
+            const actualizarEstadoBotonRellenar = () => {
+                const tieneCategoria = !!kpObtenerCategoriaProductoAutocompletadoId();
+                btnRellenar.disabled = rellenandoInfoAutomatica || !tieneCategoria;
+                btnRellenar.title = tieneCategoria
+                    ? 'Rellenar información automáticamente'
+                    : 'Selecciona una categoría antes de rellenar automáticamente';
+            };
+
+            actualizarEstadoBotonRellenar();
+            setInterval(actualizarEstadoBotonRellenar, 500);
+            document.addEventListener('change', (event) => {
+                if (event.target.matches('.categoria-select, #categoria-final')) {
+                    setTimeout(actualizarEstadoBotonRellenar, 50);
+                }
+            });
+            btnRellenar.addEventListener('mouseenter', actualizarEstadoBotonRellenar);
+            btnRellenar.addEventListener('focus', actualizarEstadoBotonRellenar);
+
+            // Campos que deben estar vacíos para poder procedir
             const camposAVerificar = [
                 'titulo',
                 'subtitulo', 
@@ -6806,6 +8486,13 @@
             ];
 
             btnRellenar.addEventListener('click', async () => {
+                actualizarEstadoBotonRellenar();
+                const categoriaIdProducto = kpObtenerCategoriaProductoAutocompletadoId();
+                if (!categoriaIdProducto) {
+                    alert('Debes seleccionar una categoría antes de rellenar la información automáticamente.');
+                    return;
+                }
+
                 // Verificar que los campos requeridos estén llenos
                 const camposFaltantes = [];
                 camposRequeridos.forEach(campo => {
@@ -6841,6 +8528,7 @@
                 btnText.classList.add('hidden');
                 btnLoading.classList.remove('hidden');
                 progresoInfo.classList.remove('hidden');
+                rellenandoInfoAutomatica = true;
                 btnRellenar.disabled = true;
 
                 try {
@@ -6852,9 +8540,11 @@
 
                     progresoTexto.textContent = 'Preparando datos del producto...';
 
+                    const categoriaId = categoriaIdProducto;
+
                     // Obtener nombre de la última categoría seleccionada
                     const selectores = document.querySelectorAll('.categoria-select');
-                    let nombreCategoria = 'bebés'; // Valor por defecto
+                    let nombreCategoria = 'la categoría seleccionada';
                     for (let i = selectores.length - 1; i >= 0; i--) {
                         if (selectores[i].value) {
                             const opcionSeleccionada = selectores[i].options[selectores[i].selectedIndex];
@@ -6866,7 +8556,7 @@
                     }
 
                     // Preparar prompt para ChatGPT
-                    const prompt = `Actúa como un experto en SEO y marketing digital especializado en productos para ${nombreCategoria}. Necesito que generes contenido optimizado para un comparador de precios.
+                    let prompt = `Actúa como un experto en SEO y marketing digital especializado en productos para ${nombreCategoria}. Necesito que generes contenido optimizado para un comparador de precios.
 
 INFORMACIÓN DEL PRODUCTO:
 - Nombre: ${nombre}
@@ -6889,7 +8579,7 @@ Debes generar EXACTAMENTE un objeto JSON con la siguiente estructura, sin texto 
   "contras": ["AQUI UN CONTRA", "AQUI UN CONTRA", "AQUI UN CONTRA"],
   "preguntas_frecuentes": [
     {"pregunta": "AQUI DEBES AÑADIRME LA PREGUNTA", "respuesta": "AQUÍ DEBES AÑADIRLA RESPUESTA"},
-    {"pregunta": "AQUI DEBES AÑADIRME LA PREGUNTA", "respuesta": "AQUÍ DEBES AÑADIRLA RESPUESTA"},
+    {"pregunta": "AQUI DEBES AÑADIRME LA PREGUNTA", "respuesta": "AQUÍ DEBES AÑADIRLA RESPUESTA"}
   ]
 }
 
@@ -6910,9 +8600,6 @@ REGLAS IMPORTANTES:
 - Optimiza para SEO con palabras clave relevantes`;
 
                     progresoTexto.textContent = 'Enviando petición a ChatGPT...';
-
-                    // Obtener categoria_id del campo oculto
-                    const categoriaId = document.getElementById('categoria-final')?.value || null;
 
                     // Hacer petición a ChatGPT
                     const response = await fetch('/productos/generar-contenido', {
@@ -7006,10 +8693,11 @@ REGLAS IMPORTANTES:
                             `;
                             faqList.appendChild(div);
                         });
-                    }if (data.caracteristicas) {
+                    }
+                    if (data.meta_titulo) {
                         document.querySelector('textarea[name="meta_titulo"]').value = data.meta_titulo;
                     }
-                    if (data.caracteristicas) {
+                    if (data.meta_descripcion) {
                         document.querySelector('textarea[name="meta_description"]').value = data.meta_descripcion;
                     }
 
@@ -7028,7 +8716,8 @@ REGLAS IMPORTANTES:
                         btnText.classList.remove('hidden');
                         btnLoading.classList.add('hidden');
                         progresoInfo.classList.add('hidden');
-                        btnRellenar.disabled = false;
+                        rellenandoInfoAutomatica = false;
+                        actualizarEstadoBotonRellenar();
                         progresoTexto.className = 'text-gray-600 dark:text-gray-400';
                     }, 3000);
                 }
@@ -7284,6 +8973,468 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+<script>
+if (!window.kpInternaGlobalRegistrar) {
+(function() {
+    const KP_IG_PAGE = 15;
+    const KP_IG_URL = @json(route('admin.imagenes.ultimas-globales'));
+    const KP_IG_IMG_BASE = @json(rtrim(asset('images/'), '/'));
+
+    window.kpPartirNombreEnPalabras = function(nombre) {
+        const n = String(nombre || '').trim();
+        if (!n) return [];
+        const tokens = n.split(/(?:\s+|\/|\||;)+/).map(function(p) { return p.trim(); }).filter(Boolean);
+        const visto = new Set();
+        const palabras = [];
+        tokens.forEach(function(token) {
+            const limpia = token.replace(/^[^a-zA-Z0-9À-ÿ.,]+|[^a-zA-Z0-9À-ÿ.,]+$/gi, '');
+            if (!limpia) return;
+            const clave = limpia.toLowerCase();
+            if (visto.has(clave)) return;
+            visto.add(clave);
+            palabras.push(limpia);
+        });
+        return palabras;
+    };
+
+    window.kpTokensBuscadorInternaGlobal = function(valor) {
+        const v = String(valor || '').trim();
+        if (!v) return [];
+        return v.split(/\s+/).map(function(t) {
+            return t.replace(/^-+|-+$/g, '').trim();
+        }).filter(Boolean);
+    };
+
+    window.kpUrlVistaDesdeRutaAlmacenIg = function(raw) {
+        if (typeof window.kpUrlVistaDesdeRutaAlmacen === 'function') {
+            return window.kpUrlVistaDesdeRutaAlmacen(raw);
+        }
+        const t = (raw || '').trim();
+        if (!t) return '';
+        if (/^https?:\/\//i.test(t)) return t;
+        let p = t.replace(/^\/+/, '');
+        if (/^images\//i.test(p)) {
+            return @json(rtrim(url('/'), '/')) + '/' + p;
+        }
+        return KP_IG_IMG_BASE + '/' + p;
+    };
+
+    const estadosPanel = {};
+
+    window.kpModalImgTabSetActive = function(tabs, activeEl) {
+        (tabs || []).forEach(function(t) {
+            if (!t) return;
+            var on = t === activeEl;
+            t.classList.toggle('kp-modal-img-tab--active', on);
+            t.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+    };
+
+    function kpIgMarcarBoton(btn, activo) {
+        const on = ['ring-2', 'ring-blue-500', 'border-blue-500', 'bg-blue-100', 'dark:bg-blue-900', 'font-semibold'];
+        if (activo) {
+            btn.classList.add.apply(btn.classList, on);
+            btn.setAttribute('aria-pressed', 'true');
+        } else {
+            btn.classList.remove.apply(btn.classList, on);
+            btn.setAttribute('aria-pressed', 'false');
+        }
+    }
+
+    function kpIgSincronizarPalabrasConBuscador(est) {
+        const tokens = window.kpTokensBuscadorInternaGlobal(est.input.value);
+        est.wrapPalabras.querySelectorAll('.kp-ig-palabra-btn').forEach(function(btn) {
+            const p = btn.dataset.palabra || '';
+            const activo = tokens.some(function(t) { return t.toLowerCase() === p.toLowerCase(); });
+            kpIgMarcarBoton(btn, activo);
+        });
+    }
+
+    function kpIgValorBuscadorDesdeTokens(tokens) {
+        if (!tokens.length) return '';
+        return tokens.join(' ');
+    }
+
+    function kpIgRenderPalabras(est) {
+        const palabras = est.getPalabras ? est.getPalabras() : [];
+        est.wrapPalabras.innerHTML = '';
+        if (!palabras.length) {
+            est.wrapPalabras.innerHTML = '<span class="text-xs text-gray-500 dark:text-gray-400">Escribe el nombre del producto para ver sugerencias.</span>';
+            return;
+        }
+        palabras.forEach(function(palabra) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'kp-ig-palabra-btn text-xs px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors';
+            btn.dataset.palabra = palabra;
+            btn.setAttribute('aria-pressed', 'false');
+            btn.textContent = palabra;
+            btn.title = 'Buscar «' + palabra + '»';
+            est.wrapPalabras.appendChild(btn);
+        });
+        kpIgSincronizarPalabrasConBuscador(est);
+    }
+
+    function kpIgPairFromItem(it) {
+        return {
+            rutaGrande: it.ruta_grande || it.ruta || '',
+            rutaPequena: it.ruta_pequena || it.ruta_grande || it.ruta || '',
+            thumbVisual: it.ruta_pequena || it.ruta_grande || it.ruta || '',
+            url: it.url || '',
+        };
+    }
+
+    function kpIgUrlPreviewDesdeRutaOrUrl(raw) {
+        const t = String(raw || '').trim();
+        if (!t) return '';
+        if (/^https?:\/\//i.test(t)) return t;
+        return window.kpUrlVistaDesdeRutaAlmacenIg(t);
+    }
+
+    window.kpIgCerrarPreviewGrande = function() {
+        const overlay = document.getElementById('kp-ig-preview-overlay');
+        if (!overlay) return;
+        overlay.style.display = 'none';
+        overlay.classList.add('hidden');
+        overlay.classList.remove('flex');
+        overlay.setAttribute('aria-hidden', 'true');
+        const img = overlay.querySelector('img');
+        if (img) img.removeAttribute('src');
+    };
+
+    window.kpIgAbrirPreviewGrande = function(rutaOrUrl) {
+        const t = String(rutaOrUrl || '').trim();
+        if (!t) return;
+        const src = kpIgUrlPreviewDesdeRutaOrUrl(t);
+        if (!src) return;
+        let overlay = document.getElementById('kp-ig-preview-overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'kp-ig-preview-overlay';
+            overlay.className = 'fixed inset-0 hidden items-center justify-center bg-black/85 p-4 cursor-pointer';
+            overlay.setAttribute('aria-hidden', 'true');
+            overlay.setAttribute('role', 'dialog');
+            overlay.setAttribute('aria-modal', 'true');
+            overlay.setAttribute('aria-label', 'Vista ampliada');
+            const img = document.createElement('img');
+            img.alt = '';
+            img.className = 'block rounded shadow-2xl bg-white max-w-[96vw] max-h-[90vh] w-auto h-auto object-contain pointer-events-none';
+            const btnCerrar = document.createElement('button');
+            btnCerrar.type = 'button';
+            btnCerrar.className = 'absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-blue-600 text-white text-xl leading-none hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-white';
+            btnCerrar.setAttribute('aria-label', 'Cerrar');
+            btnCerrar.textContent = '×';
+            overlay.appendChild(img);
+            overlay.appendChild(btnCerrar);
+            btnCerrar.addEventListener('click', function(e) {
+                e.stopPropagation();
+                window.kpIgCerrarPreviewGrande();
+            });
+            overlay.addEventListener('click', function(e) {
+                if (e.target === overlay) window.kpIgCerrarPreviewGrande();
+            });
+        }
+        const modal = document.querySelector('[id^="modal-añadir-imagen"]:not(.hidden)');
+        if (modal) {
+            modal.appendChild(overlay);
+        } else if (overlay.parentNode !== document.body) {
+            document.body.appendChild(overlay);
+        }
+        const img = overlay.querySelector('img');
+        if (!img) return;
+        img.src = src;
+        overlay.style.display = 'flex';
+        overlay.classList.remove('hidden');
+        overlay.classList.add('flex');
+        overlay.setAttribute('aria-hidden', 'false');
+    };
+
+    if (!window.__kpIgPreviewEscapeInit) {
+        window.__kpIgPreviewEscapeInit = true;
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') window.kpIgCerrarPreviewGrande();
+        });
+    }
+
+    function kpIgEstaSeleccionada(est, pair) {
+        return typeof est.isSelected === 'function' && est.isSelected(pair);
+    }
+
+    function kpIgMarcarCeldaImg(btn, seleccionada) {
+        const on = ['ring-4', 'ring-blue-500', 'border-blue-500'];
+        const badge = btn.querySelector('.kp-ig-sel-badge');
+        if (seleccionada) {
+            btn.classList.add.apply(btn.classList, on);
+            btn.setAttribute('aria-pressed', 'true');
+            if (!badge) {
+                const mark = document.createElement('span');
+                mark.className = 'kp-ig-sel-badge absolute top-0.5 left-0.5 z-10 w-5 h-5 flex items-center justify-center rounded-full bg-blue-600 text-white text-[10px] font-bold shadow pointer-events-none';
+                mark.textContent = '✓';
+                btn.appendChild(mark);
+            }
+        } else {
+            btn.classList.remove.apply(btn.classList, on);
+            btn.setAttribute('aria-pressed', 'false');
+            if (badge) badge.remove();
+        }
+    }
+
+    function kpIgSincronizarSeleccionGrid(est) {
+        if (!est || !est.grid) return;
+        est.grid.querySelectorAll('[data-kp-ig-cell]').forEach(function(cell) {
+            const btn = cell.querySelector('button');
+            if (!btn) return;
+            const pair = {
+                rutaGrande: cell.dataset.kpIgRutaGrande || '',
+                rutaPequena: cell.dataset.kpIgRutaPequena || '',
+                thumbVisual: cell.dataset.kpIgThumb || '',
+            };
+            kpIgMarcarCeldaImg(btn, kpIgEstaSeleccionada(est, pair));
+        });
+        if (typeof est.renderResumen === 'function') {
+            est.renderResumen();
+        }
+    }
+
+    window.kpIgPintarResumenSeleccion = function(el, pairs) {
+        if (!el) return;
+        el.innerHTML = '';
+        if (!pairs || !pairs.length) {
+            el.innerHTML = '<p class="text-xs text-gray-500 dark:text-gray-400">Ninguna imagen seleccionada. Haz clic en una miniatura de abajo y pulsa <strong class="font-medium">Guardar</strong>.</p>';
+            return;
+        }
+        const grid = document.createElement('div');
+        grid.className = 'grid gap-1 w-full kp-ig-seleccion-grid';
+        grid.style.gridTemplateColumns = 'repeat(10, minmax(0, 1fr))';
+        pairs.forEach(function(pair) {
+            const src = window.kpUrlVistaDesdeRutaAlmacenIg(pair.thumbVisual || pair.rutaPequena || pair.rutaGrande);
+            const cell = document.createElement('div');
+            cell.className = 'relative aspect-square rounded overflow-hidden ring-2 ring-blue-500 bg-gray-100 dark:bg-gray-800';
+            const img = document.createElement('img');
+            img.src = src;
+            img.className = 'w-full h-full object-cover block';
+            img.alt = '';
+            img.loading = 'lazy';
+            cell.appendChild(img);
+            grid.appendChild(cell);
+        });
+        el.appendChild(grid);
+        const note = document.createElement('p');
+        note.className = 'text-xs text-gray-600 dark:text-gray-400 mt-2';
+        note.textContent = pairs.length + ' imagen' + (pairs.length === 1 ? '' : 'es') + ' seleccionada' + (pairs.length === 1 ? '' : 's') + '. Pulsa Guardar para aplicar.';
+        el.appendChild(note);
+    };
+
+    function kpIgCeldaImagen(item, est, onClick) {
+        const pair = kpIgPairFromItem(item);
+        const src = window.kpUrlVistaDesdeRutaAlmacenIg(pair.thumbVisual);
+        const cell = document.createElement('div');
+        cell.className = 'kp-ig-cell min-w-0 w-full';
+        cell.dataset.kpIgCell = '1';
+        cell.dataset.kpIgRutaGrande = pair.rutaGrande;
+        cell.dataset.kpIgRutaPequena = pair.rutaPequena;
+        cell.dataset.kpIgThumb = pair.thumbVisual;
+        cell.dataset.kpIgUrl = pair.url || pair.rutaGrande || pair.thumbVisual;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'relative w-full aspect-square p-0 border border-gray-200 dark:border-gray-600 rounded overflow-hidden bg-white dark:bg-gray-800 hover:ring-2 hover:ring-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500';
+        btn.title = pair.rutaGrande || '';
+        const img = document.createElement('img');
+        img.src = src;
+        img.alt = '';
+        img.className = 'w-full h-full object-cover block pointer-events-none';
+        img.loading = 'lazy';
+        img.onerror = function() { img.className = 'w-full h-full object-cover block opacity-40 pointer-events-none'; };
+        btn.appendChild(img);
+        kpIgMarcarCeldaImg(btn, kpIgEstaSeleccionada(est, pair));
+        btn.addEventListener('click', function() {
+            onClick(item);
+            kpIgSincronizarSeleccionGrid(est);
+        });
+        const btnAmpliar = document.createElement('button');
+        btnAmpliar.type = 'button';
+        btnAmpliar.className = 'kp-ig-btn-ampliar absolute top-0 right-0 w-6 h-6 flex items-center justify-center rounded-bl-md shadow-md focus:outline-none focus:ring-2 focus:ring-white';
+        btnAmpliar.title = 'Ver tamaño original';
+        btnAmpliar.setAttribute('aria-label', 'Ampliar imagen');
+        btnAmpliar.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="M14.5 14.5L20 20"/><path d="M10 7v6M7 10h6"/></svg>';
+        cell.appendChild(btn);
+        cell.appendChild(btnAmpliar);
+        return cell;
+    }
+
+    function kpIgRenderGrid(est) {
+        const prev = est.grid.children.length;
+        const hasta = Math.min(est.visible, est.items.length);
+        for (let i = prev; i < hasta; i++) {
+            const item = est.items[i];
+            est.grid.appendChild(kpIgCeldaImagen(item, est, function(it) {
+                if (typeof est.onSelect === 'function') {
+                    est.onSelect(kpIgPairFromItem(it));
+                }
+            }));
+        }
+        est.vacio.classList.toggle('hidden', est.items.length > 0);
+        est.cargarMas.classList.toggle('hidden', !est.hasMore && est.visible >= est.items.length);
+        kpIgSincronizarSeleccionGrid(est);
+    }
+
+    async function kpIgCargar(est, appendApi) {
+        if (!appendApi) {
+            est.items = [];
+            est.visible = 0;
+            est.grid.innerHTML = '';
+            est.vacio.textContent = 'No hay imágenes que coincidan con la búsqueda.';
+        }
+        est.cargando.classList.remove('hidden');
+        est.cargarMas.disabled = true;
+        try {
+            const params = new URLSearchParams({
+                limit: String(KP_IG_PAGE),
+                offset: String(appendApi ? est.items.length : 0),
+                q: est.input.value.trim(),
+            });
+            const res = await fetch(KP_IG_URL + '?' + params.toString(), {
+                headers: { Accept: 'application/json' },
+                credentials: 'same-origin',
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message || 'Error');
+            const nuevas = Array.isArray(data.data) ? data.data : [];
+            if (appendApi) {
+                est.items = est.items.concat(nuevas);
+            } else {
+                est.items = nuevas;
+                est.visible = Math.min(KP_IG_PAGE, est.items.length);
+            }
+            est.hasMore = !!data.has_more;
+            kpIgRenderGrid(est);
+        } catch (err) {
+            console.error('Interna global:', err);
+            if (!appendApi) {
+                est.grid.innerHTML = '';
+                est.vacio.textContent = 'No se pudieron cargar las imágenes.';
+                est.vacio.classList.remove('hidden');
+                est.cargarMas.classList.add('hidden');
+            }
+        } finally {
+            est.cargando.classList.add('hidden');
+            est.cargarMas.disabled = false;
+        }
+    }
+
+    window.kpInternaGlobalRefrescarPalabras = function(prefix) {
+        const est = estadosPanel[prefix];
+        if (est) kpIgRenderPalabras(est);
+    };
+
+    window.kpInternaGlobalRefrescarSeleccion = function(prefix) {
+        const est = estadosPanel[prefix];
+        if (est) kpIgSincronizarSeleccionGrid(est);
+    };
+
+    window.kpInternaGlobalAlActivar = function(prefix) {
+        const est = estadosPanel[prefix];
+        if (!est) return Promise.resolve();
+        kpIgRenderPalabras(est);
+        return kpIgCargar(est, false).then(function() {
+            kpIgSincronizarSeleccionGrid(est);
+        });
+    };
+
+    window.kpInternaGlobalRegistrar = function(prefix, options) {
+        options = options || {};
+        const panel = document.querySelector('[data-kp-ig-panel="' + prefix + '"]');
+        if (!panel || panel.dataset.kpIgInit === '1') {
+            return estadosPanel[prefix];
+        }
+        panel.dataset.kpIgInit = '1';
+
+        const est = {
+            prefix: prefix,
+            panel: panel,
+            wrapPalabras: panel.querySelector('.kp-ig-palabras'),
+            input: panel.querySelector('.kp-ig-buscador'),
+            grid: panel.querySelector('.kp-ig-grid'),
+            vacio: panel.querySelector('.kp-ig-vacio'),
+            cargando: panel.querySelector('.kp-ig-cargando'),
+            cargarMas: panel.querySelector('.kp-ig-cargar-mas'),
+            resumen: panel.querySelector('.kp-ig-seleccion-resumen'),
+            onSelect: options.onSelect || null,
+            isSelected: options.isSelected || null,
+            renderResumen: options.renderResumen || null,
+            getPalabras: options.getPalabras || function() { return []; },
+            items: [],
+            visible: 0,
+            hasMore: false,
+            debounce: null,
+        };
+        if (!est.renderResumen && est.resumen) {
+            est.renderResumen = function() {
+                window.kpIgPintarResumenSeleccion(est.resumen, []);
+            };
+        }
+        estadosPanel[prefix] = est;
+
+        est.grid.addEventListener('click', function(e) {
+            const btnZoom = e.target.closest('.kp-ig-btn-ampliar');
+            if (btnZoom) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                const cell = btnZoom.closest('[data-kp-ig-cell]');
+                if (cell) {
+                    const url = (cell.dataset.kpIgUrl || cell.dataset.kpIgRutaGrande || cell.dataset.kpIgThumb || '').trim();
+                    if (url) window.kpIgAbrirPreviewGrande(url);
+                }
+                return;
+            }
+        }, true);
+
+        panel.addEventListener('click', function(e) {
+            const btn = e.target.closest('.kp-ig-palabra-btn');
+            if (!btn) return;
+            const palabra = btn.dataset.palabra || '';
+            let tokens = window.kpTokensBuscadorInternaGlobal(est.input.value);
+            const activo = btn.getAttribute('aria-pressed') === 'true';
+            if (activo) {
+                tokens = tokens.filter(function(t) { return t.toLowerCase() !== palabra.toLowerCase(); });
+            } else if (!tokens.some(function(t) { return t.toLowerCase() === palabra.toLowerCase(); })) {
+                tokens.push(palabra);
+            }
+            est.input.value = kpIgValorBuscadorDesdeTokens(tokens);
+            kpIgSincronizarPalabrasConBuscador(est);
+            kpIgCargar(est, false);
+            est.input.focus();
+        });
+
+        est.input.addEventListener('input', function() {
+            kpIgSincronizarPalabrasConBuscador(est);
+            clearTimeout(est.debounce);
+            est.debounce = setTimeout(function() {
+                kpIgCargar(est, false);
+            }, 350);
+        });
+
+        est.cargarMas.addEventListener('click', function() {
+            if (est.visible < est.items.length) {
+                est.visible = Math.min(est.items.length, est.visible + KP_IG_PAGE);
+                kpIgRenderGrid(est);
+            } else if (est.hasMore) {
+                const visAntes = est.visible;
+                kpIgCargar(est, true).then(function() {
+                    est.visible = Math.min(est.items.length, visAntes + KP_IG_PAGE);
+                    kpIgRenderGrid(est);
+                });
+            }
+        });
+
+        return est;
+    };
+})();
+}
+</script>
+
 {{-- SCRIPT PARA GESTIÓN DE MÚLTIPLES IMÁGENES --}}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -7507,6 +9658,56 @@ document.addEventListener('DOMContentLoaded', function() {
             setTimeout(function() { upd(t); }, 0);
         });
     }
+    function kpIndiceSeleccionInternaNueva(pair) {
+        const norm = kpNormalizarParImagenProd(pair.rutaGrande, pair.rutaPequena);
+        const key = kpPairKeyInternaProd(norm);
+        let ix = __kpInternaNuevaSelOrden.findIndex(function(x) {
+            return kpPairKeyInternaProd(kpNormalizarParImagenProd(x.rutaGrande, x.rutaPequena)) === key;
+        });
+        if (ix !== -1) return ix;
+        if (norm.rutaGrande) {
+            ix = __kpInternaNuevaSelOrden.findIndex(function(x) {
+                return x.rutaGrande && String(x.rutaGrande) === String(norm.rutaGrande);
+            });
+        }
+        return ix;
+    }
+    function kpCargarInternaNuevaDesdeProducto() {
+        kpLimpiarInternaNuevaProductoUI();
+        for (let i = 0; i < imagenesGrandes.length; i++) {
+            const pair = kpNormalizarParImagenProd(imagenesGrandes[i], imagenesPequenas[i]);
+            if (!pair.rutaGrande && !pair.rutaPequena) continue;
+            __kpInternaNuevaSelOrden.push(pair);
+            kpAddFilaInternaNuevaProducto(pair);
+        }
+        kpRenderGaleriaInternaNueva();
+    }
+    function kpQuitarFilaInternaNuevaPorPair(pair) {
+        const cont = document.getElementById('filas-interna-nueva-producto');
+        if (!cont) return;
+        const norm = kpNormalizarParImagenProd(pair.rutaGrande, pair.rutaPequena);
+        const b64 = kpStableB64KeyInterna(kpPairKeyInternaProd(norm));
+        let hit = cont.querySelector('.kp-fila-interna-nueva[data-pair-key="' + b64 + '"]');
+        if (!hit && norm.rutaGrande) {
+            cont.querySelectorAll('.kp-fila-interna-nueva').forEach(function(row) {
+                if (hit) return;
+                const g = row.querySelector('.kp-interna-nueva-g');
+                if (g && String(g.value).trim() === String(norm.rutaGrande).trim()) hit = row;
+            });
+        }
+        if (hit) hit.remove();
+    }
+    function kpDescartarInternaNuevaSeleccion(pair, ev) {
+        if (ev) {
+            ev.preventDefault();
+            ev.stopPropagation();
+        }
+        const ix = kpIndiceSeleccionInternaNueva(pair);
+        if (ix === -1) return;
+        __kpInternaNuevaSelOrden.splice(ix, 1);
+        kpQuitarFilaInternaNuevaPorPair(pair);
+        kpRenderGaleriaInternaNueva();
+    }
     function kpRenderGaleriaInternaNueva() {
         const wrap = document.getElementById('galeria-imgs-interna-nueva');
         const vac = document.getElementById('galeria-imgs-interna-nueva-vacio');
@@ -7518,29 +9719,30 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         if (vac) vac.classList.add('hidden');
-        const urlFn = typeof window.kpUrlVistaDesdeRutaAlmacen === 'function' ? window.kpUrlVistaDesdeRutaAlmacen : function() { return ''; };
+        const urlFn =
+            typeof window.kpUrlVistaDesdeRutaAlmacen === 'function'
+                ? window.kpUrlVistaDesdeRutaAlmacen
+                : function() {
+                      return '';
+                  };
         pairs.forEach(function(pair) {
-            const key = kpPairKeyInternaProd(pair);
-            const ord = __kpInternaNuevaSelOrden.findIndex(function(x) { return kpPairKeyInternaProd(x) === key; }) + 1;
+            const seleccionada = kpIndiceSeleccionInternaNueva(pair) !== -1;
+            const src = urlFn(pair.thumbVisual || pair.rutaPequena || pair.rutaGrande);
             const cell = document.createElement('div');
             cell.className = 'min-w-0 w-full';
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'relative w-full aspect-square max-w-full border p-0 overflow-hidden rounded-sm transition ' + (ord ? 'border-blue-500 ring-1 ring-inset ring-blue-400/80 bg-blue-50/50 dark:bg-blue-900/30' : 'border-gray-200 dark:border-gray-600 hover:border-gray-400');
-            const src = urlFn(pair.thumbVisual || pair.rutaPequena || pair.rutaGrande);
-            const img = document.createElement('img');
-            img.src = src;
-            img.className = 'w-full h-full object-cover block pointer-events-none';
-            img.alt = '';
-            btn.appendChild(img);
-            if (ord) {
-                const badge = document.createElement('span');
-                badge.className = 'absolute -top-0.5 -right-0.5 min-w-3 h-3.5 px-0.5 flex items-center justify-center rounded-full bg-blue-600 text-white text-[8px] font-bold leading-none';
-                badge.textContent = String(ord);
-                btn.appendChild(badge);
+            if (seleccionada) {
+                cell.appendChild(
+                    window.kpCrearCeldaGaleriaInternaMarcada(src, 'Quitar de las imágenes del producto', function(e) {
+                        kpDescartarInternaNuevaSeleccion(pair, e);
+                    })
+                );
+            } else {
+                cell.appendChild(
+                    window.kpCrearCeldaGaleriaInternaLibre(src, function() {
+                        kpToggleInternaNuevaSeleccion(pair);
+                    })
+                );
             }
-            btn.addEventListener('click', function() { kpToggleInternaNuevaSeleccion(pair); });
-            cell.appendChild(btn);
             wrap.appendChild(cell);
         });
     }
@@ -7582,22 +9784,32 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     function kpToggleInternaNuevaSeleccion(pair) {
         const norm = kpNormalizarParImagenProd(pair.rutaGrande, pair.rutaPequena);
-        const key = kpPairKeyInternaProd(norm);
-        const ix = __kpInternaNuevaSelOrden.findIndex(function(x) { return kpPairKeyInternaProd(kpNormalizarParImagenProd(x.rutaGrande, x.rutaPequena)) === key; });
-        const cont = document.getElementById('filas-interna-nueva-producto');
-        const b64 = kpStableB64KeyInterna(key);
+        const ix = kpIndiceSeleccionInternaNueva(pair);
         if (ix === -1) {
             __kpInternaNuevaSelOrden.push(norm);
             kpAddFilaInternaNuevaProducto(norm);
         } else {
             __kpInternaNuevaSelOrden.splice(ix, 1);
-            if (cont) {
-                const row = cont.querySelector('.kp-fila-interna-nueva[data-pair-key="' + b64 + '"]');
-                if (row) row.remove();
-            }
+            kpQuitarFilaInternaNuevaPorPair(pair);
         }
         kpRenderGaleriaInternaNueva();
+        if (typeof window.kpInternaGlobalRefrescarSeleccion === 'function') {
+            window.kpInternaGlobalRefrescarSeleccion('nueva');
+        }
     }
+    window.kpToggleInternaNuevaSeleccion = kpToggleInternaNuevaSeleccion;
+    window.kpIndiceSeleccionInternaNueva = kpIndiceSeleccionInternaNueva;
+    window.kpCargarInternaNuevaDesdeProducto = kpCargarInternaNuevaDesdeProducto;
+    window.kpAsegurarInternaNuevaInicializada = function() {
+        const cont = document.getElementById('filas-interna-nueva-producto');
+        const tieneFilas = cont && cont.children.length > 0;
+        if (!tieneFilas && __kpInternaNuevaSelOrden.length === 0) {
+            kpCargarInternaNuevaDesdeProducto();
+        }
+    };
+    window.kpObtenerParesSeleccionInternaNueva = function() {
+        return __kpInternaNuevaSelOrden.slice();
+    };
     
     // Renderizar las imágenes en el contenedor
     function renderizarImagenes() {
@@ -7864,7 +10076,9 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('imagenes-amazon-nueva').classList.add('hidden');
         document.getElementById('grid-imagenes-amazon-nueva').innerHTML = '';
         document.getElementById('area-recorte-nueva').classList.add('hidden');
+        document.getElementById('area-recorte-amazon-nueva').classList.add('hidden');
         imagenesAmazonSeleccionadas = [];
+        resetEstadoRecorteAmazonNueva();
         if (cropperNueva) {
             cropperNueva.destroy();
             cropperNueva = null;
@@ -7878,40 +10092,42 @@ document.addEventListener('DOMContentLoaded', function() {
         const tabUrl = document.getElementById('tab-url-nueva');
         const tabAmazon = document.getElementById('tab-amazon-nueva');
         const tabInterna = document.getElementById('tab-interna-nueva');
+        const tabInternaGlobal = document.getElementById('tab-interna-global-nueva');
         const contentSubir = document.getElementById('content-subir-nueva');
         const contentUrl = document.getElementById('content-url-nueva');
         const contentAmazon = document.getElementById('content-amazon-nueva');
         const contentInterna = document.getElementById('content-interna-nueva');
-        
-        // Resetear todas las pestañas
-        [tabUrl, tabSubir, tabAmazon, tabInterna].forEach(t => {
-            if (!t) return;
-            t.classList.remove('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
-            t.classList.add('border-transparent', 'text-gray-500');
-        });
-        [contentUrl, contentSubir, contentAmazon, contentInterna].forEach(c => {
+        const contentInternaGlobal = document.getElementById('content-interna-global-nueva');
+        const allTabs = [tabUrl, tabSubir, tabAmazon, tabInterna, tabInternaGlobal];
+
+        [contentUrl, contentSubir, contentAmazon, contentInterna, contentInternaGlobal].forEach(c => {
             if (c) c.classList.add('hidden');
         });
         
         if (tab === 'url') {
-            tabUrl.classList.add('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
-            tabUrl.classList.remove('border-transparent', 'text-gray-500');
+            window.kpModalImgTabSetActive(allTabs, tabUrl);
             contentUrl.classList.remove('hidden');
         } else if (tab === 'subir') {
-            tabSubir.classList.add('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
-            tabSubir.classList.remove('border-transparent', 'text-gray-500');
+            window.kpModalImgTabSetActive(allTabs, tabSubir);
             contentSubir.classList.remove('hidden');
         } else if (tab === 'amazon') {
-            tabAmazon.classList.add('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
-            tabAmazon.classList.remove('border-transparent', 'text-gray-500');
+            window.kpModalImgTabSetActive(allTabs, tabAmazon);
             contentAmazon.classList.remove('hidden');
             cargarCarpetasModal(); // Cargar carpetas cuando se abre la pestaña Amazon
         } else if (tab === 'interna' && tabInterna && contentInterna) {
-            tabInterna.classList.add('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
-            tabInterna.classList.remove('border-transparent', 'text-gray-500');
+            window.kpModalImgTabSetActive(allTabs, tabInterna);
             contentInterna.classList.remove('hidden');
             kpBindFilasInternaNuevaDelegation();
-            kpRenderGaleriaInternaNueva();
+            kpCargarInternaNuevaDesdeProducto();
+        } else if (tab === 'interna-global' && tabInternaGlobal && contentInternaGlobal) {
+            window.kpModalImgTabSetActive(allTabs, tabInternaGlobal);
+            contentInternaGlobal.classList.remove('hidden');
+            if (typeof window.kpAsegurarInternaNuevaInicializada === 'function') {
+                window.kpAsegurarInternaNuevaInicializada();
+            }
+            if (typeof window.kpInternaGlobalAlActivar === 'function') {
+                window.kpInternaGlobalAlActivar('nueva');
+            }
         }
     }
     
@@ -7920,6 +10136,8 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('tab-amazon-nueva').addEventListener('click', () => cambiarTabModal('amazon'));
     const tabInternaNuevaEl = document.getElementById('tab-interna-nueva');
     if (tabInternaNuevaEl) tabInternaNuevaEl.addEventListener('click', () => cambiarTabModal('interna'));
+    const tabInternaGlobalNuevaEl = document.getElementById('tab-interna-global-nueva');
+    if (tabInternaGlobalNuevaEl) tabInternaGlobalNuevaEl.addEventListener('click', () => cambiarTabModal('interna-global'));
     const btnInternaNuevaFilaVacia = document.getElementById('btn-interna-nueva-anadir-fila-vacia');
     if (btnInternaNuevaFilaVacia) {
         btnInternaNuevaFilaVacia.addEventListener('click', function() {
@@ -7971,6 +10189,179 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // ========== FUNCIONALIDAD AMAZON PARA MODAL PRINCIPAL ==========
     let imagenesAmazonSeleccionadas = [];
+    let cropperAmazonNueva = null;
+    let colaRecorteAmazonNueva = [];
+    let totalRecorteAmazonNueva = 0;
+    let carpetaActualAmazonNueva = '';
+    let modoRecorteAmazonNueva = false;
+
+    function resetEstadoRecorteAmazonNueva() {
+        colaRecorteAmazonNueva = [];
+        totalRecorteAmazonNueva = 0;
+        carpetaActualAmazonNueva = '';
+        modoRecorteAmazonNueva = false;
+        const area = document.getElementById('area-recorte-amazon-nueva');
+        const busqueda = document.getElementById('amazon-busqueda-nueva');
+        if (area) area.classList.add('hidden');
+        if (busqueda) busqueda.classList.remove('hidden');
+        if (cropperAmazonNueva) {
+            cropperAmazonNueva.destroy();
+            cropperAmazonNueva = null;
+        }
+    }
+
+    function mostrarRecorteAmazonNueva(urlImagen) {
+        const areaRecorte = document.getElementById('area-recorte-amazon-nueva');
+        const img = document.getElementById('imagen-recortar-amazon-nueva');
+        areaRecorte.classList.remove('hidden');
+        if (cropperAmazonNueva) cropperAmazonNueva.destroy();
+        const urlProxy = urlImagen.startsWith('http')
+            ? `{{ route('admin.imagenes.proxy') }}?url=${encodeURIComponent(urlImagen)}`
+            : urlImagen;
+        img.crossOrigin = 'anonymous';
+        img.src = urlProxy;
+        img.onload = function() {
+            if (cropperAmazonNueva) cropperAmazonNueva.destroy();
+            cropperAmazonNueva = new Cropper(img, {
+                aspectRatio: NaN,
+                viewMode: 1,
+                dragMode: 'move',
+                autoCropArea: 0.8,
+                restore: false,
+                guides: true,
+                center: true,
+                highlight: false,
+                cropBoxMovable: true,
+                cropBoxResizable: true,
+                toggleDragModeOnDblclick: false,
+            });
+        };
+        img.onerror = function() {
+            document.getElementById('error-amazon-nueva').textContent = 'Error al cargar la imagen desde Amazon.';
+            document.getElementById('error-amazon-nueva').classList.remove('hidden');
+            colaRecorteAmazonNueva.shift();
+            mostrarSiguienteRecorteAmazonNueva();
+        };
+    }
+
+    function mostrarSiguienteRecorteAmazonNueva() {
+        if (!colaRecorteAmazonNueva.length) {
+            resetEstadoRecorteAmazonNueva();
+            prepararModalAñadirImagenParaOtraProducto('amazon');
+            cargarCarpetasModal();
+            return;
+        }
+        const actual = totalRecorteAmazonNueva - colaRecorteAmazonNueva.length + 1;
+        const progreso = document.getElementById('progreso-recorte-amazon-nueva');
+        if (progreso) progreso.textContent = `Recortando imagen ${actual} de ${totalRecorteAmazonNueva}`;
+        mostrarRecorteAmazonNueva(colaRecorteAmazonNueva[0].url);
+    }
+
+    function iniciarColaRecorteAmazonNueva(carpeta) {
+        colaRecorteAmazonNueva = imagenesAmazonSeleccionadas.slice();
+        totalRecorteAmazonNueva = colaRecorteAmazonNueva.length;
+        carpetaActualAmazonNueva = carpeta;
+        modoRecorteAmazonNueva = true;
+        document.getElementById('imagenes-amazon-nueva').classList.add('hidden');
+        const busqueda = document.getElementById('amazon-busqueda-nueva');
+        if (busqueda) busqueda.classList.add('hidden');
+        document.getElementById('error-amazon-nueva').classList.add('hidden');
+        mostrarSiguienteRecorteAmazonNueva();
+    }
+
+    async function procesarRecorteAmazonActualNueva() {
+        if (!cropperAmazonNueva || !carpetaActualAmazonNueva) {
+            alert('Error al recortar la imagen.');
+            return;
+        }
+        const canvasOriginal = cropperAmazonNueva.getCroppedCanvas({
+            imageSmoothingEnabled: true,
+            imageSmoothingQuality: 'high'
+        });
+        if (!canvasOriginal) {
+            alert('Error al recortar la imagen');
+            return;
+        }
+        colaRecorteAmazonNueva.shift();
+        const carpetaUp = carpetaActualAmazonNueva;
+        const slugInput = document.querySelector('input[name="slug"]');
+        const nombreBase = slugInput ? slugInput.value.trim() : 'imagen';
+        const uploadId = Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+        const pendingPath = KP_PENDING_PRD + uploadId;
+        imagenesGrandes.push(pendingPath);
+        imagenesPequenas.push(pendingPath);
+        renderizarImagenes();
+
+        try {
+            const canvasGrande = document.createElement('canvas');
+            canvasGrande.width = canvasOriginal.width;
+            canvasGrande.height = canvasOriginal.height;
+            const ctxGrande = canvasGrande.getContext('2d');
+            ctxGrande.fillStyle = '#ffffff';
+            ctxGrande.fillRect(0, 0, canvasGrande.width, canvasGrande.height);
+            ctxGrande.drawImage(canvasOriginal, 0, 0);
+            const canvasPequena = document.createElement('canvas');
+            canvasPequena.width = 300;
+            canvasPequena.height = 250;
+            const ctxPequena = canvasPequena.getContext('2d');
+            ctxPequena.fillStyle = '#ffffff';
+            ctxPequena.fillRect(0, 0, canvasPequena.width, canvasPequena.height);
+            ctxPequena.drawImage(canvasOriginal, 0, 0, 300, 250);
+            const blobGrande = await new Promise(function(resolve, reject) {
+                canvasGrande.toBlob(function(b) { b ? resolve(b) : reject(new Error('Error grande')); }, 'image/webp', 0.9);
+            });
+            const blobPequena = await new Promise(function(resolve, reject) {
+                canvasPequena.toBlob(function(b) { b ? resolve(b) : reject(new Error('Error pequeña')); }, 'image/webp', 0.9);
+            });
+            const timestamp = Date.now();
+            const formDataGrande = new FormData();
+            formDataGrande.append('imagen', blobGrande, `${nombreBase}-${timestamp}.webp`);
+            formDataGrande.append('carpeta', carpetaUp);
+            formDataGrande.append('_token', '{{ csrf_token() }}');
+            const formDataPequena = new FormData();
+            formDataPequena.append('imagen', blobPequena, `${nombreBase}-${timestamp}-thumbnail.webp`);
+            formDataPequena.append('carpeta', carpetaUp);
+            formDataPequena.append('_token', '{{ csrf_token() }}');
+
+            (async function() {
+                try {
+                    const onProg = function(pct) {
+                        const el = document.getElementById('kp-prog-prd-' + uploadId);
+                        if (el) el.style.width = pct + '%';
+                    };
+                    const { dataG, dataP } = await window.__kpSubirParejaConProgreso(
+                        '{{ route("admin.imagenes.subir-simple") }}',
+                        formDataGrande,
+                        formDataPequena,
+                        '{{ csrf_token() }}',
+                        onProg,
+                        uploadsPendientesProducto,
+                        uploadId
+                    );
+                    if (dataG.success && dataP.success) {
+                        const ix = imagenesGrandes.indexOf(pendingPath);
+                        if (ix !== -1) {
+                            imagenesGrandes[ix] = dataG.data.ruta_relativa;
+                            imagenesPequenas[ix] = dataP.data.ruta_relativa;
+                        }
+                        renderizarImagenes();
+                    } else {
+                        throw new Error(dataG.message || dataP.message || 'Error al subir');
+                    }
+                } catch (error) {
+                    console.error('Error al procesar imagen Amazon:', error);
+                    quitarPlaceholderProducto(pendingPath);
+                    alert('Error al subir una imagen de Amazon: ' + error.message);
+                }
+            })();
+        } catch (error) {
+            console.error('Error al procesar imagen Amazon:', error);
+            quitarPlaceholderProducto(pendingPath);
+            alert('Error al procesar la imagen: ' + error.message);
+        }
+
+        mostrarSiguienteRecorteAmazonNueva();
+    }
     
     // Limpiar URL de Amazon automáticamente al pegar o escribir (usa limpiarUrlAmazonViaApi definido en modal sublínea)
     const urlAmazonInputNueva = document.getElementById('url-amazon-nueva');
@@ -8147,9 +10538,14 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Guardar imágenes seleccionadas de Amazon
     document.getElementById('btn-guardar-nueva').addEventListener('click', async () => {
-        const tabActiva = document.querySelector('.tab-modal.border-blue-500');
+        const tabActiva = document.querySelector('.tab-modal.kp-modal-img-tab--active');
         if (!tabActiva || tabActiva.id !== 'tab-amazon-nueva') {
             return; // No es la pestaña de Amazon, dejar que el código existente maneje el guardado
+        }
+
+        if (modoRecorteAmazonNueva) {
+            await procesarRecorteAmazonActualNueva();
+            return;
         }
         
         if (imagenesAmazonSeleccionadas.length === 0) {
@@ -8163,93 +10559,8 @@ document.addEventListener('DOMContentLoaded', function() {
             alert('Por favor, selecciona una carpeta');
             return;
         }
-        
-        try {
-            const slugInput = document.querySelector('input[name="slug"]');
-            const nombreBase = slugInput ? slugInput.value.trim() : 'imagen';
-            const seleccionAmz = imagenesAmazonSeleccionadas.slice();
 
-            seleccionAmz.forEach(function(imagen, i) {
-                const uploadId = Date.now().toString(36) + Math.random().toString(36).slice(2, 9) + 'a' + i;
-                const pendingPath = KP_PENDING_PRD + uploadId;
-                imagenesGrandes.push(pendingPath);
-                imagenesPequenas.push(pendingPath);
-
-                const timestamp = Date.now() + i;
-                const urlProxy = imagen.url.startsWith('http')
-                    ? `{{ route('admin.imagenes.proxy') }}?url=${encodeURIComponent(imagen.url)}`
-                    : imagen.url;
-
-                (async function() {
-                    try {
-                        const img = await new Promise(function(resolve, reject) {
-                            const im = new Image();
-                            im.crossOrigin = 'anonymous';
-                            im.onload = function() { resolve(im); };
-                            im.onerror = function() { reject(new Error('Error al cargar la imagen desde Amazon')); };
-                            im.src = urlProxy;
-                        });
-                        const canvasGrande = document.createElement('canvas');
-                        canvasGrande.width = img.width;
-                        canvasGrande.height = img.height;
-                        canvasGrande.getContext('2d').drawImage(img, 0, 0);
-                        const canvasPequena = document.createElement('canvas');
-                        canvasPequena.width = 300;
-                        canvasPequena.height = 250;
-                        canvasPequena.getContext('2d').drawImage(img, 0, 0, 300, 250);
-                        const blobGrande = await new Promise(function(resolveBlob, rejectBlob) {
-                            canvasGrande.toBlob(function(b) { b ? resolveBlob(b) : rejectBlob(new Error('Error grande')); }, 'image/webp', 0.9);
-                        });
-                        const blobPequena = await new Promise(function(resolveBlob, rejectBlob) {
-                            canvasPequena.toBlob(function(b) { b ? resolveBlob(b) : rejectBlob(new Error('Error pequeña')); }, 'image/webp', 0.9);
-                        });
-                        const formDataGrande = new FormData();
-                        formDataGrande.append('imagen', blobGrande, `${nombreBase}-${timestamp}.webp`);
-                        formDataGrande.append('carpeta', carpeta);
-                        formDataGrande.append('_token', '{{ csrf_token() }}');
-                        const formDataPequena = new FormData();
-                        formDataPequena.append('imagen', blobPequena, `${nombreBase}-${timestamp}-thumbnail.webp`);
-                        formDataPequena.append('carpeta', carpeta);
-                        formDataPequena.append('_token', '{{ csrf_token() }}');
-                        const onProg = (pct) => {
-                            const el = document.getElementById('kp-prog-prd-' + uploadId);
-                            if (el) el.style.width = pct + '%';
-                        };
-                        const { dataG, dataP } = await window.__kpSubirParejaConProgreso(
-                            '{{ route("admin.imagenes.subir-simple") }}',
-                            formDataGrande,
-                            formDataPequena,
-                            '{{ csrf_token() }}',
-                            onProg,
-                            uploadsPendientesProducto,
-                            uploadId
-                        );
-                        if (dataG.success && dataP.success) {
-                            const ix = imagenesGrandes.indexOf(pendingPath);
-                            if (ix !== -1) {
-                                imagenesGrandes[ix] = dataG.data.ruta_relativa;
-                                imagenesPequenas[ix] = dataP.data.ruta_relativa;
-                            }
-                            renderizarImagenes();
-                        } else {
-                            throw new Error(dataG.message || dataP.message || 'Error al subir');
-                        }
-                    } catch (error) {
-                        console.error('Error al procesar imagen Amazon:', error);
-                        quitarPlaceholderProducto(pendingPath);
-                        alert('Error al subir una imagen de Amazon: ' + error.message);
-                    }
-                })();
-            });
-
-            renderizarImagenes();
-            prepararModalAñadirImagenParaOtraProducto('amazon');
-            cargarCarpetasModal();
-
-        } catch (error) {
-            console.error('Error al guardar imágenes:', error);
-            alert('Error al guardar las imágenes: ' + error.message);
-        }
+        iniciarColaRecorteAmazonNueva(carpeta);
     });
     
     // Configurar subida de archivo
@@ -8456,7 +10767,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Guardar nueva imagen desde modal
     document.getElementById('btn-guardar-nueva').addEventListener('click', async () => {
-        const tabActiva = document.querySelector('.tab-modal.border-blue-500');
+        const tabActiva = document.querySelector('.tab-modal.kp-modal-img-tab--active');
         const tabId = tabActiva ? tabActiva.id : 'tab-url-nueva';
         
         // Si es la pestaña de Amazon, el código de Amazon ya lo maneja, no hacer nada aquí
@@ -8464,29 +10775,41 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        if (tabId === 'tab-interna-nueva') {
+        if (tabId === 'tab-interna-nueva' || tabId === 'tab-interna-global-nueva') {
             const contInt = document.getElementById('filas-interna-nueva-producto');
             const filas = contInt ? contInt.querySelectorAll('.kp-fila-interna-nueva') : [];
-            if (!filas.length) {
-                alert('Selecciona imágenes en la galería o añade al menos una fila con rutas.');
-                return;
-            }
+            const nuevasGrandes = [];
+            const nuevasPequenas = [];
             for (let i = 0; i < filas.length; i++) {
-                const rG = (filas[i].querySelector('.kp-interna-nueva-g') && filas[i].querySelector('.kp-interna-nueva-g').value || '').trim();
-                const rP = (filas[i].querySelector('.kp-interna-nueva-p') && filas[i].querySelector('.kp-interna-nueva-p').value || '').trim();
-                if (!rG) {
+                const rG = (
+                    filas[i].querySelector('.kp-interna-nueva-g') &&
+                    filas[i].querySelector('.kp-interna-nueva-g').value
+                ) || '';
+                const rP = (
+                    filas[i].querySelector('.kp-interna-nueva-p') &&
+                    filas[i].querySelector('.kp-interna-nueva-p').value
+                ) || '';
+                const rGt = rG.trim();
+                const rPt = rP.trim();
+                if (!rGt) {
                     alert('Fila ' + (i + 1) + ': indica la ruta de la imagen grande.');
                     return;
                 }
-                if (!rP) {
+                if (!rPt) {
                     alert('Fila ' + (i + 1) + ': indica la ruta de la imagen pequeña (miniatura).');
                     return;
                 }
-                imagenesGrandes.push(rG);
-                imagenesPequenas.push(rP);
+                nuevasGrandes.push(rGt);
+                nuevasPequenas.push(rPt);
             }
+            imagenesGrandes.length = 0;
+            imagenesPequenas.length = 0;
+            nuevasGrandes.forEach(function(g, idx) {
+                imagenesGrandes.push(g);
+                imagenesPequenas.push(nuevasPequenas[idx]);
+            });
             renderizarImagenes();
-            prepararModalAñadirImagenParaOtraProducto('interna');
+            cerrarModalAñadirImagen();
             return;
         }
         
@@ -8653,6 +10976,60 @@ document.addEventListener('DOMContentLoaded', function() {
         }, true);
     }
     
+    if (typeof window.kpInternaGlobalRegistrar === 'function') {
+        window.kpInternaGlobalRegistrar('nueva', {
+            onSelect: function(pair) {
+                if (typeof window.kpToggleInternaNuevaSeleccion === 'function') {
+                    window.kpToggleInternaNuevaSeleccion(pair);
+                }
+            },
+            isSelected: function(pair) {
+                return typeof window.kpIndiceSeleccionInternaNueva === 'function'
+                    && window.kpIndiceSeleccionInternaNueva(pair) !== -1;
+            },
+            renderResumen: function() {
+                const el = document.querySelector('[data-kp-ig-panel="nueva"] .kp-ig-seleccion-resumen');
+                const pairs = typeof window.kpObtenerParesSeleccionInternaNueva === 'function'
+                    ? window.kpObtenerParesSeleccionInternaNueva()
+                    : [];
+                window.kpIgPintarResumenSeleccion(el, pairs);
+            },
+            getPalabras: function() {
+                if (typeof window.kpObtenerPalabrasNombreProducto === 'function') {
+                    return window.kpObtenerPalabrasNombreProducto();
+                }
+                const nombre = document.getElementById('input_nombre')?.value
+                    || document.querySelector('input[name="nombre"]')?.value
+                    || '';
+                return window.kpPartirNombreEnPalabras(nombre);
+            },
+        });
+        window.kpInternaGlobalRegistrar('sublinea', {
+            onSelect: function(pair) {
+                if (typeof window.kpToggleInternaSublineaSeleccion === 'function') {
+                    window.kpToggleInternaSublineaSeleccion(pair);
+                }
+            },
+            isSelected: function(pair) {
+                return typeof window.kpIndiceSeleccionInternaSublinea === 'function'
+                    && window.kpIndiceSeleccionInternaSublinea(pair) !== -1;
+            },
+            renderResumen: function() {
+                const el = document.querySelector('[data-kp-ig-panel="sublinea"] .kp-ig-seleccion-resumen');
+                const pairs = typeof window.kpObtenerParesSeleccionInternaSublinea === 'function'
+                    ? window.kpObtenerParesSeleccionInternaSublinea()
+                    : [];
+                window.kpIgPintarResumenSeleccion(el, pairs);
+            },
+            getPalabras: function() {
+                if (typeof window.kpObtenerPalabrasNombreProducto === 'function') {
+                    return window.kpObtenerPalabrasNombreProducto();
+                }
+                return [];
+            },
+        });
+    }
+
     // Inicializar
     cargarImagenesExistentes();
 });
@@ -8904,7 +11281,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Obtener nombre de la última categoría seleccionada
         const selectores = document.querySelectorAll('.categoria-select');
-        let nombreCategoria = 'bebés'; // Valor por defecto
+        let nombreCategoria = 'la categoría seleccionada';
         for (let i = selectores.length - 1; i >= 0; i--) {
             if (selectores[i].value) {
                 const opcionSeleccionada = selectores[i].options[selectores[i].selectedIndex];
@@ -8939,7 +11316,7 @@ Debes generar EXACTAMENTE un objeto JSON con la siguiente estructura, sin texto 
   "contras": ["AQUI UN CONTRA", "AQUI UN CONTRA", "AQUI UN CONTRA"],
   "preguntas_frecuentes": [
     {"pregunta": "AQUI DEBES AÑADIRME LA PREGUNTA", "respuesta": "AQUÍ DEBES AÑADIRLA RESPUESTA"},
-    {"pregunta": "AQUI DEBES AÑADIRME LA PREGUNTA", "respuesta": "AQUÍ DEBES AÑADIRLA RESPUESTA"},
+    {"pregunta": "AQUI DEBES AÑADIRME LA PREGUNTA", "respuesta": "AQUÍ DEBES AÑADIRLA RESPUESTA"}
   ]
 }
 
@@ -8959,30 +11336,28 @@ REGLAS IMPORTANTES:
 - Usa la información del producto proporcionada
 - Optimiza para SEO con palabras clave relevantes`;
 
-        // Obtener información adicional de la categoría si existe
-        if (categoriaId) {
-            // Hacer petición para obtener la información adicional de la categoría
-            const url = `/panel-privado/categorias/${categoriaId}/info-chatgpt`;
-            fetch(url, {
+        const promesaInfoCategoria = categoriaId
+            ? fetch(`/panel-privado/categorias/${categoriaId}/info-chatgpt`, {
                 headers: {
                     'X-CSRF-TOKEN': '{{ csrf_token() }}',
                     'Accept': 'application/json'
                 }
             })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success && data.info_adicional && data.info_adicional.trim() !== '') {
-                    prompt += "\n\n" + data.info_adicional.trim();
+                .then(response => response.json())
+                .then(data => data.success && data.info_adicional ? data.info_adicional.trim() : '')
+            : Promise.resolve('');
+
+        promesaInfoCategoria
+            .then((infoAdicional) => {
+                if (infoAdicional) {
+                    prompt += "\n\n" + infoAdicional;
                 }
                 mostrarPromptEnModal(prompt);
             })
             .catch(error => {
-                console.error('Error al obtener info de categoría:', error);
+                console.error('Error al preparar prompt:', error);
                 mostrarPromptEnModal(prompt);
             });
-        } else {
-            mostrarPromptEnModal(prompt);
-        }
     }
 
     // Función para mostrar el prompt en el modal

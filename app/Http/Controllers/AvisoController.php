@@ -15,6 +15,7 @@ use App\Models\ProductoOfertaMasBarataPorProducto;
 use App\Models\CorreoAvisoPrecio;
 use App\Models\User;
 use App\Services\SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos;
+use App\Services\Scraping;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -86,9 +87,8 @@ class AvisoController extends Controller
 
         $this->aplicarFiltroTipoAvisos($avisosVencidosQuery, $vencidosTipo);
         
-        $avisosVencidosQuery
-            ->orderByRaw('CASE WHEN avisoable_type = ? THEN 0 ELSE 1 END', [CorreoAvisoPrecio::class])
-            ->orderBy('fecha_aviso', 'desc');
+        $this->aplicarOrdenPrioridadAvisos($avisosVencidosQuery);
+        $avisosVencidosQuery->orderBy('fecha_aviso', 'desc');
         
         $avisosVencidos = $avisosVencidosQuery->paginate($perPage, ['*'], 'vencidos_page');
         $avisosVencidos->appends($appendQuery);
@@ -105,9 +105,8 @@ class AvisoController extends Controller
 
         $this->aplicarFiltroTipoAvisos($avisosPendientesQuery, $pendientesTipo);
         
-        $avisosPendientesQuery
-            ->orderByRaw('CASE WHEN avisoable_type = ? THEN 0 ELSE 1 END', [CorreoAvisoPrecio::class])
-            ->orderBy('fecha_aviso', 'asc');
+        $this->aplicarOrdenPrioridadAvisos($avisosPendientesQuery);
+        $avisosPendientesQuery->orderBy('fecha_aviso', 'asc');
         
         $avisosPendientes = $avisosPendientesQuery->paginate($perPage, ['*'], 'pendientes_page');
         $avisosPendientes->appends($appendQuery);
@@ -123,9 +122,8 @@ class AvisoController extends Controller
 
         $this->aplicarFiltroTipoAvisos($avisosOcultosQuery, $ocultosTipo);
         
-        $avisosOcultosQuery
-            ->orderByRaw('CASE WHEN avisoable_type = ? THEN 0 ELSE 1 END', [CorreoAvisoPrecio::class])
-            ->orderBy('fecha_aviso', 'desc');
+        $this->aplicarOrdenPrioridadAvisos($avisosOcultosQuery);
+        $avisosOcultosQuery->orderBy('fecha_aviso', 'desc');
         
         $avisosOcultos = $avisosOcultosQuery->paginate($perPage, ['*'], 'ocultos_page');
         $avisosOcultos->appends($appendQuery);
@@ -218,6 +216,17 @@ class AvisoController extends Controller
             'correos' => (int) ($row->correos ?? 0),
             'internos' => (int) ($row->internos ?? 0),
         ];
+    }
+
+    /**
+     * Correos y avisos «Bajada +10% de su precio mínimo» primero; el resto después.
+     */
+    private function aplicarOrdenPrioridadAvisos(Builder $query): void
+    {
+        $query->orderByRaw(
+            'CASE WHEN avisoable_type = ? THEN 0 WHEN texto_aviso LIKE ? THEN 0 ELSE 1 END',
+            [CorreoAvisoPrecio::class, Scraping::TEXTO_AVISO_BAJADA_10_PCT_MINIMO . '%']
+        );
     }
 
     private function aplicarFiltroTipoAvisos(Builder $query, string $tipo): void

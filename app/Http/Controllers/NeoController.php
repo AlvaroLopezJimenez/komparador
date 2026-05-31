@@ -257,6 +257,42 @@ class NeoController extends Controller
     }
 
     /**
+     * Filtro por Categoria.mostrar (si/no) en listados de categorías del modal crear-masivo.
+     * Parámetros: categoria_mostrar_si, categoria_mostrar_no (misma semántica que mostrar_si / mostrar_no de tienda).
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<\App\Models\Neo>  $query
+     */
+    private function aplicarFiltroMostrarCategoriaNeoCrearMasivo($query, Request $request): void
+    {
+        if ($request->query('categoria_mostrar_si') !== null || $request->query('categoria_mostrar_no') !== null) {
+            $chkSi = $this->queryCheckboxMostrarTiendaVerdadero($request, 'categoria_mostrar_si');
+            $chkNo = $this->queryCheckboxMostrarTiendaVerdadero($request, 'categoria_mostrar_no');
+        } else {
+            $chkSi = true;
+            $chkNo = false;
+        }
+
+        if (($chkSi && $chkNo) || (! $chkSi && ! $chkNo)) {
+            return;
+        }
+
+        if ($chkSi && ! $chkNo) {
+            $query->whereIn('categoria_id', Categoria::query()->where('mostrar', 'si')->select('id'));
+
+            return;
+        }
+
+        $idsNo = Categoria::query()->where('mostrar', 'no')->pluck('id');
+        if ($idsNo->isEmpty()) {
+            $query->whereRaw('0 = 1');
+
+            return;
+        }
+
+        $query->whereIn('categoria_id', $idsNo);
+    }
+
+    /**
      * Ids recibidos en tienda_ids / tienda_ids[] que existen y tienen mostrar_tienda=no.
      *
      * @return list<int>
@@ -301,14 +337,19 @@ class NeoController extends Controller
     /**
      * Categorías que tienen al menos una fila en neo con aniadida=no (agrupadas por categoria_id).
      * Para el botón "Categoría" en crear-masivo neo.
+     *
+     * @see productosConNeoAniadidaNo() parámetros categoria_mostrar_si / categoria_mostrar_no en el listado de categorías.
      */
-    public function categoriasConNeoAniadidaNo()
+    public function categoriasConNeoAniadidaNo(Request $request)
     {
-        $grupos = Neo::where('aniadida', 'no')
+        $q = Neo::where('aniadida', 'no')
             ->whereNotNull('url_cipher')
             ->where('url_cipher', '!=', '')
-            ->whereNotNull('categoria_id')
-            ->selectRaw('categoria_id, count(*) as total')
+            ->whereNotNull('categoria_id');
+
+        $this->aplicarFiltroMostrarCategoriaNeoCrearMasivo($q, $request);
+
+        $grupos = $q->selectRaw('categoria_id, count(*) as total')
             ->groupBy('categoria_id')
             ->get();
 
@@ -330,14 +371,19 @@ class NeoController extends Controller
 
     /**
      * URLs de filas neo con aniadida=no para un categoria_id.
+     *
+     * @see productosConNeoAniadidaNo() mismos parámetros mostrar_si / mostrar_no y tienda_ids[].
      */
-    public function urlsPorCategoria(int $categoriaId)
+    public function urlsPorCategoria(Request $request, int $categoriaId)
     {
-        $urls = Neo::where('aniadida', 'no')
+        $q = Neo::where('aniadida', 'no')
             ->where('categoria_id', $categoriaId)
             ->whereNotNull('url_cipher')
-            ->where('url_cipher', '!=', '')
-            ->get()
+            ->where('url_cipher', '!=', '');
+
+        $this->aplicarFiltroMostrarTiendaNeoCrearMasivoProducto($q, $request);
+
+        $urls = $q->get()
             ->map(fn (Neo $neo) => trim((string) $neo->url))
             ->filter(fn (string $url) => $url !== '')
             ->values()
@@ -386,15 +432,20 @@ class NeoController extends Controller
 
     /**
      * Tiendas pendientes (aniadida=no) para una categoría concreta.
+     *
+     * @see productosConNeoAniadidaNo() mismos parámetros mostrar_si / mostrar_no y tienda_ids[].
      */
-    public function tiendasPorCategoria(int $categoriaId)
+    public function tiendasPorCategoria(Request $request, int $categoriaId)
     {
-        $grupos = Neo::where('aniadida', 'no')
+        $q = Neo::where('aniadida', 'no')
             ->where('categoria_id', $categoriaId)
             ->whereNotNull('url_cipher')
             ->where('url_cipher', '!=', '')
-            ->whereNotNull('tienda_id')
-            ->selectRaw('tienda_id, count(*) as total')
+            ->whereNotNull('tienda_id');
+
+        $this->aplicarFiltroMostrarTiendaNeoCrearMasivoProducto($q, $request);
+
+        $grupos = $q->selectRaw('tienda_id, count(*) as total')
             ->groupBy('tienda_id')
             ->get();
 
@@ -403,15 +454,20 @@ class NeoController extends Controller
 
     /**
      * URLs pendientes (aniadida=no) para una categoría y tienda concretas.
+     *
+     * @see productosConNeoAniadidaNo() mismos parámetros mostrar_si / mostrar_no y tienda_ids[].
      */
-    public function urlsPorCategoriaTienda(int $categoriaId, int $tiendaId)
+    public function urlsPorCategoriaTienda(Request $request, int $categoriaId, int $tiendaId)
     {
-        $urls = Neo::where('aniadida', 'no')
+        $q = Neo::where('aniadida', 'no')
             ->where('categoria_id', $categoriaId)
             ->where('tienda_id', $tiendaId)
             ->whereNotNull('url_cipher')
-            ->where('url_cipher', '!=', '')
-            ->get()
+            ->where('url_cipher', '!=', '');
+
+        $this->aplicarFiltroMostrarTiendaNeoCrearMasivoProducto($q, $request);
+
+        $urls = $q->get()
             ->map(fn (Neo $neo) => trim((string) $neo->url))
             ->filter(fn (string $url) => $url !== '')
             ->values()

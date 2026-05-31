@@ -10,19 +10,13 @@ use Illuminate\Support\Facades\DB;
 /**
  * Coolmod: extrae el precio desde el atributo data-itemprice en el HTML devuelto por la API.
  * Si detecta "Artículo no disponible", pone la oferta en mostrar-no y crea aviso a 4 días.
- * Si detecta "Consigue un regalo con la compra de este artículo", puede marcar +Juego (y aviso),
- * salvo que en el bloque de ficha titulado exactamente "Promociones" (no "Promociones y descuentos"
- * del menú) haya enlaces href con cupon-eneba o textos como "te la instalamos gratis",
- * "Consigue hasta 25 euros", "cartera de Steam".
+ * Si detecta "Consigue un regalo con la compra de este artículo", puede marcar +Juego (y aviso).
+ * En la sección Promociones se evalúa cada promo por separado: cupones/monedero (Steam, eneba…)
+ * se descartan; si queda al menos una promo no excluida, no se bloquea +Juego (no depende del nombre del juego).
+ * Si la oferta ya tiene +Juego y todas las promos listadas son excluidas, se quita el +Juego.
  */
 class CoolmodController extends PlantillaTiendaController
 {
-    /** Subcadenas en el bloque "Promociones" (mismo contenedor que cupon-eneba) que impiden +Juego. */
-    private const FRAGMENTOS_PROMOCIONES_IMPIDEN_PLUS_JUEGO = [
-        'te la instalamos gratis',
-        'consigue hasta 25 euros',
-        'cartera de steam',
-    ];
 
     public function obtenerPrecio($url, $variante = null, $tienda = null, $oferta = null): JsonResponse
     {
@@ -71,45 +65,55 @@ class CoolmodController extends PlantillaTiendaController
      */
     private function detectarYGuardarDescuentoJuegoCoolmod(string $html, OfertaProducto $oferta): void
     {
-        $tieneFraseRegalo = $this->detectarTextoRegaloConCompraCoolmod($html);
-        $descartarPorSeccionPromociones = $this->promocionesSectionImpidePlusJuego($html);
-        $regaloDetectado = $tieneFraseRegalo && !$descartarPorSeccionPromociones;
-
         $descuentoAnterior = $oferta->descuentos;
-        $descuentoNuevo = $regaloDetectado ? '+Juego' : null;
+        $tieneFraseRegalo = $this->detectarTextoRegaloConCompraCoolmod($html);
+        $todasPromocionesSonExcluidas = $this->promocionesSectionImpidePlusJuego($html);
 
-        if ($descuentoNuevo !== null) {
-            \Log::info('CoolmodController - Regalo con compra detectado (+Juego):', [
+        if ($descuentoAnterior === '+Juego' && $todasPromocionesSonExcluidas) {
+            \Log::info('CoolmodController - +Juego quitado: todas las promos son cupón/monedero (ninguna válida):', [
                 'oferta_id' => $oferta->id,
-                'descuento_anterior' => $descuentoAnterior,
             ]);
+            $oferta->update(['descuentos' => null]);
 
-            $oferta->update(['descuentos' => $descuentoNuevo]);
+            return;
+        }
 
-            if ($descuentoAnterior !== $descuentoNuevo) {
-                $avisoId = DB::table('avisos')->insertGetId([
-                    'texto_aviso'     => 'DETECTADO REGALO INCLUIDO (+Juego) - GENERADO AUTOMÁTICAMENTE',
-                    'fecha_aviso'     => now(),
-                    'user_id'         => 1,
-                    'avisoable_type'  => OfertaProducto::class,
-                    'avisoable_id'    => $oferta->id,
-                    'oculto'          => 0,
-                    'created_at'      => now(),
-                    'updated_at'      => now(),
-                ]);
+        $regaloDetectado = $tieneFraseRegalo && !$todasPromocionesSonExcluidas;
 
-                \Log::info('CoolmodController - Aviso +Juego creado:', [
-                    'aviso_id' => $avisoId,
-                    'oferta_id' => $oferta->id,
-                ]);
-            }
-        } else {
+        if (!$regaloDetectado) {
             if ($descuentoAnterior === '+Juego') {
-                \Log::info('CoolmodController - Ya no hay texto de regalo con compra; limpiando descuentos +Juego:', [
+                \Log::info('CoolmodController - Ya no hay regalo con compra válido; limpiando descuentos +Juego:', [
                     'oferta_id' => $oferta->id,
                 ]);
                 $oferta->update(['descuentos' => null]);
             }
+
+            return;
+        }
+
+        \Log::info('CoolmodController - Regalo con compra detectado (+Juego):', [
+            'oferta_id' => $oferta->id,
+            'descuento_anterior' => $descuentoAnterior,
+        ]);
+
+        $oferta->update(['descuentos' => '+Juego']);
+
+        if ($descuentoAnterior !== '+Juego') {
+            $avisoId = DB::table('avisos')->insertGetId([
+                'texto_aviso'     => 'DETECTADO REGALO INCLUIDO (+Juego) - GENERADO AUTOMÁTICAMENTE',
+                'fecha_aviso'     => now(),
+                'user_id'         => 1,
+                'avisoable_type'  => OfertaProducto::class,
+                'avisoable_id'    => $oferta->id,
+                'oculto'          => 0,
+                'created_at'      => now(),
+                'updated_at'      => now(),
+            ]);
+
+            \Log::info('CoolmodController - Aviso +Juego creado:', [
+                'aviso_id' => $avisoId,
+                'oferta_id' => $oferta->id,
+            ]);
         }
     }
 
@@ -123,14 +127,114 @@ class CoolmodController extends PlantillaTiendaController
     }
 
     /**
-     * Solo el bloque de producto con <p> cuyo texto es exactamente "Promociones" (excluye el menú
-     * "Promociones y descuentos"). En ese contenedor padre: enlace con cupon-eneba en la URL, o ciertos
-     * textos promocionales (instalación gratis, "Consigue hasta 25 euros", etc.) → no se marca +Juego.
-     *
-     * Nota: algunos textos promocionales en Coolmod solo aparecen en atributos (ej. alt de <img>),
-     * por eso además de textContent se revisan atributos comunes del bloque.
+     * Bloquea +Juego solo si hay promos listadas y todas son cupón/monedero (Steam, eneba, etc.).
+     * Si al menos una promo no está excluida, no bloquea (aunque otras sí sean cashback Steam).
      */
     private function promocionesSectionImpidePlusJuego(string $html): bool
+    {
+        $promos = $this->extraerTextosPromocionesIndividualesCoolmod($html);
+        if ($promos === []) {
+            return false;
+        }
+
+        foreach ($promos as $textoPromo) {
+            if (!$this->esPromocionCoolmodExcluidaDeMasJuego($textoPromo)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Cada enlace /promocion/ en la sección "Promociones" (banners) y en el detalle (div.p-5).
+     *
+     * @return array<int, string>
+     */
+    private function extraerTextosPromocionesIndividualesCoolmod(string $html): array
+    {
+        $xp = $this->crearXPathDesdeHtml($html);
+        if ($xp === null) {
+            return [];
+        }
+
+        $porHref = [];
+
+        $titulosPromo = $xp->query("//p[normalize-space(.) = 'Promociones']");
+        if ($titulosPromo !== false) {
+            for ($i = 0; $i < $titulosPromo->length; $i++) {
+                $p = $titulosPromo->item($i);
+                $contenedor = $p->parentNode;
+                if ($contenedor instanceof \DOMElement) {
+                    $this->agregarPromocionesDesdeEnlaces($xp, $contenedor, $porHref);
+                }
+            }
+        }
+
+        $detallePromos = $xp->query(
+            "//div[contains(concat(' ', normalize-space(@class), ' '), ' p-5 ')]"
+            . "//a[contains(@href, '/promocion/')]"
+        );
+        if ($detallePromos !== false) {
+            foreach ($detallePromos as $a) {
+                if ($a instanceof \DOMElement) {
+                    $this->agregarTextoPromocionDesdeEnlace($a, $porHref);
+                }
+            }
+        }
+
+        return array_values($porHref);
+    }
+
+    /**
+     * @param array<string, string> $porHref clave normalizada href => texto de la promo
+     */
+    private function agregarPromocionesDesdeEnlaces(\DOMXPath $xp, \DOMElement $contenedor, array &$porHref): void
+    {
+        $links = $xp->query('.//a[contains(@href, "/promocion/")]', $contenedor);
+        if ($links === false) {
+            return;
+        }
+        foreach ($links as $a) {
+            if ($a instanceof \DOMElement) {
+                $this->agregarTextoPromocionDesdeEnlace($a, $porHref);
+            }
+        }
+    }
+
+    /**
+     * @param array<string, string> $porHref
+     */
+    private function agregarTextoPromocionDesdeEnlace(\DOMElement $enlace, array &$porHref): void
+    {
+        $href = trim((string) $enlace->getAttribute('href'));
+        if ($href === '' || stripos($href, '/promocion/') === false) {
+            return;
+        }
+
+        $clave = mb_strtolower($href, 'UTF-8');
+
+        $partes = isset($porHref[$clave]) ? [$porHref[$clave]] : [$href];
+        $textoEnlace = trim(preg_replace('/\s+/u', ' ', (string) $enlace->textContent));
+        if ($textoEnlace !== '') {
+            $partes[] = $textoEnlace;
+        }
+
+        foreach ($enlace->getElementsByTagName('img') as $img) {
+            if (!$img instanceof \DOMElement) {
+                continue;
+            }
+            $alt = trim((string) $img->getAttribute('alt'));
+            if ($alt !== '') {
+                $partes[] = $alt;
+            }
+            break;
+        }
+
+        $porHref[$clave] = trim(implode(' ', array_unique($partes)));
+    }
+
+    private function crearXPathDesdeHtml(string $html): ?\DOMXPath
     {
         $prev = libxml_use_internal_errors(true);
         $dom = new \DOMDocument();
@@ -138,66 +242,49 @@ class CoolmodController extends PlantillaTiendaController
         libxml_clear_errors();
         libxml_use_internal_errors($prev);
 
-        $xp = new \DOMXPath($dom);
-        $titulosPromo = $xp->query("//p[normalize-space(.) = 'Promociones']");
-        if ($titulosPromo === false || $titulosPromo->length === 0) {
-            return false;
+        return new \DOMXPath($dom);
+    }
+
+    /**
+     * Patrones de cupón / monedero / cashback (no el título concreto del juego).
+     *
+     * @return array<int, string>
+     */
+    private function patronesCoolmodPromocionExcluidaDeMasJuego(): array
+    {
+        return [
+            '/cupon-eneba/iu',
+            '/super-oferta-rtx/iu',
+            '/power\s*up\s+con\s+msi/iu',
+            '/te\s+la\s+instalamos\s+gratis/iu',
+            '/consigue\s+hasta\s+\d+\s*euros/iu',
+            '/cartera\s+de\s+steam/iu',
+            '/monedero\s+steam/iu',
+            '/wallet\s+steam/iu',
+            '/steam\s*card/iu',
+            '/tarjeta\s+steam/iu',
+            '/tarjeta\s+regalo/iu',
+            '/gift\s*card/iu',
+            '/\bcashback\b/iu',
+            '/msi-cashback/iu',
+        ];
+    }
+
+    /** true = cupón/monedero; no cuenta como regalo de juego para desbloquear +Juego. */
+    private function esPromocionCoolmodExcluidaDeMasJuego(string $textoPromo): bool
+    {
+        $textoPromo = trim($textoPromo);
+        if ($textoPromo === '') {
+            return true;
         }
 
-        for ($i = 0; $i < $titulosPromo->length; $i++) {
-            $p = $titulosPromo->item($i);
-            $contenedor = $p->parentNode;
-            if (!$contenedor instanceof \DOMElement) {
-                continue;
-            }
-            $textoBloque = (string) $contenedor->textContent;
-            $atributosBloque = $this->extraerTextoAtributosPromociones($xp, $contenedor);
-            $textoBusqueda = $textoBloque . ' ' . $atributosBloque;
-            foreach (self::FRAGMENTOS_PROMOCIONES_IMPIDEN_PLUS_JUEGO as $frag) {
-                if (stripos($textoBusqueda, $frag) !== false) {
-                    return true;
-                }
-            }
-            $links = $xp->query('.//a[@href]', $contenedor);
-            if ($links === false) {
-                continue;
-            }
-            foreach ($links as $a) {
-                $href = $a->getAttribute('href');
-                if ($href !== '' && stripos($href, 'cupon-eneba') !== false) {
-                    return true;
-                }
+        foreach ($this->patronesCoolmodPromocionExcluidaDeMasJuego() as $patron) {
+            if (preg_match($patron, $textoPromo)) {
+                return true;
             }
         }
 
         return false;
-    }
-
-    /**
-     * Extrae texto de atributos relevantes dentro del bloque de promociones
-     * (alt/title/aria-label y href), para detectar promociones que no están en textContent.
-     */
-    private function extraerTextoAtributosPromociones(\DOMXPath $xp, \DOMElement $contenedor): string
-    {
-        $partes = [];
-        $nodos = $xp->query('.//*[@alt or @title or @aria-label or @href]', $contenedor);
-        if ($nodos === false) {
-            return '';
-        }
-
-        foreach ($nodos as $nodo) {
-            if (!$nodo instanceof \DOMElement) {
-                continue;
-            }
-            foreach (['alt', 'title', 'aria-label', 'href'] as $attr) {
-                $valor = trim((string) $nodo->getAttribute($attr));
-                if ($valor !== '') {
-                    $partes[] = $valor;
-                }
-            }
-        }
-
-        return implode(' ', $partes);
     }
 
     /**

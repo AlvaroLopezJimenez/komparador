@@ -5,8 +5,10 @@ namespace App\Services;
 use App\Http\Controllers\DescuentosController;
 use App\Http\Controllers\Scraping\ScrapingController;
 use App\Models\CorreoAvisoPrecio;
+use App\Models\HistoricoPrecioProducto;
 use App\Models\OfertaProducto;
 use App\Models\Producto;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -23,6 +25,11 @@ class Scraping
     public const NOMBRE_EJECUCION_PROGRAMA_EXTERNO = 'ejecuciones_scrapear_ofertas_programa_externo';
 
     private const UMBRAL_CAMBIO_ANOMALO = 0.40;
+
+    /** Bajada mínima respecto al precio más bajo del último año (p. ej. 0,10 = al menos un 10 % por debajo). */
+    private const UMBRAL_BAJADA_BAJO_PRECIO_MINIMO_HISTORICO = 0.10;
+
+    public const TEXTO_AVISO_BAJADA_10_PCT_MINIMO = 'Bajada +10% de su precio mínimo';
 
     /**
      * Procesa una oferta: obtiene precio (vía tienda o HTML inyectado), valida, actualiza BD.
@@ -78,6 +85,22 @@ class Scraping
         if ($anomalo !== null) {
             return $anomalo;
         }
+
+        $precioUnidadParaComprobacionHistorico = $precioUnidadNuevo;
+        if ($producto) {
+            $ofertaParaComprobacionHistorico = clone $oferta;
+            $ofertaParaComprobacionHistorico->precio_total = $precioNuevo;
+            $ofertaParaComprobacionHistorico->precio_unidad = $precioUnidadNuevo;
+
+            $ofertaParaComprobacionHistorico = $servicioOfertas->aplicarDescuentosEnvioYRecalcularPrecioUnidadAOferta(
+                $ofertaParaComprobacionHistorico,
+                $producto
+            );
+
+            $precioUnidadParaComprobacionHistorico = $ofertaParaComprobacionHistorico->precio_unidad ?? $precioUnidadNuevo;
+        }
+
+        $this->detectarYRegistrarBajadaCercaPrecioMinimoHistorico($oferta, (float) $precioUnidadParaComprobacionHistorico);
 
         $oferta->update([
             'precio_total'  => $precioNuevo,
@@ -226,6 +249,55 @@ class Scraping
         }
 
         return null;
+    }
+
+    /**
+     * Aviso si el precio por unidad nuevo está al menos un 10 % por debajo del mínimo general del producto.
+     */
+    private function detectarYRegistrarBajadaCercaPrecioMinimoHistorico(
+        OfertaProducto $oferta,
+        float $precioUnidadNuevo
+    ): void {
+        if ($precioUnidadNuevo <= 0) {
+            return;
+        }
+
+        $desde = Carbon::today()->subYear()->toDateString();
+        $precioMinimo = HistoricoPrecioProducto::where('producto_id', $oferta->producto_id)
+            ->whereNull('especificacion_interna_id')
+            ->where('fecha', '>=', $desde)
+            ->where('precio_minimo', '>', 0)
+            ->min('precio_minimo');
+
+        if ($precioMinimo === null || (float) $precioMinimo <= 0) {
+            return;
+        }
+
+        $precioMinimo = (float) $precioMinimo;
+        $umbral = $precioMinimo * (1 - self::UMBRAL_BAJADA_BAJO_PRECIO_MINIMO_HISTORICO);
+
+        if ($precioUnidadNuevo > $umbral) {
+            return;
+        }
+
+        $porcentajeBajada = (($precioMinimo - $precioUnidadNuevo) / $precioMinimo) * 100;
+        $textoAviso = sprintf(
+            '%s. Precio mínimo historico: %.2f€, %% de bajada: %s%%',
+            self::TEXTO_AVISO_BAJADA_10_PCT_MINIMO,
+            $precioMinimo,
+            number_format($porcentajeBajada, 1, ',', '.')
+        );
+
+        DB::table('avisos')->insert([
+            'texto_aviso'    => $textoAviso,
+            'fecha_aviso'    => now(),
+            'user_id'        => 1,
+            'avisoable_type' => OfertaProducto::class,
+            'avisoable_id'   => $oferta->id,
+            'oculto'         => 0,
+            'created_at'     => now(),
+            'updated_at'     => now(),
+        ]);
     }
 
     private function insertarAvisoAnomalo(

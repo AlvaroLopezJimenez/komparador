@@ -537,6 +537,24 @@
                                     $tieneMasDe5 = $totalSublineas > 5;
                                     $tieneMasDe8 = $totalSublineas > 8;
                                 @endphp
+                                @if($tieneMasDe8)
+                                <div class="filtro-busqueda-wrapper mt-1 mb-1.5">
+                                    <div class="relative">
+                                        <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+                                            <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                            </svg>
+                                        </span>
+                                        <input type="search"
+                                               class="filtro-busqueda-input w-full pl-10 pr-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-green-600 focus:border-transparent"
+                                               placeholder="Buscar en {{ $filtro['texto'] }}..."
+                                               data-linea-id="{{ $filtro['id'] }}"
+                                               autocomplete="off"
+                                               aria-label="Buscar filtros en {{ $filtro['texto'] }}">
+                                    </div>
+                                    <p class="filtro-busqueda-sin-resultados hidden text-xs text-gray-500 mt-1 px-0.5" data-linea-id="{{ $filtro['id'] }}">No se encontraron coincidencias</p>
+                                </div>
+                                @endif
                                 <div class="sublineas-container space-y-2 mt-2" 
                                      data-linea-id="{{ $filtro['id'] }}"
                                      data-total="{{ $totalSublineas }}"
@@ -863,6 +881,24 @@
                                     $tieneMasDe5 = $totalSublineas > 5;
                                     $tieneMasDe8 = $totalSublineas > 8;
                                 @endphp
+                                @if($tieneMasDe8)
+                                <div class="filtro-busqueda-wrapper mt-1 mb-1.5">
+                                    <div class="relative">
+                                        <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+                                            <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                            </svg>
+                                        </span>
+                                        <input type="search"
+                                               class="filtro-busqueda-input w-full pl-10 pr-2 py-1 text-xs border border-gray-300 rounded bg-white text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-green-600 focus:border-transparent"
+                                               placeholder="Buscar en {{ $filtro['texto'] }}..."
+                                               data-linea-id="{{ $filtro['id'] }}"
+                                               autocomplete="off"
+                                               aria-label="Buscar filtros en {{ $filtro['texto'] }}">
+                                    </div>
+                                    <p class="filtro-busqueda-sin-resultados hidden text-xs text-gray-500 mt-1 px-0.5" data-linea-id="{{ $filtro['id'] }}">No se encontraron coincidencias</p>
+                                </div>
+                                @endif
                                 <div class="sublineas-container space-y-2 mt-2" 
                                      data-linea-id="{{ $filtro['id'] }}"
                                      data-total="{{ $totalSublineas }}"
@@ -2090,6 +2126,128 @@
             }
         }
 
+        {{-- _nt1() -> normalizarTextoBusqueda() --}}
+        function _nt1(str) {
+            return (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+        }
+
+        {{-- _dsc1() -> desactivarScrollContainer() --}}
+        function _dsc1(container) {
+            container.classList.remove('sublineas-scrollable');
+            container.style.removeProperty('max-height');
+            container.style.removeProperty('height');
+            container.style.removeProperty('overflow-y');
+            container.style.removeProperty('overflow-x');
+            container.style.removeProperty('-webkit-overflow-scrolling');
+        }
+
+        {{-- _asc1() -> activarScrollContainer() --}}
+        function _asc1(container) {
+            const tieneMasDe8 = container.getAttribute('data-tiene-mas-de-8') === 'true';
+            if (!tieneMasDe8) return;
+
+            const labels = container.querySelectorAll('.filtro-sublinea-label');
+            const primerLabel = labels[0];
+            if (!primerLabel) return;
+
+            container.classList.add('sublineas-scrollable');
+            requestAnimationFrame(() => {
+                const labelHeight = primerLabel.offsetHeight;
+                const espacioEntreItems = 8;
+                const altura5Items = (labelHeight * 5) + (espacioEntreItems * 4);
+                const alturaConIndicador = altura5Items + (labelHeight * 0.33);
+
+                container.style.setProperty('max-height', `${alturaConIndicador}px`, 'important');
+                container.style.setProperty('height', `${alturaConIndicador}px`, 'important');
+                container.style.setProperty('overflow-y', 'scroll', 'important');
+                container.style.setProperty('overflow-x', 'hidden', 'important');
+                container.style.setProperty('-webkit-overflow-scrolling', 'touch', 'important');
+            });
+        }
+
+        {{-- _rap1() -> restaurarVisibilidadFiltros() --}}
+        function _rap1(container) {
+            const lineaPrincipal = container.closest('.filtro-linea-principal');
+            const btn = lineaPrincipal?.querySelector('.btn-mostrar-mas');
+            const estaMostrandoTodas = btn?.classList.contains('mostrando-todas');
+            const labels = container.querySelectorAll('.filtro-sublinea-label');
+
+            labels.forEach((label, index) => {
+                if (estaMostrandoTodas) {
+                    label.classList.remove('hidden');
+                } else if (index >= 5) {
+                    label.classList.add('hidden');
+                } else {
+                    label.classList.remove('hidden');
+                }
+            });
+
+            if (estaMostrandoTodas && container.getAttribute('data-tiene-mas-de-8') === 'true') {
+                _asc1(container);
+            } else {
+                _dsc1(container);
+            }
+
+            if (btn) btn.classList.remove('hidden');
+        }
+
+        {{-- _fb1() -> filtrarBusquedaSublineas() --}}
+        function _fb1(input) {
+            const lineaId = input.dataset.lineaId;
+            const query = _nt1(input.value);
+
+            document.querySelectorAll(`.filtro-busqueda-input[data-linea-id="${lineaId}"]`).forEach(inp => {
+                if (inp !== input) inp.value = input.value;
+            });
+
+            document.querySelectorAll(`.sublineas-container[data-linea-id="${lineaId}"]`).forEach(container => {
+                const lineaPrincipal = container.closest('.filtro-linea-principal');
+                const btn = lineaPrincipal?.querySelector('.btn-mostrar-mas');
+                const sinResultados = lineaPrincipal?.querySelector(`.filtro-busqueda-sin-resultados[data-linea-id="${lineaId}"]`);
+
+                if (!query) {
+                    _rap1(container);
+                    if (sinResultados) sinResultados.classList.add('hidden');
+                    return;
+                }
+
+                if (btn) btn.classList.add('hidden');
+                _dsc1(container);
+
+                const labels = container.querySelectorAll('.filtro-sublinea-label');
+                let visibles = 0;
+
+                labels.forEach(label => {
+                    const texto = _nt1(label.querySelector('.filtro-sublinea-texto')?.textContent);
+                    if (texto.includes(query)) {
+                        label.classList.remove('hidden');
+                        visibles++;
+                    } else {
+                        label.classList.add('hidden');
+                    }
+                });
+
+                if (sinResultados) {
+                    sinResultados.classList.toggle('hidden', visibles > 0);
+                }
+            });
+        }
+
+        {{-- _cfb1() -> configurarBusquedaFiltros() --}}
+        function _cfb1() {
+            document.querySelectorAll('.filtro-busqueda-input').forEach(input => {
+                input.addEventListener('input', function() {
+                    _fb1(this);
+                });
+                input.addEventListener('search', function() {
+                    _fb1(this);
+                });
+                input.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                });
+            });
+        }
+
         {{-- _cbm1() -> configurarBotonesMostrarMas() --}}
         {{-- Función para manejar "Mostrar más" --}}
         function _cbm1() {
@@ -2619,6 +2777,7 @@
             
             _cbe1();
             _cbm1();
+            _cfb1();
             _cfc1();
             _cmf1();
             _iac1();

@@ -182,7 +182,7 @@ class BeepController extends PlantillaTiendaController
     }
 
     // -------------------------------------------------------------------------
-    // Cron Neo Objetivos - listado de categoria por paginacion (/page-N)
+    // Cron Neo Objetivos - listado de categoria por paginacion (?page=N)
     // -------------------------------------------------------------------------
 
     public function tipoListadoCategoria(): ?string
@@ -191,7 +191,7 @@ class BeepController extends PlantillaTiendaController
     }
 
     /**
-     * Extrae URLs de producto y construye la siguiente URL como /page-N+1
+     * Extrae URLs de producto y construye la siguiente URL como ?page=N+1
      * mientras en la pagina actual haya productos.
      */
     public function extraerProductosYSiguientePagina(string $html, string $urlPeticionActual): array
@@ -260,17 +260,23 @@ class BeepController extends PlantillaTiendaController
         $host = $parts['host'];
         $port = isset($parts['port']) ? ':' . (int) $parts['port'] : '';
         $path = $parts['path'] ?? '/';
-        $query = $parts['query'] ?? '';
         $fragment = $parts['fragment'] ?? '';
 
-        // Elimina posible sufijo /page-N previo y construye el nuevo.
-        $pathBase = preg_replace('~/page-\d+/?$~i', '', $path);
-        $pathBase = rtrim((string) $pathBase, '/');
-        $nuevoPath = $pathBase . '/page-' . $siguiente;
+        // Limpia formato antiguo /page-N del path si quedó en la URL del objetivo.
+        $path = preg_replace('~/page-\d+/?$~i', '', $path);
+        $path = rtrim((string) $path, '/');
+        if ($path === '') {
+            $path = '/';
+        }
 
-        $url = $scheme . '://' . $host . $port . $nuevoPath;
-        if ($query !== '') {
-            $url .= '?' . $query;
+        $query = $parts['query'] ?? '';
+        parse_str($query, $params);
+        $params['page'] = $siguiente;
+        $queryString = http_build_query($params, '', '&', PHP_QUERY_RFC3986);
+
+        $url = $scheme . '://' . $host . $port . $path;
+        if ($queryString !== '') {
+            $url .= '?' . $queryString;
         }
         if ($fragment !== '') {
             $url .= '#' . $fragment;
@@ -281,10 +287,15 @@ class BeepController extends PlantillaTiendaController
 
     private function extraerNumeroPaginaActual(string $urlPeticionActual): int
     {
-        $path = (string) (parse_url($urlPeticionActual, PHP_URL_PATH) ?? '');
-        if (preg_match('~/page-(\d+)/?$~i', $path, $m)) {
+        if (preg_match('~[?&]page=(\d+)~i', $urlPeticionActual, $m)) {
             return max(1, (int) ($m[1] ?? 1));
         }
+
+        $path = (string) (parse_url($urlPeticionActual, PHP_URL_PATH) ?? '');
+        if (preg_match('~/page-(\d+)/?$~i', $path, $mPath)) {
+            return max(1, (int) ($mPath[1] ?? 1));
+        }
+
         return 1;
     }
 

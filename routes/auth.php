@@ -36,31 +36,31 @@ Route::middleware('guest')->group(function () {
 
 Route::middleware('auth')->group(function () {
 
-    //SOLO EL USUARIO CON EL ID1 PUEDE REGISTRAR USUARIOS
-    Route::get('register', [RegisteredUserController::class, 'create'])
-                ->name('register')
-                ->middleware('admin');
-
-    Route::post('register', [RegisteredUserController::class, 'store'])
-                ->middleware(['admin', 'throttle:5,1']);
-                
-    Route::get('verify-email', EmailVerificationPromptController::class)
-                ->name('verification.notice');
-
-    Route::get('verify-email/{id}/{hash}', VerifyEmailController::class)
-                ->middleware(['signed', 'throttle:6,1'])
-                ->name('verification.verify');
-
-    Route::post('email/verification-notification', [EmailVerificationNotificationController::class, 'store'])
-                ->middleware('throttle:6,1')
-                ->name('verification.send');
-
-    Route::get('confirm-password', [ConfirmablePasswordController::class, 'show'])
-                ->name('password.confirm');
-
-    Route::post('confirm-password', [ConfirmablePasswordController::class, 'store']);
-
-    Route::put('password', [PasswordController::class, 'update'])->name('password.update');
+    // SOLO EL USUARIO CON EL ID1 PUEDE REGISTRAR USUARIOS (rutas desactivadas)
+    // Route::get('register', [RegisteredUserController::class, 'create'])
+    //             ->name('register')
+    //             ->middleware('admin');
+    //
+    // Route::post('register', [RegisteredUserController::class, 'store'])
+    //             ->middleware(['admin', 'throttle:5,1']);
+    //
+    // Route::get('verify-email', EmailVerificationPromptController::class)
+    //             ->name('verification.notice');
+    //
+    // Route::get('verify-email/{id}/{hash}', VerifyEmailController::class)
+    //             ->middleware(['signed', 'throttle:6,1'])
+    //             ->name('verification.verify');
+    //
+    // Route::post('email/verification-notification', [EmailVerificationNotificationController::class, 'store'])
+    //             ->middleware('throttle:6,1')
+    //             ->name('verification.send');
+    //
+    // Route::get('confirm-password', [ConfirmablePasswordController::class, 'show'])
+    //             ->name('password.confirm');
+    //
+    // Route::post('confirm-password', [ConfirmablePasswordController::class, 'store']);
+    //
+    // Route::put('password', [PasswordController::class, 'update'])->name('password.update');
 
     Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])
                 ->name('logout');

@@ -647,10 +647,12 @@ class OfertasController extends Controller
             'producto_id' => 'nullable|integer|exists:productos,id',
             'especificaciones_internas' => 'nullable|string',
             'categoria_id' => 'nullable|integer|exists:categorias,id',
+            'no_productos_sugeridos' => 'nullable|boolean',
         ]);
 
         $usarChatgpt = $request->boolean('usar_chatgpt');
         $incluirContenidoPagina = $request->boolean('incluir_contenido_pagina');
+        $noProductosSugeridos = $request->boolean('no_productos_sugeridos');
         $chatgptModel = $request->filled('chatgpt_model') ? trim($request->chatgpt_model) : null;
         $mismoProductoId = $request->filled('producto_id') ? (int) $request->input('producto_id') : null;
         $mismoProductoEspecsRaw = $request->input('especificaciones_internas');
@@ -690,6 +692,7 @@ class OfertasController extends Controller
         $vocabularioCategoria = ($categoriaCatalogoId !== null)
             ? $this->construirVocabularioTokensDesdeCategoria($categoriaCatalogoId)
             : [];
+        $categoriaNombresCache = [];
 
         $resultados = [];
         foreach ($urlsParaProcesar as $data) {
@@ -735,14 +738,35 @@ class OfertasController extends Controller
                 app(ConsultarNeoCifrado::class)->hashLookup($urlParaMostrar),
                 app(ConsultarNeoCifrado::class)->hashLookup($urlParaBuscar),
             ])));
+            $categoriaUrlId = $categoriaCatalogoId;
             if (!empty($urlLookups)) {
-                $neoId = Neo::query()
+                $neoRow = Neo::query()
                     ->where('aniadida', 'no')
                     ->whereIn('url_lookup', $urlLookups)
                     ->orderBy('id')
-                    ->value('id');
-                $item['neo_id'] = $neoId ? (int) $neoId : null;
+                    ->first(['id', 'categoria_id']);
+                if ($neoRow) {
+                    $item['neo_id'] = (int) $neoRow->id;
+                    if ($neoRow->categoria_id !== null) {
+                        $catId = (int) $neoRow->categoria_id;
+                        if (!isset($categoriaNombresCache[$catId])) {
+                            $cat = Categoria::query()->find($catId, ['id', 'nombre']);
+                            $categoriaNombresCache[$catId] = $cat ? $cat->nombre : ('Categoría #' . $catId);
+                        }
+                        $item['categoria_fila'] = [
+                            'id' => $catId,
+                            'nombre' => $categoriaNombresCache[$catId],
+                        ];
+                        $item['categoria_id'] = $catId;
+                        if ($categoriaUrlId === null) {
+                            $categoriaUrlId = $catId;
+                        }
+                    }
+                }
             }
+            $vocabularioUrl = ($categoriaUrlId !== null)
+                ? $this->construirVocabularioTokensDesdeCategoria($categoriaUrlId)
+                : $vocabularioCategoria;
 
             if (UrlDescartada::where('url', $urlParaMostrar)->exists()) {
                 $item['existe'] = true;
@@ -807,8 +831,25 @@ class OfertasController extends Controller
                     } else {
                         $item['error'] = ($item['error'] ?? '') . ' Producto no encontrado.';
                     }
+                } elseif ($noProductosSugeridos) {
+                    $item['sin_producto_sugerido'] = true;
+                    $catIdForSpecs = $categoriaUrlId ?? $categoriaCatalogoId;
+                    if ($catIdForSpecs !== null) {
+                        $especsCat = $this->obtenerEspecificacionesDesdeCategoria($catIdForSpecs);
+                        if ($especsCat && !empty($especsCat['filtros'])) {
+                            $item['especificaciones'] = $especsCat;
+                            $item['tiene_especificaciones'] = true;
+                            $especsDetectadas = $this->detectarEspecificacionesProductoDesdeUrl(
+                                ['especificaciones' => $especsCat],
+                                $urlParaBuscar
+                            );
+                            if (!empty($especsDetectadas)) {
+                                $item['especificaciones_marcadas'] = $especsDetectadas;
+                            }
+                        }
+                    }
                 } else {
-                    $productos = $this->buscarProductoPorUrl($urlParaBuscar, $categoriaCatalogoId, $vocabularioCategoria);
+                    $productos = $this->buscarProductoPorUrl($urlParaBuscar, $categoriaUrlId, $vocabularioUrl);
                     if (!empty($productos)) {
                         $puntuacionMax = $productos[0]['puntuacion'] ?? 0;
                         $empatados = array_filter($productos, fn ($pr) => ($pr['puntuacion'] ?? 0) === $puntuacionMax);
@@ -1984,6 +2025,59 @@ Responde ÚNICAMENTE con el JSON.";
             $i++;
         }
         return $out;
+    }
+
+    /**
+     * Estructura de especificaciones para crear-masivo a partir de la categoría (sin producto).
+     * Incluye todas las subopciones del catálogo de la categoría para poder marcarlas desde la URL.
+     */
+    private function obtenerEspecificacionesDesdeCategoria(int $categoriaId): ?array
+    {
+        $categoria = Categoria::query()->find($categoriaId, ['id', 'especificaciones_internas']);
+        if (!$categoria || !isset($categoria->especificaciones_internas['filtros'])) {
+            return null;
+        }
+        $filtrosCategoria = $categoria->especificaciones_internas['filtros'] ?? [];
+        if (!is_array($filtrosCategoria) || $filtrosCategoria === []) {
+            return null;
+        }
+
+        $resultado = [
+            'unidad_de_medida' => 'unidad',
+            'columnas_ids' => [],
+            'filtros' => [],
+        ];
+
+        foreach ($filtrosCategoria as $f) {
+            $subprincipales = $f['subprincipales'] ?? [];
+            if (!is_array($subprincipales) || $subprincipales === []) {
+                continue;
+            }
+            $sublineas = [];
+            foreach ($subprincipales as $sub) {
+                $subId = $sub['id'] ?? null;
+                if (!$subId) {
+                    continue;
+                }
+                $imagenes = [];
+                foreach ([$sub['imagenes'] ?? [], $sub['imagen'] ?? []] as $v) {
+                    $imagenes = array_merge($imagenes, is_array($v) ? $v : ($v ? [$v] : []));
+                }
+                $sublineas[] = array_merge($sub, [
+                    'imagenes' => array_values(array_unique(array_filter($imagenes))),
+                    'usar_imagenes_producto' => false,
+                ]);
+            }
+            if ($sublineas !== []) {
+                $resultado['filtros'][] = [
+                    'id' => $f['id'],
+                    'texto' => $f['texto'] ?? '',
+                    'subprincipales' => $sublineas,
+                ];
+            }
+        }
+
+        return $resultado['filtros'] === [] ? null : $resultado;
     }
 
     /**

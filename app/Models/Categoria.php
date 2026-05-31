@@ -13,6 +13,7 @@ class Categoria extends Model
         'clicks',
         'slug',
         'parent_id',
+        'mostrar',
         'especificaciones_internas',
         'info_adicional_chatgpt'
     ];
@@ -29,6 +30,11 @@ class Categoria extends Model
     public function subcategorias()
     {
         return $this->hasMany(Categoria::class, 'parent_id');
+    }
+
+    public function scopeVisibles($query)
+    {
+        return $query->where('mostrar', 'si');
     }
 
     public function productos()
@@ -183,12 +189,20 @@ class Categoria extends Model
             }]);
 
             $categoria->productos_count = $categoria->productos()->count();
+            $categoria->total_descendientes_count = 0;
+            $categoria->mostradas_descendientes_count = 0;
 
             if ($categoria->subcategorias->count() > 0) {
                 static::cargarSubcategoriasYConteosAdministracionRecursivo($categoria->subcategorias);
 
                 foreach ($categoria->subcategorias as $sub) {
                     $categoria->productos_count += $sub->productos_count;
+                    $categoria->total_descendientes_count += 1 + ($sub->total_descendientes_count ?? 0);
+
+                    if (($sub->mostrar ?? 'si') === 'si') {
+                        $categoria->mostradas_descendientes_count++;
+                    }
+                    $categoria->mostradas_descendientes_count += $sub->mostradas_descendientes_count ?? 0;
                 }
             }
         }

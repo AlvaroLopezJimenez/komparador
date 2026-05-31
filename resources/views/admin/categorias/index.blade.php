@@ -17,6 +17,33 @@
             </a>
         </div>
 
+        @if($categoriasSinImagen->isNotEmpty())
+        <details class="mb-6 p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-400 text-amber-900 dark:text-amber-100 group">
+            <summary class="font-semibold cursor-pointer list-none flex items-center gap-2 select-none">
+                <svg class="w-4 h-4 shrink-0 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                </svg>
+                <span>
+                    Hay categorías sin imagen configurada
+                    ({{ $categoriasSinImagen->count() }} {{ $categoriasSinImagen->count() === 1 ? 'categoría' : 'categorías' }}).
+                </span>
+            </summary>
+            <ul class="mt-3 ml-6 space-y-2 text-sm border-t border-amber-300/60 dark:border-amber-600/60 pt-3">
+                @foreach($categoriasSinImagen as $aviso)
+                <li>
+                    <a href="{{ route('admin.categorias.edit', $aviso['categoria']) }}"
+                        class="font-medium text-amber-900 dark:text-amber-100 underline hover:text-amber-700 dark:hover:text-amber-200">
+                        {{ $aviso['categoria']->nombre }}
+                    </a>
+                    @if($aviso['ruta'] !== $aviso['categoria']->nombre)
+                    <span class="text-amber-800 dark:text-amber-200"> — {{ $aviso['ruta'] }}</span>
+                    @endif
+                </li>
+                @endforeach
+            </ul>
+        </details>
+        @endif
+
     <div class="max-w-5xl mx-auto py-10 px-4 space-y-8 bg-gray-50 dark:bg-gray-900 rounded-lg shadow-md"
         x-data="{
             openCategorias: [],

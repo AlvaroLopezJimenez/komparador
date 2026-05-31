@@ -234,7 +234,7 @@ if (!function_exists('_f1')) {
                         {{-- Categorías hijas --}}
                         {{-- $hijas -> $hj1, $hija -> $hj2 --}}
                         @php
-                        $hj1 = $ct1->subcategorias()->orderBy('nombre')->limit(8)->get();
+                        $hj1 = $ct1->subcategorias()->visibles()->orderBy('nombre')->limit(8)->get();
                         @endphp
                         @if($hj1->count() > 0)
                             <div class="w-full">
@@ -262,7 +262,7 @@ if (!function_exists('_f1')) {
                     @php
                     if ($bc1->count() > 8) {
                         foreach ($bc1->skip(8) as $ct2) {
-                            $hj3 = $ct2->subcategorias()->orderBy('nombre')->limit(8)->get();
+                            $hj3 = $ct2->subcategorias()->visibles()->orderBy('nombre')->limit(8)->get();
                             $urlCategoria = _f1(route('categoria.show', $ct2->slug));
                     @endphp
                         <div class="categoria-adicional bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 p-2 md:p-4 flex flex-col items-center text-center" style="display: none;">

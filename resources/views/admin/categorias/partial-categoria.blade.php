@@ -21,7 +21,13 @@
                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"></path>
             </svg>
             <span id="categoria-nombre-{{ $categoria->id }}" class="font-semibold text-gray-800 dark:text-gray-100 transition-all duration-200">{{ $categoria->nombre }}</span>
+            @if(($categoria->mostrar ?? 'si') === 'no')
+                <span class="text-sm font-medium text-red-600 dark:text-red-400">Mostrar - no</span>
+            @endif
             <span class="text-sm text-{{ $color }}">(Nivel {{ $nivel + 1 }})</span>
+            @if($categoria->subcategorias->count() > 0)
+                <span class="text-sm text-gray-600 dark:text-gray-400">Mostradas ({{ $categoria->mostradas_descendientes_count ?? 0 }}/{{ $categoria->total_descendientes_count ?? 0 }})</span>
+            @endif
         </div>
         <div class="flex gap-2 items-center">
             <span class="text-sm text-gray-600 dark:text-gray-400">{{ $categoria->productos_count }} productos</span>

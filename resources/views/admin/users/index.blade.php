@@ -111,7 +111,7 @@
         <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 border border-gray-200 dark:border-gray-700">
             <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-4">📊 Estadísticas</h3>
             
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div class="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
                     <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">{{ number_format($estadisticas['productos_creados']) }}</div>
                     <div class="text-sm text-gray-600 dark:text-gray-400">Productos Creados</div>
@@ -127,6 +127,14 @@
                 <div class="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-lg">
                     <div class="text-2xl font-bold text-orange-600 dark:text-orange-400">{{ number_format($estadisticas['ofertas_modificadas']) }}</div>
                     <div class="text-sm text-gray-600 dark:text-gray-400">Ofertas Modificadas</div>
+                </div>
+                <div class="bg-cyan-50 dark:bg-cyan-900/20 p-4 rounded-lg">
+                    <div class="text-2xl font-bold text-cyan-600 dark:text-cyan-400">{{ number_format($estadisticas['media_productos_dia'], 1, ',', '.') }}</div>
+                    <div class="text-sm text-gray-600 dark:text-gray-400">Media productos / día</div>
+                </div>
+                <div class="bg-teal-50 dark:bg-teal-900/20 p-4 rounded-lg">
+                    <div class="text-2xl font-bold text-teal-600 dark:text-teal-400">{{ number_format($estadisticas['media_ofertas_dia'], 1, ',', '.') }}</div>
+                    <div class="text-sm text-gray-600 dark:text-gray-400">Media ofertas / día</div>
                 </div>
             </div>
         </div>
@@ -339,34 +347,62 @@
             // Gráfica de actividad
             @if(count($datosGrafica['labels']) > 0)
                 const ctx = document.getElementById('graficaActividad').getContext('2d');
+                const labelsGrafica = @json($datosGrafica['labels']);
+                const objetivoOfertasDia = 150;
+                const periodoGrafica = @json($periodo ?? 'dia');
+                const datasetsGrafica = [
+                    {
+                        label: 'Productos Creados',
+                        data: @json($datosGrafica['productos_creados']),
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointHitRadius: 20
+                    },
+                    {
+                        label: 'Ofertas Creadas',
+                        data: @json($datosGrafica['ofertas_creadas']),
+                        backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                        borderColor: 'rgba(34, 197, 94, 1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointHitRadius: 20
+                    }
+                ];
+                if (periodoGrafica === 'dia') {
+                    datasetsGrafica.push({
+                        label: 'Objetivo diario (150 ofertas)',
+                        data: labelsGrafica.map(() => objetivoOfertasDia),
+                        borderColor: 'rgba(239, 68, 68, 1)',
+                        backgroundColor: 'transparent',
+                        borderWidth: 2,
+                        borderDash: [8, 4],
+                        fill: false,
+                        tension: 0,
+                        pointRadius: 0,
+                        pointHoverRadius: 0
+                    });
+                }
+                const maxDatos = Math.max(0, ...@json($datosGrafica['ofertas_creadas']), ...@json($datosGrafica['productos_creados']));
                 new Chart(ctx, {
                     type: 'line',
                     data: {
-                        labels: @json($datosGrafica['labels']),
-                        datasets: [
-                            {
-                                label: 'Productos Creados',
-                                data: @json($datosGrafica['productos_creados']),
-                                backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                                borderColor: 'rgba(59, 130, 246, 1)',
-                                borderWidth: 2,
-                                fill: true,
-                                tension: 0.4
-                            },
-                            {
-                                label: 'Ofertas Creadas',
-                                data: @json($datosGrafica['ofertas_creadas']),
-                                backgroundColor: 'rgba(34, 197, 94, 0.1)',
-                                borderColor: 'rgba(34, 197, 94, 1)',
-                                borderWidth: 2,
-                                fill: true,
-                                tension: 0.4
-                            }
-                        ]
+                        labels: labelsGrafica,
+                        datasets: datasetsGrafica
                     },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false,
+                            axis: 'x'
+                        },
                         layout: {
                             padding: {
                                 top: 10,
@@ -376,6 +412,7 @@
                         scales: {
                             y: {
                                 beginAtZero: true,
+                                suggestedMax: (periodoGrafica === 'dia' ? Math.max(objetivoOfertasDia, maxDatos) : maxDatos) + 10,
                                 ticks: {
                                     stepSize: 1
                                 }
@@ -385,6 +422,10 @@
                             legend: {
                                 display: true,
                                 position: 'top'
+                            },
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false
                             }
                         }
                     }

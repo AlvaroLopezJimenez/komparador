@@ -3152,42 +3152,43 @@ class OfertaProductoController extends Controller
     }
 
     /**
-     * Obtener datos de distribución de ofertas por hora para una tienda
+     * Obtener datos de distribución de ofertas por hora para una tienda o todas
      */
     public function obtenerDistribucionOfertas(Request $request)
     {
-        $request->validate([
-            'tienda_id' => 'required|exists:tiendas,id',
-        ]);
+        $request->validate(array_merge([
+            'tienda_id' => 'nullable|exists:tiendas,id',
+        ], $this->reglasFiltrosReorganizar()));
 
-        $tienda = \App\Models\Tienda::findOrFail($request->tienda_id);
-        $ofertas = $tienda->ofertas()->where('mostrar', 'si')->get();
-        
+        $filtros = $this->filtrosReorganizarFromRequest($request);
+        $ofertas = $this->obtenerOfertasParaReorganizar($request->tienda_id, $filtros);
+
         if ($ofertas->isEmpty()) {
+            if ($request->tienda_id) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'No hay ofertas para esta tienda'
+                ]);
+            }
+
             return response()->json([
-                'status' => 'error',
-                'message' => 'No hay ofertas para esta tienda'
+                'status' => 'ok',
+                'distribucion' => $this->distribucionHorasVacia(),
+                'total_ofertas' => 0,
+                'total_tiendas' => 0,
             ]);
         }
 
-        // Inicializar array de horas (8:00 a 23:00)
-        $distribucion = [];
-        for ($hora = 8; $hora <= 23; $hora++) {
-            $distribucion[$hora] = 0;
-        }
-
-        // Calcular próxima actualización de cada oferta
-        foreach ($ofertas as $oferta) {
-            $proximaHoraActualizacion = $this->calcularProximaHoraActualizacion($oferta);
-            if ($proximaHoraActualizacion >= 8 && $proximaHoraActualizacion <= 23) {
-                $distribucion[$proximaHoraActualizacion]++;
-            }
-        }
+        $distribucion = $this->calcularDistribucionProximaActualizacion($ofertas);
+        $tiendasCount = $request->tienda_id
+            ? 1
+            : $this->queryTiendasReorganizar($filtros)->count();
 
         return response()->json([
             'status' => 'ok',
             'distribucion' => $distribucion,
-            'total_ofertas' => $ofertas->count()
+            'total_ofertas' => $ofertas->count(),
+            'total_tiendas' => $tiendasCount,
         ]);
     }
 
@@ -3238,95 +3239,287 @@ class OfertaProductoController extends Controller
      */
     public function obtenerDistribucionDespues(Request $request)
     {
-        $request->validate([
-            'tienda_id' => 'required|exists:tiendas,id',
-        ]);
+        $request->validate(array_merge([
+            'tienda_id' => 'nullable|exists:tiendas,id',
+        ], $this->reglasFiltrosReorganizar()));
 
-        $tienda = \App\Models\Tienda::findOrFail($request->tienda_id);
-        $ofertas = $tienda->ofertas()->where('mostrar', 'si')->get();
-        
+        $filtros = $this->filtrosReorganizarFromRequest($request);
+        $ofertas = $this->obtenerOfertasParaReorganizar($request->tienda_id, $filtros);
+
         if ($ofertas->isEmpty()) {
+            if ($request->tienda_id) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'No hay ofertas para esta tienda'
+                ]);
+            }
+
             return response()->json([
-                'status' => 'error',
-                'message' => 'No hay ofertas para esta tienda'
+                'status' => 'ok',
+                'distribucion' => $this->distribucionHorasVacia(),
+                'total_ofertas' => 0,
+                'total_tiendas' => 0,
             ]);
         }
 
-        // Inicializar array de horas (8:00 a 23:00)
+        $distribucion = $this->calcularDistribucionUpdatedAt($ofertas);
+        $tiendasCount = $request->tienda_id
+            ? 1
+            : $this->queryTiendasReorganizar($filtros)->count();
+
+        return response()->json([
+            'status' => 'ok',
+            'distribucion' => $distribucion,
+            'total_ofertas' => $ofertas->count(),
+            'total_tiendas' => $tiendasCount,
+        ]);
+    }
+
+    /**
+     * Ejecutar reorganización de update_at de ofertas (una tienda o todas)
+     */
+    public function ejecutarReorganizarUpdateAt(Request $request)
+    {
+        $request->validate(array_merge([
+            'tienda_id' => 'nullable|exists:tiendas,id',
+            'hora_inicio' => 'nullable|integer|min:0|max:23',
+            'hora_fin' => 'nullable|integer|min:0|max:23',
+        ], $this->reglasFiltrosReorganizar()));
+
+        $horaInicio = (int) $request->input('hora_inicio', 8);
+        $horaFin = (int) $request->input('hora_fin', 22);
+        $filtros = $this->filtrosReorganizarFromRequest($request);
+
+        if ($request->tienda_id) {
+            $tienda = \App\Models\Tienda::findOrFail($request->tienda_id);
+            $ofertas = $tienda->ofertas()->where('mostrar', 'si')->with('producto')->get();
+
+            if ($ofertas->isEmpty()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'No hay ofertas para esta tienda'
+                ]);
+            }
+
+            $resultado = $this->ejecutarReorganizacionOfertas($ofertas, $horaInicio, $horaFin);
+
+            return response()->json([
+                'status' => 'ok',
+                'modo' => 'tienda',
+                'total_ofertas' => $ofertas->count(),
+                'actualizadas' => $resultado['actualizadas'],
+                'errores' => $resultado['errores'],
+                'log' => $resultado['log'],
+                'hora_inicio' => $horaInicio,
+                'hora_fin' => $horaFin,
+            ]);
+        }
+
+        if ((!$filtros['mostrar_si'] && !$filtros['mostrar_no']) || (!$filtros['scrapear_si'] && !$filtros['scrapear_no'])) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Selecciona al menos una opción en cada filtro'
+            ]);
+        }
+
+        $tiendas = $this->queryTiendasReorganizar($filtros)
+            ->orderBy('nombre')
+            ->get();
+
+        if ($tiendas->isEmpty()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'No hay tiendas con los filtros seleccionados'
+            ]);
+        }
+
+        $totalOfertas = 0;
+        $actualizadas = 0;
+        $errores = 0;
+        $log = [];
+        $tiendasProcesadas = 0;
+
+        foreach ($tiendas as $tienda) {
+            $ofertas = $tienda->ofertas()->where('mostrar', 'si')->with('producto')->get();
+            if ($ofertas->isEmpty()) {
+                continue;
+            }
+
+            $resultado = $this->ejecutarReorganizacionOfertas($ofertas, $horaInicio, $horaFin);
+            $totalOfertas += $ofertas->count();
+            $actualizadas += $resultado['actualizadas'];
+            $errores += $resultado['errores'];
+            $tiendasProcesadas++;
+
+            $log[] = [
+                'status' => 'tienda',
+                'tienda_id' => $tienda->id,
+                'tienda' => $tienda->nombre,
+                'total_ofertas' => $ofertas->count(),
+                'actualizadas' => $resultado['actualizadas'],
+                'errores' => $resultado['errores'],
+            ];
+        }
+
+        if ($totalOfertas === 0) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'No hay ofertas con los filtros seleccionados'
+            ]);
+        }
+
+        return response()->json([
+            'status' => 'ok',
+            'modo' => 'todas',
+            'total_ofertas' => $totalOfertas,
+            'actualizadas' => $actualizadas,
+            'errores' => $errores,
+            'tiendas_procesadas' => $tiendasProcesadas,
+            'log' => $log,
+            'hora_inicio' => $horaInicio,
+            'hora_fin' => $horaFin,
+        ]);
+    }
+
+    private function reglasFiltrosReorganizar(): array
+    {
+        return [
+            'mostrar_si' => 'nullable|boolean',
+            'mostrar_no' => 'nullable|boolean',
+            'scrapear_si' => 'nullable|boolean',
+            'scrapear_no' => 'nullable|boolean',
+        ];
+    }
+
+    private function filtrosReorganizarFromRequest(Request $request): array
+    {
+        return [
+            'mostrar_si' => $request->boolean('mostrar_si'),
+            'mostrar_no' => $request->boolean('mostrar_no'),
+            'scrapear_si' => $request->boolean('scrapear_si'),
+            'scrapear_no' => $request->boolean('scrapear_no'),
+        ];
+    }
+
+    private function queryTiendasReorganizar(array $filtros)
+    {
+        $query = \App\Models\Tienda::query();
+        $this->aplicarFiltroCampoTienda($query, 'mostrar_tienda', $filtros['mostrar_si'], $filtros['mostrar_no']);
+        $this->aplicarFiltroCampoTienda($query, 'scrapear', $filtros['scrapear_si'], $filtros['scrapear_no']);
+
+        return $query;
+    }
+
+    private function aplicarFiltroCampoTienda($query, string $campo, bool $incluirSi, bool $incluirNo): void
+    {
+        if ($incluirSi && $incluirNo) {
+            return;
+        }
+
+        $valores = [];
+        if ($incluirSi) {
+            $valores[] = 'si';
+        }
+        if ($incluirNo) {
+            $valores[] = 'no';
+        }
+
+        if ($valores === []) {
+            $query->whereRaw('0 = 1');
+            return;
+        }
+
+        $query->whereIn($campo, $valores);
+    }
+
+    private function distribucionHorasVacia(): array
+    {
         $distribucion = [];
         for ($hora = 8; $hora <= 23; $hora++) {
             $distribucion[$hora] = 0;
         }
 
-        // Para la distribución DESPUÉS, simplemente contar por la hora del updated_at actual
+        return $distribucion;
+    }
+
+    private function obtenerOfertasParaReorganizar(?int $tiendaId, array $filtros)
+    {
+        $query = \App\Models\OfertaProducto::query()
+            ->where('mostrar', 'si');
+
+        if ($tiendaId) {
+            $query->where('tienda_id', $tiendaId);
+        } else {
+            $query->whereHas('tienda', function ($q) use ($filtros) {
+                $this->aplicarFiltroCampoTienda($q, 'mostrar_tienda', $filtros['mostrar_si'], $filtros['mostrar_no']);
+                $this->aplicarFiltroCampoTienda($q, 'scrapear', $filtros['scrapear_si'], $filtros['scrapear_no']);
+            });
+        }
+
+        return $query->get();
+    }
+
+    private function calcularDistribucionProximaActualizacion($ofertas): array
+    {
+        $distribucion = [];
+        for ($hora = 8; $hora <= 23; $hora++) {
+            $distribucion[$hora] = 0;
+        }
+
         foreach ($ofertas as $oferta) {
+            $proximaHoraActualizacion = $this->calcularProximaHoraActualizacion($oferta);
+            if ($proximaHoraActualizacion >= 8 && $proximaHoraActualizacion <= 23) {
+                $distribucion[$proximaHoraActualizacion]++;
+            }
+        }
+
+        return $distribucion;
+    }
+
+    private function calcularDistribucionUpdatedAt($ofertas): array
+    {
+        $distribucion = [];
+        for ($hora = 8; $hora <= 23; $hora++) {
+            $distribucion[$hora] = 0;
+        }
+
+        foreach ($ofertas as $oferta) {
+            if (!$oferta->updated_at) {
+                continue;
+            }
             $horaActualizacion = $oferta->updated_at->hour;
             if ($horaActualizacion >= 8 && $horaActualizacion <= 23) {
                 $distribucion[$horaActualizacion]++;
             }
         }
 
-        return response()->json([
-            'status' => 'ok',
-            'distribucion' => $distribucion,
-            'total_ofertas' => $ofertas->count()
-        ]);
+        return $distribucion;
     }
 
-    /**
-     * Ejecutar reorganización de update_at de ofertas
-     */
-    public function ejecutarReorganizarUpdateAt(Request $request)
+    private function ejecutarReorganizacionOfertas($ofertas, int $horaInicio, int $horaFin): array
     {
-        $request->validate([
-            'tienda_id' => 'required|exists:tiendas,id',
-            'hora_inicio' => 'nullable|integer|min:0|max:23',
-            'hora_fin' => 'nullable|integer|min:0|max:23',
-        ]);
-
-        $tienda = \App\Models\Tienda::findOrFail($request->tienda_id);
-        $ofertas = $tienda->ofertas()->where('mostrar', 'si')->get();
-        
-        if ($ofertas->isEmpty()) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'No hay ofertas para esta tienda'
-            ]);
-        }
-
-        // Obtener horas de inicio y fin (por defecto 8:00 y 22:59)
-        $horaInicio = $request->input('hora_inicio', 8);
-        $horaFin = $request->input('hora_fin', 22);
-        $minutoFin = 59; // Siempre terminar a los 59 minutos
-        
+        $minutoFin = 59;
         $totalOfertas = $ofertas->count();
-        
-        // Calcular minutos totales disponibles (desde inicio hasta fin)
-        $minutosTotales = ($horaFin - $horaInicio) * 60 + $minutoFin + 1; // +1 para incluir el minuto final
-        
-        // Generar horarios aleatorios para cada oferta
+        $minutosTotales = ($horaFin - $horaInicio) * 60 + $minutoFin + 1;
         $horariosGenerados = [];
-        
-        if ($totalOfertas == 1) {
-            // Si solo hay una oferta, ponerla en el medio del rango
+
+        if ($totalOfertas === 1) {
             $horariosGenerados[] = $minutosTotales / 2;
         } else {
-            // Generar horarios aleatorios con separación mínima
-            $separacionMinima = max(30, $minutosTotales / ($totalOfertas * 3)); // Mínimo 30 minutos o 1/3 del rango por oferta
-            
+            $separacionMinima = max(30, $minutosTotales / ($totalOfertas * 3));
+
             for ($i = 0; $i < $totalOfertas; $i++) {
                 $intentos = 0;
-                $maxIntentos = 100; // Evitar bucle infinito
-                
+                $maxIntentos = 100;
+
                 do {
                     $minutosAleatorios = rand(0, $minutosTotales - 1);
                     $intentos++;
                 } while ($intentos < $maxIntentos && $this->horarioMuyCerca($minutosAleatorios, $horariosGenerados, $separacionMinima));
-                
+
                 $horariosGenerados[] = $minutosAleatorios;
             }
-            
-            // Ordenar los horarios para que queden en orden cronológico
+
             sort($horariosGenerados);
         }
 
@@ -3336,28 +3529,22 @@ class OfertaProductoController extends Controller
 
         foreach ($ofertas as $index => $oferta) {
             try {
-                // Usar el horario aleatorio generado para esta oferta
                 $minutosOffsetActual = $horariosGenerados[$index];
-                
                 $hora = $horaInicio + floor($minutosOffsetActual / 60);
                 $minuto = $minutosOffsetActual % 60;
-                
-                // Asegurar que no exceda la hora fin
+
                 if ($hora > $horaFin || ($hora == $horaFin && $minuto > $minutoFin)) {
                     $hora = $horaFin;
                     $minuto = $minutoFin;
                 }
 
-                // IMPORTANTE: Mantener el día original de updated_at pero cambiar solo la hora
                 $fechaOriginal = $oferta->updated_at ?? now();
-                // Crear nueva fecha manteniendo el mismo día, mes y año, solo cambiando hora y minuto
                 $nuevaFecha = $fechaOriginal->copy()->setTime($hora, $minuto, 0);
 
-                // Actualizar solo el updated_at sin tocar otros campos
-                $oferta->timestamps = false; // Deshabilitar timestamps automáticos
+                $oferta->timestamps = false;
                 $oferta->updated_at = $nuevaFecha;
                 $oferta->save();
-                $oferta->timestamps = true; // Rehabilitar timestamps
+                $oferta->timestamps = true;
 
                 $actualizadas++;
                 $log[] = [
@@ -3365,29 +3552,24 @@ class OfertaProductoController extends Controller
                     'producto' => $oferta->producto->nombre ?? 'Sin producto',
                     'fecha_original' => $fechaOriginal->format('Y-m-d H:i:s'),
                     'nueva_fecha' => $nuevaFecha->format('Y-m-d H:i:s'),
-                    'status' => 'actualizada'
+                    'status' => 'actualizada',
                 ];
-
             } catch (\Exception $e) {
                 $errores++;
                 $log[] = [
                     'oferta_id' => $oferta->id,
                     'producto' => $oferta->producto->nombre ?? 'Sin producto',
                     'error' => $e->getMessage(),
-                    'status' => 'error'
+                    'status' => 'error',
                 ];
             }
         }
 
-        return response()->json([
-            'status' => 'ok',
-            'total_ofertas' => $totalOfertas,
+        return [
             'actualizadas' => $actualizadas,
             'errores' => $errores,
             'log' => $log,
-            'hora_inicio' => $horaInicio,
-            'hora_fin' => $horaFin
-        ]);
+        ];
     }
 
     private function parseNullableDateTime(?string $valor): ?Carbon

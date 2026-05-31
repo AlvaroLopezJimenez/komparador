@@ -8,6 +8,7 @@ use App\Models\EjecucionGlobal;
 use App\Models\Neo;
 use App\Models\Neoobjetivo;
 use App\Models\OfertaProducto;
+use App\Models\Producto;
 use App\Models\Tienda;
 use App\Models\UrlDescartada;
 use App\Models\User;
@@ -1846,11 +1847,9 @@ class CronNeoObjetivosController extends Controller
     /**
      * Detecta la tienda a partir del host de la URL (misma lógica que crear-masivo / analizarUrls).
      *
-     * @param string $url URL de la categoría o producto
-     * @param \Illuminate\Support\Collection|\App\Models\Tienda[] $todasLasTiendas
-     * @return \App\Models\Tienda|null
+     * @param  \Illuminate\Support\Collection|\App\Models\Tienda[]  $todasLasTiendas
      */
-    private function detectarTiendaPorUrl(string $url, $todasLasTiendas)
+    private function detectarTiendaPorUrl(string $url, $todasLasTiendas): ?Tienda
     {
         try {
             $parsed = parse_url($url);
@@ -1874,12 +1873,77 @@ class CronNeoObjetivosController extends Controller
         } catch (\Throwable $e) {
             //
         }
+
         return null;
     }
 
     /**
-     * Tras la rama categoría/tienda del cron: filas neo sin tienda_id pero con URL cifrada v2
-     * se descifran, se limpian como en productos y se asigna tienda por host (igual que crear-masivo).
+     * Panel crear-masivo: botón «Buscar» (tienda por URL + categoría desde producto si falta).
+     */
+    public function rellenarTiendaIdNeoDesdeUrlCrearMasivo()
+    {
+        return response()->json([
+            'success' => true,
+            'stats' => [
+                'tienda' => $this->rellenarTiendaIdNeoSinTiendaDesdeUrlDescifrada(),
+                'categoria' => $this->rellenarCategoriaIdNeoDesdeProducto(),
+            ],
+        ]);
+    }
+
+    /**
+     * Filas neo con aniadida=no, producto_id y sin categoria_id: copia categoría del producto.
+     *
+     * @return array{revisadas: int, actualizadas: int, producto_sin_categoria: int, errores: int}
+     */
+    private function rellenarCategoriaIdNeoDesdeProducto(): array
+    {
+        $stats = [
+            'revisadas' => 0,
+            'actualizadas' => 0,
+            'producto_sin_categoria' => 0,
+            'errores' => 0,
+        ];
+
+        Neo::query()
+            ->where('aniadida', 'no')
+            ->whereNotNull('producto_id')
+            ->whereNull('categoria_id')
+            ->orderBy('id')
+            ->chunkById(200, function ($neos) use (&$stats) {
+                $productoIds = $neos->pluck('producto_id')->unique()->filter()->values()->all();
+                if ($productoIds === []) {
+                    return;
+                }
+
+                $productos = Producto::query()
+                    ->whereIn('id', $productoIds)
+                    ->get(['id', 'categoria_id'])
+                    ->keyBy('id');
+
+                foreach ($neos as $neo) {
+                    $stats['revisadas']++;
+                    try {
+                        $producto = $productos->get($neo->producto_id);
+                        if ($producto === null || $producto->categoria_id === null) {
+                            $stats['producto_sin_categoria']++;
+
+                            continue;
+                        }
+                        $neo->categoria_id = $producto->categoria_id;
+                        $neo->save();
+                        $stats['actualizadas']++;
+                    } catch (\Throwable $e) {
+                        $stats['errores']++;
+                    }
+                }
+            });
+
+        return $stats;
+    }
+
+    /**
+     * Filas neo sin tienda_id pero con URL cifrada v2: descifra, limpia y asigna tienda por host.
      *
      * @return array{revisadas: int, actualizadas: int, sin_tienda_detectada: int, url_descifrada_vacia: int, errores: int}
      */

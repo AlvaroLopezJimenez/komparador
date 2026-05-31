@@ -1048,6 +1048,22 @@
     .scrollbar-hide::-webkit-scrollbar {
       display: none;
     }
+
+    .filtro-grupo-buscar-btn {
+      color: #d16a0f;
+    }
+    .filtro-grupo-buscar-btn:hover {
+      color: #e97b11;
+    }
+    .filtro-grupo-buscar-textarea {
+      font-size: 16px;
+      line-height: 1.25;
+    }
+    .filtro-grupo-buscar-textarea:focus {
+      outline: none;
+      border-color: #e97b11;
+      box-shadow: 0 0 0 2px rgba(233, 123, 17, 0.25);
+    }
     
     .sublineas-carrusel-container {
       position: relative;
@@ -2441,9 +2457,21 @@
                         break;
                       }
                     }
+                    $numSubprincipales = count($filtro['subprincipales']);
+                    $mostrarBuscadorGrupo = $numSubprincipales > 6;
                   @endphp
                   <div class="filtro-linea-principal" data-linea-id="{{ $filtro['id'] }}" data-formato="{{ $filtro['formato'] ?? 'texto' }}">
-                    <div class="font-bold text-sm sm:text-base text-black mb-2" style="color: #000000 !important; font-weight: bold !important;">{{ $filtro['texto'] }}</div>
+                    <div class="flex flex-wrap items-center gap-2 mb-2">
+                      <span class="font-bold text-sm sm:text-base text-black" style="color: #000000 !important; font-weight: bold !important;">{{ $filtro['texto'] }}</span>
+                      @if($mostrarBuscadorGrupo)
+                        <button type="button" class="filtro-grupo-buscar-btn text-sm underline cursor-pointer" data-linea-id="{{ $filtro['id'] }}">Buscar</button>
+                      @endif
+                    </div>
+                    @if($mostrarBuscadorGrupo)
+                      <div class="filtro-grupo-buscar-wrap hidden mb-2" data-linea-id="{{ $filtro['id'] }}">
+                        <textarea class="filtro-grupo-buscar-textarea w-full px-2 py-1 border border-gray-300 rounded resize-none min-h-[2rem] max-h-[2rem] focus:outline-none overflow-hidden" rows="1" placeholder="Buscar en {{ $filtro['texto'] }}" data-linea-id="{{ $filtro['id'] }}" autocomplete="off"></textarea>
+                      </div>
+                    @endif
                     @php
                       $formato = $filtro['formato'] ?? 'texto';
                       $necesitaCarrusel = in_array($formato, ['imagen', 'imagen_texto', 'imagen_precio', 'imagen_texto_precio']);
@@ -3067,6 +3095,7 @@
               _sob1();
             }
             _cbe1();
+            _cfbe1();
             _aeb1();
             {{-- Actualizar contadores de sublíneas al cargar --}}
             _acs1();
@@ -4187,6 +4216,64 @@
             });
           }
           
+          {{-- Filtrar sublíneas de un grupo por texto de búsqueda --}}
+          {{-- _fse1: filtrarSublineasEspecificaciones - Muestra u oculta botones según coincidencia con el texto --}}
+          function _fse1(lineaId, query) {
+            const linea = document.querySelector(`.filtro-linea-principal[data-linea-id="${lineaId}"]`);
+            if (!linea) return;
+
+            const botones = linea.querySelectorAll('.filtro-sublinea-btn');
+            const tokens = String(query || '').trim().split(/[\s\n]+/).filter(Boolean);
+
+            botones.forEach(boton => {
+              const texto = (boton.dataset.sublineaTexto || '').toLowerCase();
+              if (tokens.length === 0) {
+                boton.classList.remove('hidden');
+                return;
+              }
+              const coincide = tokens.some(token => texto.includes(token.toLowerCase()));
+              boton.classList.toggle('hidden', !coincide);
+            });
+          }
+
+          {{-- Configurar buscador por grupo de especificaciones (grupos con más de 6 opciones) --}}
+          {{-- _cfbe1: configurarFiltroBuscarEspecificaciones - Toggle textarea y filtrado en tiempo real --}}
+          function _cfbe1() {
+            document.querySelectorAll('.filtro-grupo-buscar-btn').forEach(btn => {
+              if (btn.dataset.configurado === '1') return;
+              btn.dataset.configurado = '1';
+
+              btn.addEventListener('click', function() {
+                const lineaId = this.dataset.lineaId;
+                const wrap = document.querySelector(`.filtro-grupo-buscar-wrap[data-linea-id="${lineaId}"]`);
+                if (!wrap) return;
+
+                const textarea = wrap.querySelector('.filtro-grupo-buscar-textarea');
+                const isHidden = wrap.classList.contains('hidden');
+
+                if (isHidden) {
+                  wrap.classList.remove('hidden');
+                  if (textarea) textarea.focus();
+                } else {
+                  wrap.classList.add('hidden');
+                  if (textarea) {
+                    textarea.value = '';
+                    _fse1(lineaId, '');
+                  }
+                }
+              });
+            });
+
+            document.querySelectorAll('.filtro-grupo-buscar-textarea').forEach(textarea => {
+              if (textarea.dataset.configurado === '1') return;
+              textarea.dataset.configurado = '1';
+
+              textarea.addEventListener('input', function() {
+                _fse1(this.dataset.lineaId, this.value);
+              });
+            });
+          }
+
           {{-- Configurar event listeners para los botones de especificaciones --}}
           {{-- _cbe1: configurarBotonesEspecificaciones - Configura los event listeners para los botones de especificaciones (click, long press) --}}
           function _cbe1() {

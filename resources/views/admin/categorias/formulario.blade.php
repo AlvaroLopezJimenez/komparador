@@ -150,7 +150,7 @@
         @endif
 
         {{-- FORMULARIO CREAR/EDITAR CATEGORÍA --}}
-        <form method="POST" action="{{ $categoria ? route('admin.categorias.update', $categoria) : route('admin.categorias.store') }}">
+        <form id="form-categoria" method="POST" action="{{ $categoria ? route('admin.categorias.update', $categoria) : route('admin.categorias.store') }}">
             @csrf
             @if($categoria)
                 @method('PUT')
@@ -185,175 +185,48 @@
                     </div>
                 </div>
 
-                {{-- IMÁGENES --}}
+                <div>
+                    <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">¿Mostrar? *</label>
+                    <div class="flex gap-6">
+                        <label class="inline-flex items-center">
+                            <input type="radio" name="mostrar" value="si"
+                                {{ old('mostrar', $categoria->mostrar ?? 'si') === 'si' ? 'checked' : '' }}
+                                class="form-radio text-pink-600">
+                            <span class="ml-2 text-gray-700 dark:text-gray-200">Sí</span>
+                        </label>
+                        <label class="inline-flex items-center">
+                            <input type="radio" name="mostrar" value="no"
+                                {{ old('mostrar', $categoria->mostrar ?? 'si') === 'no' ? 'checked' : '' }}
+                                class="form-radio text-pink-600">
+                            <span class="ml-2 text-gray-700 dark:text-gray-200">No</span>
+                        </label>
+                    </div>
+                </div>
+
+                @if(!$categoria)
+                {{-- IMÁGENES (nueva categoría: después de datos básicos) --}}
                 <fieldset class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 space-y-4 border border-gray-200 dark:border-gray-700">
                     <legend class="text-lg font-semibold text-gray-700 dark:text-gray-200">Imagen de la categoría</legend>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Una sola imagen por categoría (144×120 px). Se guarda en la carpeta <strong class="font-medium">categorias</strong>.</p>
 
-                    <!-- Pestañas de gestión de imágenes -->
-                    <div class="border-b border-gray-200 dark:border-gray-600">
-                        <nav class="-mb-px flex space-x-8" aria-label="Tabs">
-                            <button type="button" id="tab-upload-categoria" class="tab-button-categoria border-b-2 border-blue-500 py-2 px-1 text-sm font-medium text-blue-600 dark:text-blue-400" aria-current="page">
-                                Subir imagen
-                            </button>
-                            <button type="button" id="tab-manual-categoria" class="tab-button-categoria border-b-2 border-transparent py-2 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300">
-                                Nombre manual
-                            </button>
-                            <button type="button" id="tab-url-categoria" class="tab-button-categoria border-b-2 border-transparent py-2 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300">
-                                Descargar desde URL
-                            </button>
-                        </nav>
+                    <div id="imagen-categoria-container" class="flex flex-wrap gap-3 items-start min-h-[5rem]">
+                        <!-- Vista previa generada por JS -->
                     </div>
 
-                    <!-- Contenido de la pestaña de subida -->
-                    <div id="content-upload-categoria" class="tab-content-categoria space-y-4">
-                        <div>
-                            <label class="block mb-2 font-medium text-gray-700 dark:text-gray-200">Imagen de la categoría *</label>
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <!-- Selector de carpeta -->
-                                <div>
-                                    <label class="block mb-1 text-sm text-gray-600 dark:text-gray-400">Carpeta</label>
-                                    <div class="flex gap-2">
-                                        <select id="carpeta-imagen-categoria" class="flex-1 px-3 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border text-sm">
-                                            <option value="">Selecciona una carpeta</option>
-                                            <option value="categorias">categorias</option>
-                                            <option value="panales">panales</option>
-                                            <option value="tiendas">tiendas</option>
-                                        </select>
-                                        <button type="button" id="btn-ver-imagenes-categoria" class="bg-gray-500 hover:bg-gray-600 text-white px-3 py-2 rounded text-sm">
-                                            Ver
-                                        </button>
-                                    </div>
-                                    
-                                    <!-- Información de imagen actual -->
-                                    @php
-                                        $imgActual = old('imagen', $categoria->imagen ?? '');
-                                        $carpetaActual = $imgActual ? explode('/', $imgActual)[0] : '';
-                                    @endphp
-                                    @if($imgActual)
-                                    <div class="mt-2 p-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded text-xs">
-                                        <div class="text-green-700 dark:text-green-300 font-medium">✓ Imagen actual:</div>
-                                        <div class="text-green-600 dark:text-green-400 break-words">{{ $imgActual }}</div>
-                                        
-                                        <!-- Vista previa de imagen actual -->
-                                        <div class="mt-2 flex items-center gap-2">
-                                            <img id="preview-upload-categoria" src="{{ asset('images/' . $imgActual) }}" alt="Vista previa" class="h-12 w-12 object-contain border rounded">
-                                            <button type="button" id="btn-limpiar-categoria" class="text-xs text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300">
-                                                Limpiar
-                                            </button>
-                                        </div>
-                                    </div>
-                                    @else
-                                    <!-- Vista previa vacía (oculta por defecto) -->
-                                    <div class="mt-2 flex items-center gap-2 hidden" id="preview-container-categoria">
-                                        <img id="preview-upload-categoria" src="" alt="Vista previa" class="h-12 w-12 object-contain border rounded">
-                                        <button type="button" id="btn-limpiar-categoria" class="text-xs text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300">
-                                            Limpiar
-                                        </button>
-                                    </div>
-                                    @endif
-                                </div>
-                                
-                                <!-- Área de upload -->
-                                <div class="md:col-span-2">
-                                    <label class="block mb-1 text-sm text-gray-600 dark:text-gray-400">Seleccionar imagen</label>
-                                    <div class="flex gap-2">
-                                        <input type="file" id="file-imagen-categoria" accept="image/*" class="hidden">
-                                        <button type="button" id="btn-seleccionar-categoria" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm">
-                                            Seleccionar archivo
-                                        </button>
-                                        <span id="nombre-archivo-categoria" class="text-sm text-gray-500 dark:text-gray-400 self-center"></span>
-                                    </div>
-                                    
-                                    <!-- Área de drag & drop -->
-                                    <div id="drop-zone-categoria" class="mt-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 text-center hover:border-blue-400 dark:hover:border-blue-500 transition-colors">
-                                        <div class="text-gray-500 dark:text-gray-400">
-                                            <svg class="mx-auto h-8 w-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-                                            </svg>
-                                            <p>Arrastra y suelta la imagen aquí</p>
-                                            <p class="text-xs">o haz clic para seleccionar</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Campo oculto -->
-                            <input type="hidden" id="ruta-imagen-categoria" name="imagen" value="{{ $categoria ? $categoria->imagen : '' }}">
-                            <span id="ruta-completa-categoria" class="text-sm text-gray-600 dark:text-gray-400 hidden"></span>
-                            @error('imagen') <p class="text-red-500 text-sm mt-1">{{ $message }}</p> @enderror
-                        </div>
+                    <div class="mt-4 flex flex-wrap items-center gap-3">
+                        <button type="button" id="btn-añadir-imagen-categoria" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-md transition duration-150 ease-in-out">
+                            + Añadir imagen
+                        </button>
+                        <button type="button" id="btn-cambiar-imagen-categoria" class="hidden bg-gray-600 hover:bg-gray-700 text-white font-semibold px-4 py-2 rounded-md">
+                            Cambiar imagen
+                        </button>
                     </div>
 
-                    <!-- Contenido de la pestaña manual (oculto por defecto) -->
-                    <div id="content-manual-categoria" class="tab-content-categoria space-y-4 hidden">
-                        <div>
-                            <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">Nombre de imagen *</label>
-                            <div class="flex gap-2 items-center">
-                                <input type="text" id="imagen-categoria-input" name="imagen_manual" 
-                                    value="{{ $categoria && $categoria->imagen ? $categoria->imagen : '' }}"
-                                    placeholder="categorias/ejemplo.jpg" 
-                                    class="w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border @error('imagen') border-red-500 @enderror">
-                                <button type="button" id="buscar-imagen-categoria" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3 h-full rounded">Buscar imagen</button>
-                                @php
-                                    $imgCategoria = old('imagen', $categoria->imagen ?? '');
-                                    $imgCategoriaSrc = $imgCategoria ? asset('images/' . $imgCategoria) : '';
-                                    $imgCategoriaDisplay = $imgCategoria ? 'block' : 'none';
-                                @endphp
-                                <img id="preview-imagen-categoria" src="{{ $imgCategoriaSrc }}" alt="Vista previa" class="h-12 w-12 object-contain ml-2 border rounded" style="display: {{ $imgCategoriaDisplay }};">
-                            </div>
-                            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Ejemplo: categorias/panales.jpg</p>
-                            @error('imagen') <p class="text-red-500 text-sm mt-1">{{ $message }}</p> @enderror
-                        </div>
-                    </div>
-
-                    <!-- Contenido de la pestaña de descarga desde URL (oculto por defecto) -->
-                    <div id="content-url-categoria" class="tab-content-categoria space-y-4 hidden">
-                        <div>
-                            <label class="block mb-2 font-medium text-gray-700 dark:text-gray-200">Descargar imagen desde URL *</label>
-                            <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Se generará automáticamente la imagen redimensionada a 144x120.</p>
-                            
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <!-- Selector de carpeta -->
-                                <div>
-                                    <label class="block mb-1 text-sm text-gray-600 dark:text-gray-400">Carpeta</label>
-                                    <select id="carpeta-imagen-url-categoria" class="w-full px-3 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border text-sm">
-                                        <option value="">Selecciona una carpeta</option>
-                                        <option value="categorias">categorias</option>
-                                        <option value="panales">panales</option>
-                                        <option value="tiendas">tiendas</option>
-                                    </select>
-                                </div>
-                                
-                                <!-- URL y botón -->
-                                <div class="md:col-span-2">
-                                    <label class="block mb-1 text-sm text-gray-600 dark:text-gray-400">URL de la imagen</label>
-                                    <div class="flex gap-2">
-                                        <input type="url" id="url-imagen-categoria" 
-                                            class="flex-1 px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border text-sm"
-                                            placeholder="https://ejemplo.com/imagen.jpg">
-                                        <button type="button" id="btn-descargar-url-categoria" 
-                                            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm disabled:bg-gray-400 disabled:cursor-not-allowed">
-                                            Descargar
-                                        </button>
-                                    </div>
-                                    <div id="error-url-categoria" class="mt-1 text-sm text-red-500 hidden"></div>
-                                    
-                                    <!-- Resultado de la ruta -->
-                                    <div id="ruta-resultado-categoria" class="mt-2 text-sm text-gray-600 dark:text-gray-400 hidden">
-                                        <div class="flex items-center gap-2">
-                                            <span class="font-medium">Imagen:</span>
-                                            <span id="ruta-texto-categoria" class="font-medium"></span>
-                                            <span id="estado-proceso-categoria" class="ml-2"></span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Campo oculto para la ruta -->
-                            <input type="hidden" id="ruta-imagen-categoria-url" name="imagen" value="{{ old('imagen', $categoria->imagen ?? '') }}">
-                        </div>
-                    </div>
+                    <input type="hidden" id="ruta-imagen-categoria" name="imagen" value="{{ old('imagen', '') }}">
+                    <p id="ruta-imagen-categoria-texto" class="text-xs text-gray-500 dark:text-gray-400 break-all hidden"></p>
+                    @error('imagen') <p class="text-red-500 text-sm mt-1">{{ $message }}</p> @enderror
                 </fieldset>
+                @endif
 
                 {{-- ESPECIFICACIONES INTERNAS --}}
                 <fieldset class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 space-y-4 border border-gray-200 dark:border-gray-700">
@@ -383,6 +256,31 @@
                     </div>
                 </fieldset>
 
+                @if($categoria)
+                {{-- IMÁGENES (editar: última sección antes de guardar) --}}
+                <fieldset class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 space-y-4 border border-gray-200 dark:border-gray-700">
+                    <legend class="text-lg font-semibold text-gray-700 dark:text-gray-200">Imagen de la categoría</legend>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Una sola imagen por categoría (144×120 px). Se guarda en la carpeta <strong class="font-medium">categorias</strong>.</p>
+
+                    <div id="imagen-categoria-container" class="flex flex-wrap gap-3 items-start min-h-[5rem]">
+                        <!-- Vista previa generada por JS -->
+                    </div>
+
+                    <div class="mt-4 flex flex-wrap items-center gap-3">
+                        <button type="button" id="btn-añadir-imagen-categoria" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-md transition duration-150 ease-in-out">
+                            + Añadir imagen
+                        </button>
+                        <button type="button" id="btn-cambiar-imagen-categoria" class="hidden bg-gray-600 hover:bg-gray-700 text-white font-semibold px-4 py-2 rounded-md">
+                            Cambiar imagen
+                        </button>
+                    </div>
+
+                    <input type="hidden" id="ruta-imagen-categoria" name="imagen" value="{{ old('imagen', $categoria->imagen ?? '') }}">
+                    <p id="ruta-imagen-categoria-texto" class="text-xs text-gray-500 dark:text-gray-400 break-all hidden"></p>
+                    @error('imagen') <p class="text-red-500 text-sm mt-1">{{ $message }}</p> @enderror
+                </fieldset>
+                @endif
+
                 <div class="flex justify-end gap-2">
                     <a href="{{ route('admin.categorias.index') }}" 
                         class="bg-gray-500 hover:bg-gray-600 text-white font-semibold px-6 py-2 rounded shadow">
@@ -410,41 +308,204 @@
             data-parent-id="{{ $categoria && $categoria->parent_id ? $categoria->parent_id : '' }}">
         </div>
 
-        {{-- MODAL PARA VER IMÁGENES EXISTENTES --}}
-        <div id="modalImagenesCategoria" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
-            <div class="bg-white dark:bg-gray-900 rounded-lg p-6 max-w-6xl w-full relative shadow-xl overflow-y-auto max-h-[90vh]">
-                <button onclick="cerrarModalImagenesCategoria()" class="absolute top-3 right-4 text-xl text-gray-800 dark:text-gray-100 hover:text-gray-600 dark:hover:text-gray-300">×</button>
-                <div class="mb-4">
-                    <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200">Imágenes en la carpeta: <span class="text-blue-600 dark:text-blue-400" id="nombre-carpeta-modal">categorias</span></h3>
-                    <p class="text-sm text-gray-500 dark:text-gray-400">Haz clic en una imagen para seleccionarla</p>
-                </div>
-                <div id="contenido-modal-imagenes-categoria" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                    <div class="text-center text-gray-500 dark:text-gray-400">Cargando imágenes...</div>
-                </div>
-            </div>
-        </div>
+        {{-- MODAL PARA AÑADIR IMAGEN DE CATEGORÍA (mismo patrón que productos) --}}
+        <style>
+            .kp-modal-img-tabs__nav {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.25rem;
+                padding: 0.35rem;
+                background: #f3f4f6;
+                border: 1px solid #d1d5db;
+                border-radius: 0.5rem;
+            }
+            .dark .kp-modal-img-tabs__nav {
+                background: #1f2937;
+                border-color: #4b5563;
+            }
+            .kp-modal-img-tab {
+                flex: 1 1 auto;
+                min-width: max(6.5rem, fit-content);
+                padding: 0.5rem 0.75rem;
+                font-size: 0.8125rem;
+                font-weight: 500;
+                line-height: 1.25;
+                text-align: center;
+                color: #4b5563;
+                background: transparent;
+                border: 1px solid transparent;
+                border-radius: 0.375rem;
+                white-space: nowrap;
+                cursor: pointer;
+                transition: background-color 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+            }
+            .dark .kp-modal-img-tab {
+                color: #9ca3af;
+            }
+            .kp-modal-img-tab:hover:not(.kp-modal-img-tab--active) {
+                background: #e5e7eb;
+                color: #374151;
+            }
+            .dark .kp-modal-img-tab:hover:not(.kp-modal-img-tab--active) {
+                background: #374151;
+                color: #e5e7eb;
+            }
+            .kp-modal-img-tab--active {
+                background: #fff;
+                color: #1d4ed8;
+                border-color: #93c5fd;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+                font-weight: 600;
+            }
+            .dark .kp-modal-img-tab--active {
+                background: #111827;
+                color: #93c5fd;
+                border-color: #3b82f6;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+            }
+            .kp-modal-img-tab:focus-visible {
+                outline: 2px solid #3b82f6;
+                outline-offset: 2px;
+            }
+            .kp-ig-cell { position: relative; }
+            .kp-ig-btn-ampliar {
+                line-height: 0;
+                z-index: 30;
+                background-color: #2563eb;
+                color: #fff;
+                border: none;
+                cursor: pointer;
+            }
+            .kp-ig-btn-ampliar:hover { background-color: #1d4ed8; }
+            .kp-ig-btn-ampliar svg { width: 0.8rem; height: 0.8rem; display: block; }
+            #kp-ig-preview-overlay { z-index: 99999; }
+            #kp-ig-preview-overlay img {
+                max-width: min(96vw, 1200px);
+                max-height: 90vh;
+                width: auto;
+                height: auto;
+                object-fit: contain;
+            }
+        </style>
 
-        {{-- MODAL PARA RECORTAR IMAGEN DESDE URL --}}
-        <div id="modalRecortarImagenCategoria" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
-            <div class="bg-white dark:bg-gray-900 rounded-lg p-6 max-w-4xl w-full relative shadow-xl">
-                <button onclick="cerrarModalRecortarCategoria()" class="absolute top-3 right-4 text-xl text-gray-800 dark:text-gray-100 hover:text-gray-600 dark:hover:text-gray-300">×</button>
+        <div id="modal-añadir-imagen-categoria" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+            <div class="bg-white dark:bg-gray-900 rounded-lg p-6 max-w-4xl w-full relative shadow-xl overflow-y-auto max-h-[90vh]">
+                <button type="button" onclick="cerrarModalAñadirImagenCategoria()" class="absolute top-3 right-4 text-xl text-gray-800 dark:text-gray-100 hover:text-gray-600 dark:hover:text-gray-300">×</button>
                 <div class="mb-4">
-                    <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200">Recortar imagen</h3>
-                    <p class="text-sm text-gray-500 dark:text-gray-400">Selecciona el área que deseas mantener. La imagen se redimensionará automáticamente a 144x120.</p>
+                    <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200">Añadir imagen de categoría</h3>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">La imagen se guardará redimensionada a 144×120 en la carpeta <strong class="font-medium">categorias</strong>.</p>
                 </div>
-                <div class="mb-4">
-                    <div id="contenedor-cropper-categoria" class="max-h-[60vh] overflow-auto">
-                        <img id="imagen-recortar-categoria" src="" alt="Imagen a recortar" style="max-width: 100%; display: block;">
+
+                <div class="kp-modal-img-tabs mb-4" role="tablist" aria-label="Origen de la imagen">
+                    <nav class="kp-modal-img-tabs__nav">
+                        <button type="button" id="tab-url-cat" class="tab-modal-cat kp-modal-img-tab kp-modal-img-tab--active" role="tab" aria-selected="true">
+                            Descargar desde URL
+                        </button>
+                        <button type="button" id="tab-subir-cat" class="tab-modal-cat kp-modal-img-tab" role="tab" aria-selected="false">
+                            Subir imagen
+                        </button>
+                        <button type="button" id="tab-amazon-cat" class="tab-modal-cat kp-modal-img-tab" role="tab" aria-selected="false">
+                            Amazon
+                        </button>
+                        <button type="button" id="tab-interna-global-cat" class="tab-modal-cat kp-modal-img-tab" role="tab" aria-selected="false">
+                            Interna Global
+                        </button>
+                    </nav>
+                </div>
+
+                <div id="content-url-cat" class="tab-content-modal-cat space-y-4">
+                    <div>
+                        <label class="block mb-2 text-sm text-gray-600 dark:text-gray-400">URL de la imagen</label>
+                        <div class="flex gap-2">
+                            <input type="url" id="url-imagen-cat" class="flex-1 px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border text-sm" placeholder="https://ejemplo.com/imagen.jpg">
+                            <button type="button" id="btn-descargar-url-cat" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm">
+                                Descargar
+                            </button>
+                        </div>
+                        <div id="error-url-cat" class="mt-1 text-sm text-red-500 hidden"></div>
+                    </div>
+                    <div id="area-recorte-cat" class="hidden space-y-4">
+                        <div class="mb-4">
+                            <h4 class="text-md font-semibold text-gray-700 dark:text-gray-200 mb-2">Recortar imagen</h4>
+                            <p class="text-sm text-gray-500 dark:text-gray-400 mb-2">Selecciona el área que deseas mantener. Se redimensionará a 144×120.</p>
+                            <div id="contenedor-cropper-cat" style="max-width: 650px; max-height: 450px; margin: 0 auto; overflow: hidden;">
+                                <img id="imagen-recortar-cat" src="" alt="Imagen a recortar" style="display: block; max-width: 100%; height: auto;">
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="flex justify-end gap-3">
-                    <button type="button" onclick="cerrarModalRecortarCategoria()" 
-                        class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600">
+
+                <div id="content-subir-cat" class="tab-content-modal-cat space-y-4 hidden">
+                    <div>
+                        <label class="block mb-2 text-sm text-gray-600 dark:text-gray-400">Seleccionar imagen</label>
+                        <input type="file" id="file-subir-cat" accept="image/*" class="hidden">
+                        <button type="button" id="btn-seleccionar-cat" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm mb-2">
+                            Seleccionar archivo
+                        </button>
+                        <div id="drop-zone-cat" class="mt-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 text-center hover:border-blue-400 dark:hover:border-blue-500 transition-colors">
+                            <div class="text-gray-500 dark:text-gray-400">
+                                <svg class="mx-auto h-8 w-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                                </svg>
+                                <p>Arrastra y suelta la imagen aquí</p>
+                                <p class="text-xs">o haz clic para seleccionar</p>
+                            </div>
+                        </div>
+                        <span id="nombre-archivo-cat" class="text-sm text-gray-500 dark:text-gray-400"></span>
+                    </div>
+                </div>
+
+                <div id="content-amazon-cat" class="tab-content-modal-cat space-y-4 hidden">
+                    <div>
+                        <label class="block mb-2 text-sm text-gray-600 dark:text-gray-400">URL del producto de Amazon</label>
+                        <div class="flex gap-2">
+                            <input type="url" id="url-amazon-cat" class="flex-1 px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border text-sm" placeholder="https://www.amazon.es/dp/XXXXXXXXXX">
+                            <button type="button" id="btn-buscar-amazon-cat" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm">
+                                Buscar
+                            </button>
+                        </div>
+                        <div id="error-amazon-cat" class="mt-1 text-sm text-red-500 hidden"></div>
+                        <div id="loading-amazon-cat" class="mt-2 text-sm text-gray-500 dark:text-gray-400 hidden">Buscando imágenes...</div>
+                    </div>
+                    <div id="imagenes-amazon-cat" class="hidden">
+                        <label class="block mb-2 text-sm font-semibold text-gray-700 dark:text-gray-200">Selecciona una imagen:</label>
+                        <div id="grid-imagenes-amazon-cat" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-h-96 overflow-y-auto p-2"></div>
+                    </div>
+                </div>
+
+                <div id="content-interna-global-cat" class="tab-content-modal-cat space-y-4 hidden" data-kp-ig-prefix="cat">
+                    <p class="text-sm text-gray-600 dark:text-gray-400">
+                        Imágenes recientes del almacén. Pulsa una palabra del nombre de la categoría para buscar. Haz clic en una miniatura para seleccionarla (solo una). Si ya es 144×120 se reutiliza tal cual; si es más grande se redimensionará y guardará en <strong class="font-medium">categorias</strong>. Pulsa <strong class="font-medium">Guardar</strong> al terminar.
+                    </p>
+                    <div class="kp-ig-panel border border-gray-200 dark:border-gray-600 rounded-lg p-3 bg-gray-50/80 dark:bg-gray-800/40 space-y-3" data-kp-ig-panel="cat">
+                        <div class="kp-ig-seleccion border border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-white/70 dark:bg-gray-900/50">
+                            <p class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Seleccionada para guardar</p>
+                            <div class="kp-ig-seleccion-resumen text-xs text-gray-500 dark:text-gray-400">Ninguna imagen seleccionada.</div>
+                        </div>
+                        <div>
+                            <p class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Palabras del nombre de la categoría</p>
+                            <div class="kp-ig-palabras flex flex-wrap gap-1.5 min-h-[1.25rem]"></div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Buscar por nombre de archivo</label>
+                            <input type="text" class="kp-ig-buscador w-full px-3 py-1.5 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ej: panales talla 4" autocomplete="off" />
+                        </div>
+                        <div>
+                            <p class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Últimas imágenes añadidas</p>
+                            <p class="kp-ig-cargando text-xs text-gray-500 dark:text-gray-400 hidden">Cargando imágenes…</p>
+                            <div class="kp-ig-grid grid gap-1 w-full min-h-[2rem]" style="grid-template-columns: repeat(5, minmax(0, 1fr));"></div>
+                            <p class="kp-ig-vacio text-xs text-gray-500 dark:text-gray-400 mt-2 hidden">No hay imágenes que coincidan con la búsqueda.</p>
+                            <button type="button" class="kp-ig-cargar-mas mt-3 w-full text-sm py-2 rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 hidden">Cargar más</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-3 mt-6">
+                    <button type="button" onclick="cerrarModalAñadirImagenCategoria()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600">
                         Cancelar
                     </button>
-                    <button type="button" id="btn-confirmar-recorte-categoria" 
-                        class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
-                        Aceptar y procesar
+                    <button type="button" id="btn-guardar-cat" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
+                        Guardar
                     </button>
                 </div>
             </div>
@@ -492,12 +553,6 @@
                 }
             }
             
-            // Configurar scripts de imágenes
-            inicializarPestañasImagenes();
-            configurarUpload();
-            configurarBotonVerImagenes();
-            configurarImagenManual();
-            
             // Verificar slug inicial si estamos editando
             if (categoriaActual) {
                 const scope = document.querySelector('[x-data]')?._x_dataStack?.[0];
@@ -508,48 +563,6 @@
                 }
             }
         });
-
-        // Función para inicializar pestañas de imágenes
-        function inicializarPestañasImagenes() {
-            const tabUpload = document.getElementById('tab-upload-categoria');
-            const tabManual = document.getElementById('tab-manual-categoria');
-            const tabUrl = document.getElementById('tab-url-categoria');
-            const contentUpload = document.getElementById('content-upload-categoria');
-            const contentManual = document.getElementById('content-manual-categoria');
-            const contentUrl = document.getElementById('content-url-categoria');
-
-            if (!tabUpload || !tabManual || !tabUrl || !contentUpload || !contentManual || !contentUrl) {
-                return;
-            }
-
-            // Función para cambiar pestañas
-            function cambiarTab(tabActiva, contenidoActivo) {
-                // Ocultar todos los contenidos
-                contentUpload.classList.add('hidden');
-                contentManual.classList.add('hidden');
-                contentUrl.classList.add('hidden');
-                
-                // Quitar estilos activos de todas las pestañas
-                tabUpload.classList.remove('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
-                tabUpload.classList.add('border-transparent', 'text-gray-500', 'dark:text-gray-400');
-                tabManual.classList.remove('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
-                tabManual.classList.add('border-transparent', 'text-gray-500', 'dark:text-gray-400');
-                tabUrl.classList.remove('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
-                tabUrl.classList.add('border-transparent', 'text-gray-500', 'dark:text-gray-400');
-                
-                // Mostrar contenido activo
-                contenidoActivo.classList.remove('hidden');
-                
-                // Estilo activo para la pestaña seleccionada
-                tabActiva.classList.remove('border-transparent', 'text-gray-500', 'dark:text-gray-400');
-                tabActiva.classList.add('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
-            }
-
-            // Eventos de cambio de pestañas
-            tabUpload.addEventListener('click', () => cambiarTab(tabUpload, contentUpload));
-            tabManual.addEventListener('click', () => cambiarTab(tabManual, contentManual));
-            tabUrl.addEventListener('click', () => cambiarTab(tabUrl, contentUrl));
-        }
 
         async function cargarJerarquiaCategoria(parentId) {
             // Obtener la jerarquía completa desde la raíz hasta el padre
@@ -798,483 +811,6 @@
             console.log('Categoría final actualizada:', categoriaFinal);
         }
 
-        // Función para configurar upload
-        function configurarUpload() {
-            const carpetaSelect = document.getElementById('carpeta-imagen-categoria');
-            const fileInput = document.getElementById('file-imagen-categoria');
-            const btnSeleccionar = document.getElementById('btn-seleccionar-categoria');
-            const dropZone = document.getElementById('drop-zone-categoria');
-            const nombreArchivo = document.getElementById('nombre-archivo-categoria');
-            const preview = document.getElementById('preview-upload-categoria');
-            const rutaImagen = document.getElementById('ruta-imagen-categoria');
-            const rutaCompleta = document.getElementById('ruta-completa-categoria');
-            const previewContainer = document.getElementById('preview-container-categoria');
-
-            if (!carpetaSelect || !fileInput || !btnSeleccionar || !dropZone || !nombreArchivo || !preview || !rutaImagen) {
-                console.error('No se encontraron todos los elementos necesarios para la subida de imágenes');
-                return;
-            }
-
-            btnSeleccionar.addEventListener('click', () => {
-                fileInput.click();
-            });
-
-            fileInput.addEventListener('change', (e) => {
-                const file = e.target.files[0];
-                if (file) {
-                    procesarArchivo(file);
-                }
-            });
-
-            dropZone.addEventListener('click', () => fileInput.click());
-            
-            dropZone.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                dropZone.classList.add('border-blue-500', 'bg-blue-50', 'dark:bg-blue-900/20');
-            });
-
-            dropZone.addEventListener('dragleave', (e) => {
-                e.preventDefault();
-                dropZone.classList.remove('border-blue-500', 'bg-blue-50', 'dark:bg-blue-900/20');
-            });
-
-            dropZone.addEventListener('drop', (e) => {
-                e.preventDefault();
-                dropZone.classList.remove('border-blue-500', 'bg-blue-50', 'dark:bg-blue-900/20');
-                
-                const files = e.dataTransfer.files;
-                if (files.length > 0) {
-                    procesarArchivo(files[0]);
-                }
-            });
-
-            // Función para procesar el archivo
-            function procesarArchivo(file) {
-                // Validar que sea una imagen
-                if (!file.type.startsWith('image/')) {
-                    alert('Por favor selecciona un archivo de imagen válido.');
-                    return;
-                }
-
-                // Validar tamaño (máximo 5MB)
-                if (file.size > 5 * 1024 * 1024) {
-                    alert('La imagen es demasiado grande. Máximo 5MB.');
-                    return;
-                }
-
-                // Validar que se haya seleccionado una carpeta
-                const carpeta = carpetaSelect.value;
-                if (!carpeta) {
-                    alert('Por favor selecciona una carpeta primero.');
-                    return;
-                }
-
-                // Mostrar nombre del archivo
-                nombreArchivo.textContent = file.name;
-
-                // Crear vista previa
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    preview.src = e.target.result;
-                    preview.classList.remove('hidden');
-                    
-                    // Mostrar contenedor de vista previa
-                    if (previewContainer) {
-                        previewContainer.classList.remove('hidden');
-                    }
-                };
-                reader.readAsDataURL(file);
-
-                // Subir imagen al servidor
-                subirImagen(file, carpeta);
-            }
-
-            // Función para limpiar campos de imagen
-            function limpiarCamposImagen() {
-                rutaImagen.value = '';
-                if (rutaCompleta) {
-                    rutaCompleta.textContent = '';
-                }
-                nombreArchivo.textContent = '';
-                fileInput.value = '';
-                
-                // Ocultar contenedor de vista previa
-                if (previewContainer) {
-                    previewContainer.classList.add('hidden');
-                }
-                
-                // Limpiar vista previa
-                preview.src = '';
-                preview.classList.add('hidden');
-            }
-
-            // Limpiar campos cuando se cambia la carpeta
-            carpetaSelect.addEventListener('change', () => {
-                limpiarCamposImagen();
-            });
-
-            // Configurar botón de limpiar
-            const btnLimpiar = document.getElementById('btn-limpiar-categoria');
-            if (btnLimpiar) {
-                btnLimpiar.addEventListener('click', () => {
-                    limpiarCamposImagen();
-                });
-            }
-
-            // Función para redimensionar imagen a 144x120
-            function redimensionarImagen(file, callback) {
-                const img = new Image();
-                const reader = new FileReader();
-                
-                reader.onload = function(e) {
-                    img.onload = function() {
-                        const canvas = document.createElement('canvas');
-                        const ctx = canvas.getContext('2d');
-                        
-                        // Tamaño objetivo: 144x120
-                        canvas.width = 144;
-                        canvas.height = 120;
-                        
-                        // Redimensionar imagen estirando al tamaño exacto
-                        ctx.imageSmoothingEnabled = true;
-                        ctx.imageSmoothingQuality = 'high';
-                        ctx.drawImage(img, 0, 0, 144, 120);
-                        
-                        // Convertir a blob (webp)
-                        canvas.toBlob(function(blob) {
-                            if (blob) {
-                                callback(blob);
-                            } else {
-                                callback(file); // Si falla, usar archivo original
-                            }
-                        }, 'image/webp', 0.9);
-                    };
-                    img.src = e.target.result;
-                };
-                reader.readAsDataURL(file);
-            }
-
-            // Función para subir la imagen al servidor
-            function subirImagen(file, carpeta) {
-                // Mostrar indicador de carga
-                nombreArchivo.textContent = 'Redimensionando y subiendo...';
-                btnSeleccionar.disabled = true;
-
-                // Redimensionar imagen antes de subir
-                redimensionarImagen(file, function(blobRedimensionado) {
-                    const formData = new FormData();
-                    
-                    // Obtener nombre base del slug o nombre de categoría
-                    const slugInput = document.getElementById('slug-categoria');
-                    const nombreBase = slugInput && slugInput.value.trim() ? slugInput.value.trim() : 'categoria_' + Date.now();
-                    
-                    formData.append('imagen', blobRedimensionado, `${nombreBase}.webp`);
-                    formData.append('carpeta', carpeta);
-                    formData.append('_token', '{{ csrf_token() }}');
-
-                    nombreArchivo.textContent = 'Subiendo...';
-
-                    fetch('{{ route("admin.imagenes.subir-simple") }}', {
-                        method: 'POST',
-                        body: formData,
-                        headers: {
-                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                        }
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            // Actualizar campos con la respuesta del servidor
-                            rutaImagen.value = data.data.ruta_relativa;
-                            if (rutaCompleta) {
-                                rutaCompleta.textContent = `Ruta: ${data.data.ruta_relativa}`;
-                            }
-                            nombreArchivo.textContent = '✓ Subida correctamente';
-                            
-                            // Mostrar contenedor de vista previa
-                            if (previewContainer) {
-                                previewContainer.classList.remove('hidden');
-                            }
-                            
-                            // Actualizar vista previa con la imagen subida
-                            preview.src = `/images/${data.data.ruta_relativa}`;
-                            
-                            // Sincronizar con pestaña manual
-                            const inputManual = document.getElementById('imagen-categoria-input');
-                            const previewManual = document.getElementById('preview-imagen-categoria');
-                            if (inputManual) {
-                                inputManual.value = data.data.ruta_relativa;
-                            }
-                            if (previewManual) {
-                                previewManual.src = `/images/${data.data.ruta_relativa}`;
-                                previewManual.style.display = 'block';
-                            }
-                            
-                            console.log('Imagen subida:', data.data);
-                        } else {
-                            throw new Error(data.message || 'Error al subir la imagen');
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error al subir imagen:', error);
-                        nombreArchivo.textContent = '✗ Error al subir';
-                        alert(`Error al subir la imagen: ${error.message}`);
-                        
-                        // Limpiar campos en caso de error
-                        rutaImagen.value = '';
-                        if (rutaCompleta) {
-                            rutaCompleta.textContent = '';
-                        }
-                        preview.classList.add('hidden');
-                    })
-                    .finally(() => {
-                        btnSeleccionar.disabled = false;
-                    });
-                });
-            }
-        }
-
-        function configurarBotonVerImagenes() {
-            const btnVer = document.getElementById('btn-ver-imagenes-categoria');
-            const carpetaSelect = document.getElementById('carpeta-imagen-categoria');
-            const rutaImagen = document.getElementById('ruta-imagen-categoria');
-            const rutaCompleta = document.getElementById('ruta-completa-categoria');
-            const preview = document.getElementById('preview-upload-categoria');
-
-            if (!btnVer || !carpetaSelect) {
-                return;
-            }
-
-            btnVer.addEventListener('click', () => {
-                const carpeta = carpetaSelect.value;
-                if (!carpeta) {
-                    alert('Por favor selecciona una carpeta primero.');
-                    return;
-                }
-                abrirModalImagenes(carpeta, rutaImagen, rutaCompleta, preview);
-            });
-        }
-
-        // Función para abrir el modal de imágenes
-        function abrirModalImagenes(carpeta, rutaImagen, rutaCompleta, preview) {
-            const modal = document.getElementById('modalImagenesCategoria');
-            const nombreCarpeta = document.getElementById('nombre-carpeta-modal');
-            const contenido = document.getElementById('contenido-modal-imagenes-categoria');
-
-            if (nombreCarpeta) {
-                nombreCarpeta.textContent = carpeta;
-            }
-            if (modal) {
-                modal.classList.remove('hidden');
-            }
-
-            // Cargar imágenes de la carpeta
-            cargarImagenesCarpeta(carpeta, contenido, rutaImagen, rutaCompleta, preview);
-        }
-
-        // Función para cargar imágenes de una carpeta
-        function cargarImagenesCarpeta(carpeta, contenido, rutaImagen, rutaCompleta, preview) {
-            contenido.innerHTML = '<div class="text-center text-gray-500 dark:text-gray-400">Cargando imágenes...</div>';
-
-            fetch(`{{ route('admin.imagenes.listar') }}?carpeta=${carpeta}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success && data.data.length > 0) {
-                        mostrarImagenesEnModal(data.data, contenido, rutaImagen, rutaCompleta, preview);
-                    } else {
-                        contenido.innerHTML = '<div class="text-center text-gray-500 dark:text-gray-400">No hay imágenes en esta carpeta</div>';
-                    }
-                })
-                .catch(error => {
-                    console.error('Error al cargar imágenes:', error);
-                    contenido.innerHTML = '<div class="text-center text-red-500">Error al cargar las imágenes</div>';
-                });
-        }
-
-        // Función para mostrar imágenes en el modal
-        function mostrarImagenesEnModal(imagenes, contenido, rutaImagen, rutaCompleta, preview) {
-            contenido.innerHTML = '';
-
-            imagenes.forEach(imagen => {
-                const div = document.createElement('div');
-                div.className = 'relative group cursor-pointer hover:scale-105 transition-transform duration-200';
-                div.innerHTML = `
-                    <img src="${imagen.url}" alt="${imagen.nombre}" 
-                         class="w-full h-24 object-cover rounded border-2 border-transparent hover:border-blue-500">
-                    <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded"></div>
-                    <div class="absolute bottom-0 left-0 right-0 bg-black bg-opacity-75 text-white text-xs p-1 rounded-b truncate">
-                        ${imagen.nombre}
-                    </div>
-                `;
-
-                div.addEventListener('click', () => {
-                    seleccionarImagenExistente(imagen, rutaImagen, rutaCompleta, preview);
-                    cerrarModalImagenesCategoria();
-                });
-
-                contenido.appendChild(div);
-            });
-        }
-
-        // Función para seleccionar una imagen existente
-        function seleccionarImagenExistente(imagen, rutaImagen, rutaCompleta, preview) {
-            // Actualizar campos
-            rutaImagen.value = imagen.ruta;
-            if (rutaCompleta) {
-                rutaCompleta.textContent = `Ruta: ${imagen.ruta}`;
-            }
-
-            // Actualizar vista previa
-            preview.src = imagen.url;
-            preview.classList.remove('hidden');
-
-            // Actualizar nombre del archivo
-            const nombreArchivo = document.getElementById('nombre-archivo-categoria');
-            if (nombreArchivo) {
-                nombreArchivo.textContent = `✓ Seleccionada: ${imagen.nombre}`;
-            }
-
-            // Mostrar contenedor de vista previa
-            const previewContainer = document.getElementById('preview-container-categoria');
-            if (previewContainer) {
-                previewContainer.classList.remove('hidden');
-            }
-
-            // Sincronizar con pestaña manual
-            const inputManual = document.getElementById('imagen-categoria-input');
-            const previewManual = document.getElementById('preview-imagen-categoria');
-            if (inputManual) {
-                inputManual.value = imagen.ruta;
-            }
-            if (previewManual) {
-                previewManual.src = imagen.url;
-                previewManual.style.display = 'block';
-            }
-
-            console.log('Imagen seleccionada:', imagen);
-        }
-
-        // Función para cerrar el modal de imágenes
-        window.cerrarModalImagenesCategoria = function() {
-            document.getElementById('modalImagenesCategoria').classList.add('hidden');
-        };
-
-        function seleccionarImagenCategoria(ruta) {
-            const rutaImagen = document.getElementById('ruta-imagen-categoria');
-            const rutaCompleta = document.getElementById('ruta-completa-categoria');
-            const preview = document.getElementById('preview-upload-categoria');
-            const inputManual = document.getElementById('imagen-categoria-input');
-            const previewManual = document.getElementById('preview-imagen-categoria');
-            const previewContainer = document.getElementById('preview-container-categoria');
-            
-            if (rutaImagen) {
-                rutaImagen.value = ruta;
-            }
-            if (rutaCompleta) {
-                rutaCompleta.textContent = `Ruta: ${ruta}`;
-            }
-            if (preview) {
-                preview.src = `/images/${ruta}`;
-                preview.classList.remove('hidden');
-            }
-            if (previewContainer) {
-                previewContainer.classList.remove('hidden');
-            }
-            if (inputManual) {
-                inputManual.value = ruta;
-            }
-            if (previewManual) {
-                previewManual.src = `/images/${ruta}`;
-                previewManual.style.display = 'block';
-            }
-            
-            cerrarModalImagenesCategoria();
-        }
-
-        function configurarImagenManual() {
-            const btnBuscar = document.getElementById('buscar-imagen-categoria');
-            const inputImagen = document.getElementById('imagen-categoria-input');
-            const preview = document.getElementById('preview-imagen-categoria');
-            const rutaImagen = document.getElementById('ruta-imagen-categoria');
-            
-            if (btnBuscar) {
-                btnBuscar.onclick = function() {
-                    const input = document.getElementById('imagen-categoria-input');
-                    if (input && input.value.trim() !== '') {
-                        if (preview) {
-                            preview.src = '/images/' + input.value.trim();
-                            preview.style.display = 'block';
-                        }
-                        if (rutaImagen) {
-                            rutaImagen.value = input.value.trim();
-                        }
-                    } else if (preview) {
-                        preview.src = '';
-                        preview.style.display = 'none';
-                    }
-                };
-            }
-            
-            if (inputImagen) {
-                inputImagen.addEventListener('input', function() {
-                    if (rutaImagen) {
-                        rutaImagen.value = this.value;
-                    }
-                    if (this.value.trim() === '' && preview) {
-                        preview.style.display = 'none';
-                    } else if (this.value.trim() !== '' && preview) {
-                        preview.src = '/images/' + this.value.trim();
-                        preview.style.display = 'block';
-                    }
-                });
-            }
-        }
-
-        // Sincronizar campos entre pestañas
-        function sincronizarCampos() {
-            const rutaImagen = document.getElementById('ruta-imagen-categoria').value;
-            
-            // Sincronizar imagen
-            const inputManual = document.getElementById('imagen-categoria-input');
-            if (inputManual) {
-                inputManual.value = rutaImagen || '';
-            }
-            
-            // Sincronizar vista previa en pestaña manual
-            if (rutaImagen) {
-                const previewManual = document.getElementById('preview-imagen-categoria');
-                if (previewManual) {
-                    previewManual.src = `{{ asset('images/') }}/${rutaImagen}`;
-                    previewManual.style.display = 'block';
-                }
-            }
-        }
-
-        // Sincronizar campos manuales con los campos de upload
-        function sincronizarCamposManuales() {
-            const inputManual = document.getElementById('imagen-categoria-input');
-            const rutaImagen = document.getElementById('ruta-imagen-categoria');
-            
-            if (inputManual && inputManual.value) {
-                if (rutaImagen) {
-                    rutaImagen.value = inputManual.value;
-                }
-            }
-        }
-
-        // Sincronizar antes de enviar el formulario
-        const form = document.querySelector('form');
-        if (form) {
-            form.addEventListener('submit', function(e) {
-                sincronizarCampos();
-            });
-        }
-        
-        // Sincronizar campos manuales cuando se escriba en ellos
-        const inputManual = document.getElementById('imagen-categoria-input');
-        if (inputManual) {
-            inputManual.addEventListener('input', sincronizarCamposManuales);
-        }
 
         // Habilitar botón de guardar cuando hay nombre
         document.addEventListener('DOMContentLoaded', function() {
@@ -1291,141 +827,809 @@
             }
         });
     </script>
-
-    {{-- SCRIPT PARA DESCARGAR Y RECORTAR IMAGEN DESDE URL --}}
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.5.13/dist/cropper.min.css">
     <script src="https://cdn.jsdelivr.net/npm/cropperjs@1.5.13/dist/cropper.min.js"></script>
+
+<script>
+if (!window.kpInternaGlobalRegistrar) {
+(function() {
+    const KP_IG_PAGE = 15;
+    const KP_IG_URL = @json(route('admin.imagenes.ultimas-globales'));
+    const KP_IG_IMG_BASE = @json(rtrim(asset('images/'), '/'));
+
+    window.kpPartirNombreEnPalabras = function(nombre) {
+        const n = String(nombre || '').trim();
+        if (!n) return [];
+        const tokens = n.split(/(?:\s+|\/|\||;)+/).map(function(p) { return p.trim(); }).filter(Boolean);
+        const visto = new Set();
+        const palabras = [];
+        tokens.forEach(function(token) {
+            const limpia = token.replace(/^[^a-zA-Z0-9À-ÿ.,]+|[^a-zA-Z0-9À-ÿ.,]+$/gi, '');
+            if (!limpia) return;
+            const clave = limpia.toLowerCase();
+            if (visto.has(clave)) return;
+            visto.add(clave);
+            palabras.push(limpia);
+        });
+        return palabras;
+    };
+
+    window.kpTokensBuscadorInternaGlobal = function(valor) {
+        const v = String(valor || '').trim();
+        if (!v) return [];
+        return v.split(/\s+/).map(function(t) {
+            return t.replace(/^-+|-+$/g, '').trim();
+        }).filter(Boolean);
+    };
+
+    window.kpUrlVistaDesdeRutaAlmacenIg = function(raw) {
+        if (typeof window.kpUrlVistaDesdeRutaAlmacen === 'function') {
+            return window.kpUrlVistaDesdeRutaAlmacen(raw);
+        }
+        const t = (raw || '').trim();
+        if (!t) return '';
+        if (/^https?:\/\//i.test(t)) return t;
+        let p = t.replace(/^\/+/, '');
+        if (/^images\//i.test(p)) {
+            return @json(rtrim(url('/'), '/')) + '/' + p;
+        }
+        return KP_IG_IMG_BASE + '/' + p;
+    };
+
+    const estadosPanel = {};
+
+    window.kpModalImgTabSetActive = function(tabs, activeEl) {
+        (tabs || []).forEach(function(t) {
+            if (!t) return;
+            var on = t === activeEl;
+            t.classList.toggle('kp-modal-img-tab--active', on);
+            t.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+    };
+
+    function kpIgMarcarBoton(btn, activo) {
+        const on = ['ring-2', 'ring-blue-500', 'border-blue-500', 'bg-blue-100', 'dark:bg-blue-900', 'font-semibold'];
+        if (activo) {
+            btn.classList.add.apply(btn.classList, on);
+            btn.setAttribute('aria-pressed', 'true');
+        } else {
+            btn.classList.remove.apply(btn.classList, on);
+            btn.setAttribute('aria-pressed', 'false');
+        }
+    }
+
+    function kpIgSincronizarPalabrasConBuscador(est) {
+        const tokens = window.kpTokensBuscadorInternaGlobal(est.input.value);
+        est.wrapPalabras.querySelectorAll('.kp-ig-palabra-btn').forEach(function(btn) {
+            const p = btn.dataset.palabra || '';
+            const activo = tokens.some(function(t) { return t.toLowerCase() === p.toLowerCase(); });
+            kpIgMarcarBoton(btn, activo);
+        });
+    }
+
+    function kpIgValorBuscadorDesdeTokens(tokens) {
+        if (!tokens.length) return '';
+        return tokens.join(' ');
+    }
+
+    function kpIgRenderPalabras(est) {
+        const palabras = est.getPalabras ? est.getPalabras() : [];
+        est.wrapPalabras.innerHTML = '';
+        if (!palabras.length) {
+            est.wrapPalabras.innerHTML = '<span class="text-xs text-gray-500 dark:text-gray-400">Escribe el nombre de la categoría para ver sugerencias.</span>';
+            return;
+        }
+        palabras.forEach(function(palabra) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'kp-ig-palabra-btn text-xs px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors';
+            btn.dataset.palabra = palabra;
+            btn.setAttribute('aria-pressed', 'false');
+            btn.textContent = palabra;
+            btn.title = 'Buscar «' + palabra + '»';
+            est.wrapPalabras.appendChild(btn);
+        });
+        kpIgSincronizarPalabrasConBuscador(est);
+    }
+
+    function kpIgPairFromItem(it) {
+        return {
+            rutaGrande: it.ruta_grande || it.ruta || '',
+            rutaPequena: it.ruta_pequena || it.ruta_grande || it.ruta || '',
+            thumbVisual: it.ruta_pequena || it.ruta_grande || it.ruta || '',
+            url: it.url || '',
+        };
+    }
+
+    function kpIgUrlPreviewDesdeRutaOrUrl(raw) {
+        const t = String(raw || '').trim();
+        if (!t) return '';
+        if (/^https?:\/\//i.test(t)) return t;
+        return window.kpUrlVistaDesdeRutaAlmacenIg(t);
+    }
+
+    window.kpIgCerrarPreviewGrande = function() {
+        const overlay = document.getElementById('kp-ig-preview-overlay');
+        if (!overlay) return;
+        overlay.style.display = 'none';
+        overlay.classList.add('hidden');
+        overlay.classList.remove('flex');
+        overlay.setAttribute('aria-hidden', 'true');
+        const img = overlay.querySelector('img');
+        if (img) img.removeAttribute('src');
+    };
+
+    window.kpIgAbrirPreviewGrande = function(rutaOrUrl) {
+        const t = String(rutaOrUrl || '').trim();
+        if (!t) return;
+        const src = kpIgUrlPreviewDesdeRutaOrUrl(t);
+        if (!src) return;
+        let overlay = document.getElementById('kp-ig-preview-overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'kp-ig-preview-overlay';
+            overlay.className = 'fixed inset-0 hidden items-center justify-center bg-black/85 p-4 cursor-pointer';
+            overlay.setAttribute('aria-hidden', 'true');
+            overlay.setAttribute('role', 'dialog');
+            overlay.setAttribute('aria-modal', 'true');
+            overlay.setAttribute('aria-label', 'Vista ampliada');
+            const img = document.createElement('img');
+            img.alt = '';
+            img.className = 'block rounded shadow-2xl bg-white max-w-[96vw] max-h-[90vh] w-auto h-auto object-contain pointer-events-none';
+            const btnCerrar = document.createElement('button');
+            btnCerrar.type = 'button';
+            btnCerrar.className = 'absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-blue-600 text-white text-xl leading-none hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-white';
+            btnCerrar.setAttribute('aria-label', 'Cerrar');
+            btnCerrar.textContent = '×';
+            overlay.appendChild(img);
+            overlay.appendChild(btnCerrar);
+            btnCerrar.addEventListener('click', function(e) {
+                e.stopPropagation();
+                window.kpIgCerrarPreviewGrande();
+            });
+            overlay.addEventListener('click', function(e) {
+                if (e.target === overlay) window.kpIgCerrarPreviewGrande();
+            });
+        }
+        const modal = document.querySelector('[id^="modal-añadir-imagen"]:not(.hidden)');
+        if (modal) {
+            modal.appendChild(overlay);
+        } else if (overlay.parentNode !== document.body) {
+            document.body.appendChild(overlay);
+        }
+        const img = overlay.querySelector('img');
+        if (!img) return;
+        img.src = src;
+        overlay.style.display = 'flex';
+        overlay.classList.remove('hidden');
+        overlay.classList.add('flex');
+        overlay.setAttribute('aria-hidden', 'false');
+    };
+
+    if (!window.__kpIgPreviewEscapeInit) {
+        window.__kpIgPreviewEscapeInit = true;
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') window.kpIgCerrarPreviewGrande();
+        });
+    }
+
+    function kpIgEstaSeleccionada(est, pair) {
+        return typeof est.isSelected === 'function' && est.isSelected(pair);
+    }
+
+    function kpIgMarcarCeldaImg(btn, seleccionada) {
+        const on = ['ring-4', 'ring-blue-500', 'border-blue-500'];
+        const badge = btn.querySelector('.kp-ig-sel-badge');
+        if (seleccionada) {
+            btn.classList.add.apply(btn.classList, on);
+            btn.setAttribute('aria-pressed', 'true');
+            if (!badge) {
+                const mark = document.createElement('span');
+                mark.className = 'kp-ig-sel-badge absolute top-0.5 left-0.5 z-10 w-5 h-5 flex items-center justify-center rounded-full bg-blue-600 text-white text-[10px] font-bold shadow pointer-events-none';
+                mark.textContent = '✓';
+                btn.appendChild(mark);
+            }
+        } else {
+            btn.classList.remove.apply(btn.classList, on);
+            btn.setAttribute('aria-pressed', 'false');
+            if (badge) badge.remove();
+        }
+    }
+
+    function kpIgSincronizarSeleccionGrid(est) {
+        if (!est || !est.grid) return;
+        est.grid.querySelectorAll('[data-kp-ig-cell]').forEach(function(cell) {
+            const btn = cell.querySelector('button');
+            if (!btn) return;
+            const pair = {
+                rutaGrande: cell.dataset.kpIgRutaGrande || '',
+                rutaPequena: cell.dataset.kpIgRutaPequena || '',
+                thumbVisual: cell.dataset.kpIgThumb || '',
+            };
+            kpIgMarcarCeldaImg(btn, kpIgEstaSeleccionada(est, pair));
+        });
+        if (typeof est.renderResumen === 'function') {
+            est.renderResumen();
+        }
+    }
+
+    window.kpIgPintarResumenSeleccion = function(el, pairs) {
+        if (!el) return;
+        el.innerHTML = '';
+        if (!pairs || !pairs.length) {
+            el.innerHTML = '<p class="text-xs text-gray-500 dark:text-gray-400">Ninguna imagen seleccionada. Haz clic en una miniatura de abajo y pulsa <strong class="font-medium">Guardar</strong>.</p>';
+            return;
+        }
+        const grid = document.createElement('div');
+        grid.className = 'grid gap-1 w-full kp-ig-seleccion-grid';
+        grid.style.gridTemplateColumns = 'repeat(10, minmax(0, 1fr))';
+        pairs.forEach(function(pair) {
+            const src = window.kpUrlVistaDesdeRutaAlmacenIg(pair.thumbVisual || pair.rutaPequena || pair.rutaGrande);
+            const cell = document.createElement('div');
+            cell.className = 'relative aspect-square rounded overflow-hidden ring-2 ring-blue-500 bg-gray-100 dark:bg-gray-800';
+            const img = document.createElement('img');
+            img.src = src;
+            img.className = 'w-full h-full object-cover block';
+            img.alt = '';
+            img.loading = 'lazy';
+            cell.appendChild(img);
+            grid.appendChild(cell);
+        });
+        el.appendChild(grid);
+        const note = document.createElement('p');
+        note.className = 'text-xs text-gray-600 dark:text-gray-400 mt-2';
+        note.textContent = pairs.length + ' imagen' + (pairs.length === 1 ? '' : 'es') + ' seleccionada' + (pairs.length === 1 ? '' : 's') + '. Pulsa Guardar para aplicar.';
+        el.appendChild(note);
+    };
+
+    function kpIgCeldaImagen(item, est, onClick) {
+        const pair = kpIgPairFromItem(item);
+        const src = window.kpUrlVistaDesdeRutaAlmacenIg(pair.thumbVisual);
+        const cell = document.createElement('div');
+        cell.className = 'kp-ig-cell min-w-0 w-full';
+        cell.dataset.kpIgCell = '1';
+        cell.dataset.kpIgRutaGrande = pair.rutaGrande;
+        cell.dataset.kpIgRutaPequena = pair.rutaPequena;
+        cell.dataset.kpIgThumb = pair.thumbVisual;
+        cell.dataset.kpIgUrl = pair.url || pair.rutaGrande || pair.thumbVisual;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'relative w-full aspect-square p-0 border border-gray-200 dark:border-gray-600 rounded overflow-hidden bg-white dark:bg-gray-800 hover:ring-2 hover:ring-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500';
+        btn.title = pair.rutaGrande || '';
+        const img = document.createElement('img');
+        img.src = src;
+        img.alt = '';
+        img.className = 'w-full h-full object-cover block pointer-events-none';
+        img.loading = 'lazy';
+        img.onerror = function() { img.className = 'w-full h-full object-cover block opacity-40 pointer-events-none'; };
+        btn.appendChild(img);
+        kpIgMarcarCeldaImg(btn, kpIgEstaSeleccionada(est, pair));
+        btn.addEventListener('click', function() {
+            onClick(item);
+            kpIgSincronizarSeleccionGrid(est);
+        });
+        const btnAmpliar = document.createElement('button');
+        btnAmpliar.type = 'button';
+        btnAmpliar.className = 'kp-ig-btn-ampliar absolute top-0 right-0 w-6 h-6 flex items-center justify-center rounded-bl-md shadow-md focus:outline-none focus:ring-2 focus:ring-white';
+        btnAmpliar.title = 'Ver tamaño original';
+        btnAmpliar.setAttribute('aria-label', 'Ampliar imagen');
+        btnAmpliar.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="M14.5 14.5L20 20"/><path d="M10 7v6M7 10h6"/></svg>';
+        cell.appendChild(btn);
+        cell.appendChild(btnAmpliar);
+        return cell;
+    }
+
+    function kpIgRenderGrid(est) {
+        const prev = est.grid.children.length;
+        const hasta = Math.min(est.visible, est.items.length);
+        for (let i = prev; i < hasta; i++) {
+            const item = est.items[i];
+            est.grid.appendChild(kpIgCeldaImagen(item, est, function(it) {
+                if (typeof est.onSelect === 'function') {
+                    est.onSelect(kpIgPairFromItem(it));
+                }
+            }));
+        }
+        est.vacio.classList.toggle('hidden', est.items.length > 0);
+        est.cargarMas.classList.toggle('hidden', !est.hasMore && est.visible >= est.items.length);
+        kpIgSincronizarSeleccionGrid(est);
+    }
+
+    async function kpIgCargar(est, appendApi) {
+        if (!appendApi) {
+            est.items = [];
+            est.visible = 0;
+            est.grid.innerHTML = '';
+            est.vacio.textContent = 'No hay imágenes que coincidan con la búsqueda.';
+        }
+        est.cargando.classList.remove('hidden');
+        est.cargarMas.disabled = true;
+        try {
+            const params = new URLSearchParams({
+                limit: String(KP_IG_PAGE),
+                offset: String(appendApi ? est.items.length : 0),
+                q: est.input.value.trim(),
+            });
+            const res = await fetch(KP_IG_URL + '?' + params.toString(), {
+                headers: { Accept: 'application/json' },
+                credentials: 'same-origin',
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message || 'Error');
+            const nuevas = Array.isArray(data.data) ? data.data : [];
+            if (appendApi) {
+                est.items = est.items.concat(nuevas);
+            } else {
+                est.items = nuevas;
+                est.visible = Math.min(KP_IG_PAGE, est.items.length);
+            }
+            est.hasMore = !!data.has_more;
+            kpIgRenderGrid(est);
+        } catch (err) {
+            console.error('Interna global:', err);
+            if (!appendApi) {
+                est.grid.innerHTML = '';
+                est.vacio.textContent = 'No se pudieron cargar las imágenes.';
+                est.vacio.classList.remove('hidden');
+                est.cargarMas.classList.add('hidden');
+            }
+        } finally {
+            est.cargando.classList.add('hidden');
+            est.cargarMas.disabled = false;
+        }
+    }
+
+    window.kpInternaGlobalRefrescarPalabras = function(prefix) {
+        const est = estadosPanel[prefix];
+        if (est) kpIgRenderPalabras(est);
+    };
+
+    window.kpInternaGlobalRefrescarSeleccion = function(prefix) {
+        const est = estadosPanel[prefix];
+        if (est) kpIgSincronizarSeleccionGrid(est);
+    };
+
+    window.kpInternaGlobalAlActivar = function(prefix) {
+        const est = estadosPanel[prefix];
+        if (!est) return Promise.resolve();
+        kpIgRenderPalabras(est);
+        return kpIgCargar(est, false).then(function() {
+            kpIgSincronizarSeleccionGrid(est);
+        });
+    };
+
+    window.kpInternaGlobalRegistrar = function(prefix, options) {
+        options = options || {};
+        const panel = document.querySelector('[data-kp-ig-panel="' + prefix + '"]');
+        if (!panel || panel.dataset.kpIgInit === '1') {
+            return estadosPanel[prefix];
+        }
+        panel.dataset.kpIgInit = '1';
+
+        const est = {
+            prefix: prefix,
+            panel: panel,
+            wrapPalabras: panel.querySelector('.kp-ig-palabras'),
+            input: panel.querySelector('.kp-ig-buscador'),
+            grid: panel.querySelector('.kp-ig-grid'),
+            vacio: panel.querySelector('.kp-ig-vacio'),
+            cargando: panel.querySelector('.kp-ig-cargando'),
+            cargarMas: panel.querySelector('.kp-ig-cargar-mas'),
+            resumen: panel.querySelector('.kp-ig-seleccion-resumen'),
+            onSelect: options.onSelect || null,
+            isSelected: options.isSelected || null,
+            renderResumen: options.renderResumen || null,
+            getPalabras: options.getPalabras || function() { return []; },
+            items: [],
+            visible: 0,
+            hasMore: false,
+            debounce: null,
+        };
+        if (!est.renderResumen && est.resumen) {
+            est.renderResumen = function() {
+                window.kpIgPintarResumenSeleccion(est.resumen, []);
+            };
+        }
+        estadosPanel[prefix] = est;
+
+        est.grid.addEventListener('click', function(e) {
+            const btnZoom = e.target.closest('.kp-ig-btn-ampliar');
+            if (btnZoom) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                const cell = btnZoom.closest('[data-kp-ig-cell]');
+                if (cell) {
+                    const url = (cell.dataset.kpIgUrl || cell.dataset.kpIgRutaGrande || cell.dataset.kpIgThumb || '').trim();
+                    if (url) window.kpIgAbrirPreviewGrande(url);
+                }
+                return;
+            }
+        }, true);
+
+        panel.addEventListener('click', function(e) {
+            const btn = e.target.closest('.kp-ig-palabra-btn');
+            if (!btn) return;
+            const palabra = btn.dataset.palabra || '';
+            let tokens = window.kpTokensBuscadorInternaGlobal(est.input.value);
+            const activo = btn.getAttribute('aria-pressed') === 'true';
+            if (activo) {
+                tokens = tokens.filter(function(t) { return t.toLowerCase() !== palabra.toLowerCase(); });
+            } else if (!tokens.some(function(t) { return t.toLowerCase() === palabra.toLowerCase(); })) {
+                tokens.push(palabra);
+            }
+            est.input.value = kpIgValorBuscadorDesdeTokens(tokens);
+            kpIgSincronizarPalabrasConBuscador(est);
+            kpIgCargar(est, false);
+            est.input.focus();
+        });
+
+        est.input.addEventListener('input', function() {
+            kpIgSincronizarPalabrasConBuscador(est);
+            clearTimeout(est.debounce);
+            est.debounce = setTimeout(function() {
+                kpIgCargar(est, false);
+            }, 350);
+        });
+
+        est.cargarMas.addEventListener('click', function() {
+            if (est.visible < est.items.length) {
+                est.visible = Math.min(est.items.length, est.visible + KP_IG_PAGE);
+                kpIgRenderGrid(est);
+            } else if (est.hasMore) {
+                const visAntes = est.visible;
+                kpIgCargar(est, true).then(function() {
+                    est.visible = Math.min(est.items.length, visAntes + KP_IG_PAGE);
+                    kpIgRenderGrid(est);
+                });
+            }
+        });
+
+        return est;
+    };
+})();
+}
+</script>
+
     <script>
     document.addEventListener('DOMContentLoaded', function() {
-        let cropperCategoria = null;
-        let imagenTemporalUrlCategoria = null;
-        let carpetaActualCategoria = null;
-        let nombreCategoria = null;
+        const formCatImg = document.getElementById('form-categoria');
+        if (!formCatImg) return;
 
-        // Función para validar que el slug esté relleno
-        function validarNombre() {
-            // Obtener el slug
+        const KP_CARPETA_CAT = 'categorias';
+        const KP_W_CAT = 144;
+        const KP_H_CAT = 120;
+        const KP_PENDING_CAT = '__pending_cat:';
+        const KP_IMG_BASE = @json(rtrim(asset('images/'), '/'));
+        const KP_CSRF = document.querySelector('meta[name="csrf-token"]')?.content || '{{ csrf_token() }}';
+        const KP_SUBIR_URL = @json(route('admin.imagenes.subir-simple'));
+        const KP_PROXY_URL = @json(route('admin.imagenes.proxy'));
+        const KP_AMAZON_URL = @json(route('admin.productos.obtener-imagenes-amazon'));
+        const KP_LIMPIAR_AMAZON_URL = @json(route('admin.ofertas.limpiar.url'));
+
+        let rutaImagenCategoria = '';
+        let subidaPendienteCat = false;
+        let cropperCat = null;
+        let carpetaActualUrlCat = KP_CARPETA_CAT;
+        let imagenAmazonSeleccionadaCat = null;
+        let seleccionInternaGlobalCat = null;
+
+        const inputRuta = document.getElementById('ruta-imagen-categoria');
+        const contenedor = document.getElementById('imagen-categoria-container');
+        const textoRuta = document.getElementById('ruta-imagen-categoria-texto');
+        const btnAñadir = document.getElementById('btn-añadir-imagen-categoria');
+        const btnCambiar = document.getElementById('btn-cambiar-imagen-categoria');
+        const modal = document.getElementById('modal-añadir-imagen-categoria');
+
+        function obtenerSlugCategoria() {
             const slugInput = document.getElementById('slug-categoria');
-            let slug = slugInput ? slugInput.value.trim() : '';
-            
-            // Si no hay slug, intentar obtener el nombre
-            if (!slug) {
-                const nombreInput = document.getElementById('nombre-categoria');
-                slug = nombreInput ? nombreInput.value.trim() : '';
-            }
-            
-            nombreCategoria = slug;
-            return slug !== '';
+            if (slugInput && slugInput.value.trim()) return slugInput.value.trim();
+            const nombreInput = document.getElementById('nombre-categoria');
+            return nombreInput ? nombreInput.value.trim() : '';
         }
 
-        // Función para mostrar error
-        function mostrarError(mensaje) {
-            const errorDiv = document.getElementById('error-url-categoria');
-            if (errorDiv) {
-                errorDiv.textContent = mensaje;
-                errorDiv.classList.remove('hidden');
+        function validarSlugParaImagen() {
+            if (!obtenerSlugCategoria()) {
+                alert('Escribe el nombre o slug de la categoría antes de añadir la imagen.');
+                return false;
             }
+            return true;
         }
 
-        // Función para ocultar error
-        function ocultarError() {
-            const errorDiv = document.getElementById('error-url-categoria');
-            if (errorDiv) {
-                errorDiv.classList.add('hidden');
-            }
+        function urlVistaCat(ruta) {
+            if (!ruta || ruta.indexOf(KP_PENDING_CAT) === 0) return '';
+            if (/^https?:\/\//i.test(ruta)) return ruta;
+            return KP_IMG_BASE + '/' + ruta.replace(/^\/+/, '');
         }
 
-        // Función para mostrar estado de carga
-        function mostrarEstado(estado) {
-            const estadoDiv = document.getElementById('estado-proceso-categoria');
-            const rutaResultado = document.getElementById('ruta-resultado-categoria');
-            
-            if (estado === 'loading') {
-                if (estadoDiv) {
-                    estadoDiv.innerHTML = '<svg class="animate-spin h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>';
+        function aplicarRutaImagenCategoria(ruta) {
+            rutaImagenCategoria = ruta || '';
+            if (inputRuta) inputRuta.value = rutaImagenCategoria;
+            if (textoRuta) {
+                if (rutaImagenCategoria && rutaImagenCategoria.indexOf(KP_PENDING_CAT) !== 0) {
+                    textoRuta.textContent = rutaImagenCategoria;
+                    textoRuta.classList.remove('hidden');
+                } else {
+                    textoRuta.textContent = '';
+                    textoRuta.classList.add('hidden');
                 }
-                if (rutaResultado) {
-                    rutaResultado.classList.remove('hidden');
-                }
-            } else if (estado === 'success') {
-                if (estadoDiv) {
-                    estadoDiv.innerHTML = '<svg class="h-5 w-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
-                }
-                if (rutaResultado) {
-                    rutaResultado.classList.remove('hidden');
-                }
-            } else if (estado === 'error') {
-                if (estadoDiv) {
-                    estadoDiv.innerHTML = '<svg class="h-5 w-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
-                }
-                if (rutaResultado) {
-                    rutaResultado.classList.remove('hidden');
-                }
+            }
+            renderizarImagenCategoria();
+            if (btnAñadir && btnCambiar) {
+                const tiene = !!rutaImagenCategoria;
+                btnAñadir.classList.toggle('hidden', tiene);
+                btnCambiar.classList.toggle('hidden', !tiene);
             }
         }
 
-        // Función para descargar imagen desde URL
-        async function descargarImagen(url) {
-            if (!validarNombre()) {
-                mostrarError('Debes escribir el nombre o slug de la categoría antes de descargar la imagen.');
+        function renderizarImagenCategoria() {
+            if (!contenedor) return;
+            contenedor.innerHTML = '';
+            if (!rutaImagenCategoria) return;
+
+            const pendiente = rutaImagenCategoria.indexOf(KP_PENDING_CAT) === 0;
+            const div = document.createElement('div');
+            div.className = 'relative group';
+
+            if (pendiente) {
+                div.innerHTML = '<div class="w-[144px] h-[120px] flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-700 rounded border border-gray-300 dark:border-gray-600"><span class="text-xs text-gray-600 dark:text-gray-300">Subiendo…</span></div>';
+            } else {
+                const src = urlVistaCat(rutaImagenCategoria);
+                div.innerHTML = '<div class="relative inline-block">' +
+                    '<img src="' + src + '" alt="Imagen categoría" class="w-[144px] h-[120px] object-cover rounded border border-gray-300 dark:border-gray-600 block" ' +
+                    'onerror="this.src=\'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'144\' height=\'120\'%3E%3Crect width=\'144\' height=\'120\' fill=\'%23ddd\'/%3E%3C/svg%3E\'">' +
+                    '<button type="button" class="btn-quitar-imagen-cat absolute top-0 right-0 bg-red-600 hover:bg-red-700 text-white rounded-full w-7 h-7 flex items-center justify-center font-bold text-base opacity-0 group-hover:opacity-100 transition-opacity shadow-lg" style="transform: translate(25%, -25%); z-index: 30;" title="Quitar">×</button>' +
+                    '</div>';
+                div.querySelector('.btn-quitar-imagen-cat')?.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    aplicarRutaImagenCategoria('');
+                });
+            }
+            contenedor.appendChild(div);
+        }
+
+        async function blobDesdeCanvas144x120(sourceCanvasOrImage) {
+            const canvas = document.createElement('canvas');
+            canvas.width = KP_W_CAT;
+            canvas.height = KP_H_CAT;
+            const ctx = canvas.getContext('2d');
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            const w = sourceCanvasOrImage.width || sourceCanvasOrImage.naturalWidth;
+            const h = sourceCanvasOrImage.height || sourceCanvasOrImage.naturalHeight;
+            ctx.drawImage(sourceCanvasOrImage, 0, 0, w, h, 0, 0, KP_W_CAT, KP_H_CAT);
+            return new Promise(function(resolve, reject) {
+                canvas.toBlob(function(b) { b ? resolve(b) : reject(new Error('Error al convertir imagen')); }, 'image/webp', 0.9);
+            });
+        }
+
+        async function cargarImagenDesdeRuta(ruta) {
+            const src = window.kpUrlVistaDesdeRutaAlmacenIg
+                ? window.kpUrlVistaDesdeRutaAlmacenIg(ruta)
+                : urlVistaCat(ruta);
+            return new Promise(function(resolve, reject) {
+                const im = new Image();
+                im.crossOrigin = 'anonymous';
+                im.onload = function() { resolve(im); };
+                im.onerror = function() { reject(new Error('No se pudo cargar la imagen de origen')); };
+                im.src = src;
+            });
+        }
+
+        async function subirBlobCategoria(blob) {
+            const nombreBase = obtenerSlugCategoria() || ('categoria_' + Date.now());
+            const formData = new FormData();
+            formData.append('imagen', blob, nombreBase + '.webp');
+            formData.append('carpeta', KP_CARPETA_CAT);
+            formData.append('_token', KP_CSRF);
+            const res = await fetch(KP_SUBIR_URL, {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-CSRF-TOKEN': KP_CSRF, 'Accept': 'application/json' },
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message || 'Error al subir');
+            return data.data.ruta_relativa;
+        }
+
+        function normalizarRutaAlmacenCat(ruta) {
+            return (ruta || '').trim().replace(/^\/+/, '');
+        }
+
+        /** Interna global: reutiliza la ruta si ya es 144×120; solo redimensiona y sube a categorias si es más grande. */
+        async function resolverRutaImagenInternaGlobalCategoria(rutaOrigen) {
+            const ruta = normalizarRutaAlmacenCat(rutaOrigen);
+            if (!ruta) throw new Error('Ruta de imagen no válida');
+            const img = await cargarImagenDesdeRuta(ruta);
+            const w = img.naturalWidth || img.width;
+            const h = img.naturalHeight || img.height;
+            if (w === KP_W_CAT && h === KP_H_CAT) {
+                return ruta;
+            }
+            if (w > KP_W_CAT || h > KP_H_CAT) {
+                const blob = await blobDesdeCanvas144x120(img);
+                return subirBlobCategoria(blob);
+            }
+            return ruta;
+        }
+
+        function kpPairKeyCat(pair) {
+            return (pair.rutaGrande || '') + '|' + (pair.rutaPequena || '');
+        }
+
+        window.cerrarModalAñadirImagenCategoria = function() {
+            if (modal) modal.classList.add('hidden');
+            limpiarModalCat();
+        };
+
+        function limpiarModalCat() {
+            const fileInput = document.getElementById('file-subir-cat');
+            if (fileInput) fileInput.value = '';
+            const urlIn = document.getElementById('url-imagen-cat');
+            if (urlIn) urlIn.value = '';
+            const urlAmz = document.getElementById('url-amazon-cat');
+            if (urlAmz) urlAmz.value = '';
+            const nomArch = document.getElementById('nombre-archivo-cat');
+            if (nomArch) nomArch.textContent = '';
+            const errUrl = document.getElementById('error-url-cat');
+            if (errUrl) errUrl.classList.add('hidden');
+            const errAmz = document.getElementById('error-amazon-cat');
+            if (errAmz) errAmz.classList.add('hidden');
+            const loadAmz = document.getElementById('loading-amazon-cat');
+            if (loadAmz) loadAmz.classList.add('hidden');
+            const imgsAmz = document.getElementById('imagenes-amazon-cat');
+            if (imgsAmz) imgsAmz.classList.add('hidden');
+            const gridAmz = document.getElementById('grid-imagenes-amazon-cat');
+            if (gridAmz) gridAmz.innerHTML = '';
+            const areaRec = document.getElementById('area-recorte-cat');
+            if (areaRec) areaRec.classList.add('hidden');
+            imagenAmazonSeleccionadaCat = null;
+            if (cropperCat) { cropperCat.destroy(); cropperCat = null; }
+        }
+
+        function abrirModalCat(tab) {
+            if (!validarSlugParaImagen()) return;
+            if (modal) modal.classList.remove('hidden');
+            limpiarModalCat();
+            cambiarTabModalCat(tab || 'url');
+        }
+
+        function cambiarTabModalCat(tab) {
+            const tabUrl = document.getElementById('tab-url-cat');
+            const tabSubir = document.getElementById('tab-subir-cat');
+            const tabAmazon = document.getElementById('tab-amazon-cat');
+            const tabIg = document.getElementById('tab-interna-global-cat');
+            const cUrl = document.getElementById('content-url-cat');
+            const cSubir = document.getElementById('content-subir-cat');
+            const cAmazon = document.getElementById('content-amazon-cat');
+            const cIg = document.getElementById('content-interna-global-cat');
+            const allTabs = [tabUrl, tabSubir, tabAmazon, tabIg];
+            [cUrl, cSubir, cAmazon, cIg].forEach(function(c) { if (c) c.classList.add('hidden'); });
+            if (tab === 'url') {
+                window.kpModalImgTabSetActive(allTabs, tabUrl);
+                cUrl.classList.remove('hidden');
+            } else if (tab === 'subir') {
+                window.kpModalImgTabSetActive(allTabs, tabSubir);
+                cSubir.classList.remove('hidden');
+            } else if (tab === 'amazon') {
+                window.kpModalImgTabSetActive(allTabs, tabAmazon);
+                cAmazon.classList.remove('hidden');
+            } else if (tab === 'interna-global') {
+                window.kpModalImgTabSetActive(allTabs, tabIg);
+                cIg.classList.remove('hidden');
+                if (typeof window.kpInternaGlobalAlActivar === 'function') {
+                    window.kpInternaGlobalAlActivar('cat');
+                }
+            }
+        }
+
+        if (btnAñadir) btnAñadir.addEventListener('click', function() { abrirModalCat('url'); });
+        if (btnCambiar) btnCambiar.addEventListener('click', function() { abrirModalCat('url'); });
+
+        document.getElementById('tab-url-cat')?.addEventListener('click', function() { cambiarTabModalCat('url'); });
+        document.getElementById('tab-subir-cat')?.addEventListener('click', function() { cambiarTabModalCat('subir'); });
+        document.getElementById('tab-amazon-cat')?.addEventListener('click', function() { cambiarTabModalCat('amazon'); });
+        document.getElementById('tab-interna-global-cat')?.addEventListener('click', function() { cambiarTabModalCat('interna-global'); });
+
+        const nombreCatInput = document.getElementById('nombre-categoria');
+        if (nombreCatInput) {
+            nombreCatInput.addEventListener('input', function() {
+                if (typeof window.kpInternaGlobalRefrescarPalabras === 'function') {
+                    window.kpInternaGlobalRefrescarPalabras('cat');
+                }
+            });
+        }
+
+        async function procesarArchivoSubir(file) {
+            if (!validarSlugParaImagen()) return;
+            if (!file.type.startsWith('image/')) {
+                alert('Selecciona un archivo de imagen válido.');
                 return;
             }
-
-            const carpetaSelect = document.getElementById('carpeta-imagen-url-categoria');
-            const carpeta = carpetaSelect.value;
-
-            if (!carpeta) {
-                mostrarError('Debes seleccionar una carpeta primero.');
+            if (file.size > 5 * 1024 * 1024) {
+                alert('La imagen es demasiado grande. Máximo 5MB.');
                 return;
             }
-
-            if (!url || url.trim() === '') {
-                mostrarError('Debes introducir una URL válida.');
-                return;
+            const pending = KP_PENDING_CAT + Date.now();
+            aplicarRutaImagenCategoria(pending);
+            subidaPendienteCat = true;
+            cerrarModalAñadirImagenCategoria();
+            try {
+                const urlRevoke = URL.createObjectURL(file);
+                const img = await new Promise(function(resolve, reject) {
+                    const im = new Image();
+                    im.onload = function() { URL.revokeObjectURL(urlRevoke); resolve(im); };
+                    im.onerror = function() { URL.revokeObjectURL(urlRevoke); reject(new Error('Imagen no válida')); };
+                    im.src = urlRevoke;
+                });
+                const blob = await blobDesdeCanvas144x120(img);
+                const ruta = await subirBlobCategoria(blob);
+                aplicarRutaImagenCategoria(ruta);
+            } catch (err) {
+                console.error(err);
+                alert('Error al subir la imagen: ' + (err.message || err));
+                aplicarRutaImagenCategoria('');
+            } finally {
+                subidaPendienteCat = false;
             }
-
-            ocultarError();
-            carpetaActualCategoria = carpeta;
-            imagenTemporalUrlCategoria = url;
-
-            // Mostrar modal de recorte directamente con la URL original
-            mostrarModalRecortar(url);
         }
 
-        // Función para mostrar modal de recorte
-        function mostrarModalRecortar(urlImagen) {
-            const modal = document.getElementById('modalRecortarImagenCategoria');
-            const img = document.getElementById('imagen-recortar-categoria');
-            
-            // Limpiar cropper anterior si existe
-            if (cropperCategoria) {
-                cropperCategoria.destroy();
-                cropperCategoria = null;
+        const fileSubir = document.getElementById('file-subir-cat');
+        const btnSel = document.getElementById('btn-seleccionar-cat');
+        const dropZone = document.getElementById('drop-zone-cat');
+        if (btnSel && fileSubir) btnSel.addEventListener('click', function() { fileSubir.click(); });
+        if (dropZone) {
+            dropZone.addEventListener('click', function() { fileSubir?.click(); });
+            dropZone.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                dropZone.classList.add('border-blue-500', 'bg-blue-50', 'dark:bg-blue-900/20');
+            });
+            dropZone.addEventListener('dragleave', function() {
+                dropZone.classList.remove('border-blue-500', 'bg-blue-50', 'dark:bg-blue-900/20');
+            });
+            dropZone.addEventListener('drop', function(e) {
+                e.preventDefault();
+                dropZone.classList.remove('border-blue-500', 'bg-blue-50', 'dark:bg-blue-900/20');
+                if (e.dataTransfer.files.length) procesarArchivoSubir(e.dataTransfer.files[0]);
+            });
+        }
+        if (fileSubir) {
+            fileSubir.addEventListener('change', function(e) {
+                if (e.target.files.length) procesarArchivoSubir(e.target.files[0]);
+            });
+        }
+
+        document.getElementById('btn-descargar-url-cat')?.addEventListener('click', function() {
+            const url = document.getElementById('url-imagen-cat')?.value.trim();
+            const err = document.getElementById('error-url-cat');
+            if (!url) {
+                if (err) { err.textContent = 'Introduce una URL válida.'; err.classList.remove('hidden'); }
+                return;
             }
-            
-            // Usar proxy para evitar problemas CORS
-            const urlProxy = urlImagen.startsWith('http://') || urlImagen.startsWith('https://') 
-                ? `{{ route('admin.imagenes.proxy') }}?url=${encodeURIComponent(urlImagen)}`
+            if (err) err.classList.add('hidden');
+            carpetaActualUrlCat = KP_CARPETA_CAT;
+            mostrarRecorteCat(url);
+        });
+
+        function mostrarRecorteCat(urlImagen) {
+            const area = document.getElementById('area-recorte-cat');
+            const img = document.getElementById('imagen-recortar-cat');
+            if (!area || !img) return;
+            area.classList.remove('hidden');
+            if (cropperCat) cropperCat.destroy();
+            const urlProxy = /^https?:\/\//i.test(urlImagen)
+                ? KP_PROXY_URL + '?url=' + encodeURIComponent(urlImagen)
                 : urlImagen;
-            
-            // Configurar la imagen con crossOrigin para evitar problemas CORS
             img.crossOrigin = 'anonymous';
             img.src = urlProxy;
-            if (modal) {
-                modal.classList.remove('hidden');
-            }
-
-            // Inicializar cropper cuando la imagen se cargue
             img.onload = function() {
-                if (cropperCategoria) {
-                    cropperCategoria.destroy();
-                }
-                
-                cropperCategoria = new Cropper(img, {
-                    aspectRatio: NaN, // Sin restricción de aspecto
+                if (cropperCat) cropperCat.destroy();
+                cropperCat = new Cropper(img, {
+                    aspectRatio: KP_W_CAT / KP_H_CAT,
                     viewMode: 1,
                     dragMode: 'move',
-                    autoCropArea: 0.8,
+                    autoCropArea: 0.9,
                     restore: false,
                     guides: true,
                     center: true,
@@ -1435,217 +1639,241 @@
                     toggleDragModeOnDblclick: false,
                 });
             };
-            
-            // Manejar errores de carga de imagen
             img.onerror = function() {
-                mostrarError('Error al cargar la imagen. Verifica que la URL sea accesible y sea una imagen válida.');
-                cerrarModalRecortarCategoria();
+                const err = document.getElementById('error-url-cat');
+                if (err) { err.textContent = 'Error al cargar la imagen.'; err.classList.remove('hidden'); }
+                area.classList.add('hidden');
             };
         }
 
-        // Función para cerrar modal de recorte
-        window.cerrarModalRecortarCategoria = function() {
-            const modal = document.getElementById('modalRecortarImagenCategoria');
-            if (modal) {
-                modal.classList.add('hidden');
-            }
-            
-            if (cropperCategoria) {
-                cropperCategoria.destroy();
-                cropperCategoria = null;
-            }
-            
-            imagenTemporalUrlCategoria = null;
-            carpetaActualCategoria = null;
-        };
-
-        // Función para redimensionar canvas estirando la imagen al tamaño exacto
-        function redimensionarCanvas(canvasOriginal, anchoDestino, altoDestino) {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            
-            // Forzar el tamaño exacto
-            canvas.width = anchoDestino;
-            canvas.height = altoDestino;
-            
-            // Estirar la imagen completa al tamaño exacto sin mantener aspecto
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'high';
-            // Dibujar la imagen completa estirada al tamaño exacto
-            ctx.drawImage(canvasOriginal, 0, 0, canvasOriginal.width, canvasOriginal.height, 0, 0, anchoDestino, altoDestino);
-            
-            return canvas;
-        }
-
-        // Función para procesar imagen recortada
-        async function procesarImagenRecortada() {
-            if (!cropperCategoria || !carpetaActualCategoria) {
-                console.error('Cropper o carpeta no disponible');
-                mostrarError('Error: No se puede procesar la imagen. Intenta de nuevo.');
-                return;
-            }
-
-            // Obtener el canvas recortado sin redimensionar
-            const canvasOriginal = cropperCategoria.getCroppedCanvas({
-                imageSmoothingEnabled: true,
-                imageSmoothingQuality: 'high'
-            });
-
-            if (!canvasOriginal) {
-                mostrarError('Error al recortar la imagen');
-                return;
-            }
-
-            mostrarEstado('loading');
-
+        async function limpiarUrlAmazonViaApi(url) {
+            if (!url || !url.trim()) return url || '';
             try {
-                // Redimensionar a 144x120 para categoría
-                const canvasCategoria = redimensionarCanvas(canvasOriginal, 144, 120);
-
-                // Convertir canvas a blob (webp)
-                const blobCategoria = await new Promise((resolve, reject) => {
-                    canvasCategoria.toBlob((blob) => {
-                        if (blob) {
-                            resolve(blob);
-                        } else {
-                            reject(new Error('Error al convertir imagen'));
-                        }
-                    }, 'image/webp', 0.9);
-                });
-
-                // Crear nombre base del archivo desde el slug
-                const slugInput = document.getElementById('slug-categoria');
-                const nombreBase = slugInput ? slugInput.value.trim() : nombreCategoria.trim();
-
-                // Subir imagen
-                const formDataCategoria = new FormData();
-                formDataCategoria.append('imagen', blobCategoria, `${nombreBase}.webp`);
-                formDataCategoria.append('carpeta', carpetaActualCategoria);
-                formDataCategoria.append('_token', document.querySelector('meta[name="csrf-token"]').getAttribute('content'));
-
-                const responseCategoria = await fetch('{{ route("admin.imagenes.subir-simple") }}', {
+                const res = await fetch(KP_LIMPIAR_AMAZON_URL, {
                     method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                    },
-                    body: formDataCategoria
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': KP_CSRF },
+                    body: JSON.stringify({ url: url.trim() }),
                 });
+                if (!res.ok) return url.trim();
+                const data = await res.json();
+                return data.url_limpia ?? url.trim();
+            } catch (e) {
+                return url.trim();
+            }
+        }
 
-                const dataCategoria = await responseCategoria.json();
+        const urlAmazonInput = document.getElementById('url-amazon-cat');
+        if (urlAmazonInput) {
+            urlAmazonInput.addEventListener('paste', function() {
+                setTimeout(async function() {
+                    const u = urlAmazonInput.value.trim();
+                    if (u) {
+                        const limpia = await limpiarUrlAmazonViaApi(u);
+                        if (limpia !== u) urlAmazonInput.value = limpia;
+                    }
+                }, 10);
+            });
+            urlAmazonInput.addEventListener('input', function(e) {
+                const url = e.target.value.trim();
+                if (!url || !url.includes('amazon')) return;
+                limpiarUrlAmazonViaApi(url).then(function(limpia) {
+                    if (limpia !== url && limpia.length < url.length) e.target.value = limpia;
+                });
+            });
+        }
 
-                if (!dataCategoria.success) {
-                    throw new Error(dataCategoria.message || 'Error al subir la imagen');
+        document.getElementById('btn-buscar-amazon-cat')?.addEventListener('click', async function() {
+            const urlInput = document.getElementById('url-amazon-cat');
+            const errorDiv = document.getElementById('error-amazon-cat');
+            const loadingDiv = document.getElementById('loading-amazon-cat');
+            const imagenesDiv = document.getElementById('imagenes-amazon-cat');
+            const gridDiv = document.getElementById('grid-imagenes-amazon-cat');
+            const url = urlInput?.value.trim();
+            if (!url) {
+                if (errorDiv) { errorDiv.textContent = 'Introduce una URL de Amazon'; errorDiv.classList.remove('hidden'); }
+                return;
+            }
+            if (errorDiv) errorDiv.classList.add('hidden');
+            if (loadingDiv) loadingDiv.classList.remove('hidden');
+            if (imagenesDiv) imagenesDiv.classList.add('hidden');
+            if (gridDiv) gridDiv.innerHTML = '';
+            imagenAmazonSeleccionadaCat = null;
+            try {
+                const response = await fetch(KP_AMAZON_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': KP_CSRF },
+                    body: JSON.stringify({ url: url }),
+                });
+                const data = await response.json();
+                if (!data.success) throw new Error(data.error || 'Error al obtener imágenes');
+                if (!data.imagenes || !data.imagenes.length) {
+                    if (errorDiv) { errorDiv.textContent = 'No se encontraron imágenes'; errorDiv.classList.remove('hidden'); }
+                    return;
                 }
-
-                // Actualizar campos con la ruta
-                const rutaCategoria = document.getElementById('ruta-imagen-categoria-url');
-                const rutaTextoCategoria = document.getElementById('ruta-texto-categoria');
-
-                // Actualizar ruta
-                if (rutaCategoria) {
-                    rutaCategoria.value = dataCategoria.data.ruta_relativa;
-                }
-                if (rutaTextoCategoria) {
-                    rutaTextoCategoria.textContent = dataCategoria.data.ruta_relativa;
-                }
-
-                // Mostrar estado de éxito
-                mostrarEstado('success');
-                
-                // También actualizar los campos ocultos de la pestaña upload
-                const rutaUpload = document.getElementById('ruta-imagen-categoria');
-                if (rutaUpload) {
-                    rutaUpload.value = dataCategoria.data.ruta_relativa;
-                }
-
-                // Actualizar vista previa
-                const preview = document.getElementById('preview-upload-categoria');
-                const previewContainer = document.getElementById('preview-container-categoria');
-                if (preview) {
-                    preview.src = `/images/${dataCategoria.data.ruta_relativa}`;
-                    preview.classList.remove('hidden');
-                }
-                if (previewContainer) {
-                    previewContainer.classList.remove('hidden');
-                }
-
-                // Sincronizar con pestaña manual
-                const inputManual = document.getElementById('imagen-categoria-input');
-                const previewManual = document.getElementById('preview-imagen-categoria');
-                if (inputManual) {
-                    inputManual.value = dataCategoria.data.ruta_relativa;
-                }
-                if (previewManual) {
-                    previewManual.src = `/images/${dataCategoria.data.ruta_relativa}`;
-                    previewManual.style.display = 'block';
-                }
-
-                cerrarModalRecortarCategoria();
-
+                data.imagenes.forEach(function(imagen, index) {
+                    const div = document.createElement('div');
+                    div.className = 'relative border-2 border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden cursor-pointer hover:border-blue-500';
+                    const img = document.createElement('img');
+                    img.src = imagen.url;
+                    img.className = 'w-full h-32 object-contain';
+                    const radio = document.createElement('input');
+                    radio.type = 'radio';
+                    radio.name = 'amazon-cat-sel';
+                    radio.className = 'absolute top-2 right-2 w-5 h-5';
+                    div.appendChild(img);
+                    div.appendChild(radio);
+                    div.addEventListener('click', function() {
+                        gridDiv.querySelectorAll('input[type=radio]').forEach(function(r) { r.checked = false; });
+                        radio.checked = true;
+                        imagenAmazonSeleccionadaCat = imagen;
+                        gridDiv.querySelectorAll('div').forEach(function(d) { d.classList.remove('ring-4', 'ring-blue-500'); });
+                        div.classList.add('ring-4', 'ring-blue-500');
+                    });
+                    gridDiv.appendChild(div);
+                });
+                if (imagenesDiv) imagenesDiv.classList.remove('hidden');
             } catch (error) {
-                console.error('Error:', error);
-                mostrarError(error.message || 'Error al procesar la imagen');
-                mostrarEstado('error');
+                if (errorDiv) { errorDiv.textContent = error.message || 'Error'; errorDiv.classList.remove('hidden'); }
+            } finally {
+                if (loadingDiv) loadingDiv.classList.add('hidden');
+            }
+        });
+
+        async function procesarImagenAmazonCat() {
+            if (!imagenAmazonSeleccionadaCat) {
+                alert('Selecciona una imagen de Amazon');
+                return;
+            }
+            const pending = KP_PENDING_CAT + 'amz';
+            aplicarRutaImagenCategoria(pending);
+            cerrarModalAñadirImagenCategoria();
+            try {
+                const urlProxy = imagenAmazonSeleccionadaCat.url.startsWith('http')
+                    ? KP_PROXY_URL + '?url=' + encodeURIComponent(imagenAmazonSeleccionadaCat.url)
+                    : imagenAmazonSeleccionadaCat.url;
+                const img = await new Promise(function(resolve, reject) {
+                    const im = new Image();
+                    im.crossOrigin = 'anonymous';
+                    im.onload = function() { resolve(im); };
+                    im.onerror = function() { reject(new Error('Error al cargar imagen Amazon')); };
+                    im.src = urlProxy;
+                });
+                const blob = await blobDesdeCanvas144x120(img);
+                const ruta = await subirBlobCategoria(blob);
+                aplicarRutaImagenCategoria(ruta);
+            } catch (err) {
+                alert('Error: ' + (err.message || err));
+                aplicarRutaImagenCategoria('');
             }
         }
 
-        // Event listener para botón de descarga
-        const btnDescargar = document.getElementById('btn-descargar-url-categoria');
-        if (btnDescargar) {
-            btnDescargar.addEventListener('click', () => {
-                const url = document.getElementById('url-imagen-categoria').value.trim();
-                descargarImagen(url);
+        async function procesarRecorteUrlCat() {
+            if (!cropperCat) {
+                alert('Descarga y recorta la imagen primero.');
+                return;
+            }
+            const canvasOriginal = cropperCat.getCroppedCanvas({ imageSmoothingEnabled: true, imageSmoothingQuality: 'high' });
+            if (!canvasOriginal) {
+                alert('Error al recortar');
+                return;
+            }
+            const pending = KP_PENDING_CAT + 'url';
+            aplicarRutaImagenCategoria(pending);
+            cerrarModalAñadirImagenCategoria();
+            try {
+                const blob = await blobDesdeCanvas144x120(canvasOriginal);
+                const ruta = await subirBlobCategoria(blob);
+                aplicarRutaImagenCategoria(ruta);
+            } catch (err) {
+                alert('Error: ' + (err.message || err));
+                aplicarRutaImagenCategoria('');
+            }
+        }
+
+        async function procesarInternaGlobalCat() {
+            if (!seleccionInternaGlobalCat) {
+                alert('Selecciona una imagen del almacén');
+                return;
+            }
+            const rutaOrigen = seleccionInternaGlobalCat.rutaPequena || seleccionInternaGlobalCat.rutaGrande || seleccionInternaGlobalCat.thumbVisual;
+            const pending = KP_PENDING_CAT + 'ig';
+            aplicarRutaImagenCategoria(pending);
+            cerrarModalAñadirImagenCategoria();
+            try {
+                const ruta = await resolverRutaImagenInternaGlobalCategoria(rutaOrigen);
+                aplicarRutaImagenCategoria(ruta);
+                seleccionInternaGlobalCat = null;
+            } catch (err) {
+                alert('Error al procesar la imagen: ' + (err.message || err));
+                aplicarRutaImagenCategoria('');
+            }
+        }
+
+        document.getElementById('btn-guardar-cat')?.addEventListener('click', async function() {
+            const tabActiva = document.querySelector('.tab-modal-cat.kp-modal-img-tab--active');
+            const tabId = tabActiva ? tabActiva.id : 'tab-url-cat';
+            if (tabId === 'tab-subir-cat') {
+                if (!fileSubir?.files?.length) alert('Selecciona un archivo primero.');
+                return;
+            }
+            if (tabId === 'tab-amazon-cat') {
+                await procesarImagenAmazonCat();
+                return;
+            }
+            if (tabId === 'tab-interna-global-cat') {
+                await procesarInternaGlobalCat();
+                return;
+            }
+            if (tabId === 'tab-url-cat') {
+                await procesarRecorteUrlCat();
+            }
+        });
+
+        if (typeof window.kpInternaGlobalRegistrar === 'function') {
+            window.kpInternaGlobalRegistrar('cat', {
+                onSelect: function(pair) {
+                    if (seleccionInternaGlobalCat && kpPairKeyCat(seleccionInternaGlobalCat) === kpPairKeyCat(pair)) {
+                        seleccionInternaGlobalCat = null;
+                    } else {
+                        seleccionInternaGlobalCat = pair;
+                    }
+                    if (typeof window.kpInternaGlobalRefrescarSeleccion === 'function') {
+                        window.kpInternaGlobalRefrescarSeleccion('cat');
+                    }
+                },
+                isSelected: function(pair) {
+                    return seleccionInternaGlobalCat && kpPairKeyCat(seleccionInternaGlobalCat) === kpPairKeyCat(pair);
+                },
+                renderResumen: function() {
+                    const el = document.querySelector('[data-kp-ig-panel="cat"] .kp-ig-seleccion-resumen');
+                    const pairs = seleccionInternaGlobalCat ? [seleccionInternaGlobalCat] : [];
+                    window.kpIgPintarResumenSeleccion(el, pairs);
+                },
+                getPalabras: function() {
+                    const nombre = document.getElementById('nombre-categoria')?.value || '';
+                    return window.kpPartirNombreEnPalabras(nombre);
+                },
             });
         }
 
-        // Event listener para confirmar recorte
-        const btnConfirmar = document.getElementById('btn-confirmar-recorte-categoria');
-        if (btnConfirmar) {
-            btnConfirmar.addEventListener('click', function(e) {
+        formCatImg.addEventListener('submit', function(e) {
+            if (subidaPendienteCat || (rutaImagenCategoria && rutaImagenCategoria.indexOf(KP_PENDING_CAT) === 0)) {
                 e.preventDefault();
-                e.stopPropagation();
-                console.log('Botón confirmar recorte clickeado');
-                procesarImagenRecortada();
-            });
-        }
-
-        // Cargar carpetas disponibles para el select de URL
-        fetch('{{ route("admin.imagenes.carpetas") }}')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success && data.data.length > 0) {
-                    actualizarSelectCarpetasURL(data.data);
-                }
-            })
-            .catch(error => {
-                console.error('Error al cargar carpetas:', error);
-            });
-
-        function actualizarSelectCarpetasURL(carpetas) {
-            const select = document.getElementById('carpeta-imagen-url-categoria');
-            if (!select) return;
-
-            const primeraOpcion = select.querySelector('option[value=""]');
-            select.innerHTML = '';
-            
-            if (primeraOpcion) {
-                select.appendChild(primeraOpcion);
-            } else {
-                const option = document.createElement('option');
-                option.value = '';
-                option.textContent = 'Selecciona una carpeta';
-                select.appendChild(option);
+                alert('Espera a que termine de subirse la imagen antes de guardar la categoría.');
             }
+        });
 
-            carpetas.forEach(carpeta => {
-                const option = document.createElement('option');
-                option.value = carpeta;
-                option.textContent = carpeta.charAt(0).toUpperCase() + carpeta.slice(1);
-                select.appendChild(option);
-            });
+        if (inputRuta && inputRuta.value) {
+            aplicarRutaImagenCategoria(inputRuta.value);
+        } else {
+            renderizarImagenCategoria();
+            if (btnAñadir && btnCambiar) {
+                btnCambiar.classList.add('hidden');
+            }
         }
     });
     </script>
+
 
     {{-- SCRIPT PARA ESPECIFICACIONES INTERNAS --}}
     <script>

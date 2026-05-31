@@ -21,6 +21,8 @@ use App\Models\Neoobjetivo;
 
 class ProductoController extends Controller
 {
+    private const NOMBRE_EJECUCION_OFERTA_MAS_BARATA = 'ejecuciones_actualizar_oferta_mas_barata_productos';
+
     public function index(Request $request)
     {
         $busqueda = $request->input('buscar');
@@ -74,6 +76,7 @@ class ProductoController extends Controller
         return view('admin.productos.formulario', [
             'producto' => null,
             'categoriasRaiz' => $categoriasRaiz,
+            'categoriasRecientes' => $this->categoriasRecientesDesdeUltimosProductos(),
         ]);
     }
 
@@ -248,7 +251,13 @@ class ProductoController extends Controller
             'categoria_especificaciones_nombre' => $categoriaEspecificacionesNombre
         ]);
 
-        return view('admin.productos.formulario', compact('producto', 'categoriasRaiz', 'categoriaRelacionadosNombre', 'categoriaEspecificacionesNombre'));
+        return view('admin.productos.formulario', [
+            'producto' => $producto,
+            'categoriasRaiz' => $categoriasRaiz,
+            'categoriaRelacionadosNombre' => $categoriaRelacionadosNombre,
+            'categoriaEspecificacionesNombre' => $categoriaEspecificacionesNombre,
+            'categoriasRecientes' => $this->categoriasRecientesDesdeUltimosProductos(),
+        ]);
     }
 
 
@@ -1116,7 +1125,8 @@ public function generarContenido(Request $request)
             'modelo' => 'required|string',
             'talla' => 'required|string',
             'prompt' => 'required|string',
-            'categoria_id' => 'nullable|exists:categorias,id'
+            'categoria_id' => 'nullable|exists:categorias,id',
+            'especificaciones_internas' => 'nullable|array',
         ]);
 
         $nombre = $request->input('nombre');
@@ -1186,7 +1196,7 @@ public function generarContenido(Request $request)
                 ],
             ],
             'temperature' => 0.2,
-            'max_tokens' => 2000,
+            'max_tokens' => 3000,
             'response_format' => ['type' => 'json_object'], // si el SDK no lo soporta, se ignora
         ]);
 
@@ -2123,6 +2133,44 @@ public function generarContenido(Request $request)
     }
 
     /**
+     * Categorías distintas de los últimos productos creados (para atajos en el formulario).
+     *
+     * @return array<int, array{id: int, nombre: string}>
+     */
+    private function categoriasRecientesDesdeUltimosProductos(int $limiteCategorias = 6, int $productosARevisar = 50): array
+    {
+        $productos = Producto::query()
+            ->whereNotNull('categoria_id')
+            ->with('categoria:id,nombre')
+            ->orderByDesc('id')
+            ->limit($productosARevisar)
+            ->get(['id', 'categoria_id']);
+
+        $vistas = [];
+        $categorias = [];
+
+        foreach ($productos as $producto) {
+            if (!$producto->categoria) {
+                continue;
+            }
+            $categoriaId = (int) $producto->categoria_id;
+            if (isset($vistas[$categoriaId])) {
+                continue;
+            }
+            $vistas[$categoriaId] = true;
+            $categorias[] = [
+                'id' => $categoriaId,
+                'nombre' => $producto->categoria->nombre,
+            ];
+            if (count($categorias) >= $limiteCategorias) {
+                break;
+            }
+        }
+
+        return $categorias;
+    }
+
+    /**
      * Buscar categorías para el formulario de productos
      */
     public function buscarCategorias(Request $request)
@@ -2151,14 +2199,106 @@ public function generarContenido(Request $request)
     public function obtenerEspecificacionesInternas($categoriaId)
     {
         $categoria = Categoria::find($categoriaId);
-        
+
         if (!$categoria) {
             return response()->json(['error' => 'Categoría no encontrada'], 404);
         }
-        
+
         return response()->json([
-            'especificaciones_internas' => $categoria->especificaciones_internas
+            'especificaciones_internas' => $categoria->especificaciones_internas,
+            'conteos_productos' => $this->calcularConteosProductosEspecificaciones($categoria),
         ]);
+    }
+
+    public function actualizarEspecificacionesInternasCategoria(Request $request, $categoriaId)
+    {
+        $categoria = Categoria::find($categoriaId);
+
+        if (!$categoria) {
+            return response()->json(['error' => 'Categoría no encontrada'], 404);
+        }
+
+        $validated = $request->validate([
+            'especificaciones_internas' => 'required|array',
+            'especificaciones_internas.filtros' => 'required|array',
+        ]);
+
+        $categoria->especificaciones_internas = $validated['especificaciones_internas'];
+        $categoria->save();
+
+        return response()->json([
+            'success' => true,
+            'especificaciones_internas' => $categoria->especificaciones_internas,
+            'conteos_productos' => $this->calcularConteosProductosEspecificaciones($categoria),
+        ]);
+    }
+
+    /**
+     * Cuenta productos con cada sublínea marcada (misma lógica que en CategoriaController).
+     */
+    private function calcularConteosProductosEspecificaciones(Categoria $categoria): array
+    {
+        $conteos = [];
+
+        if (!$categoria->especificaciones_internas || !isset($categoria->especificaciones_internas['filtros'])) {
+            return $conteos;
+        }
+
+        $productos = Producto::where('categoria_id_especificaciones_internas', $categoria->id)
+            ->whereNotNull('categoria_especificaciones_internas_elegidas')
+            ->where('mostrar', 'si')
+            ->get(['id', 'categoria_especificaciones_internas_elegidas']);
+
+        foreach ($categoria->especificaciones_internas['filtros'] as $filtro) {
+            $lineaId = (string) ($filtro['id'] ?? '');
+
+            if ($lineaId === '') {
+                continue;
+            }
+
+            if (!isset($conteos[$lineaId])) {
+                $conteos[$lineaId] = [];
+            }
+
+            foreach ($filtro['subprincipales'] ?? [] as $sub) {
+                $sublineaId = (string) ($sub['id'] ?? '');
+
+                if ($sublineaId === '') {
+                    continue;
+                }
+
+                $contador = 0;
+
+                foreach ($productos as $producto) {
+                    $especificaciones = $producto->categoria_especificaciones_internas_elegidas;
+
+                    if (!$especificaciones || !is_array($especificaciones)) {
+                        continue;
+                    }
+
+                    $productoLinea = $especificaciones[$lineaId] ?? null;
+
+                    if (!$productoLinea) {
+                        continue;
+                    }
+
+                    $productoSublineas = is_array($productoLinea) ? $productoLinea : [$productoLinea];
+
+                    foreach ($productoSublineas as $item) {
+                        $itemId = (is_array($item) && isset($item['id'])) ? (string) $item['id'] : (string) $item;
+
+                        if ($sublineaId === $itemId) {
+                            $contador++;
+                            break;
+                        }
+                    }
+                }
+
+                $conteos[$lineaId][$sublineaId] = $contador;
+            }
+        }
+
+        return $conteos;
     }
 
     /**
@@ -2614,6 +2754,12 @@ public function generarContenido(Request $request)
      */
     public function actualizarOfertaMasBarataPorProducto(Request $request)
     {
+        $ejecucion = null;
+        $totalProductos = 0;
+        $actualizados = 0;
+        $errores = 0;
+        $sinOfertas = 0;
+
         try {
             // Verificar token de seguridad
             if ($request->get('token') !== env('TOKEN_ACTUALIZAR_PRECIOS')) {
@@ -2623,9 +2769,16 @@ public function generarContenido(Request $request)
             $servicioOfertas = new SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos();
             $productos = Producto::all();
             $totalProductos = $productos->count();
-            $actualizados = 0;
-            $errores = 0;
-            $sinOfertas = 0;
+
+            $ejecucion = \App\Models\EjecucionGlobal::create([
+                'inicio' => now(),
+                'nombre' => self::NOMBRE_EJECUCION_OFERTA_MAS_BARATA,
+                'log' => [
+                    'estado' => 'iniciada',
+                    'origen' => 'admin/productos/actualizar-oferta-mas-barata',
+                    'total_productos' => $totalProductos,
+                ],
+            ]);
 
             \Log::info("Iniciando actualización de ofertas más baratas para {$totalProductos} productos");
 
@@ -2673,11 +2826,29 @@ public function generarContenido(Request $request)
                 }
             }
 
-            \Log::info("Proceso completado: {$actualizados} actualizados, {$sinOfertas} sin ofertas, {$errores} errores de {$totalProductos} productos");
+            $mensaje = "Proceso completado: {$actualizados} actualizados, {$sinOfertas} sin ofertas, {$errores} errores";
+
+            $ejecucion->update([
+                'fin' => now(),
+                'total' => $totalProductos,
+                'total_guardado' => $actualizados,
+                'total_errores' => $errores,
+                'log' => [
+                    'estado' => 'completada',
+                    'origen' => 'admin/productos/actualizar-oferta-mas-barata',
+                    'message' => $mensaje,
+                    'total_productos' => $totalProductos,
+                    'actualizados' => $actualizados,
+                    'sin_ofertas' => $sinOfertas,
+                    'errores' => $errores,
+                ],
+            ]);
+
+            \Log::info("{$mensaje} de {$totalProductos} productos");
 
             return response()->json([
                 'success' => true,
-                'message' => "Proceso completado: {$actualizados} actualizados, {$sinOfertas} sin ofertas, {$errores} errores",
+                'message' => $mensaje,
                 'total_productos' => $totalProductos,
                 'actualizados' => $actualizados,
                 'sin_ofertas' => $sinOfertas,
@@ -2686,6 +2857,25 @@ public function generarContenido(Request $request)
 
         } catch (\Exception $e) {
             \Log::error('Error en actualizarOfertaMasBarataPorProducto: ' . $e->getMessage());
+
+            if ($ejecucion) {
+                $ejecucion->update([
+                    'fin' => now(),
+                    'total' => $totalProductos,
+                    'total_guardado' => $actualizados,
+                    'total_errores' => $errores + 1,
+                    'log' => [
+                        'estado' => 'fallida',
+                        'origen' => 'admin/productos/actualizar-oferta-mas-barata',
+                        'error' => $e->getMessage(),
+                        'total_productos' => $totalProductos,
+                        'actualizados' => $actualizados,
+                        'sin_ofertas' => $sinOfertas,
+                        'errores' => $errores + 1,
+                    ],
+                ]);
+            }
+
             return response()->json([
                 'success' => false,
                 'message' => 'Error interno del servidor: ' . $e->getMessage()
@@ -2827,6 +3017,12 @@ public function generarContenido(Request $request)
      */
     public function ejecutarOfertaMasBarataSegundoPlano(Request $request)
     {
+        $ejecucion = null;
+        $totalProductos = 0;
+        $actualizados = 0;
+        $sinOfertas = 0;
+        $errores = 0;
+
         try {
             // Verificar token de seguridad
             if ($request->get('token') !== env('TOKEN_ACTUALIZAR_PRECIOS')) {
@@ -2835,9 +3031,16 @@ public function generarContenido(Request $request)
 
             $productos = Producto::all();
             $totalProductos = $productos->count();
-            $actualizados = 0;
-            $sinOfertas = 0;
-            $errores = 0;
+
+            $ejecucion = \App\Models\EjecucionGlobal::create([
+                'inicio' => now(),
+                'nombre' => self::NOMBRE_EJECUCION_OFERTA_MAS_BARATA,
+                'log' => [
+                    'estado' => 'iniciada',
+                    'origen' => 'productos/oferta-mas-barata/ejecutar-segundo-plano',
+                    'total_productos' => $totalProductos,
+                ],
+            ]);
 
             \Log::info("Iniciando proceso de actualizar oferta más barata para {$totalProductos} productos");
 
@@ -2872,11 +3075,29 @@ public function generarContenido(Request $request)
                 }
             }
 
-            \Log::info("Proceso completado: {$actualizados} actualizados, {$sinOfertas} sin ofertas, {$errores} errores de {$totalProductos} productos");
+            $mensaje = "Proceso completado: {$actualizados} actualizados, {$sinOfertas} sin ofertas, {$errores} errores";
+
+            $ejecucion->update([
+                'fin' => now(),
+                'total' => $totalProductos,
+                'total_guardado' => $actualizados,
+                'total_errores' => $errores,
+                'log' => [
+                    'estado' => 'completada',
+                    'origen' => 'productos/oferta-mas-barata/ejecutar-segundo-plano',
+                    'message' => $mensaje,
+                    'total_productos' => $totalProductos,
+                    'actualizados' => $actualizados,
+                    'sin_ofertas' => $sinOfertas,
+                    'errores' => $errores,
+                ],
+            ]);
+
+            \Log::info("{$mensaje} de {$totalProductos} productos");
 
             return response()->json([
                 'success' => true,
-                'message' => "Proceso completado: {$actualizados} actualizados, {$sinOfertas} sin ofertas, {$errores} errores",
+                'message' => $mensaje,
                 'total_productos' => $totalProductos,
                 'actualizados' => $actualizados,
                 'sin_ofertas' => $sinOfertas,
@@ -2885,6 +3106,25 @@ public function generarContenido(Request $request)
 
         } catch (\Exception $e) {
             \Log::error('Error en ejecutarOfertaMasBarataSegundoPlano: ' . $e->getMessage());
+
+            if ($ejecucion) {
+                $ejecucion->update([
+                    'fin' => now(),
+                    'total' => $totalProductos,
+                    'total_guardado' => $actualizados,
+                    'total_errores' => $errores + 1,
+                    'log' => [
+                        'estado' => 'fallida',
+                        'origen' => 'productos/oferta-mas-barata/ejecutar-segundo-plano',
+                        'error' => $e->getMessage(),
+                        'total_productos' => $totalProductos,
+                        'actualizados' => $actualizados,
+                        'sin_ofertas' => $sinOfertas,
+                        'errores' => $errores + 1,
+                    ],
+                ]);
+            }
+
             return response()->json([
                 'success' => false,
                 'message' => 'Error interno del servidor: ' . $e->getMessage()

@@ -15,6 +15,7 @@ use App\Http\Controllers\CategoriaController;
 use App\Http\Controllers\AvisoController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\NeoController;
+use App\Http\Controllers\CrearMasivoConIaController;
 use App\Http\Controllers\CholloController;
 use App\Http\Controllers\ClickController;
 use App\Http\Controllers\CholloPublicController;
@@ -497,7 +498,12 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
     Route::post('neo/prueba-neoobjetivos', [\App\Http\Controllers\Crons\CronNeoObjetivosController::class, 'pruebaNeoobjetivosEjecutar'])->name('neo.prueba-neoobjetivos.ejecutar');
 
     Route::get('neo/crear-masivo', [NeoController::class, 'crearMasivo'])->name('neo.crear-masivo');
+    Route::get('neo/crear-masivo-ia', [CrearMasivoConIaController::class, 'index'])->name('neo.crear-masivo-ia');
+    Route::post('neo/crear-masivo-ia/palabras-clave', [CrearMasivoConIaController::class, 'palabrasClave'])->name('neo.crear-masivo-ia.palabras-clave');
+    Route::post('neo/crear-masivo-ia/elegir-producto', [CrearMasivoConIaController::class, 'elegirProducto'])->name('neo.crear-masivo-ia.elegir-producto');
+    Route::post('neo/crear-masivo-ia/completar-especificaciones', [CrearMasivoConIaController::class, 'completarEspecificaciones'])->name('neo.crear-masivo-ia.completar-especificaciones');
     Route::get('neo/crear-masivo/productos', [NeoController::class, 'productosConNeoAniadidaNo'])->name('neo.crear-masivo.productos');
+    Route::post('neo/crear-masivo/rellenar-tienda-id', [\App\Http\Controllers\Crons\CronNeoObjetivosController::class, 'rellenarTiendaIdNeoDesdeUrlCrearMasivo'])->name('neo.crear-masivo.rellenar-tienda-id');
     Route::get('neo/crear-masivo/tiendas-mostrar-no', [NeoController::class, 'tiendasMostrarNoCrearMasivoModalProducto'])->name('neo.crear-masivo.tiendas-mostrar-no');
     Route::get('neo/crear-masivo/urls-por-producto/{productoId}', [NeoController::class, 'urlsPorProducto'])->name('neo.crear-masivo.urls-por-producto');
     Route::get('neo/crear-masivo/categorias', [NeoController::class, 'categoriasConNeoAniadidaNo'])->name('neo.crear-masivo.categorias');
@@ -666,6 +672,7 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
         Route::get('imagenes/listar', [App\Http\Controllers\ImagenController::class, 'listar'])->name('imagenes.listar');
         Route::delete('imagenes/eliminar', [App\Http\Controllers\ImagenController::class, 'eliminar'])->name('imagenes.eliminar');
         Route::get('imagenes/carpetas', [App\Http\Controllers\ImagenController::class, 'carpetasDisponibles'])->name('imagenes.carpetas');
+        Route::get('imagenes/ultimas-globales', [App\Http\Controllers\ImagenController::class, 'ultimasGlobales'])->name('imagenes.ultimas-globales');
         Route::get('imagenes/proxy', [App\Http\Controllers\ImagenController::class, 'servirImagenProxy'])->name('imagenes.proxy');
         Route::post('imagenes/descargar-url', [App\Http\Controllers\ImagenController::class, 'descargarDesdeUrl'])->name('imagenes.descargar-url');
         Route::post('imagenes/procesar-recorte', [App\Http\Controllers\ImagenController::class, 'procesarRecorte'])->name('imagenes.procesar-recorte');
@@ -708,6 +715,7 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
     Route::post('productos/buscar-relacionados', [ProductoController::class, 'buscarRelacionados']);
     Route::get('productos/buscar/categorias', [ProductoController::class, 'buscarCategorias'])->name('admin.productos.buscar.categorias');
     Route::get('productos/categoria/{categoria}/especificaciones-internas', [ProductoController::class, 'obtenerEspecificacionesInternas'])->name('admin.productos.categoria.especificaciones-internas');
+    Route::put('productos/categoria/{categoria}/especificaciones-internas', [ProductoController::class, 'actualizarEspecificacionesInternasCategoria'])->name('admin.productos.categoria.especificaciones-internas.actualizar');
     Route::get('productos/categoria/{categoria}/palabras-clave-relacionadas', [ProductoController::class, 'obtenerPalabrasClaveRelacionadas'])->name('admin.productos.categoria.palabras-clave-relacionadas');
     Route::get('productos/categoria/{categoria}/palabra-clave/{palabraClave}/productos', [ProductoController::class, 'obtenerProductosPorPalabraClave'])->name('admin.productos.categoria.palabra-clave.productos');
     Route::get('productos/{producto}', [ProductoController::class, 'obtenerProducto'])->name('admin.productos.obtener');

@@ -2,8 +2,9 @@
 
 namespace App\Services;
 
-use App\Models\Producto;
 use App\Http\Controllers\DescuentosController;
+use App\Models\OfertaProducto;
+use App\Models\Producto;
 use App\Services\CalcularPrecioUnidad;
 
 class SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos
@@ -277,6 +278,109 @@ class SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos
         $ofertas = $ofertas->sortBy('precio_unidad')->values();
         
         return $ofertas;
+    }
+
+    /**
+     * Aplica a una oferta concreta la misma lógica de precios usada al mostrar ofertas.
+     * Devuelve una copia modificada en memoria; no guarda cambios en la base de datos.
+     */
+    public function aplicarDescuentosEnvioYRecalcularPrecioUnidadAOferta(OfertaProducto $oferta, Producto $producto): OfertaProducto
+    {
+        $ofertaParaCalculo = clone $oferta;
+
+        if ($oferta->relationLoaded('tienda') && $oferta->tienda) {
+            $ofertaParaCalculo->setRelation('tienda', $oferta->tienda);
+        }
+
+        $ofertas = collect([$ofertaParaCalculo]);
+        $ofertas = $this->aplicarChollosTiendaActivos($ofertas);
+
+        $descuentosController = new DescuentosController();
+        $ofertas = $descuentosController->aplicarDescuentosYOrdenar($ofertas);
+
+        $ofertas = $this->aplicarEnvioYRecalcularPrecioUnidad($ofertas, $producto);
+
+        return $ofertas->first();
+    }
+
+    /**
+     * Añade a las ofertas los cupones de chollos de tienda activos, sin guardar cambios.
+     */
+    private function aplicarChollosTiendaActivos($ofertas)
+    {
+        $chollosTienda = \App\Models\Chollo::where('tipo', 'tienda')
+            ->where('finalizada', 'no')
+            ->where('mostrar', 'si')
+            ->where('fecha_inicio', '<=', now())
+            ->where(function($query) {
+                $query->whereNull('fecha_final')
+                      ->orWhere('fecha_final', '>=', now());
+            })
+            ->orderBy('created_at', 'desc')
+            ->orderBy('id', 'desc')
+            ->get();
+
+        if ($chollosTienda->isEmpty()) {
+            return $ofertas;
+        }
+
+        $chollosPorTienda = [];
+        foreach ($chollosTienda as $cholloTienda) {
+            $tiendaId = $cholloTienda->tienda_id;
+            if (!isset($chollosPorTienda[$tiendaId])) {
+                $chollosPorTienda[$tiendaId] = $cholloTienda;
+            }
+        }
+
+        return $ofertas->map(function($oferta) use ($chollosPorTienda) {
+            $ofertaTiendaId = $oferta->tienda_id ?? ($oferta->getAttribute('tienda_id') ?? null);
+
+            if (!$ofertaTiendaId || !isset($chollosPorTienda[$ofertaTiendaId])) {
+                return $oferta;
+            }
+
+            $descuentosActual = $oferta->descuentos ?? ($oferta->getAttribute('descuentos') ?? null);
+            if (!empty($descuentosActual)) {
+                return $oferta;
+            }
+
+            $cholloTienda = $chollosPorTienda[$ofertaTiendaId];
+            $descripcionInterna = json_decode($cholloTienda->descripcion_interna, true);
+            $cupones = $descripcionInterna['cupones'] ?? [];
+            $tipoChollo = $descripcionInterna['tipo'] ?? 'cupon';
+
+            if (empty($cupones)) {
+                return $oferta;
+            }
+
+            if ($tipoChollo === '1_solo_cupon') {
+                $cupon = $cupones[0] ?? null;
+                if ($cupon && isset($cupon['descuento']) && isset($cupon['cupon'])) {
+                    $tipoDescuento = $cupon['tipo_descuento'] ?? 'euros';
+                    $descuentosInfo = "CholloTienda1SoloCuponQueAplicaDescuento;tienda_id;{$cholloTienda->tienda_id};descuento;{$cupon['descuento']};tipo_descuento;{$tipoDescuento};cupon;{$cupon['cupon']}";
+                    $oferta->descuentos = $descuentosInfo;
+                    $oferta->setAttribute('descuentos', $descuentosInfo);
+                }
+            } else {
+                $descuentosInfo = "CholloTienda;tienda_id;{$cholloTienda->tienda_id}";
+
+                foreach ($cupones as $cupon) {
+                    if (isset($cupon['descuento']) && isset($cupon['sobrePrecioTotal']) && isset($cupon['cupon'])) {
+                        $descuentosInfo .= ";descuento;{$cupon['descuento']};sobrePrecioTotal;{$cupon['sobrePrecioTotal']};cupon;{$cupon['cupon']}";
+                    }
+                }
+
+                $oferta->descuentos = $descuentosInfo;
+                $oferta->setAttribute('descuentos', $descuentosInfo);
+            }
+
+            if (!isset($oferta->tienda_id)) {
+                $oferta->tienda_id = $ofertaTiendaId;
+                $oferta->setAttribute('tienda_id', $ofertaTiendaId);
+            }
+
+            return $oferta;
+        })->values();
     }
 
     /**

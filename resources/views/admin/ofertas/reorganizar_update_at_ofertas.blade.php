@@ -21,24 +21,39 @@
                     Reorganizar Update_at de Ofertas
                 </h1>
                 <p class="text-gray-600 dark:text-gray-400">
-                    Esta herramienta reorganiza las horas de actualización de las ofertas de una tienda específica,
+                    Esta herramienta reorganiza las horas de actualización de las ofertas,
                     distribuyéndolas uniformemente entre las 8:00 y las 23:00 horas, manteniendo el mismo día que tenían originalmente.
+                    Puedes hacerlo para una tienda concreta o para todas a la vez.
                 </p>
             </div>
 
-            {{-- Selector de tienda --}}
-            <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                <label for="tienda-select" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Seleccionar Tienda
-                </label>
-                <select id="tienda-select" class="w-full px-4 py-2 rounded bg-white dark:bg-gray-800 text-gray-800 dark:text-white border border-gray-300 dark:border-gray-600">
-                    <option value="">Selecciona una tienda...</option>
-                    @foreach($tiendas as $tienda)
-                        <option value="{{ $tienda->id }}" data-ofertas="{{ $tienda->ofertas_count ?? 0 }}">
-                            {{ $tienda->nombre }} ({{ $tienda->ofertas_count ?? 0 }} ofertas)
-                        </option>
-                    @endforeach
-                </select>
+            {{-- Selector de tienda o reorganizar todas --}}
+            <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 space-y-4">
+                <div>
+                    <label for="tienda-select" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Seleccionar Tienda
+                    </label>
+                    <select id="tienda-select" class="w-full px-4 py-2 rounded bg-white dark:bg-gray-800 text-gray-800 dark:text-white border border-gray-300 dark:border-gray-600">
+                        <option value="">Selecciona una tienda...</option>
+                        @foreach($tiendas as $tienda)
+                            <option value="{{ $tienda->id }}" data-ofertas="{{ $tienda->ofertas_count ?? 0 }}">
+                                {{ $tienda->nombre }} ({{ $tienda->ofertas_count ?? 0 }} ofertas)
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="text-center">
+                    <span class="text-sm text-gray-500 dark:text-gray-400">— o —</span>
+                </div>
+                <div class="text-center">
+                    <button type="button" id="btn-reorganizar-todas"
+                        class="inline-flex items-center px-5 py-2.5 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                        Reorganizar todas las tiendas
+                    </button>
+                </div>
             </div>
 
             {{-- Información de la tienda seleccionada --}}
@@ -51,6 +66,45 @@
                     <div class="text-right">
                         <p class="text-2xl font-bold text-blue-900 dark:text-blue-100" id="total-ofertas">0</p>
                         <p class="text-sm text-blue-700 dark:text-blue-300">ofertas</p>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Filtros de tiendas (solo modo general) --}}
+            <div id="filtros-tiendas" class="hidden bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">🏪 Filtros de tiendas</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <p class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Mostrar tienda</p>
+                        <div class="flex items-center gap-4">
+                            <label class="inline-flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" id="filtro_mostrar_si" checked
+                                    class="rounded text-indigo-600 focus:ring-indigo-500">
+                                <span class="text-sm text-gray-700 dark:text-gray-300">Sí</span>
+                            </label>
+                            <label class="inline-flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" id="filtro_mostrar_no"
+                                    class="rounded text-indigo-600 focus:ring-indigo-500">
+                                <span class="text-sm text-gray-700 dark:text-gray-300">No</span>
+                            </label>
+                        </div>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Puedes marcar uno o ambos</p>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Scraping</p>
+                        <div class="flex items-center gap-4">
+                            <label class="inline-flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" id="filtro_scrapear_si" checked
+                                    class="rounded text-indigo-600 focus:ring-indigo-500">
+                                <span class="text-sm text-gray-700 dark:text-gray-300">Sí</span>
+                            </label>
+                            <label class="inline-flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" id="filtro_scrapear_no"
+                                    class="rounded text-indigo-600 focus:ring-indigo-500">
+                                <span class="text-sm text-gray-700 dark:text-gray-300">No</span>
+                            </label>
+                        </div>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Puedes marcar uno o ambos</p>
                     </div>
                 </div>
             </div>
@@ -176,104 +230,188 @@
         document.addEventListener('DOMContentLoaded', function() {
             const tiendaSelect = document.getElementById('tienda-select');
             const tiendaInfo = document.getElementById('tienda-info');
+            const filtrosTiendas = document.getElementById('filtros-tiendas');
+            const btnReorganizarTodas = document.getElementById('btn-reorganizar-todas');
             const btnEjecutar = document.getElementById('btn-ejecutar');
             const progresoContainer = document.getElementById('progreso-container');
             const resultados = document.getElementById('resultados');
             const logContainer = document.getElementById('log-container');
-            
-            // Variables para las gráficas
+
             let graficaAntes = null;
             let graficaDespues = null;
+            let modoActual = null;
 
-            // Manejar selección de tienda
+            function obtenerFiltros() {
+                return {
+                    mostrar_si: document.getElementById('filtro_mostrar_si').checked,
+                    mostrar_no: document.getElementById('filtro_mostrar_no').checked,
+                    scrapear_si: document.getElementById('filtro_scrapear_si').checked,
+                    scrapear_no: document.getElementById('filtro_scrapear_no').checked,
+                };
+            }
+
+            function filtrosValidos(filtros) {
+                return (filtros.mostrar_si || filtros.mostrar_no) && (filtros.scrapear_si || filtros.scrapear_no);
+            }
+
+            function textoFiltrosActivos(filtros) {
+                const mostrar = [];
+                if (filtros.mostrar_si) mostrar.push('sí');
+                if (filtros.mostrar_no) mostrar.push('no');
+                const scrapear = [];
+                if (filtros.scrapear_si) scrapear.push('sí');
+                if (filtros.scrapear_no) scrapear.push('no');
+                return `Mostrar: ${mostrar.join(' + ') || 'ninguno'} · Scraping: ${scrapear.join(' + ') || 'ninguno'}`;
+            }
+
+            function ocultarPaneles() {
+                tiendaInfo.classList.add('hidden');
+                filtrosTiendas.classList.add('hidden');
+                document.getElementById('configuracion-horarios').classList.add('hidden');
+                document.getElementById('grafica-antes-container').classList.add('hidden');
+                document.getElementById('grafica-despues-container').classList.add('hidden');
+                btnEjecutar.disabled = true;
+                btnReorganizarTodas.classList.remove('ring-2', 'ring-indigo-500');
+            }
+
+            function limpiarResultados() {
+                resultados.classList.add('hidden');
+                logContainer.classList.add('hidden');
+                progresoContainer.classList.add('hidden');
+                document.getElementById('grafica-despues-container').classList.add('hidden');
+                const horariosInfo = resultados.querySelector('.horarios-info-extra');
+                if (horariosInfo) {
+                    horariosInfo.remove();
+                }
+            }
+
+            function activarModoTienda(selectedOption, tiendaId, ofertasCount) {
+                modoActual = 'tienda';
+                limpiarResultados();
+                btnReorganizarTodas.classList.remove('ring-2', 'ring-indigo-500');
+                filtrosTiendas.classList.add('hidden');
+
+                document.getElementById('tienda-nombre').textContent = selectedOption.textContent.split(' (')[0];
+                document.getElementById('tienda-details').textContent = 'Reorganización de una tienda concreta';
+                document.getElementById('total-ofertas').textContent = ofertasCount;
+                tiendaInfo.classList.remove('hidden');
+                document.getElementById('configuracion-horarios').classList.remove('hidden');
+                btnEjecutar.disabled = ofertasCount === 0;
+
+                cargarDistribucionActual(tiendaId);
+            }
+
+            function activarModoTodas() {
+                modoActual = 'todas';
+                limpiarResultados();
+                tiendaSelect.value = '';
+                btnReorganizarTodas.classList.add('ring-2', 'ring-indigo-500');
+
+                document.getElementById('tienda-nombre').textContent = 'Todas las tiendas';
+                document.getElementById('tienda-details').textContent = 'Reorganización general con filtros configurables';
+                tiendaInfo.classList.remove('hidden');
+                filtrosTiendas.classList.remove('hidden');
+                document.getElementById('configuracion-horarios').classList.remove('hidden');
+
+                cargarDistribucionActual(null);
+            }
+
             tiendaSelect.addEventListener('change', function() {
                 const selectedOption = this.options[this.selectedIndex];
                 const tiendaId = this.value;
                 const ofertasCount = parseInt(selectedOption.dataset.ofertas) || 0;
 
                 if (tiendaId) {
-                    document.getElementById('tienda-nombre').textContent = selectedOption.textContent.split(' (')[0];
-                    document.getElementById('tienda-details').textContent = `API: ${selectedOption.dataset.api || 'No especificada'}`;
-                    document.getElementById('total-ofertas').textContent = ofertasCount;
-                    tiendaInfo.classList.remove('hidden');
-                    document.getElementById('configuracion-horarios').classList.remove('hidden');
-                    btnEjecutar.disabled = ofertasCount === 0;
-                    
-                    // Cargar y mostrar la gráfica de distribución actual
-                    cargarDistribucionActual(tiendaId);
-                } else {
-                    tiendaInfo.classList.add('hidden');
-                    document.getElementById('configuracion-horarios').classList.add('hidden');
-                    document.getElementById('grafica-antes-container').classList.add('hidden');
-                    btnEjecutar.disabled = true;
+                    activarModoTienda(selectedOption, tiendaId, ofertasCount);
+                } else if (modoActual !== 'todas') {
+                    modoActual = null;
+                    ocultarPaneles();
+                    limpiarResultados();
                 }
             });
 
-            // Manejar ejecución
-            btnEjecutar.addEventListener('click', function() {
-                const tiendaId = tiendaSelect.value;
-                if (!tiendaId) return;
+            btnReorganizarTodas.addEventListener('click', function() {
+                activarModoTodas();
+            });
 
-                // Deshabilitar controles
+            document.querySelectorAll('#filtros-tiendas input[type="checkbox"]').forEach(function(input) {
+                input.addEventListener('change', function() {
+                    if (modoActual === 'todas') {
+                        limpiarResultados();
+                        cargarDistribucionActual(null);
+                    }
+                });
+            });
+
+            btnEjecutar.addEventListener('click', function() {
+                if (!modoActual) return;
+
+                const tiendaId = modoActual === 'tienda' ? tiendaSelect.value : null;
+                if (modoActual === 'tienda' && !tiendaId) return;
+
+                const filtros = obtenerFiltros();
+                if (modoActual === 'todas' && !filtrosValidos(filtros)) {
+                    mostrarNotificacion('Selecciona al menos una opción en cada filtro', 'error');
+                    return;
+                }
+
                 btnEjecutar.disabled = true;
                 tiendaSelect.disabled = true;
+                btnReorganizarTodas.disabled = true;
+                document.querySelectorAll('#filtros-tiendas input[type="checkbox"]').forEach(function(el) {
+                    el.disabled = true;
+                });
+
+                limpiarResultados();
                 progresoContainer.classList.remove('hidden');
-                resultados.classList.add('hidden');
-                logContainer.classList.add('hidden');
+                actualizarProgreso(0, modoActual === 'todas' ? 'Iniciando reorganización de todas las tiendas...' : 'Iniciando reorganización...');
 
-                // Iniciar progreso
-                actualizarProgreso(0, 'Iniciando reorganización...');
-
-                // Obtener horas personalizadas
                 const horaInicio = document.getElementById('hora-inicio').value;
                 const horaFin = document.getElementById('hora-fin').value;
+                const payload = {
+                    hora_inicio: parseInt(horaInicio),
+                    hora_fin: parseInt(horaFin),
+                    ...obtenerFiltros(),
+                };
 
-                // Ejecutar reorganización
+                if (tiendaId) {
+                    payload.tienda_id = tiendaId;
+                }
+
                 fetch('{{ route("admin.ofertas.reorganizar.update-at.ejecutar") }}', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                     },
-                    body: JSON.stringify({
-                        tienda_id: tiendaId,
-                        hora_inicio: parseInt(horaInicio),
-                        hora_fin: parseInt(horaFin)
-                    })
+                    body: JSON.stringify(payload)
                 })
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'ok') {
-                        // Mostrar resultados
                         document.getElementById('total-procesadas').textContent = data.total_ofertas;
                         document.getElementById('actualizadas').textContent = data.actualizadas;
                         document.getElementById('errores').textContent = data.errores;
-                        
-                        // Mostrar información de horarios utilizados
+
                         const horariosInfo = document.createElement('div');
-                        horariosInfo.className = 'mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg';
-                        horariosInfo.innerHTML = `
-                            <p class="text-sm text-blue-700 dark:text-blue-300">
-                                <strong>⏰ Horarios utilizados:</strong> ${data.hora_inicio}:00 - ${data.hora_fin}:59
-                            </p>
-                        `;
-                        document.getElementById('resultados').appendChild(horariosInfo);
-                        
-                        // Mostrar log
-                        mostrarLog(data.log);
-                        
-                        // Completar progreso
+                        horariosInfo.className = 'horarios-info-extra mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg';
+                        let extraInfo = `<strong>⏰ Horarios utilizados:</strong> ${data.hora_inicio}:00 - ${data.hora_fin}:59`;
+                        if (data.modo === 'todas') {
+                            extraInfo += `<br><strong>🏪 Tiendas procesadas:</strong> ${data.tiendas_procesadas}`;
+                        }
+                        horariosInfo.innerHTML = `<p class="text-sm text-blue-700 dark:text-blue-300">${extraInfo}</p>`;
+                        resultados.appendChild(horariosInfo);
+
+                        mostrarLog(data.log, data.modo);
                         actualizarProgreso(100, 'Reorganización completada');
-                        
-                        // Mostrar resultados
                         resultados.classList.remove('hidden');
                         logContainer.classList.remove('hidden');
-                        
-                        // Cargar y mostrar la gráfica DESPUÉS de la reorganización
                         cargarDistribucionDespues(tiendaId);
-                        
-                        // Mostrar notificación
-                        mostrarNotificacion(`Reorganización completada: ${data.actualizadas} ofertas actualizadas`, 'success');
+
+                        const mensaje = data.modo === 'todas'
+                            ? `Reorganización completada: ${data.actualizadas} ofertas en ${data.tiendas_procesadas} tiendas`
+                            : `Reorganización completada: ${data.actualizadas} ofertas actualizadas`;
+                        mostrarNotificacion(mensaje, 'success');
                     } else {
                         actualizarProgreso(0, 'Error: ' + data.message);
                         mostrarNotificacion('Error: ' + data.message, 'error');
@@ -285,9 +423,17 @@
                     mostrarNotificacion('Error de conexión', 'error');
                 })
                 .finally(() => {
-                    // Rehabilitar controles
-                    btnEjecutar.disabled = false;
+                    btnReorganizarTodas.disabled = false;
                     tiendaSelect.disabled = false;
+                    document.querySelectorAll('#filtros-tiendas input[type="checkbox"]').forEach(function(el) {
+                        el.disabled = false;
+                    });
+                    if (modoActual === 'tienda') {
+                        const ofertasCount = parseInt(tiendaSelect.options[tiendaSelect.selectedIndex]?.dataset.ofertas) || 0;
+                        btnEjecutar.disabled = ofertasCount === 0;
+                    } else if (modoActual === 'todas') {
+                        btnEjecutar.disabled = false;
+                    }
                 });
             });
 
@@ -297,23 +443,33 @@
                 document.getElementById('progreso-porcentaje').textContent = Math.round(porcentaje) + '%';
             }
 
-            function mostrarLog(log) {
+            function mostrarLog(log, modo = 'tienda') {
                 const logContent = document.getElementById('log-content');
                 logContent.innerHTML = '';
-                
-                log.forEach((item, index) => {
+
+                log.forEach((item) => {
                     const div = document.createElement('div');
                     div.className = 'mb-1';
-                    
-                    if (item.status === 'actualizada') {
+
+                    if (item.status === 'tienda') {
+                        div.innerHTML = `<span class="text-blue-400">🏪</span> ${item.tienda}: ${item.actualizadas}/${item.total_ofertas} actualizadas` +
+                            (item.errores > 0 ? ` <span class="text-red-400">(${item.errores} errores)</span>` : '');
+                    } else if (item.status === 'actualizada') {
                         const fechaOriginal = item.fecha_original || 'Fecha no disponible';
-                        div.innerHTML = `<span class="text-green-400">✓</span> Oferta ${item.oferta_id} (${item.producto}) - Original: ${fechaOriginal} → Nueva: ${item.nueva_fecha}</span>`;
+                        div.innerHTML = `<span class="text-green-400">✓</span> Oferta ${item.oferta_id} (${item.producto}) - Original: ${fechaOriginal} → Nueva: ${item.nueva_fecha}`;
                     } else if (item.status === 'error') {
-                        div.innerHTML = `<span class="text-red-400">✗</span> Error en oferta ${item.oferta_id} (${item.producto}): ${item.error}</span>`;
+                        div.innerHTML = `<span class="text-red-400">✗</span> Error en oferta ${item.oferta_id} (${item.producto}): ${item.error}`;
                     }
-                    
+
                     logContent.appendChild(div);
                 });
+
+                if (modo === 'todas') {
+                    const resumen = document.createElement('div');
+                    resumen.className = 'mt-2 pt-2 border-t border-gray-700 text-gray-400 text-xs';
+                    resumen.textContent = 'Resumen por tienda (detalle individual omitido en modo general).';
+                    logContent.appendChild(resumen);
+                }
             }
 
             function mostrarNotificacion(mensaje, tipo = 'info') {
@@ -334,23 +490,42 @@
                 }, 5000);
             }
 
-            // Función para cargar la distribución actual de ofertas
             function cargarDistribucionActual(tiendaId) {
+                const payload = { ...obtenerFiltros() };
+                if (tiendaId) {
+                    payload.tienda_id = tiendaId;
+                } else if (!filtrosValidos(payload)) {
+                    document.getElementById('total-ofertas').textContent = '0';
+                    document.getElementById('tienda-details').textContent = 'Selecciona al menos una opción en cada filtro';
+                    mostrarGraficaAntes({}, 0);
+                    document.getElementById('grafica-antes-container').classList.remove('hidden');
+                    btnEjecutar.disabled = true;
+                    return;
+                }
+
                 fetch('{{ route("admin.ofertas.reorganizar.update-at.distribucion") }}', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                     },
-                    body: JSON.stringify({ tienda_id: tiendaId })
+                    body: JSON.stringify(payload)
                 })
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'ok') {
+                        document.getElementById('total-ofertas').textContent = data.total_ofertas;
+                        if (modoActual === 'todas' && data.total_tiendas !== undefined) {
+                            document.getElementById('tienda-details').textContent =
+                                `${data.total_tiendas} tiendas · ${textoFiltrosActivos(payload)}`;
+                        }
                         mostrarGraficaAntes(data.distribucion, data.total_ofertas);
                         document.getElementById('grafica-antes-container').classList.remove('hidden');
+                        btnEjecutar.disabled = data.total_ofertas === 0;
                     } else {
                         console.error('Error al cargar distribución:', data.message);
+                        mostrarNotificacion(data.message, 'error');
+                        btnEjecutar.disabled = true;
                     }
                 })
                 .catch(error => {
@@ -358,15 +533,19 @@
                 });
             }
 
-            // Función para cargar la distribución después de la reorganización
             function cargarDistribucionDespues(tiendaId) {
+                const payload = { ...obtenerFiltros() };
+                if (tiendaId) {
+                    payload.tienda_id = tiendaId;
+                }
+
                 fetch('{{ route("admin.ofertas.reorganizar.update-at.distribucion-despues") }}', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                     },
-                    body: JSON.stringify({ tienda_id: tiendaId })
+                    body: JSON.stringify(payload)
                 })
                 .then(response => response.json())
                 .then(data => {

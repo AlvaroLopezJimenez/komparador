@@ -97,11 +97,17 @@ class UsersController extends Controller
             $query->where('user_id', $usuarioId);
         }
         
+        $productosCreados = (clone $query)->where('action_type', UserActivity::ACTION_PRODUCTO_CREADO)->count();
+        $ofertasCreadas = (clone $query)->where('action_type', UserActivity::ACTION_OFERTA_CREADA)->count();
+        $diasEnRango = max(1, Carbon::parse($fechaDesde)->diffInDays(Carbon::parse($fechaHasta)) + 1);
+
         return [
-            'productos_creados' => (clone $query)->where('action_type', UserActivity::ACTION_PRODUCTO_CREADO)->count(),
+            'productos_creados' => $productosCreados,
             'productos_modificados' => (clone $query)->where('action_type', UserActivity::ACTION_PRODUCTO_MODIFICADO)->count(),
-            'ofertas_creadas' => (clone $query)->where('action_type', UserActivity::ACTION_OFERTA_CREADA)->count(),
+            'ofertas_creadas' => $ofertasCreadas,
             'ofertas_modificadas' => (clone $query)->where('action_type', UserActivity::ACTION_OFERTA_MODIFICADA)->count(),
+            'media_productos_dia' => round($productosCreados / $diasEnRango, 1),
+            'media_ofertas_dia' => round($ofertasCreadas / $diasEnRango, 1),
         ];
     }
     

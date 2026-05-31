@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers\Scraping\Tiendas;
 
+use App\Http\Controllers\Scraping\PeticionApiHTMLController;
 use App\Http\Controllers\Scraping\Tiendas\PlantillaTiendaController;
-use Illuminate\Support\Facades\DB;
 use App\Models\OfertaProducto;
+use Illuminate\Support\Facades\DB;
 
 class PccomponentesController extends PlantillaTiendaController
 {
@@ -128,24 +129,244 @@ class PccomponentesController extends PlantillaTiendaController
     }
 
     /**
-     * Extrae URLs de productos desde el contenido del sitemap (etiquetas <loc>).
-     * El contenido puede ser XML de sitemap estándar con <url><loc>...</loc></url>.
+     * Extrae URLs de productos desde sitemap XML (urlset con &lt;loc&gt;, con o sin namespace).
      *
-     * @param string $contenidoSitemap Contenido crudo del sitemap (XML/HTML)
-     * @return string[] URLs de productos
+     * @param string $contenidoSitemap Contenido crudo del sitemap (XML)
+     * @return string[] URLs de fichas de producto en pccomponentes.com
      */
     public function urlsProductosDesdeSitemap(string $contenidoSitemap): array
     {
+        $contenido = $this->normalizarContenidoSitemapPccomponentes($contenidoSitemap);
+        $todasLasLocs = $this->extraerTodasLasLocsSitemapPccomponentes($contenido);
+
+        $productos = array_values(array_filter(
+            $todasLasLocs,
+            fn (string $u) => $this->esUrlProductoPccomponentesDesdeSitemap($u)
+        ));
+
+        if ($productos !== []) {
+            return $productos;
+        }
+
+        return $this->urlsProductosDesdeSubSitemapsPccomponentes($todasLasLocs, null);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function extraerTodasLasLocsSitemapPccomponentes(string $contenido): array
+    {
+        $urls = $this->urlsLocDesdeSitemapXmlPccomponentes($contenido);
+        if ($urls === []) {
+            $urls = $this->urlsLocDesdeSitemapRegexPccomponentes($contenido);
+        }
+
+        return array_values(array_unique(array_filter(array_map('trim', $urls))));
+    }
+
+    /**
+     * Si el índice solo enlaza .xml hijos, descarga cada sub-sitemap y extrae productos.
+     *
+     * @param array<int, string> $locs
+     * @return array<int, string>
+     */
+    private function urlsProductosDesdeSubSitemapsPccomponentes(array $locs, ?string $apiTienda): array
+    {
+        $subSitemaps = array_values(array_filter($locs, fn (string $u) => $this->esUrlSubSitemapPccomponentes($u)));
+        if ($subSitemaps === []) {
+            return [];
+        }
+
+        $apiHTML = $this->apiHTML ?? app(PeticionApiHTMLController::class);
+        $productos = [];
+        $maxSubSitemaps = 20;
+
+        foreach (array_slice($subSitemaps, 0, $maxSubSitemaps) as $urlSub) {
+            $resultado = $apiHTML->obtenerHTML($urlSub, null, $apiTienda);
+            if (empty($resultado['success']) || empty($resultado['html'])) {
+                continue;
+            }
+            $productos = array_merge(
+                $productos,
+                $this->urlsProductosDesdeSitemap((string) $resultado['html'])
+            );
+        }
+
+        return array_values(array_unique($productos));
+    }
+
+    private function esUrlSubSitemapPccomponentes(string $url): bool
+    {
+        if (!$this->esUrlProductoPccomponentesDesdeSitemap($url)) {
+            $path = (string) (parse_url($url, PHP_URL_PATH) ?? '');
+            if (preg_match('/\.xml$/iu', $path) && preg_match('/(?:^|\.)pccomponentes\.com$/iu', (string) parse_url($url, PHP_URL_HOST))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function normalizarContenidoSitemapPccomponentes(string $contenido): string
+    {
+        $contenido = html_entity_decode($contenido, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $contenido = preg_replace('/^\xEF\xBB\xBF/', '', $contenido) ?? $contenido;
+        $contenido = preg_replace('/<!--\s*PROVEEDOR:[\s\S]*?-->\s*/iu', '', $contenido, 1) ?? $contenido;
+
+        return trim($contenido);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function urlsLocDesdeSitemapXmlPccomponentes(string $contenido): array
+    {
+        $prev = libxml_use_internal_errors(true);
+        $xml = @simplexml_load_string($contenido, 'SimpleXMLElement', LIBXML_NOERROR | LIBXML_NOWARNING);
+        libxml_clear_errors();
+        libxml_use_internal_errors($prev);
+
+        if ($xml === false) {
+            return [];
+        }
+
         $urls = [];
-        if (preg_match_all('/<loc>\s*([^<]+)\s*<\/loc>/i', $contenidoSitemap, $matches)) {
+        $this->recolectarLocsSitemapXml($xml, $urls);
+
+        foreach ($xml->getNamespaces(true) as $nsUri) {
+            if ($nsUri === '' || !is_string($nsUri)) {
+                continue;
+            }
+            $this->recolectarLocsSitemapXml($xml->children($nsUri), $urls);
+        }
+
+        return $urls;
+    }
+
+    /**
+     * @param array<int, string> $urls
+     */
+    private function recolectarLocsSitemapXml(\SimpleXMLElement $nodo, array &$urls): void
+    {
+        foreach ($nodo->url ?? [] as $urlNodo) {
+            $loc = trim((string) ($urlNodo->loc ?? ''));
+            if ($loc !== '') {
+                $urls[] = $loc;
+            }
+        }
+
+        foreach ($nodo->sitemap ?? [] as $sitemapNodo) {
+            $loc = trim((string) ($sitemapNodo->loc ?? ''));
+            if ($loc !== '') {
+                $urls[] = $loc;
+            }
+        }
+
+        foreach ($nodo->getNamespaces(true) as $nsUri) {
+            if ($nsUri === '' || !is_string($nsUri)) {
+                continue;
+            }
+            $hijos = $nodo->children($nsUri);
+            foreach ($hijos->url ?? [] as $urlNodo) {
+                $loc = trim((string) ($urlNodo->loc ?? ''));
+                if ($loc !== '') {
+                    $urls[] = $loc;
+                }
+            }
+            foreach ($hijos->sitemap ?? [] as $sitemapNodo) {
+                $loc = trim((string) ($sitemapNodo->loc ?? ''));
+                if ($loc !== '') {
+                    $urls[] = $loc;
+                }
+            }
+        }
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function urlsLocDesdeSitemapRegexPccomponentes(string $contenido): array
+    {
+        $urls = [];
+
+        if (preg_match_all('/<(?:[\w.-]+:)?loc\b[^>]*>\s*([^<]+?)\s*<\/(?:[\w.-]+:)?loc>/iu', $contenido, $matches)) {
             foreach ($matches[1] as $url) {
-                $url = trim($url);
+                $url = trim(html_entity_decode($url, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
                 if ($url !== '') {
                     $urls[] = $url;
                 }
             }
         }
+
+        if ($urls === [] && preg_match_all(
+            '#https?://(?:www\.)?pccomponentes\.com/[a-z0-9][a-z0-9/-]*#iu',
+            $contenido,
+            $m2
+        )) {
+            foreach ($m2[0] as $url) {
+                $urls[] = trim($url);
+            }
+        }
+
         return $urls;
+    }
+
+    /**
+     * URL de ficha en pccomponentes.com (cualquier categoría).
+     * Los sitemaps de categoría solo incluyen productos en &lt;loc&gt;; aquí se excluyen
+     * sub-sitemaps .xml y secciones genéricas de la web (blog, carrito, etc.), no slugs de categoría.
+     */
+    private function esUrlProductoPccomponentesDesdeSitemap(string $url): bool
+    {
+        $partes = parse_url($url);
+        if ($partes === false || empty($partes['host'])) {
+            return false;
+        }
+
+        if (!preg_match('/(?:^|\.)pccomponentes\.com$/iu', (string) $partes['host'])) {
+            return false;
+        }
+
+        if (!empty($partes['query']) || !empty($partes['fragment'])) {
+            return false;
+        }
+
+        $path = rtrim((string) ($partes['path'] ?? ''), '/');
+        if ($path === '' || $path === '/') {
+            return false;
+        }
+
+        if (preg_match('/\.xml$/iu', $path) || preg_match('/sitemap/iu', $path)) {
+            return false;
+        }
+
+        if (!preg_match('#^/(?:[a-z0-9][a-z0-9-]*)(?:/[a-z0-9][a-z0-9-]*)*$#iu', $path)) {
+            return false;
+        }
+
+        $pathLower = mb_strtolower($path, 'UTF-8');
+        $prefijosNoProducto = [
+            '/blog',
+            '/ayuda',
+            '/servicios',
+            '/carrito',
+            '/login',
+            '/cuenta',
+            '/usuario',
+            '/legal',
+            '/contacto',
+            '/empresa',
+            '/comunidad',
+            '/ofertas-especiales',
+        ];
+
+        foreach ($prefijosNoProducto as $prefijo) {
+            if ($pathLower === $prefijo || str_starts_with($pathLower, $prefijo . '/')) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
