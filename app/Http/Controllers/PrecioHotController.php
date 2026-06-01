@@ -357,6 +357,26 @@ class PrecioHotController extends Controller
                 continue;
             }
 
+            $diasRachaPrecioBajo = HistoricoPrecioProducto::diasConsecutivosPrecioActualAntesDeHoy(
+                $producto->id,
+                null,
+                $precioOferta
+            );
+            if ($diasRachaPrecioBajo > HistoricoPrecioProducto::DIAS_RACHA_OFERTA_PASADA_HOT) {
+                Producto::where('id', $producto->id)->update(['rebajado' => null]);
+                $this->registrarMuestraDepuracion('general_oferta_pasada_racha', [
+                    'producto_id' => $producto->id,
+                    'nombre' => $producto->nombre,
+                    'precio_minimo_historico' => round($precioMinimoHistorico, 3),
+                    'precio_oferta' => round($precioOferta, 3),
+                    'rebaja_pct' => round($diferencia, 2),
+                    'dias_racha_precio_bajo' => $diasRachaPrecioBajo,
+                    'umbral_dias' => HistoricoPrecioProducto::DIAS_RACHA_OFERTA_PASADA_HOT,
+                    'oferta_id' => $mejorOferta->id,
+                ]);
+                continue;
+            }
+
             $porcentajeRebajado = (int) round($diferencia);
             Producto::where('id', $producto->id)->update(['rebajado' => $porcentajeRebajado]);
 
@@ -535,6 +555,7 @@ class PrecioHotController extends Controller
                 'ventana' => 'últimos 3 meses',
                 'referencia' => 'mínimo de precio_minimo en histórico (excluye 0, hoy y racha de días previos con el mismo precio que la oferta actual)',
                 'rebaja_minima_pct' => HistoricoPrecioProducto::REBAJA_MINIMA_PCT_HOT,
+                'oferta_pasada_racha' => 'si el precio bajo lleva más de ' . HistoricoPrecioProducto::DIAS_RACHA_OFERTA_PASADA_HOT . ' días consecutivos (sin contar hoy), no entra en hot',
                 'precio_actual' => 'mejor oferta con descuentos/chollos',
                 'unidad_unica' => 'solo evalúa variantes marcadas como mostrar',
             ],
@@ -561,11 +582,13 @@ class PrecioHotController extends Controller
             '   · Rechazos general sin oferta: ' . ($c['rechazos_general_sin_oferta'] ?? 0),
             '   · Rechazos general precio > mínimo: ' . ($c['rechazos_general_precio_superior_al_minimo'] ?? 0),
             '   · Rechazos general rebaja <' . HistoricoPrecioProducto::REBAJA_MINIMA_PCT_HOT . '%: ' . ($c['rechazos_general_rebaja_menor_umbral'] ?? $c['rechazos_general_rebaja_menor_5'] ?? 0),
+            '   · Rechazos general oferta pasada (racha >' . HistoricoPrecioProducto::DIAS_RACHA_OFERTA_PASADA_HOT . ' días): ' . ($c['rechazos_general_oferta_pasada_racha'] ?? 0),
             '   · Variantes omitidas (no mostrar): ' . ($c['rechazos_spec_omitida_no_mostrar'] ?? 0),
             '   · Rechazos variante sin histórico 3m: ' . ($c['rechazos_spec_sin_historico_3m'] ?? 0),
             '   · Rechazos variante sin oferta: ' . ($c['rechazos_spec_sin_oferta'] ?? 0),
             '   · Rechazos variante precio > mínimo: ' . ($c['rechazos_spec_precio_superior_al_minimo'] ?? 0),
             '   · Rechazos variante rebaja <' . HistoricoPrecioProducto::REBAJA_MINIMA_PCT_HOT . '%: ' . ($c['rechazos_spec_rebaja_menor_umbral'] ?? $c['rechazos_spec_rebaja_menor_5'] ?? 0),
+            '   · Rechazos variante oferta pasada (racha >' . HistoricoPrecioProducto::DIAS_RACHA_OFERTA_PASADA_HOT . ' días): ' . ($c['rechazos_spec_oferta_pasada_racha'] ?? 0),
         ];
     }
 
@@ -783,6 +806,13 @@ class PrecioHotController extends Controller
                 $general['rebaja_pct'] = round($diferencia, 2);
                 if ($diferencia < HistoricoPrecioProducto::REBAJA_MINIMA_PCT_HOT) {
                     $general['motivo'] = 'rebaja_menor_umbral';
+                } elseif (HistoricoPrecioProducto::esOfertaPasadaDeModaParaHot($productoId, null, $precioOferta)) {
+                    $general['motivo'] = 'oferta_pasada_racha';
+                    $general['dias_racha_precio_bajo'] = HistoricoPrecioProducto::diasConsecutivosPrecioActualAntesDeHoy(
+                        $productoId,
+                        null,
+                        $precioOferta
+                    );
                 } elseif (!$mejorOferta->tienda) {
                     $general['motivo'] = 'sin_tienda';
                 } else {
@@ -925,6 +955,16 @@ class PrecioHotController extends Controller
 
         if ($diferencia < HistoricoPrecioProducto::REBAJA_MINIMA_PCT_HOT) {
             $resultado['motivo'] = 'rebaja_menor_umbral';
+            return $resultado;
+        }
+
+        if (HistoricoPrecioProducto::esOfertaPasadaDeModaParaHot($producto->id, $specId, $precioOferta)) {
+            $resultado['motivo'] = 'oferta_pasada_racha';
+            $resultado['dias_racha_precio_bajo'] = HistoricoPrecioProducto::diasConsecutivosPrecioActualAntesDeHoy(
+                $producto->id,
+                $specId,
+                $precioOferta
+            );
             return $resultado;
         }
 
@@ -1470,11 +1510,20 @@ class PrecioHotController extends Controller
                         'oferta_id' => $mejorOfertaEspecificacion->id,
                     ]);
                 }
+
+                $diasRachaPrecioBajoSpec = HistoricoPrecioProducto::diasConsecutivosPrecioActualAntesDeHoy(
+                    $producto->id,
+                    (string) $sublineaId,
+                    $precioOfertaEspecificacion
+                );
+                $ofertaPasadaDeModaSpec = $diasRachaPrecioBajoSpec > HistoricoPrecioProducto::DIAS_RACHA_OFERTA_PASADA_HOT;
                 
                 // Actualizar campo rebajado en especificaciones_busqueda
                 $umbralHot = HistoricoPrecioProducto::REBAJA_MINIMA_PCT_HOT;
                 $rebajado = 0;
-                if ($diferencia >= $umbralHot) {
+                if ($ofertaPasadaDeModaSpec) {
+                    $rebajado = 0;
+                } elseif ($diferencia >= $umbralHot) {
                     $rebajado = (int) round($diferencia);
                 } elseif ($diferencia > 0 && $diferencia < $umbralHot) {
                     $rebajado = 0;
@@ -1509,6 +1558,22 @@ class PrecioHotController extends Controller
                 }
                 
                 if ($diferencia >= HistoricoPrecioProducto::REBAJA_MINIMA_PCT_HOT) {
+                    if ($ofertaPasadaDeModaSpec) {
+                        $this->registrarMuestraDepuracion('spec_oferta_pasada_racha', [
+                            'producto_id' => $producto->id,
+                            'nombre' => $producto->nombre,
+                            'variante' => $sublineaTexto,
+                            'especificacion_id' => $sublineaId,
+                            'precio_minimo_historico' => round($precioMinimoHistoricoEspecificacion, 3),
+                            'precio_oferta' => round($precioOfertaEspecificacion, 3),
+                            'rebaja_pct' => round($diferencia, 2),
+                            'dias_racha_precio_bajo' => $diasRachaPrecioBajoSpec,
+                            'umbral_dias' => HistoricoPrecioProducto::DIAS_RACHA_OFERTA_PASADA_HOT,
+                            'oferta_id' => $mejorOfertaEspecificacion->id,
+                        ]);
+                        continue;
+                    }
+
                     $tienda = $mejorOfertaEspecificacion->tienda;
                     if (!$tienda) {
                         $this->registrarMuestraDepuracion('spec_sin_tienda', [

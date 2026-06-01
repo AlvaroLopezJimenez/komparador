@@ -22,11 +22,6 @@ if (!function_exists('_f1')) {
     }
 }
 
-// En home hay <x-listado-categorias-horizontal-head />: ocultamos el enlace «Categorías» del nav escritorio.
-// La hamburguesa se muestra en todas las vistas (incl. comparador/unidades).
-$rutaActual = request()->route();
-$esHome = $rutaActual && $rutaActual->getName() === 'home';
-$ocultarEnlaceCategoriasNav = $esHome;
 @endphp
 <header class="kk-header-wrap">
     <div class="kk-header-inner">
@@ -56,14 +51,11 @@ $ocultarEnlaceCategoriasNav = $esHome;
 
         <nav class="kk-nav-desktop">
             <a href="{{ _f1(route('home')) }}">Inicio</a>
-            <a href="{{ _f1(route('buscar', ['q' => 'precios hot'])) }}">🔥 Precios Hot</a>
-            <a href="{{ _f1(route('buscar', ['q' => 'más vendidos'])) }}">Vendidos</a>
-            @if(!$ocultarEnlaceCategoriasNav)
-            <a href="#" onclick="if(typeof window._ap1 === 'function') { window._ap1(); } return false;">Categorías</a>
-            @endif
+            <a href="{{ _f1(route('buscar', ['q' => 'precios hot'])) }}">🔥 En mínimos</a>
+            <a href="{{ _f1(route('buscar', ['q' => 'más vendidos'])) }}" class="kk-nav-vendidos"><span class="kk-nav-plus">+</span> Vendidos</a>
         </nav>
 
-        <button type="button" id="bm1" class="kk-menu-btn lg:hidden" aria-label="Abrir menú" aria-expanded="false" aria-controls="nm1">
+        <button type="button" id="bm1" class="kk-menu-btn" aria-label="Abrir categorías" aria-expanded="false" aria-controls="pc1">
             <svg class="kk-menu-btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
@@ -79,11 +71,9 @@ $ocultarEnlaceCategoriasNav = $esHome;
     <nav id="nm1" class="hidden kk-mobile-nav lg:hidden">
         <div class="kk-mobile-nav-inner">
             <a href="{{ _f1(route('home')) }}">Inicio</a>
-            <a href="{{ _f1(route('buscar', ['q' => 'precios hot'])) }}">🔥 Precios Hot</a>
+            <a href="{{ _f1(route('buscar', ['q' => 'precios hot'])) }}">🔥 En mínimos</a>
             <a href="{{ _f1(route('buscar', ['q' => 'más vendidos'])) }}" class="kk-mobile-nav-vendidos">
-                <svg class="kk-mobile-nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 4v16m8-8H4"></path>
-                </svg>
+                <span class="kk-nav-plus">+</span>
                 <span>Vendidos</span>
             </a>
         </div>
@@ -168,6 +158,15 @@ $ocultarEnlaceCategoriasNav = $esHome;
         white-space: nowrap;
     }
     .kk-nav-desktop a:hover { background: #fef3e7; color: #d16a0f; }
+    .kk-nav-plus {
+        color: #73b112;
+        font-weight: 800;
+    }
+    .kk-nav-desktop a:hover .kk-nav-plus,
+    .kk-mobile-nav-inner a:hover .kk-nav-plus {
+        color: #73b112;
+    }
+    .kk-nav-vendidos .kk-nav-plus { margin-right: .1rem; }
     .kk-menu-btn {
         flex-shrink: 0;
         margin-left: .25rem;
@@ -190,11 +189,11 @@ $ocultarEnlaceCategoriasNav = $esHome;
         align-items: center;
         gap: .5rem;
     }
-    .kk-mobile-nav-icon {
-        width: 1.25rem;
-        height: 1.25rem;
+    .kk-mobile-nav-vendidos .kk-nav-plus {
+        font-size: 1.15rem;
+        font-weight: 800;
+        line-height: 1;
         flex-shrink: 0;
-        color: #73b112;
     }
     .kk-mobile-nav-inner {
         max-width: 1200px;
@@ -291,8 +290,8 @@ $ocultarEnlaceCategoriasNav = $esHome;
         _bm1.addEventListener('click', function() {
             {{-- Si el panel de categorías está disponible, abrirlo (mismo comportamiento que la copia) --}}
             {{-- Si no, desplegar el nav móvil #nm1 --}}
-            if (typeof window._ap1 === 'function') {
-                window._ap1();
+            if (typeof window._pclAp1 === 'function') {
+                window._pclAp1();
             } else {
                 const _n1 = document.getElementById('nm1');
                 if (_n1) {

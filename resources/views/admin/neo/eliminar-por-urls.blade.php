@@ -117,9 +117,15 @@
                         },
                         body: JSON.stringify({ urls: textarea.value }),
                     });
-                    const data = await res.json();
+                    let data;
+                    try {
+                        data = await res.json();
+                    } catch (parseErr) {
+                        mostrarMensaje('Error del servidor (código ' + res.status + '). Revisa el log de Laravel.', true);
+                        return;
+                    }
                     if (!res.ok) {
-                        mostrarMensaje(data.message || 'Error al comprobar.', true);
+                        mostrarMensaje(data.message || data.error || 'Error al comprobar.', true);
                         return;
                     }
                     ultimaData = data;

@@ -12,6 +12,12 @@ class HistoricoPrecioProducto extends Model
     /** Rebaja mínima (%) respecto al mínimo histórico de referencia para considerar precio hot */
     public const REBAJA_MINIMA_PCT_HOT = 1;
 
+    /**
+     * Días consecutivos (sin contar hoy) al mismo precio que la oferta actual.
+     * Por encima de este umbral el precio bajo se considera oferta ya pasada de moda.
+     */
+    public const DIAS_RACHA_OFERTA_PASADA_HOT = 10;
+
     protected $table = 'historico_precios_productos';
 
     protected $fillable = [
@@ -94,6 +100,55 @@ class HistoricoPrecioProducto extends Model
         $precioPorFecha = static::mapaPrecioMinimoPorFecha($productoId, $especificacionInternaId, $desde);
 
         return static::fechasExcluidasDesdeMapa($precioPorFecha, $desde, $precioActual);
+    }
+
+    /**
+     * Días consecutivos anteriores a hoy con el mismo precio_minimo que la oferta actual.
+     */
+    public static function diasConsecutivosPrecioActualAntesDeHoy(
+        int $productoId,
+        ?string $especificacionInternaId = null,
+        ?float $precioActual = null,
+        int $meses = 3
+    ): int {
+        if ($precioActual === null) {
+            return 0;
+        }
+
+        $fechasExcluidas = static::fechasExcluidasRachaPrecioActual(
+            $productoId,
+            $especificacionInternaId,
+            Carbon::now()->subMonths($meses)->startOfDay(),
+            $precioActual
+        );
+
+        $hoy = Carbon::today()->toDateString();
+        $dias = 0;
+
+        foreach ($fechasExcluidas as $fecha) {
+            if ($fecha !== $hoy) {
+                $dias++;
+            }
+        }
+
+        return $dias;
+    }
+
+    /**
+     * Oferta con precio bajo sostenido demasiado tiempo: no debe entrar en precios hot.
+     */
+    public static function esOfertaPasadaDeModaParaHot(
+        int $productoId,
+        ?string $especificacionInternaId = null,
+        ?float $precioActual = null,
+        int $meses = 3
+    ): bool {
+        return static::diasConsecutivosPrecioActualAntesDeHoy(
+            $productoId,
+            $especificacionInternaId,
+            $precioActual,
+            $meses
+        ) > static::DIAS_RACHA_OFERTA_PASADA_HOT;
     }
 
     /**

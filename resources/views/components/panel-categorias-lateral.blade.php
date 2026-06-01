@@ -145,7 +145,7 @@ $cp1 = \App\Models\Categoria::whereNull('parent_id')
 {{-- btnCerrarPanel -> bcp1, contenedorNavegacion -> cn1, listaCategoriasPadre -> lcp1 --}}
 {{-- headerPanel -> hp1, logoPanel -> lp1, nombreCategoriaPanel -> ncp1, btnVolverPanel -> bvp1 --}}
 {{-- textoNombreCategoria -> tnc1, contenedorLogoNombre -> cln1 --}}
-const _pc1 = document.getElementById('pc1');
+const _pelPc1 = document.getElementById('pc1');
 const _op1 = document.getElementById('op1');
 const _bcb1 = document.getElementById('bcb1');
 const _bcp1 = document.getElementById('bcp1');
@@ -186,23 +186,23 @@ function _f2(url) {
     return url;
 }
 
-{{-- abrirPanel -> _ap1() - Función global para abrir el panel desde cualquier lugar --}}
-window._ap1 = function() {
-    if (!_pc1 || !_op1) return;
-    _pc1.classList.remove('hidden');
-    _pc1.classList.remove('-translate-x-full');
+{{-- abrirPanel -> _pclAp1() - Prefijo _pcl para no colisionar con scripts de página (p. ej. unidades: _cp1 gráfico) --}}
+window._pclAp1 = function() {
+    if (!_pelPc1 || !_op1) return;
+    _pelPc1.classList.remove('hidden');
+    _pelPc1.classList.remove('-translate-x-full');
     _op1.classList.remove('hidden');
     document.body.style.overflow = 'hidden';
     _hn1 = [];
     _rh1();
 }
 
-{{-- cerrarPanel -> _cp1() --}}
-function _cp1() {
-    if (!_pc1 || !_op1) return;
-    _pc1.classList.add('-translate-x-full');
+{{-- cerrarPanel -> _pclCp1() --}}
+window._pclCp1 = function() {
+    if (!_pelPc1 || !_op1) return;
+    _pelPc1.classList.add('-translate-x-full');
     setTimeout(() => {
-        _pc1.classList.add('hidden');
+        _pelPc1.classList.add('hidden');
     }, 300);
     _op1.classList.add('hidden');
     document.body.style.overflow = '';
@@ -289,7 +289,7 @@ function _mc1(categoriaId, categoriaNombre, categoriaSlug, subcategorias) {
 {{-- volverAtras -> va1() --}}
 function _va1() {
     if (_hn1.length === 0) {
-        _cp1();
+        window._pclCp1();
         return;
     }
 
@@ -324,17 +324,17 @@ function _va1() {
 {{-- Event Listeners --}}
 _bcb1?.addEventListener('click', function(e) {
     e.preventDefault();
-    window._ap1();
+    window._pclAp1();
 });
 
 _bcp1?.addEventListener('click', function(e) {
     e.preventDefault();
-    _cp1();
+    window._pclCp1();
 });
 
 _op1?.addEventListener('click', function(e) {
     if (e.target === _op1) {
-        _cp1();
+        window._pclCp1();
     }
 });
 

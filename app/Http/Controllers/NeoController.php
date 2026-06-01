@@ -916,15 +916,30 @@ class NeoController extends Controller
         $unicosOrden = array_values(array_unique($lineas));
         $repetidasEnTexto = count($lineas) > count($unicosOrden);
 
+        $cifrado = app(ConsultarNeoCifrado::class);
+        $lookupPorUrl = [];
+        foreach ($unicosOrden as $url) {
+            $lookupPorUrl[$url] = $cifrado->hashLookup($url);
+        }
+
+        $lookupsUnicos = array_values(array_unique($lookupPorUrl));
+        $filasPorLookup = collect();
+        foreach (array_chunk($lookupsUnicos, 500) as $chunkLookups) {
+            $filasPorLookup = $filasPorLookup->merge(
+                Neo::query()
+                    ->whereIn('url_lookup', $chunkLookups)
+                    ->orderBy('id')
+                    ->get(['id', 'aniadida', 'created_at', 'url_lookup'])
+                    ->groupBy('url_lookup')
+            );
+        }
+
         $noEncontradas = [];
         $encontradas = [];
 
         foreach ($unicosOrden as $url) {
-            $lookup = app(ConsultarNeoCifrado::class)->hashLookup($url);
-            $filas = Neo::query()
-                ->where('url_lookup', $lookup)
-                ->orderBy('id')
-                ->get(['id', 'url', 'aniadida', 'created_at']);
+            $lookup = $lookupPorUrl[$url];
+            $filas = $filasPorLookup->get($lookup, collect());
 
             if ($filas->isEmpty()) {
                 $noEncontradas[] = $url;

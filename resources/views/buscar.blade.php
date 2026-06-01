@@ -18,22 +18,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   {{-- $cU3 -> $canonicalUrl --}}
   <link rel="canonical" href="{{ $cU3 }}">
-  {{-- $q1X2 -> $query --}}
-  <title>Búsqueda: {{ $q1X2 }} - Komparador.com</title>
-  {{-- $q1X2 -> $query --}}
-  <meta name="description" content="Resultados de búsqueda para {{ $q1X2 }} en Komparador.com">
-  {{-- $q1X2 -> $query --}}
-  <meta property="og:title" content="Resultados para '{{ $q1X2 }}' - Komparador.com">
-  {{-- $q1X2 -> $query --}}
-<meta property="og:description" content="Explora productos relacionados con '{{ $q1X2 }}' en Komparador.com.">
+  @php
+    $esPreciosHotPagina = strtolower(trim($q1X2 ?? '')) === 'precios hot';
+    $tituloBusquedaVisible = $esPreciosHotPagina ? 'En mínimos históricos' : $q1X2;
+  @endphp
+  <title>Búsqueda: {{ $tituloBusquedaVisible }} - Komparador.com</title>
+  <meta name="description" content="Resultados de búsqueda para {{ $tituloBusquedaVisible }} en Komparador.com">
+  <meta property="og:title" content="Resultados para '{{ $tituloBusquedaVisible }}' - Komparador.com">
+<meta property="og:description" content="Explora productos relacionados con '{{ $tituloBusquedaVisible }}' en Komparador.com.">
 <meta property="og:image" content="{{ asset('images/logo.png') }}">
 <meta property="og:url" content="{{ url()->current() }}">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
-  {{-- $q1X2 -> $query --}}
-<meta name="twitter:title" content="Búsqueda: {{ $q1X2 }}">
-  {{-- $q1X2 -> $query --}}
-<meta name="twitter:description" content="Compara precios en Komparador.com para '{{ $q1X2 }}'.">
+<meta name="twitter:title" content="Búsqueda: {{ $tituloBusquedaVisible }}">
+<meta name="twitter:description" content="Compara precios en Komparador.com para '{{ $tituloBusquedaVisible }}'.">
 <meta name="twitter:image" content="{{ asset('images/logo.png') }}">
     <link rel="icon" type="image/png" href="{{ asset('images/icono.webp') }}">  
 @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -133,7 +131,7 @@ if (!function_exists('oCV6X')) {
 
       <div class="mb-4">
         @php
-          $esPreciosHot = strtolower(trim($q1X2 ?? '')) === 'precios hot';
+          $esPreciosHot = $esPreciosHotPagina ?? (strtolower(trim($q1X2 ?? '')) === 'precios hot');
           $esMasVendidos = in_array(strtolower(trim($q1X2 ?? '')), ['más vendidos', 'mas vendidos', 'más vendido', 'mas vendido']);
           $diasSeleccionado = $diasSeleccionado ?? 7;
         @endphp
@@ -141,7 +139,7 @@ if (!function_exists('oCV6X')) {
           <div>
             <h1 class="text-xl font-bold text-gray-800">
               @if($esPreciosHot)
-                🔥 Precios Hot
+                🔥 En mínimos históricos
               @elseif($esMasVendidos)
                 + Vendidos
               @else
@@ -152,7 +150,7 @@ if (!function_exists('oCV6X')) {
             <p class="text-gray-600">
               {{-- $p4X7 -> $productos --}}
               @if($esPreciosHot)
-                Se encontraron {{ $p4X7->total() }} productos con los mejores descuentos
+                Se encontraron {{ $p4X7->total() }} productos en mínimos históricos
               @elseif($esMasVendidos)
                 Se encontraron {{ $p4X7->total() }} productos más vendidos
               @else
@@ -188,9 +186,7 @@ if (!function_exists('oCV6X')) {
 
       {{-- $p4X7 -> $productos --}}
       @php
-        // Detectar si es búsqueda de precios hot o más vendidos
-        $esPreciosHot = strtolower(trim($q1X2 ?? '')) === 'precios hot';
-        $esMasVendidos = in_array(strtolower(trim($q1X2 ?? '')), ['más vendidos', 'mas vendidos', 'más vendido', 'mas vendido']);
+        $esMasVendidos = $esMasVendidos ?? in_array(strtolower(trim($q1X2 ?? '')), ['más vendidos', 'mas vendidos', 'más vendido', 'mas vendido']);
       @endphp
       @if($p4X7->count() > 0)
         <div class="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-6">
