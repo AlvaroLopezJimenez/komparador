@@ -2002,11 +2002,13 @@ class CronNeoObjetivosController extends Controller
         $categoriaIdentificador = $categoriaNombre !== null && $categoriaNombre !== ''
             ? $categoriaNombre
             : mb_substr($url, 0, 500);
+        $urlNeoobjetivo = trim($url);
 
         return sprintf(
-            'La tienda %s se ha ejecutado el sacar los productos de la categoría %s y no se han encontrado productos.',
+            'La tienda %s se ha ejecutado el sacar los productos de la categoría %s y no se han encontrado productos. URL neoobjetivo: %s',
             $tiendaNombre,
-            $categoriaIdentificador
+            $categoriaIdentificador,
+            $urlNeoobjetivo !== '' ? $urlNeoobjetivo : '(vacía)'
         );
     }
 

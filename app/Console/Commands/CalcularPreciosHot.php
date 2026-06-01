@@ -10,7 +10,6 @@ use App\Models\OfertaProducto;
 use App\Models\HistoricoPrecioProducto;
 use App\Services\SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos;
 use Illuminate\Console\Command;
-use Carbon\Carbon;
 
 class CalcularPreciosHot extends Command
 {
@@ -33,6 +32,8 @@ class CalcularPreciosHot extends Command
      */
     public function handle()
     {
+        @set_time_limit(300);
+
         // Verificar token de seguridad
         $token = $this->option('token');
         if (!$token || $token !== env('TOKEN_ACTUALIZAR_PRECIOS')) {
@@ -258,102 +259,81 @@ class CalcularPreciosHot extends Command
     private function calcularProductosHot($productos, $limite)
     {
         $productosHot = [];
-        $haceUnMes = Carbon::now()->subMonth();
         $servicioOfertas = new SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos();
 
         foreach ($productos as $producto) {
-            // Calcular precio medio del último mes para el producto general (sin especificacion_interna_id)
-            $precioMedio = HistoricoPrecioProducto::where('producto_id', $producto->id)
-                ->whereNull('especificacion_interna_id')
-                ->where('fecha', '>=', $haceUnMes)
-                ->where('precio_minimo', '>', 0)
-                ->whereNotNull('precio_minimo')
-                ->avg('precio_minimo');
+            $mejorOferta = $servicioOfertas->obtener($producto);
 
-            // Validar que el precio medio sea válido (mayor que 0)
-            if (!$precioMedio || $precioMedio <= 0) {
-                // Limpiar rebajado si no hay precio medio válido
+            if (!$mejorOferta || $mejorOferta->precio_unidad <= 0) {
                 Producto::where('id', $producto->id)->update(['rebajado' => null]);
-            } else {
-                // Usar el servicio para obtener la oferta más barata con descuentos y chollos aplicados
-                $mejorOferta = $servicioOfertas->obtener($producto);
-                
-                if ($mejorOferta && $mejorOferta->precio_unidad > 0) {
-                    // Usar el precio_unidad de la oferta procesada (con descuentos y chollos aplicados)
-                    $precioOferta = $mejorOferta->precio_unidad;
-                    
-                    // Validar que el precio de la oferta no sea mayor que el precio medio (evitar descuentos negativos)
-                    if ($precioOferta <= $precioMedio) {
-                        // Calcular porcentaje de diferencia usando el precio de la oferta más barata
-                        $diferencia = (($precioMedio - $precioOferta) / $precioMedio) * 100;
+                continue;
+            }
 
-                        // Solo incluir si el precio de la oferta es menor que la media y la diferencia es del 5% o más
-                        if ($diferencia >= 5) {
-                            // Actualizar campo rebajado del producto SOLO si entra en precios hot
-                            // Si la diferencia es >= 5%, guardar el porcentaje redondeado a entero
-                            $porcentajeRebajado = (int) round($diferencia);
-                            Producto::where('id', $producto->id)->update(['rebajado' => $porcentajeRebajado]);
-                            
-                            // Verificar que la tienda existe y tiene los datos necesarios
-                            $tienda = $mejorOferta->tienda;
-                            if ($tienda) {
-                                // Obtener unidad de medida del producto
-                                $unidadMedida = $producto->unidadDeMedida ?? 'unidad';
-                                
-                                // Formatear precio según la unidad de medida
-                                $decimalesPrecio = ($unidadMedida === 'unidadMilesima') ? 3 : 2;
-                                $precioFormateado = number_format($precioOferta, $decimalesPrecio, ',', '.') . ' €';
-                                
-                                // Añadir sufijo según la unidad de medida
-                                if ($unidadMedida === 'unidad') {
-                                    $precioFormateado .= '/Und.';
-                                } elseif ($unidadMedida === 'kilos') {
-                                    $precioFormateado .= '/Kg.';
-                                } elseif ($unidadMedida === 'litros') {
-                                    $precioFormateado .= '/L.';
-                                } elseif ($unidadMedida === 'unidadMilesima') {
-                                    $precioFormateado .= '/Und.';
-                                } elseif ($unidadMedida === '800gramos') {
-                                    $precioFormateado .= '/800gr.';
-                                } elseif ($unidadMedida === '100ml') {
-                                    $precioFormateado .= '/100ml.';
-                                } elseif ($unidadMedida === 'unidadUnica') {
-                                    $precioFormateado .= '';
-                                }
-                                
-                                $productosHot[] = [
-                                    'producto_id' => $producto->id,
-                                    'oferta_id' => $mejorOferta->id,
-                                    'tienda_id' => $mejorOferta->tienda_id,
-                                    'img_tienda' => $tienda->imagen ?? null,
-                                    'img_producto' => $producto->imagen_pequena ?? null,
-                                    'precio_oferta' => $precioOferta,
-                                    'precio_formateado' => $precioFormateado,
-                                    'porcentaje_diferencia' => round($diferencia, 2),
-                                    'url_oferta' => $mejorOferta->url,
-                                    'url_producto' => $this->generarUrlProducto($producto),
-                                    'producto_nombre' => $producto->nombre,
-                                    'tienda_nombre' => $tienda->nombre ?? 'Tienda desconocida',
-                                    'unidades' => $mejorOferta->unidades ?? '1.00',
-                                    'unidad_medida' => $unidadMedida
-                                ];
-                            }
-                        } else {
-                            // Si la diferencia es menor al 5%, limpiar rebajado (poner a null)
-                            Producto::where('id', $producto->id)->update(['rebajado' => null]);
+            $precioOferta = $mejorOferta->precio_unidad;
+            $precioMinimoHistorico = HistoricoPrecioProducto::precioMinimoReferenciaUltimosMeses(
+                $producto->id,
+                null,
+                3,
+                $precioOferta
+            );
+
+            if ($precioMinimoHistorico === null || $precioMinimoHistorico <= 0) {
+                Producto::where('id', $producto->id)->update(['rebajado' => null]);
+            } elseif ($precioOferta <= $precioMinimoHistorico) {
+                $diferencia = (($precioMinimoHistorico - $precioOferta) / $precioMinimoHistorico) * 100;
+
+                if ($diferencia >= HistoricoPrecioProducto::REBAJA_MINIMA_PCT_HOT) {
+                    $porcentajeRebajado = (int) round($diferencia);
+                    Producto::where('id', $producto->id)->update(['rebajado' => $porcentajeRebajado]);
+
+                    $tienda = $mejorOferta->tienda;
+                    if ($tienda) {
+                        $unidadMedida = $producto->unidadDeMedida ?? 'unidad';
+                        $decimalesPrecio = ($unidadMedida === 'unidadMilesima') ? 3 : 2;
+                        $precioFormateado = number_format($precioOferta, $decimalesPrecio, ',', '.') . ' €';
+
+                        if ($unidadMedida === 'unidad') {
+                            $precioFormateado .= '/Und.';
+                        } elseif ($unidadMedida === 'kilos') {
+                            $precioFormateado .= '/Kg.';
+                        } elseif ($unidadMedida === 'litros') {
+                            $precioFormateado .= '/L.';
+                        } elseif ($unidadMedida === 'unidadMilesima') {
+                            $precioFormateado .= '/Und.';
+                        } elseif ($unidadMedida === '800gramos') {
+                            $precioFormateado .= '/800gr.';
+                        } elseif ($unidadMedida === '100ml') {
+                            $precioFormateado .= '/100ml.';
+                        } elseif ($unidadMedida === 'unidadUnica') {
+                            $precioFormateado .= '';
                         }
-                    } else {
-                        // Limpiar rebajado si el precio actual es mayor que la media (no es descuento)
-                        Producto::where('id', $producto->id)->update(['rebajado' => null]);
+
+                        $productosHot[] = [
+                            'producto_id' => $producto->id,
+                            'oferta_id' => $mejorOferta->id,
+                            'tienda_id' => $mejorOferta->tienda_id,
+                            'img_tienda' => $tienda->imagen ?? null,
+                            'img_producto' => $producto->imagen_pequena ?? null,
+                            'precio_oferta' => $precioOferta,
+                            'precio_formateado' => $precioFormateado,
+                            'porcentaje_diferencia' => round($diferencia, 2),
+                            'url_oferta' => $mejorOferta->url,
+                            'url_producto' => $this->generarUrlProducto($producto),
+                            'producto_nombre' => $producto->nombre,
+                            'tienda_nombre' => $tienda->nombre ?? 'Tienda desconocida',
+                            'unidades' => $mejorOferta->unidades ?? '1.00',
+                            'unidad_medida' => $unidadMedida,
+                        ];
                     }
                 } else {
-                    // Limpiar rebajado si no hay oferta válida
                     Producto::where('id', $producto->id)->update(['rebajado' => null]);
                 }
+            } else {
+                Producto::where('id', $producto->id)->update(['rebajado' => null]);
             }
             
             // Calcular precios hot de especificaciones internas si el producto las tiene
-            $productosHotEspecificaciones = $this->calcularPreciosHotEspecificacionesInternas($producto, $haceUnMes);
+            $productosHotEspecificaciones = $this->calcularPreciosHotEspecificacionesInternas($producto);
             $productosHot = array_merge($productosHot, $productosHotEspecificaciones);
         }
 
@@ -382,7 +362,7 @@ class CalcularPreciosHot extends Command
     /**
      * Calcula precios hot para las especificaciones internas de un producto
      */
-    private function calcularPreciosHotEspecificacionesInternas($producto, $haceUnMes)
+    private function calcularPreciosHotEspecificacionesInternas($producto)
     {
         $productosHot = [];
         
@@ -522,19 +502,6 @@ class CalcularPreciosHot extends Command
                 // Convertir el texto a slug para usarlo en la URL
                 $sublineaTextoSlug = \Illuminate\Support\Str::slug($sublineaTexto);
                 
-                // Calcular precio medio del histórico de esta especificación interna
-                $precioMedioEspecificacion = HistoricoPrecioProducto::where('producto_id', $producto->id)
-                    ->where('especificacion_interna_id', $sublineaId)
-                    ->where('fecha', '>=', $haceUnMes)
-                    ->where('precio_minimo', '>', 0)
-                    ->whereNotNull('precio_minimo')
-                    ->avg('precio_minimo');
-                
-                // Si no hay precio medio válido, continuar con la siguiente especificación
-                if (!$precioMedioEspecificacion || $precioMedioEspecificacion <= 0) {
-                    continue;
-                }
-                
                 // Filtrar ofertas que coincidan con esta especificación específica
                 $ofertasFiltradas = $todasLasOfertas->filter(function($oferta) use ($lineaId, $sublineaId) {
                     $especificacionesOferta = $oferta->especificaciones_internas;
@@ -572,24 +539,30 @@ class CalcularPreciosHot extends Command
                 }
                 
                 $precioOfertaEspecificacion = $mejorOfertaEspecificacion->precio_unidad;
-                
-                // Validar que el precio de la oferta no sea mayor que el precio medio
-                if ($precioOfertaEspecificacion > $precioMedioEspecificacion) {
+
+                $precioMinimoHistoricoEspecificacion = HistoricoPrecioProducto::precioMinimoReferenciaUltimosMeses(
+                    $producto->id,
+                    (string) $sublineaId,
+                    3,
+                    $precioOfertaEspecificacion
+                );
+
+                if ($precioMinimoHistoricoEspecificacion === null || $precioMinimoHistoricoEspecificacion <= 0) {
                     continue;
                 }
                 
-                // Calcular porcentaje de diferencia
-                $diferencia = (($precioMedioEspecificacion - $precioOfertaEspecificacion) / $precioMedioEspecificacion) * 100;
+                if ($precioOfertaEspecificacion > $precioMinimoHistoricoEspecificacion) {
+                    continue;
+                }
+
+                $diferencia = (($precioMinimoHistoricoEspecificacion - $precioOfertaEspecificacion) / $precioMinimoHistoricoEspecificacion) * 100;
                 
-                // Actualizar campo rebajado en especificaciones_busqueda
-                // Si la diferencia es >= 5%, guardar el porcentaje redondeado a entero
-                // Si la diferencia está entre 0.1% y 4.99%, guardar 0
-                // Si no hay rebaja o el precio es mayor que la media, guardar 0
+                $umbralHot = HistoricoPrecioProducto::REBAJA_MINIMA_PCT_HOT;
                 $rebajado = 0;
-                if ($diferencia >= 5) {
+                if ($diferencia >= $umbralHot) {
                     $rebajado = (int) round($diferencia);
-                } elseif ($diferencia > 0 && $diferencia < 5) {
-                    $rebajado = 0; // Rebajas menores al 5% se guardan como 0
+                } elseif ($diferencia > 0 && $diferencia < $umbralHot) {
+                    $rebajado = 0;
                 }
                 
                 // Actualizar especificaciones_busqueda si existe esta especificación
@@ -604,8 +577,7 @@ class CalcularPreciosHot extends Command
                     }
                 }
                 
-                // Solo incluir en precios hot si la diferencia es del 5% o más
-                if ($diferencia >= 5) {
+                if ($diferencia >= HistoricoPrecioProducto::REBAJA_MINIMA_PCT_HOT) {
                     $tienda = $mejorOfertaEspecificacion->tienda;
                     if (!$tienda) {
                         continue;
@@ -742,24 +714,6 @@ class CalcularPreciosHot extends Command
                 }
                 
                 $especificacionId = $sublineaId;
-            
-                // Calcular precio medio del histórico de esta especificación interna
-                $precioMedioEspecificacion = HistoricoPrecioProducto::where('producto_id', $producto->id)
-                    ->where('especificacion_interna_id', $especificacionId)
-                    ->where('fecha', '>=', $haceUnMes)
-                    ->where('precio_minimo', '>', 0)
-                    ->whereNotNull('precio_minimo')
-                    ->avg('precio_minimo');
-                
-                // Si no hay precio medio válido, poner rebajado a 0
-                if (!$precioMedioEspecificacion || $precioMedioEspecificacion <= 0) {
-                    if (isset($especificacionesBusqueda[$sublineaTextoSlug]['rebajado']) && 
-                        $especificacionesBusqueda[$sublineaTextoSlug]['rebajado'] != 0) {
-                        $especificacionesBusqueda[$sublineaTextoSlug]['rebajado'] = 0;
-                        $necesitaActualizarEspecificacionesBusqueda = true;
-                    }
-                    continue;
-                }
                 
                 // Filtrar ofertas que coincidan con esta especificación específica
                 $ofertasFiltradas = $todasLasOfertas->filter(function($oferta) use ($lineaId, $especificacionId) {
@@ -796,16 +750,30 @@ class CalcularPreciosHot extends Command
                 $rebajado = 0;
                 if ($mejorOfertaEspecificacion && $mejorOfertaEspecificacion->precio_unidad > 0) {
                     $precioOfertaEspecificacion = $mejorOfertaEspecificacion->precio_unidad;
+
+                    $precioMinimoHistoricoEspecificacion = HistoricoPrecioProducto::precioMinimoReferenciaUltimosMeses(
+                        $producto->id,
+                        (string) $especificacionId,
+                        3,
+                        $precioOfertaEspecificacion
+                    );
+
+                    if ($precioMinimoHistoricoEspecificacion === null || $precioMinimoHistoricoEspecificacion <= 0) {
+                        if (isset($especificacionesBusqueda[$sublineaTextoSlug]['rebajado']) &&
+                            $especificacionesBusqueda[$sublineaTextoSlug]['rebajado'] != 0) {
+                            $especificacionesBusqueda[$sublineaTextoSlug]['rebajado'] = 0;
+                            $necesitaActualizarEspecificacionesBusqueda = true;
+                        }
+                        continue;
+                    }
                     
-                    if ($precioOfertaEspecificacion <= $precioMedioEspecificacion) {
-                        $diferencia = (($precioMedioEspecificacion - $precioOfertaEspecificacion) / $precioMedioEspecificacion) * 100;
+                    if ($precioOfertaEspecificacion <= $precioMinimoHistoricoEspecificacion) {
+                        $diferencia = (($precioMinimoHistoricoEspecificacion - $precioOfertaEspecificacion) / $precioMinimoHistoricoEspecificacion) * 100;
                         
-                        // Si la diferencia es >= 5%, guardar el porcentaje redondeado a entero
-                        // Si la diferencia está entre 0.1% y 4.99%, guardar 0
-                        if ($diferencia >= 5) {
+                        if ($diferencia >= HistoricoPrecioProducto::REBAJA_MINIMA_PCT_HOT) {
                             $rebajado = (int) round($diferencia);
                         } else {
-                            $rebajado = 0; // Rebajas menores al 5% se guardan como 0
+                            $rebajado = 0;
                         }
                     }
                 }

@@ -11,11 +11,27 @@ use App\Models\HistoricoPrecioProducto;
 use App\Models\Tienda;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
 use App\Services\SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos;
+use Carbon\Carbon;
 
 class PrecioHotController extends Controller
 {
+    /** IDs de producto con análisis detallado en la respuesta del navegador */
+    private const PRODUCTOS_DEPURACION_FOCALIZADA = [107];
+    /** @var bool Incluir detalle de depuración solo en la respuesta JSON del navegador */
+    private bool $incluirDetalleDepuracionEnRespuesta = false;
+
+    /** @var array Resultado del listado global de esta ejecución (top 60) */
+    private array $ultimoListadoGlobalPreciosHot = [];
+
+    /** @var bool Recopilar motivos de rechazo durante el paso global (solo navegador) */
+    private bool $recopilarDepuracionGlobal = false;
+
+    /** @var array Informe de depuración para la respuesta JSON */
+    private array $depuracionGlobal = [];
+
+    private const DEPURACION_MAX_MUESTRAS_POR_MOTIVO = 8;
+
     public function index()
     {
         $preciosHot = PrecioHot::orderBy('created_at', 'desc')->get();
@@ -24,6 +40,8 @@ class PrecioHotController extends Controller
 
     public function ejecutarSegundoPlano(Request $request)
     {
+        @set_time_limit(300);
+
         $token = $request->get('token');
         if ($token !== env('TOKEN_ACTUALIZAR_PRECIOS')) {
             return response()->json(['status' => 'error', 'message' => 'Token inválido']);
@@ -37,6 +55,8 @@ class PrecioHotController extends Controller
         ]);
 
         try {
+            $this->incluirDetalleDepuracionEnRespuesta = true;
+
             $this->procesarPreciosHotCompleto($ejecucion);
             
             $ejecucion->update([
@@ -46,22 +66,44 @@ class PrecioHotController extends Controller
             // Recargar la ejecución para obtener los logs actualizados
             $ejecucion->refresh();
 
+            $productosHotDepuracion = $this->incluirDetalleDepuracionEnRespuesta
+                ? $this->construirDetalleDepuracionDesdeListadoGlobal()
+                : [];
+
+            if ($this->incluirDetalleDepuracionEnRespuesta) {
+                $this->depuracionGlobal['productos_focalizados'] = [];
+                foreach (self::PRODUCTOS_DEPURACION_FOCALIZADA as $productoFocalId) {
+                    $this->depuracionGlobal['productos_focalizados'][$productoFocalId] =
+                        $this->generarAnalisisProductoFocalizado($productoFocalId);
+                }
+            }
+
             return response()->json([
                 'status' => 'ok',
                 'inserciones' => $ejecucion->total_guardado,
                 'errores' => $ejecucion->total_errores,
-                'ejecucion_id' => $ejecucion->id
+                'total_categorias' => $ejecucion->total,
+                'total_inserciones' => $ejecucion->total_guardado,
+                'total_errores' => $ejecucion->total_errores,
+                'log' => $ejecucion->log ?? [],
+                'productos_hot' => $productosHotDepuracion,
+                'total_productos_hot' => count($productosHotDepuracion),
+                'depuracion' => $this->depuracionGlobal,
+                'ejecucion_id' => $ejecucion->id,
             ]);
         } catch (\Exception $e) {
             $ejecucion->update([
                 'fin' => now(),
-                'total_errores' => $ejecucion->total_errores + 1
+                'total_errores' => ($ejecucion->total_errores ?? 0) + 1
             ]);
 
             return response()->json([
                 'status' => 'error',
                 'message' => 'Error en el proceso: ' . $e->getMessage()
             ]);
+        } finally {
+            $this->incluirDetalleDepuracionEnRespuesta = false;
+            $this->recopilarDepuracionGlobal = false;
         }
     }
 
@@ -82,6 +124,8 @@ class PrecioHotController extends Controller
     // Método principal que procesa todos los precios hot (usado por ambas ejecuciones)
     public function procesarPreciosHotCompleto($ejecucion)
     {
+        @set_time_limit(300);
+
         $log = [];
         $totalCategorias = 0;
         $totalInserciones = 0;
@@ -145,18 +189,25 @@ class PrecioHotController extends Controller
             // Procesar categoría global "Precios Hot"
             try {
                 $log[] = "🔄 Procesando categoría global: Precios Hot";
+                if ($this->incluirDetalleDepuracionEnRespuesta) {
+                    $this->recopilarDepuracionGlobal = true;
+                }
                 $productosHotGlobal = $this->obtenerProductosHotGlobal(60, $log);
-                
+                $this->recopilarDepuracionGlobal = false;
+                $this->ultimoListadoGlobalPreciosHot = $productosHotGlobal;
+
+                PrecioHot::updateOrCreate(
+                    ['nombre' => 'Precios Hot'],
+                    ['datos' => $productosHotGlobal]
+                );
+
                 if (!empty($productosHotGlobal)) {
-                    PrecioHot::updateOrCreate(
-                        ['nombre' => 'Precios Hot'],
-                        ['datos' => $productosHotGlobal]
-                    );
                     $totalInserciones++;
-                    $log[] = "✅ Categoría global 'Precios Hot': " . count($productosHotGlobal) . " productos hot encontrados";
+                    $log[] = "✅ Categoría global 'Precios Hot': " . count($productosHotGlobal) . " productos hot en listado (top 60)";
                 } else {
                     $log[] = "⚠️ Categoría global 'Precios Hot': No se encontraron productos hot";
                 }
+
             } catch (\Exception $e) {
                 $totalErrores++;
                 $log[] = "❌ Error en categoría global 'Precios Hot': " . $e->getMessage();
@@ -204,123 +255,172 @@ class PrecioHotController extends Controller
             ->whereNotNull('precio')
             ->where('precio', '>', 0)
             ->get();
-        
-        return $this->calcularProductosHot($productos, $limite, $log);
+
+        if ($this->recopilarDepuracionGlobal) {
+            $this->inicializarDepuracionGlobal($productos->count());
+        }
+
+        $resultado = $this->calcularProductosHot($productos, $limite, $log);
+
+        if ($this->recopilarDepuracionGlobal) {
+            $this->finalizarDepuracionGlobal(count($resultado));
+            foreach ($this->depuracionGlobal['resumen_texto'] ?? [] as $linea) {
+                $log[] = $linea;
+            }
+        }
+
+        return $resultado;
+    }
+
+    private function tieneEspecificacionesUnidadUnica(Producto $producto): bool
+    {
+        return $producto->unidadDeMedida === 'unidadUnica'
+            && $producto->categoria_id_especificaciones_internas
+            && $producto->categoria_especificaciones_internas_elegidas;
     }
 
     private function calcularProductosHot($productos, $limite, &$log = [])
     {
         $productosHot = [];
-        $haceUnMes = Carbon::now()->subMonth();
         $servicioOfertas = new SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos();
 
         foreach ($productos as $producto) {
-            // Calcular precio medio del último mes para el producto general (sin especificacion_interna_id)
-            $precioMedio = HistoricoPrecioProducto::where('producto_id', $producto->id)
-                ->whereNull('especificacion_interna_id')
-                ->where('fecha', '>=', $haceUnMes)
-                ->where('precio_minimo', '>', 0)
-                ->whereNotNull('precio_minimo')
-                ->avg('precio_minimo');
-
-            // Validar que el precio medio sea válido (mayor que 0)
-            if (!$precioMedio || $precioMedio <= 0) {
-                // Limpiar rebajado si no hay precio medio válido
-                Producto::where('id', $producto->id)->update(['rebajado' => null]);
+            if ($this->tieneEspecificacionesUnidadUnica($producto)) {
+                $this->incrementarDepuracion('productos_unidad_unica');
+                $hotSpecs = $this->calcularPreciosHotEspecificacionesInternas($producto);
+                $productosHot = array_merge($productosHot, $hotSpecs);
+                if ($this->recopilarDepuracionGlobal && count($hotSpecs) > 0) {
+                    $this->incrementarDepuracion('hot_especificacion', count($hotSpecs));
+                }
                 continue;
             }
-            
-            // Usar el servicio para obtener la oferta más barata con descuentos y chollos aplicados
+
+            $this->incrementarDepuracion('evaluados_general');
+
             $mejorOferta = $servicioOfertas->obtener($producto);
-            
+
             if (!$mejorOferta || $mejorOferta->precio_unidad <= 0) {
-                // Limpiar rebajado si no hay oferta válida
                 Producto::where('id', $producto->id)->update(['rebajado' => null]);
-                continue;
-            }
-
-            // Usar el precio_unidad de la oferta procesada (con descuentos y chollos aplicados)
-            $precioOferta = $mejorOferta->precio_unidad;
-            
-            // Validar que el precio de la oferta no sea mayor que el precio medio (evitar descuentos negativos)
-            if ($precioOferta > $precioMedio) {
-                // Limpiar rebajado si el precio actual es mayor que la media (no es descuento)
-                Producto::where('id', $producto->id)->update(['rebajado' => null]);
-                continue;
-            }
-            
-            // Calcular porcentaje de diferencia usando el precio de la oferta más barata
-            $diferencia = (($precioMedio - $precioOferta) / $precioMedio) * 100;
-
-            // Solo incluir si el precio de la oferta es menor que la media y la diferencia es del 5% o más
-            if ($diferencia >= 5) {
-                // Actualizar campo rebajado del producto SOLO si entra en precios hot
-                // Si la diferencia es >= 5%, guardar el porcentaje redondeado a entero
-                $porcentajeRebajado = (int) round($diferencia);
-                Producto::where('id', $producto->id)->update(['rebajado' => $porcentajeRebajado]);
-                
-                // Verificar que la tienda existe y tiene los datos necesarios
-                $tienda = $mejorOferta->tienda;
-                if (!$tienda) {
-                    continue; // Saltar si no hay tienda
-                }
-                
-                // Obtener unidad de medida del producto
-                $unidadMedida = $producto->unidadDeMedida ?? 'unidad';
-                
-                // Formatear precio según la unidad de medida
-                $decimalesPrecio = ($unidadMedida === 'unidadMilesima') ? 3 : 2;
-                $precioFormateado = number_format($precioOferta, $decimalesPrecio, ',', '.') . ' €';
-                
-                // Añadir sufijo según la unidad de medida
-                if ($unidadMedida === 'unidad') {
-                    $precioFormateado .= '/Und.';
-                } elseif ($unidadMedida === 'kilos') {
-                    $precioFormateado .= '/Kg.';
-                } elseif ($unidadMedida === 'litros') {
-                    $precioFormateado .= '/L.';
-                } elseif ($unidadMedida === 'unidadMilesima') {
-                    $precioFormateado .= '/Und.';
-                } elseif ($unidadMedida === '800gramos') {
-                    $precioFormateado .= '/800gr.';
-                } elseif ($unidadMedida === '100ml') {
-                    $precioFormateado .= '/100ml.';
-                } elseif ($unidadMedida === 'unidadUnica') {
-                    // No añadir sufijo para unidadUnica
-                } else {
-                    $precioFormateado .= '/Und.';
-                }
-                
-                $productoHotData = [
+                $this->registrarMuestraDepuracion('general_sin_oferta', [
                     'producto_id' => $producto->id,
-                    'oferta_id' => $mejorOferta->id,
-                    'tienda_id' => $mejorOferta->tienda_id,
-                    'img_tienda' => $tienda->url_imagen ?? null,
-                    'img_producto' => (!empty($producto->imagen_pequena) && is_array($producto->imagen_pequena) && isset($producto->imagen_pequena[0]))
-    ? $producto->imagen_pequena[0]
-    : null,
-                    'precio_oferta' => $precioOferta,
-                    'precio_formateado' => $precioFormateado,
-                    'porcentaje_diferencia' => round($diferencia, 2),
-                    'url_oferta' => route('click.redirigir', ['ofertaId' => $mejorOferta->id]),
-                    'url_producto' => $this->generarUrlProducto($producto),
-                    'producto_nombre' => $producto->nombre,
-                    'tienda_nombre' => $tienda->nombre ?? 'Tienda desconocida',
-                    'unidades' => $mejorOferta->unidades ?? 1,
-                    'unidad_medida' => $unidadMedida,
-                    'num_imagenes' => 0,
-                    'orden_especificacion' => -1
-                ];
-                
-                $productosHot[] = $productoHotData;
-            } else {
-                // Si la diferencia es menor al 5%, limpiar rebajado (poner a null)
-                Producto::where('id', $producto->id)->update(['rebajado' => null]);
+                    'nombre' => $producto->nombre,
+                ]);
+                continue;
             }
-            
-            // Calcular precios hot de especificaciones internas si el producto las tiene
-            $productosHotEspecificaciones = $this->calcularPreciosHotEspecificacionesInternas($producto, $haceUnMes);
-            $productosHot = array_merge($productosHot, $productosHotEspecificaciones);
+
+            $precioOferta = $mejorOferta->precio_unidad;
+
+            $precioMinimoHistorico = HistoricoPrecioProducto::precioMinimoReferenciaUltimosMeses(
+                $producto->id,
+                null,
+                3,
+                $precioOferta
+            );
+            $filasHistoricoGeneral = $this->contarFilasHistorico($producto->id, null, $precioOferta);
+
+            if ($precioMinimoHistorico === null || $precioMinimoHistorico <= 0) {
+                Producto::where('id', $producto->id)->update(['rebajado' => null]);
+                $this->registrarMuestraDepuracion('general_sin_historico_3m', [
+                    'producto_id' => $producto->id,
+                    'nombre' => $producto->nombre,
+                    'filas_historico_3m' => $filasHistoricoGeneral,
+                    'precio_producto' => $producto->precio,
+                    'precio_oferta' => round($precioOferta, 3),
+                ]);
+                continue;
+            }
+
+            if ($precioOferta > $precioMinimoHistorico) {
+                Producto::where('id', $producto->id)->update(['rebajado' => null]);
+                $this->registrarMuestraDepuracion('general_precio_superior_al_minimo', [
+                    'producto_id' => $producto->id,
+                    'nombre' => $producto->nombre,
+                    'precio_minimo_historico' => round($precioMinimoHistorico, 3),
+                    'precio_oferta' => round($precioOferta, 3),
+                    'oferta_id' => $mejorOferta->id,
+                ]);
+                continue;
+            }
+
+            $diferencia = (($precioMinimoHistorico - $precioOferta) / $precioMinimoHistorico) * 100;
+
+            if ($diferencia < HistoricoPrecioProducto::REBAJA_MINIMA_PCT_HOT) {
+                Producto::where('id', $producto->id)->update(['rebajado' => null]);
+                $this->registrarMuestraDepuracion('general_rebaja_menor_umbral', [
+                    'producto_id' => $producto->id,
+                    'nombre' => $producto->nombre,
+                    'precio_minimo_historico' => round($precioMinimoHistorico, 3),
+                    'precio_oferta' => round($precioOferta, 3),
+                    'rebaja_pct' => round($diferencia, 2),
+                    'oferta_id' => $mejorOferta->id,
+                ]);
+                continue;
+            }
+
+            $porcentajeRebajado = (int) round($diferencia);
+            Producto::where('id', $producto->id)->update(['rebajado' => $porcentajeRebajado]);
+
+            $tienda = $mejorOferta->tienda;
+            if (!$tienda) {
+                $this->registrarMuestraDepuracion('general_sin_tienda', [
+                    'producto_id' => $producto->id,
+                    'nombre' => $producto->nombre,
+                    'oferta_id' => $mejorOferta->id,
+                    'rebaja_pct' => round($diferencia, 2),
+                ]);
+                continue;
+            }
+
+            $this->incrementarDepuracion('hot_general');
+            $this->registrarMuestraDepuracion('general_hot_ok', [
+                'producto_id' => $producto->id,
+                'nombre' => $producto->nombre,
+                'precio_minimo_historico' => round($precioMinimoHistorico, 3),
+                'precio_oferta' => round($precioOferta, 3),
+                'rebaja_pct' => round($diferencia, 2),
+                'oferta_id' => $mejorOferta->id,
+            ], false);
+
+            $unidadMedida = $producto->unidadDeMedida ?? 'unidad';
+            $decimalesPrecio = ($unidadMedida === 'unidadMilesima') ? 3 : 2;
+            $precioFormateado = number_format($precioOferta, $decimalesPrecio, ',', '.') . ' €';
+
+            if ($unidadMedida === 'unidad') {
+                $precioFormateado .= '/Und.';
+            } elseif ($unidadMedida === 'kilos') {
+                $precioFormateado .= '/Kg.';
+            } elseif ($unidadMedida === 'litros') {
+                $precioFormateado .= '/L.';
+            } elseif ($unidadMedida === 'unidadMilesima') {
+                $precioFormateado .= '/Und.';
+            } elseif ($unidadMedida === '800gramos') {
+                $precioFormateado .= '/800gr.';
+            } elseif ($unidadMedida === '100ml') {
+                $precioFormateado .= '/100ml.';
+            } elseif ($unidadMedida !== 'unidadUnica') {
+                $precioFormateado .= '/Und.';
+            }
+
+            $productosHot[] = [
+                'producto_id' => $producto->id,
+                'oferta_id' => $mejorOferta->id,
+                'tienda_id' => $mejorOferta->tienda_id,
+                'img_tienda' => $tienda->url_imagen ?? null,
+                'img_producto' => (!empty($producto->imagen_pequena) && is_array($producto->imagen_pequena) && isset($producto->imagen_pequena[0]))
+                    ? $producto->imagen_pequena[0]
+                    : null,
+                'precio_oferta' => $precioOferta,
+                'precio_formateado' => $precioFormateado,
+                'porcentaje_diferencia' => round($diferencia, 2),
+                'url_oferta' => route('click.redirigir', ['ofertaId' => $mejorOferta->id]),
+                'url_producto' => $this->generarUrlProducto($producto),
+                'producto_nombre' => $producto->nombre,
+                'tienda_nombre' => $tienda->nombre ?? 'Tienda desconocida',
+                'unidades' => $mejorOferta->unidades ?? 1,
+                'unidad_medida' => $unidadMedida,
+                'num_imagenes' => 0,
+                'orden_especificacion' => -1,
+            ];
         }
 
         // Desduplicar por oferta_id: una oferta solo puede aparecer una vez
@@ -369,6 +469,474 @@ class PrecioHotController extends Controller
         });
 
         return array_slice($productosHot, 0, $limite);
+    }
+
+    /**
+     * Detalle solo para la respuesta del navegador: mismo listado global guardado (top 60)
+     * con columnas extra de depuración, sin modificar lo persistido en precios_hot.
+     */
+    private function construirDetalleDepuracionDesdeListadoGlobal(): array
+    {
+        $detalle = [];
+        foreach ($this->ultimoListadoGlobalPreciosHot as $entry) {
+            $detalle[] = $this->enriquecerEntradaParaDepuracion($entry);
+        }
+
+        return $detalle;
+    }
+
+    private function enriquecerEntradaParaDepuracion(array $entry): array
+    {
+        $productoId = (int) ($entry['producto_id'] ?? 0);
+        if ($productoId <= 0) {
+            return $entry;
+        }
+
+        $producto = Producto::find($productoId);
+        if (!$producto) {
+            return array_merge($entry, [
+                'tipo' => 'desconocido',
+                'precio_minimo_historico' => null,
+            ]);
+        }
+
+        $urlBase = $this->generarUrlProducto($producto);
+        $urlProducto = $entry['url_producto'] ?? '';
+        $especificacionInternaId = null;
+        $tipo = 'general';
+
+        if ($urlProducto !== $urlBase && str_starts_with($urlProducto, $urlBase . '/')) {
+            $tipo = 'especificacion';
+            $slugEspec = substr($urlProducto, strlen($urlBase) + 1);
+            $busqueda = $producto->especificaciones_busqueda ?? [];
+            if (isset($busqueda[$slugEspec]['id'])) {
+                $especificacionInternaId = (string) $busqueda[$slugEspec]['id'];
+            }
+        }
+
+        $precioOfertaEntrada = isset($entry['precio_oferta']) ? (float) $entry['precio_oferta'] : null;
+        $precioMinimoHistorico = HistoricoPrecioProducto::precioMinimoReferenciaUltimosMeses(
+            $productoId,
+            $especificacionInternaId,
+            3,
+            $precioOfertaEntrada
+        );
+
+        return array_merge($entry, [
+            'tipo' => $tipo,
+            'precio_minimo_historico' => $precioMinimoHistorico !== null ? round($precioMinimoHistorico, 3) : null,
+        ]);
+    }
+
+    private function inicializarDepuracionGlobal(int $totalProductosConPrecio): void
+    {
+        $this->depuracionGlobal = [
+            'criterios' => [
+                'ventana' => 'últimos 3 meses',
+                'referencia' => 'mínimo de precio_minimo en histórico (excluye 0, hoy y racha de días previos con el mismo precio que la oferta actual)',
+                'rebaja_minima_pct' => HistoricoPrecioProducto::REBAJA_MINIMA_PCT_HOT,
+                'precio_actual' => 'mejor oferta con descuentos/chollos',
+                'unidad_unica' => 'solo evalúa variantes marcadas como mostrar',
+            ],
+            'productos_con_precio_en_cola' => $totalProductosConPrecio,
+            'contadores' => [],
+            'muestras' => [],
+            'resumen_texto' => [],
+        ];
+    }
+
+    private function finalizarDepuracionGlobal(int $hotEnListadoTop60): void
+    {
+        $c = $this->depuracionGlobal['contadores'] ?? [];
+        $this->depuracionGlobal['hot_en_listado_top60'] = $hotEnListadoTop60;
+        $this->depuracionGlobal['resumen_texto'] = [
+            '📊 Depuración global — productos en cola: ' . ($this->depuracionGlobal['productos_con_precio_en_cola'] ?? 0),
+            '   · unidadUnica (solo variantes): ' . ($c['productos_unidad_unica'] ?? 0),
+            '   · evaluados como general: ' . ($c['evaluados_general'] ?? 0),
+            '   · variantes evaluadas (mostrar): ' . ($c['variantes_evaluadas'] ?? 0),
+            '   · HOT general detectados: ' . ($c['hot_general'] ?? 0),
+            '   · HOT variante detectados: ' . ($c['hot_especificacion'] ?? 0),
+            '   · En listado final (top 60): ' . $hotEnListadoTop60,
+            '   · Rechazos general sin histórico 3m: ' . ($c['rechazos_general_sin_historico_3m'] ?? 0),
+            '   · Rechazos general sin oferta: ' . ($c['rechazos_general_sin_oferta'] ?? 0),
+            '   · Rechazos general precio > mínimo: ' . ($c['rechazos_general_precio_superior_al_minimo'] ?? 0),
+            '   · Rechazos general rebaja <' . HistoricoPrecioProducto::REBAJA_MINIMA_PCT_HOT . '%: ' . ($c['rechazos_general_rebaja_menor_umbral'] ?? $c['rechazos_general_rebaja_menor_5'] ?? 0),
+            '   · Variantes omitidas (no mostrar): ' . ($c['rechazos_spec_omitida_no_mostrar'] ?? 0),
+            '   · Rechazos variante sin histórico 3m: ' . ($c['rechazos_spec_sin_historico_3m'] ?? 0),
+            '   · Rechazos variante sin oferta: ' . ($c['rechazos_spec_sin_oferta'] ?? 0),
+            '   · Rechazos variante precio > mínimo: ' . ($c['rechazos_spec_precio_superior_al_minimo'] ?? 0),
+            '   · Rechazos variante rebaja <' . HistoricoPrecioProducto::REBAJA_MINIMA_PCT_HOT . '%: ' . ($c['rechazos_spec_rebaja_menor_umbral'] ?? $c['rechazos_spec_rebaja_menor_5'] ?? 0),
+        ];
+    }
+
+    private function incrementarDepuracion(string $clave, int $cantidad = 1): void
+    {
+        if (!$this->recopilarDepuracionGlobal) {
+            return;
+        }
+        $this->depuracionGlobal['contadores'][$clave] = ($this->depuracionGlobal['contadores'][$clave] ?? 0) + $cantidad;
+    }
+
+    private function registrarMuestraDepuracion(string $motivo, array $fila, bool $esRechazo = true): void
+    {
+        if (!$this->recopilarDepuracionGlobal) {
+            return;
+        }
+        if ($esRechazo) {
+            $this->incrementarDepuracion('rechazos_' . $motivo);
+        }
+        if (!isset($this->depuracionGlobal['muestras'][$motivo])) {
+            $this->depuracionGlobal['muestras'][$motivo] = [];
+        }
+        if (count($this->depuracionGlobal['muestras'][$motivo]) >= self::DEPURACION_MAX_MUESTRAS_POR_MOTIVO) {
+            return;
+        }
+        $this->depuracionGlobal['muestras'][$motivo][] = $fila;
+    }
+
+    private function contarFilasHistorico(int $productoId, ?string $especificacionInternaId, ?float $precioActual = null): int
+    {
+        return HistoricoPrecioProducto::calcularReferenciaHistorica(
+            $productoId,
+            $especificacionInternaId,
+            3,
+            $precioActual
+        )['filas_usadas_en_referencia'];
+    }
+
+    private function obtenerDetalleHistorico3m(int $productoId, ?string $especificacionInternaId, ?float $precioActual = null): array
+    {
+        $desde = Carbon::now()->subMonths(3)->startOfDay();
+        $precioPorFecha = HistoricoPrecioProducto::mapaPrecioMinimoPorFecha(
+            $productoId,
+            $especificacionInternaId,
+            $desde
+        );
+        $fechasExcluidas = HistoricoPrecioProducto::fechasExcluidasDesdeMapa(
+            $precioPorFecha,
+            $desde,
+            $precioActual
+        );
+        $excluidasLookup = array_fill_keys($fechasExcluidas, true);
+
+        $precioMinimo = null;
+        $filasUsadas = 0;
+        $preciosReferencia = [];
+
+        foreach ($precioPorFecha as $fecha => $precio) {
+            if (isset($excluidasLookup[$fecha])) {
+                continue;
+            }
+            $filasUsadas++;
+            $preciosReferencia[] = $precio;
+            if ($precioMinimo === null || $precio < $precioMinimo) {
+                $precioMinimo = $precio;
+            }
+        }
+
+        $filasTotales = collect($precioPorFecha)
+            ->sortKeysDesc()
+            ->map(fn ($precio, $fecha) => (object) ['fecha' => $fecha, 'precio_minimo' => $precio]);
+
+        return [
+            'desde' => $desde->toDateString(),
+            'hasta' => now()->toDateString(),
+            'especificacion_interna_id' => $especificacionInternaId,
+            'precio_actual_oferta' => $precioActual !== null ? round($precioActual, 3) : null,
+            'fechas_excluidas_racha' => $fechasExcluidas,
+            'filas_con_precio' => count($precioPorFecha),
+            'filas_usadas_en_referencia' => $filasUsadas,
+            'precio_minimo_calculado' => $precioMinimo !== null ? round($precioMinimo, 3) : null,
+            'precio_maximo_en_ventana' => $preciosReferencia !== [] ? round(max($preciosReferencia), 3) : null,
+            'ultimas_filas' => $filasTotales->take(20)->map(fn ($f) => [
+                'fecha' => $f->fecha instanceof \DateTimeInterface ? $f->fecha->format('Y-m-d') : (string) $f->fecha,
+                'precio_minimo' => round((float) $f->precio_minimo, 3),
+                'excluida_racha' => isset($excluidasLookup[
+                    $f->fecha instanceof \DateTimeInterface ? $f->fecha->format('Y-m-d') : (string) $f->fecha
+                ]),
+            ])->values()->all(),
+        ];
+    }
+
+    /**
+     * Análisis paso a paso de un producto (solo respuesta navegador).
+     */
+    private function generarAnalisisProductoFocalizado(int $productoId): array
+    {
+        $producto = Producto::with(['categoria', 'categoriaEspecificaciones'])->find($productoId);
+
+        if (!$producto) {
+            return ['error' => 'Producto no encontrado', 'producto_id' => $productoId];
+        }
+
+        $enListadoGlobal = collect($this->ultimoListadoGlobalPreciosHot)->contains(
+            fn ($e) => (int) ($e['producto_id'] ?? 0) === $productoId
+        );
+
+        $analisis = [
+            'producto_id' => $productoId,
+            'nombre' => $producto->nombre,
+            'slug' => $producto->slug,
+            'precio_campo_producto' => $producto->precio,
+            'unidadDeMedida' => $producto->unidadDeMedida,
+            'obsoleto' => $producto->obsoleto ?? null,
+            'en_cola_global_precio_mayor_0' => $producto->precio !== null && $producto->precio > 0,
+            'tiene_especificaciones_unidad_unica' => $this->tieneEspecificacionesUnidadUnica($producto),
+            'entro_en_listado_hot_top60_esta_ejecucion' => $enListadoGlobal,
+            'historico_general_3m' => null,
+            'variantes' => [],
+            'general' => null,
+            'conclusion' => null,
+        ];
+
+        $servicioOfertas = new SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos();
+
+        if (!$analisis['en_cola_global_precio_mayor_0']) {
+            $analisis['conclusion'] = 'Excluido del paso global: precio del producto null o 0.';
+            return $analisis;
+        }
+
+        if ($analisis['tiene_especificaciones_unidad_unica']) {
+            $especificacionesElegidas = $producto->categoria_especificaciones_internas_elegidas;
+            $categoriaEspecificaciones = $producto->categoriaEspecificaciones;
+            $filtrosCombinados = [];
+
+            if ($categoriaEspecificaciones && $categoriaEspecificaciones->especificaciones_internas) {
+                $filtros = $categoriaEspecificaciones->especificaciones_internas['filtros'] ?? [];
+                $filtrosProducto = $especificacionesElegidas['_producto']['filtros'] ?? [];
+                $filtrosCombinados = array_merge($filtros, is_array($filtrosProducto) ? $filtrosProducto : []);
+            }
+
+            $todasLasOfertas = $servicioOfertas->obtenerTodas($producto);
+            $analisis['total_ofertas_producto'] = $todasLasOfertas->count();
+
+            foreach ($especificacionesElegidas as $lineaId => $sublineasProducto) {
+                if (strpos((string) $lineaId, '_') === 0) {
+                    continue;
+                }
+
+                $lineaPrincipal = null;
+                foreach ($filtrosCombinados as $filtro) {
+                    if (isset($filtro['id']) && strval($filtro['id']) === strval($lineaId)) {
+                        $lineaPrincipal = $filtro;
+                        break;
+                    }
+                }
+
+                if (!$lineaPrincipal) {
+                    continue;
+                }
+
+                $sublineasArray = is_array($sublineasProducto) ? $sublineasProducto : [$sublineasProducto];
+
+                foreach ($sublineasArray as $sublineaProducto) {
+                    $analisis['variantes'][] = $this->evaluarVarianteProductoFocalizado(
+                        $producto,
+                        $lineaId,
+                        $sublineaProducto,
+                        $lineaPrincipal,
+                        $todasLasOfertas
+                    );
+                }
+            }
+
+            $variantesHot = array_filter($analisis['variantes'], fn ($v) => ($v['es_hot'] ?? false) === true);
+            $analisis['conclusion'] = count($variantesHot) > 0
+                ? 'Hay ' . count($variantesHot) . ' variante(s) que cumplen criterio hot en este análisis.'
+                : 'Ninguna variante con mostrar cumple hot (rebaja >= ' . HistoricoPrecioProducto::REBAJA_MINIMA_PCT_HOT . '% bajo mínimo 3m). Revisa motivo en cada variante.';
+
+            return $analisis;
+        }
+
+        $mejorOferta = $servicioOfertas->obtener($producto);
+        $precioOfertaGeneral = ($mejorOferta && $mejorOferta->precio_unidad > 0)
+            ? (float) $mejorOferta->precio_unidad
+            : null;
+        $analisis['historico_general_3m'] = $this->obtenerDetalleHistorico3m($productoId, null, $precioOfertaGeneral);
+
+        $precioMinimoHistorico = HistoricoPrecioProducto::precioMinimoReferenciaUltimosMeses(
+            $productoId,
+            null,
+            3,
+            $precioOfertaGeneral
+        );
+        $general = [
+            'precio_minimo_historico_3m' => $precioMinimoHistorico !== null ? round($precioMinimoHistorico, 3) : null,
+            'mejor_oferta_id' => $mejorOferta?->id,
+            'precio_oferta' => $precioOfertaGeneral !== null ? round($precioOfertaGeneral, 3) : null,
+            'es_hot' => false,
+            'motivo' => null,
+            'rebaja_pct' => null,
+        ];
+
+        if (!$mejorOferta || $mejorOferta->precio_unidad <= 0) {
+            $general['motivo'] = 'sin_oferta';
+        } elseif ($precioMinimoHistorico === null || $precioMinimoHistorico <= 0) {
+            $general['motivo'] = 'sin_historico_3m';
+        } else {
+            $precioOferta = (float) $mejorOferta->precio_unidad;
+            if ($precioOferta > $precioMinimoHistorico) {
+                $general['motivo'] = 'precio_superior_al_minimo';
+                $general['rebaja_pct'] = round((($precioMinimoHistorico - $precioOferta) / $precioMinimoHistorico) * 100, 2);
+            } else {
+                $diferencia = (($precioMinimoHistorico - $precioOferta) / $precioMinimoHistorico) * 100;
+                $general['rebaja_pct'] = round($diferencia, 2);
+                if ($diferencia < HistoricoPrecioProducto::REBAJA_MINIMA_PCT_HOT) {
+                    $general['motivo'] = 'rebaja_menor_umbral';
+                } elseif (!$mejorOferta->tienda) {
+                    $general['motivo'] = 'sin_tienda';
+                } else {
+                    $general['motivo'] = 'hot_ok';
+                    $general['es_hot'] = true;
+                }
+            }
+        }
+
+        $analisis['general'] = $general;
+        $analisis['conclusion'] = $general['es_hot']
+            ? 'Producto general cumple hot.'
+            : 'Producto general NO hot: ' . ($general['motivo'] ?? 'desconocido');
+
+        return $analisis;
+    }
+
+    private function evaluarVarianteProductoFocalizado(
+        Producto $producto,
+        $lineaId,
+        $sublineaProducto,
+        array $lineaPrincipal,
+        $todasLasOfertas
+    ): array {
+        $esMostrar = false;
+        $sublineaId = null;
+
+        if (is_array($sublineaProducto)) {
+            $sublineaId = $sublineaProducto['id'] ?? null;
+            $mValue = $sublineaProducto['m'] ?? null;
+            if ($mValue !== null) {
+                $esMostrar = ($mValue === 1 || $mValue === '1' || $mValue === true || $mValue === 'true');
+            }
+            if (!$esMostrar && isset($sublineaProducto['mostrar'])) {
+                $esMostrar = ($sublineaProducto['mostrar'] === true || $sublineaProducto['mostrar'] === 'true'
+                    || $sublineaProducto['mostrar'] === 1 || $sublineaProducto['mostrar'] === '1');
+            }
+        } else {
+            $sublineaId = strval($sublineaProducto);
+        }
+
+        $sublineaTexto = null;
+        $subprincipales = $lineaPrincipal['subprincipales'] ?? [];
+        foreach ($subprincipales as $subprincipal) {
+            $subprincipalId = is_array($subprincipal) ? ($subprincipal['id'] ?? null) : strval($subprincipal);
+            if (strval($subprincipalId) === strval($sublineaId)) {
+                if (is_array($subprincipal)) {
+                    $sublineaTexto = $subprincipal['texto'] ?? $subprincipal['slug'] ?? strval($subprincipalId);
+                } else {
+                    $sublineaTexto = strval($subprincipal);
+                }
+                if (is_array($sublineaProducto) && !empty($sublineaProducto['textoAlternativo'])) {
+                    $sublineaTexto = $sublineaProducto['textoAlternativo'];
+                }
+                break;
+            }
+        }
+
+        $resultado = [
+            'variante' => $sublineaTexto,
+            'especificacion_id' => $sublineaId,
+            'linea_id' => $lineaId,
+            'marcada_mostrar' => $esMostrar,
+            'es_hot' => false,
+            'motivo' => null,
+            'rebaja_pct' => null,
+            'precio_minimo_historico_3m' => null,
+            'precio_oferta' => null,
+            'oferta_id' => null,
+            'ofertas_coincidentes' => 0,
+            'historico_3m' => null,
+        ];
+
+        if (!$esMostrar || !$sublineaId) {
+            $resultado['motivo'] = 'omitida_no_mostrar';
+            return $resultado;
+        }
+
+        if (!$sublineaTexto) {
+            $resultado['motivo'] = 'sin_texto_variante';
+            return $resultado;
+        }
+
+        $specId = (string) $sublineaId;
+
+        $ofertasFiltradas = $todasLasOfertas->filter(function ($oferta) use ($lineaId, $sublineaId) {
+            $especificacionesOferta = $oferta->especificaciones_internas;
+            if (!$especificacionesOferta || !is_array($especificacionesOferta)) {
+                return false;
+            }
+            $ofertaLinea = $especificacionesOferta[$lineaId] ?? null;
+            if (!$ofertaLinea) {
+                return false;
+            }
+            $ofertaSublineas = is_array($ofertaLinea) ? $ofertaLinea : [$ofertaLinea];
+            foreach ($ofertaSublineas as $item) {
+                $itemId = (is_array($item) && isset($item['id'])) ? strval($item['id']) : strval($item);
+                if (strval($itemId) === strval($sublineaId)) {
+                    return true;
+                }
+            }
+            return false;
+        });
+
+        $resultado['ofertas_coincidentes'] = $ofertasFiltradas->count();
+
+        if ($ofertasFiltradas->isEmpty()) {
+            $resultado['motivo'] = 'sin_oferta_para_variante';
+            return $resultado;
+        }
+
+        $mejorOferta = $ofertasFiltradas->first();
+        $precioOferta = (float) $mejorOferta->precio_unidad;
+        $resultado['precio_oferta'] = round($precioOferta, 3);
+        $resultado['oferta_id'] = $mejorOferta->id;
+
+        if ($precioOferta <= 0) {
+            $resultado['motivo'] = 'oferta_precio_invalido';
+            return $resultado;
+        }
+
+        $historico = $this->obtenerDetalleHistorico3m($producto->id, $specId, $precioOferta);
+        $resultado['historico_3m'] = $historico;
+        $precioMinimoHistorico = $historico['precio_minimo_calculado'];
+        $resultado['precio_minimo_historico_3m'] = $precioMinimoHistorico;
+
+        if ($precioMinimoHistorico === null || $precioMinimoHistorico <= 0) {
+            $resultado['motivo'] = 'sin_historico_3m';
+            return $resultado;
+        }
+
+        if ($precioOferta > $precioMinimoHistorico) {
+            $resultado['motivo'] = 'precio_superior_al_minimo';
+            $resultado['rebaja_pct'] = round((($precioMinimoHistorico - $precioOferta) / $precioMinimoHistorico) * 100, 2);
+            return $resultado;
+        }
+
+        $diferencia = (($precioMinimoHistorico - $precioOferta) / $precioMinimoHistorico) * 100;
+        $resultado['rebaja_pct'] = round($diferencia, 2);
+
+        if ($diferencia < HistoricoPrecioProducto::REBAJA_MINIMA_PCT_HOT) {
+            $resultado['motivo'] = 'rebaja_menor_umbral';
+            return $resultado;
+        }
+
+        if (!$mejorOferta->tienda) {
+            $resultado['motivo'] = 'sin_tienda';
+            return $resultado;
+        }
+
+        $resultado['motivo'] = 'hot_ok';
+        $resultado['es_hot'] = true;
+
+        return $resultado;
     }
 
     private function obtenerCategoriaIdsIncluyendoHijas($categoriaId)
@@ -653,7 +1221,7 @@ class PrecioHotController extends Controller
     /**
      * Calcula precios hot para las especificaciones internas de un producto
      */
-    private function calcularPreciosHotEspecificacionesInternas($producto, $haceUnMes)
+    private function calcularPreciosHotEspecificacionesInternas($producto)
     {
         $productosHot = [];
         
@@ -745,8 +1313,16 @@ class PrecioHotController extends Controller
                 }
                 
                 if (!$esMostrar || !$sublineaId) {
+                    $this->registrarMuestraDepuracion('spec_omitida_no_mostrar', [
+                        'producto_id' => $producto->id,
+                        'nombre' => $producto->nombre,
+                        'especificacion_id' => $sublineaId,
+                        'linea_id' => $lineaId,
+                    ]);
                     continue;
                 }
+
+                $this->incrementarDepuracion('variantes_evaluadas');
                 
                 // Obtener la primera imagen de la sublínea si tiene imágenes
                 $primeraImagen = null;
@@ -791,24 +1367,16 @@ class PrecioHotController extends Controller
                 }
                 
                 if (!$sublineaTexto) {
+                    $this->registrarMuestraDepuracion('spec_sin_texto', [
+                        'producto_id' => $producto->id,
+                        'nombre' => $producto->nombre,
+                        'especificacion_id' => $sublineaId,
+                    ]);
                     continue;
                 }
                 
                 // Convertir el texto a slug para usarlo en la URL
                 $sublineaTextoSlug = \Illuminate\Support\Str::slug($sublineaTexto);
-                
-                // Calcular precio medio del histórico de esta especificación interna
-                $precioMedioEspecificacion = HistoricoPrecioProducto::where('producto_id', $producto->id)
-                    ->where('especificacion_interna_id', $sublineaId)
-                    ->where('fecha', '>=', $haceUnMes)
-                    ->where('precio_minimo', '>', 0)
-                    ->whereNotNull('precio_minimo')
-                    ->avg('precio_minimo');
-                
-                // Si no hay precio medio válido, continuar con la siguiente especificación
-                if (!$precioMedioEspecificacion || $precioMedioEspecificacion <= 0) {
-                    continue;
-                }
                 
                 // Filtrar ofertas que coincidan con esta especificación específica
                 $ofertasFiltradas = $todasLasOfertas->filter(function($oferta) use ($lineaId, $sublineaId) {
@@ -843,28 +1411,73 @@ class PrecioHotController extends Controller
                 }
                 
                 if (!$mejorOfertaEspecificacion || $mejorOfertaEspecificacion->precio_unidad <= 0) {
+                    $this->registrarMuestraDepuracion('spec_sin_oferta', [
+                        'producto_id' => $producto->id,
+                        'nombre' => $producto->nombre,
+                        'variante' => $sublineaTexto,
+                        'especificacion_id' => $sublineaId,
+                        'ofertas_coincidentes' => $ofertasFiltradas->count(),
+                    ]);
                     continue;
                 }
                 
                 $precioOfertaEspecificacion = $mejorOfertaEspecificacion->precio_unidad;
-                
-                // Validar que el precio de la oferta no sea mayor que el precio medio
-                if ($precioOfertaEspecificacion > $precioMedioEspecificacion) {
+
+                $precioMinimoHistoricoEspecificacion = HistoricoPrecioProducto::precioMinimoReferenciaUltimosMeses(
+                    $producto->id,
+                    (string) $sublineaId,
+                    3,
+                    $precioOfertaEspecificacion
+                );
+                $filasHistoricoSpec = $this->contarFilasHistorico($producto->id, (string) $sublineaId, $precioOfertaEspecificacion);
+
+                if ($precioMinimoHistoricoEspecificacion === null || $precioMinimoHistoricoEspecificacion <= 0) {
+                    $this->registrarMuestraDepuracion('spec_sin_historico_3m', [
+                        'producto_id' => $producto->id,
+                        'nombre' => $producto->nombre,
+                        'variante' => $sublineaTexto,
+                        'especificacion_id' => $sublineaId,
+                        'filas_historico_3m' => $filasHistoricoSpec,
+                        'precio_oferta' => round($precioOfertaEspecificacion, 3),
+                    ]);
                     continue;
                 }
                 
-                // Calcular porcentaje de diferencia
-                $diferencia = (($precioMedioEspecificacion - $precioOfertaEspecificacion) / $precioMedioEspecificacion) * 100;
+                if ($precioOfertaEspecificacion > $precioMinimoHistoricoEspecificacion) {
+                    $this->registrarMuestraDepuracion('spec_precio_superior_al_minimo', [
+                        'producto_id' => $producto->id,
+                        'nombre' => $producto->nombre,
+                        'variante' => $sublineaTexto,
+                        'especificacion_id' => $sublineaId,
+                        'precio_minimo_historico' => round($precioMinimoHistoricoEspecificacion, 3),
+                        'precio_oferta' => round($precioOfertaEspecificacion, 3),
+                        'oferta_id' => $mejorOfertaEspecificacion->id,
+                    ]);
+                    continue;
+                }
+
+                $diferencia = (($precioMinimoHistoricoEspecificacion - $precioOfertaEspecificacion) / $precioMinimoHistoricoEspecificacion) * 100;
+
+                if ($diferencia < HistoricoPrecioProducto::REBAJA_MINIMA_PCT_HOT) {
+                    $this->registrarMuestraDepuracion('spec_rebaja_menor_umbral', [
+                        'producto_id' => $producto->id,
+                        'nombre' => $producto->nombre,
+                        'variante' => $sublineaTexto,
+                        'especificacion_id' => $sublineaId,
+                        'precio_minimo_historico' => round($precioMinimoHistoricoEspecificacion, 3),
+                        'precio_oferta' => round($precioOfertaEspecificacion, 3),
+                        'rebaja_pct' => round($diferencia, 2),
+                        'oferta_id' => $mejorOfertaEspecificacion->id,
+                    ]);
+                }
                 
                 // Actualizar campo rebajado en especificaciones_busqueda
-                // Si la diferencia es >= 5%, guardar el porcentaje redondeado a entero
-                // Si la diferencia está entre 0.1% y 4.99%, guardar 0
-                // Si no hay rebaja o el precio es mayor que la media, guardar 0
+                $umbralHot = HistoricoPrecioProducto::REBAJA_MINIMA_PCT_HOT;
                 $rebajado = 0;
-                if ($diferencia >= 5) {
+                if ($diferencia >= $umbralHot) {
                     $rebajado = (int) round($diferencia);
-                } elseif ($diferencia > 0 && $diferencia < 5) {
-                    $rebajado = 0; // Rebajas menores al 5% se guardan como 0
+                } elseif ($diferencia > 0 && $diferencia < $umbralHot) {
+                    $rebajado = 0;
                 }
                 
                 // Actualizar especificaciones_busqueda si existe esta especificación
@@ -895,12 +1508,29 @@ class PrecioHotController extends Controller
                     }
                 }
                 
-                // Solo incluir en precios hot si la diferencia es del 5% o más
-                if ($diferencia >= 5) {
+                if ($diferencia >= HistoricoPrecioProducto::REBAJA_MINIMA_PCT_HOT) {
                     $tienda = $mejorOfertaEspecificacion->tienda;
                     if (!$tienda) {
+                        $this->registrarMuestraDepuracion('spec_sin_tienda', [
+                            'producto_id' => $producto->id,
+                            'nombre' => $producto->nombre,
+                            'variante' => $sublineaTexto,
+                            'oferta_id' => $mejorOfertaEspecificacion->id,
+                            'rebaja_pct' => round($diferencia, 2),
+                        ]);
                         continue;
                     }
+
+                    $this->registrarMuestraDepuracion('spec_hot_ok', [
+                        'producto_id' => $producto->id,
+                        'nombre' => $producto->nombre . ' ' . $sublineaTexto,
+                        'variante' => $sublineaTexto,
+                        'especificacion_id' => $sublineaId,
+                        'precio_minimo_historico' => round($precioMinimoHistoricoEspecificacion, 3),
+                        'precio_oferta' => round($precioOfertaEspecificacion, 3),
+                        'rebaja_pct' => round($diferencia, 2),
+                        'oferta_id' => $mejorOfertaEspecificacion->id,
+                    ], false);
                     
                     // Obtener unidad de medida del producto
                     $unidadMedida = $producto->unidadDeMedida ?? 'unidadUnica';
@@ -1046,24 +1676,6 @@ class PrecioHotController extends Controller
                 }
                 
                 $especificacionId = $sublineaId;
-            
-                // Calcular precio medio del histórico de esta especificación interna
-                $precioMedioEspecificacion = HistoricoPrecioProducto::where('producto_id', $producto->id)
-                    ->where('especificacion_interna_id', $especificacionId)
-                    ->where('fecha', '>=', $haceUnMes)
-                    ->where('precio_minimo', '>', 0)
-                    ->whereNotNull('precio_minimo')
-                    ->avg('precio_minimo');
-                
-                // Si no hay precio medio válido, poner rebajado a 0
-                if (!$precioMedioEspecificacion || $precioMedioEspecificacion <= 0) {
-                    if (isset($especificacionesBusqueda[$sublineaTextoSlug]['rebajado']) && 
-                        $especificacionesBusqueda[$sublineaTextoSlug]['rebajado'] != 0) {
-                        $especificacionesBusqueda[$sublineaTextoSlug]['rebajado'] = 0;
-                        $necesitaActualizarEspecificacionesBusqueda = true;
-                    }
-                    continue;
-                }
                 
                 // Filtrar ofertas que coincidan con esta especificación específica
                 $ofertasFiltradas = $todasLasOfertas->filter(function($oferta) use ($lineaId, $especificacionId) {
@@ -1100,16 +1712,30 @@ class PrecioHotController extends Controller
                 $rebajado = 0;
                 if ($mejorOfertaEspecificacion && $mejorOfertaEspecificacion->precio_unidad > 0) {
                     $precioOfertaEspecificacion = $mejorOfertaEspecificacion->precio_unidad;
+
+                    $precioMinimoHistoricoEspecificacion = HistoricoPrecioProducto::precioMinimoReferenciaUltimosMeses(
+                        $producto->id,
+                        (string) $especificacionId,
+                        3,
+                        $precioOfertaEspecificacion
+                    );
+
+                    if ($precioMinimoHistoricoEspecificacion === null || $precioMinimoHistoricoEspecificacion <= 0) {
+                        if (isset($especificacionesBusqueda[$sublineaTextoSlug]['rebajado']) &&
+                            $especificacionesBusqueda[$sublineaTextoSlug]['rebajado'] != 0) {
+                            $especificacionesBusqueda[$sublineaTextoSlug]['rebajado'] = 0;
+                            $necesitaActualizarEspecificacionesBusqueda = true;
+                        }
+                        continue;
+                    }
                     
-                    if ($precioOfertaEspecificacion <= $precioMedioEspecificacion) {
-                        $diferencia = (($precioMedioEspecificacion - $precioOfertaEspecificacion) / $precioMedioEspecificacion) * 100;
+                    if ($precioOfertaEspecificacion <= $precioMinimoHistoricoEspecificacion) {
+                        $diferencia = (($precioMinimoHistoricoEspecificacion - $precioOfertaEspecificacion) / $precioMinimoHistoricoEspecificacion) * 100;
                         
-                        // Si la diferencia es >= 5%, guardar el porcentaje redondeado a entero
-                        // Si la diferencia está entre 0.1% y 4.99%, guardar 0
-                        if ($diferencia >= 5) {
+                        if ($diferencia >= HistoricoPrecioProducto::REBAJA_MINIMA_PCT_HOT) {
                             $rebajado = (int) round($diferencia);
                         } else {
-                            $rebajado = 0; // Rebajas menores al 5% se guardan como 0
+                            $rebajado = 0;
                         }
                     }
                 }

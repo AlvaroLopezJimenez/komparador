@@ -3452,6 +3452,12 @@
         const anchor = div.querySelector('.url-fila-link');
         const span = div.querySelector('.url-fila-texto');
         if (!url || !anchor || !span) return;
+        if (rowData.producto_asignado_desde_neo) {
+            span.textContent = url;
+            anchor.title = url;
+            anchor.href = url;
+            return;
+        }
         const tokensProducto = obtenerSetTokensProductoFilaCrearMasivo(rowData);
         const tokensSpecs = obtenerSetTokensSpecsMarcadasFilaCrearMasivo(div);
         const palabrasSlug = extraerPalabrasSlugDesdeUrlCrearMasivo(url);
@@ -4154,7 +4160,7 @@
             }
 
             let selectorEmpateHtml = '';
-            if (puedeCrear && r.hay_empate && r.candidatos_empatados && r.candidatos_empatados.length > 1) {
+            if (puedeCrear && r.hay_empate && r.candidatos_empatados && r.candidatos_empatados.length > 1 && !r.producto_asignado_desde_neo) {
                 selectorEmpateHtml = '<div class="mt-2 p-3 bg-amber-50 dark:bg-amber-900/20 rounded border border-amber-200 dark:border-amber-700"><span class="text-sm font-medium text-amber-800 dark:text-amber-200">Varios productos coinciden. Elige el correcto:</span><div class="mt-2 flex flex-wrap gap-2">' +
                     r.candidatos_empatados.map((c, i) => '<button type="button" class="btn-elegir-producto px-3 py-1.5 text-sm rounded border transition ' + (i === 0 ? 'border-green-600 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200' : 'border-gray-300 dark:border-gray-600 hover:border-green-500') + '" data-candidato-idx="' + i + '">' + (c.texto_completo || c.nombre || c.id) + '</button>').join('') +
                     '</div></div>';
@@ -4277,13 +4283,15 @@
             div.__rowData = r;
             renderUrlResaltadaFilaCrearMasivo(div);
             if (puedeCrear) actualizarEstadoBotonGenerar(div);
-            if (r.producto && r.tiene_especificaciones) {
+            if (r.producto && r.tiene_especificaciones && !r.producto_asignado_desde_neo) {
                 setTimeout(() => actualizarConteosOpcionesEspecsFila(div), 50);
             }
 
-            const especsMarcadasAuto = (r.especificaciones_marcadas_chatgpt && typeof r.especificaciones_marcadas_chatgpt === 'object')
-                ? r.especificaciones_marcadas_chatgpt
-                : ((r.especificaciones_marcadas && typeof r.especificaciones_marcadas === 'object') ? r.especificaciones_marcadas : null);
+            const especsMarcadasAuto = !r.producto_asignado_desde_neo
+                ? ((r.especificaciones_marcadas_chatgpt && typeof r.especificaciones_marcadas_chatgpt === 'object')
+                    ? r.especificaciones_marcadas_chatgpt
+                    : ((r.especificaciones_marcadas && typeof r.especificaciones_marcadas === 'object') ? r.especificaciones_marcadas : null))
+                : null;
             if (especsMarcadasAuto) {
                 Object.keys(especsMarcadasAuto).forEach(function(principalId) {
                     const subIds = especsMarcadasAuto[principalId];
@@ -4456,7 +4464,7 @@
                 }
             }
 
-            if (puedeCrear && r.hay_empate && r.candidatos_empatados) {
+            if (puedeCrear && r.hay_empate && r.candidatos_empatados && !r.producto_asignado_desde_neo) {
                 div.__candidatosEmpatados = r.candidatos_empatados;
             }
 
@@ -5057,6 +5065,7 @@
 
     async function actualizarConteosOpcionesEspecsFila(div) {
         if (!div || !div.__rowData || !div.__rowData.producto || div.__rowData.ofertaGenerada) return;
+        if (div.__rowData.producto_asignado_desde_neo) return;
         const specLines = div.querySelectorAll('.spec-line');
         if (!specLines.length) {
             limpiarConteosOpcionesEspecsFila(div);
@@ -5381,6 +5390,10 @@
             }
             cerrarModalDescartarUrlCrearMasivo();
             aplicarEstadoFilaDescartadaCrearMasivo(div);
+            const flujo = window.__flujoModalUrlsCrearMasivo;
+            if (flujo && !flujo.modoFinal && div === flujo.filaActualEnModal) {
+                avanzarASiguienteUrlEnFlujoModalCrearMasivo();
+            }
         } catch (err) {
             if (div) {
                 const msgEl = div.querySelector('.generado-msg');

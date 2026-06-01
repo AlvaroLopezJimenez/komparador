@@ -1965,48 +1965,37 @@ public function generarContenido(Request $request)
     private function calcularProductosHot($productos, $limite)
     {
         $productosHot = [];
-        $haceUnMes = Carbon::now()->subMonth();
         $servicioOfertas = new \App\Services\SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos();
 
         foreach ($productos as $producto) {
-            // Calcular precio medio del último mes para el producto general (sin especificacion_interna_id)
-            $precioMedio = HistoricoPrecioProducto::where('producto_id', $producto->id)
-                ->whereNull('especificacion_interna_id')
-                ->where('fecha', '>=', $haceUnMes)
-                ->where('precio_minimo', '>', 0)
-                ->whereNotNull('precio_minimo')
-                ->avg('precio_minimo');
-
-            if (!$precioMedio || $precioMedio <= 0) {
-                // Limpiar rebajado si no hay precio medio válido
-                Producto::where('id', $producto->id)->update(['rebajado' => null]);
-                continue; // Saltar productos sin historial de precios
-            }
-
-            // Usar el servicio para obtener la oferta más barata con descuentos y chollos aplicados
             $mejorOferta = $servicioOfertas->obtener($producto);
             
             if (!$mejorOferta || $mejorOferta->precio_unidad <= 0) {
-                // Limpiar rebajado si no hay oferta válida
-                Producto::where('id', $producto->id)->update(['rebajado' => null]);
-                continue; // Saltar productos sin ofertas
-            }
-
-            // Usar el precio_unidad de la oferta procesada (con descuentos y chollos aplicados)
-            $precioOferta = $mejorOferta->precio_unidad;
-
-            // Validar que el precio de la oferta no sea mayor que el precio medio
-            if ($precioOferta > $precioMedio) {
-                // Limpiar rebajado si el precio actual es mayor que la media
                 Producto::where('id', $producto->id)->update(['rebajado' => null]);
                 continue;
             }
 
-            // Calcular porcentaje de diferencia usando el precio de la oferta más barata
-            $diferencia = (($precioMedio - $precioOferta) / $precioMedio) * 100;
+            $precioOferta = $mejorOferta->precio_unidad;
+            $precioMinimoHistorico = HistoricoPrecioProducto::precioMinimoReferenciaUltimosMeses(
+                $producto->id,
+                null,
+                3,
+                $precioOferta
+            );
 
-            // Solo incluir si el precio de la oferta es menor que la media y la diferencia es del 5% o más
-            if ($diferencia >= 5) {
+            if ($precioMinimoHistorico === null || $precioMinimoHistorico <= 0) {
+                Producto::where('id', $producto->id)->update(['rebajado' => null]);
+                continue;
+            }
+
+            if ($precioOferta > $precioMinimoHistorico) {
+                Producto::where('id', $producto->id)->update(['rebajado' => null]);
+                continue;
+            }
+
+            $diferencia = (($precioMinimoHistorico - $precioOferta) / $precioMinimoHistorico) * 100;
+
+            if ($diferencia >= HistoricoPrecioProducto::REBAJA_MINIMA_PCT_HOT) {
                 // Actualizar campo rebajado del producto SOLO si entra en precios hot
                 $porcentajeRebajado = (int) round($diferencia);
                 Producto::where('id', $producto->id)->update(['rebajado' => $porcentajeRebajado]);
@@ -2026,7 +2015,7 @@ public function generarContenido(Request $request)
                     ];
                 }
             } else {
-                // Si la diferencia es menor al 5%, limpiar rebajado (poner a null)
+                // Si la diferencia es menor al umbral hot, limpiar rebajado
                 Producto::where('id', $producto->id)->update(['rebajado' => null]);
             }
         }

@@ -739,14 +739,18 @@ class OfertasController extends Controller
                 app(ConsultarNeoCifrado::class)->hashLookup($urlParaBuscar),
             ])));
             $categoriaUrlId = $categoriaCatalogoId;
+            $neoProductoId = null;
             if (!empty($urlLookups)) {
                 $neoRow = Neo::query()
                     ->where('aniadida', 'no')
                     ->whereIn('url_lookup', $urlLookups)
                     ->orderBy('id')
-                    ->first(['id', 'categoria_id']);
+                    ->first(['id', 'categoria_id', 'producto_id']);
                 if ($neoRow) {
                     $item['neo_id'] = (int) $neoRow->id;
+                    if ($neoRow->producto_id !== null) {
+                        $neoProductoId = (int) $neoRow->producto_id;
+                    }
                     if ($neoRow->categoria_id !== null) {
                         $catId = (int) $neoRow->categoria_id;
                         if (!isset($categoriaNombresCache[$catId])) {
@@ -830,6 +834,19 @@ class OfertasController extends Controller
                         }
                     } else {
                         $item['error'] = ($item['error'] ?? '') . ' Producto no encontrado.';
+                    }
+                } elseif ($neoProductoId) {
+                    $productoUnico = $this->construirProductoParaCrearMasivo($neoProductoId);
+                    if ($productoUnico) {
+                        $item['producto'] = $productoUnico;
+                        $item['especificaciones'] = $productoUnico['especificaciones'] ?? null;
+                        $item['tiene_especificaciones'] = $productoUnico['tiene_especificaciones'] ?? false;
+                        $item['productos_candidatos'] = [$productoUnico];
+                        $item['producto_asignado_desde_neo'] = true;
+                        $item['hay_empate'] = false;
+                        $item['candidatos_empatados'] = [];
+                    } else {
+                        $item['error'] = ($item['error'] ?? '') . ' Producto neo no encontrado.';
                     }
                 } elseif ($noProductosSugeridos) {
                     $item['sin_producto_sugerido'] = true;
@@ -921,6 +938,7 @@ class OfertasController extends Controller
         foreach ($resultados as $idx => $r) {
             if ($r['existe'] ?? false) continue;
             if (!($r['tienda'] ?? null)) continue;
+            if (!empty($r['producto_asignado_desde_neo'])) continue;
             $candidatos = $r['productos_candidatos'] ?? [];
             if (empty($candidatos)) continue;
             $indicesParaChatgpt[$idx] = $r;
