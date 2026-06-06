@@ -88,6 +88,16 @@ class ProductoController extends Controller
             'marca' => 'required|string',
             'modelo' => 'required|string',
             'talla' => 'nullable|string',
+            'palabras_exigidas' => [
+                'required',
+                'string',
+                'max:5000',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (trim((string) $value) === '') {
+                        $fail('Las palabras exigidas son obligatorias.');
+                    }
+                },
+            ],
             'unidadDeMedida' => 'required|in:total,unidad,kilos,litros,unidadMilesima,unidadUnica,800gramos,100ml',
             'precio' => 'nullable|numeric',
             'imagenes_grandes' => 'nullable',
@@ -157,6 +167,7 @@ class ProductoController extends Controller
             'marca' => $validated['marca'],
             'modelo' => $validated['modelo'],
             'talla' => $validated['talla'],
+            'palabras_exigidas' => trim($validated['palabras_exigidas']),
             'unidadDeMedida' => $validated['unidadDeMedida'],
             'precio' => $validated['precio'],
             'imagen_grande' => $imagenesGrandes,
@@ -269,6 +280,16 @@ class ProductoController extends Controller
             'marca' => 'required|string',
             'modelo' => 'required|string',
             'talla' => 'nullable|string',
+            'palabras_exigidas' => [
+                'required',
+                'string',
+                'max:5000',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (trim((string) $value) === '') {
+                        $fail('Las palabras exigidas son obligatorias.');
+                    }
+                },
+            ],
             'unidadDeMedida' => 'required|in:total,unidad,kilos,litros,unidadMilesima,unidadUnica,800gramos,100ml',
             'precio' => 'nullable|numeric',
             'imagenes_grandes' => 'nullable',
@@ -366,6 +387,7 @@ class ProductoController extends Controller
             'marca' => $validated['marca'],
             'modelo' => $validated['modelo'],
             'talla' => $validated['talla'],
+            'palabras_exigidas' => trim($validated['palabras_exigidas']),
             'unidadDeMedida' => $validated['unidadDeMedida'],
             'precio' => $validated['precio'],
             'imagen_grande' => $imagenesGrandes,

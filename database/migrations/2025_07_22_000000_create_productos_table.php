@@ -14,6 +14,7 @@ return new class extends Migration {
             $table->string('marca');
             $table->string('modelo');
             $table->string('talla')->nullable();
+            $table->text('palabras_exigidas')->nullable();
             $table->decimal('precio', 8, 3)->nullable();
             $table->integer('rebajado')->nullable();
             $table->string('unidadDeMedida')->nullable();

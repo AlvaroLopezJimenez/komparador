@@ -13,6 +13,7 @@ class Producto extends Model
         'marca',
         'modelo',
         'talla',
+        'palabras_exigidas',
         'precio',
         'rebajado',
         'unidadDeMedida',

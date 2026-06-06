@@ -177,6 +177,21 @@
                         @error('talla') <p class="text-red-500 text-sm mt-1">{{ $message }}</p> @enderror
                     </div>
 
+                    <div>
+                        <label class="flex items-center gap-1.5 mb-1 font-medium text-gray-700 dark:text-gray-200">
+                            <span>Palabras exigidas <span class="text-red-500">*</span></span>
+                            <button type="button"
+                                class="tooltip-btn inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-gray-100 text-xs font-bold hover:bg-gray-400 dark:hover:bg-gray-500 focus:outline-none"
+                                aria-label="Ayuda sobre palabras exigidas"
+                                data-tooltip='Estas palabras mínimas deberán coincidir con el titulo del producto de amazon, para poder ser guardada en el sistema (Utilizar las mínimas indispensables) Ej Gigabyte GeForce RTX 9060 XT, poner tan solo "Gigabyte 9060 XT"'>?</button>
+                        </label>
+                        <input type="text" id="input_palabras_exigidas" name="palabras_exigidas" required
+                            value="{{ old('palabras_exigidas', $producto->palabras_exigidas ?? '') }}"
+                            class="w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border @error('palabras_exigidas') border-red-500 @enderror"
+                            placeholder="Ej: Gigabyte 9060 XT">
+                        @error('palabras_exigidas') <p class="text-red-500 text-sm mt-1">{{ $message }}</p> @enderror
+                    </div>
+
 
                     <div class="md:col-span-2 flex gap-2">
                         <button type="button" id="rellenar-info-automatica" disabled
@@ -2783,9 +2798,29 @@
         }
 
         // Función para actualizar el estado del botón de guardar
+        function validarPalabrasExigidas() {
+            const input = document.getElementById('input_palabras_exigidas');
+            if (!input) {
+                return { valido: true, mensaje: '' };
+            }
+            if ((input.value || '').trim() === '') {
+                return { valido: false, mensaje: 'Debes rellenar las palabras exigidas.' };
+            }
+            return { valido: true, mensaje: '' };
+        }
+        window.validarPalabrasExigidas = validarPalabrasExigidas;
+
         function actualizarBotonGuardar(habilitado, mensaje) {
             const btnGuardar = document.getElementById('btn_guardar');
             if (!btnGuardar) return;
+
+            if (habilitado) {
+                const palabras = validarPalabrasExigidas();
+                if (!palabras.valido) {
+                    habilitado = false;
+                    mensaje = palabras.mensaje;
+                }
+            }
 
             // Si se pide habilitar, comprobar también validación Neo (al menos un campo con URL o "No encontrado", y ningún campo con valor inválido)
             if (habilitado && typeof window.validarNeo === 'function') {
@@ -2806,6 +2841,28 @@
                 btnGuardar.title = mensaje || 'Debes seleccionar la última categoría de la jerarquía';
             }
         }
+
+        function reevaluarEstadoBotonGuardar() {
+            const palabras = validarPalabrasExigidas();
+            if (!palabras.valido) {
+                actualizarBotonGuardar(false, palabras.mensaje);
+                return;
+            }
+            if (typeof window.validarNeo === 'function') {
+                const r = window.validarNeo();
+                if (!r.valido) {
+                    actualizarBotonGuardar(false, r.mensaje);
+                    return;
+                }
+            }
+            const categoriaId = document.getElementById('categoria-final')?.value;
+            if (categoriaId && typeof verificarCategoriaParaGuardar === 'function') {
+                verificarCategoriaParaGuardar(categoriaId);
+                return;
+            }
+            actualizarBotonGuardar(true, '');
+        }
+        window.reevaluarEstadoBotonGuardar = reevaluarEstadoBotonGuardar;
 
         // Función para mostrar/ocultar la advertencia de subcategorías
         function mostrarAdvertenciaSubcategorias(mostrar) {
@@ -2861,8 +2918,70 @@
                         return false;
                     }
                 }
+
+                const palabras = validarPalabrasExigidas();
+                if (!palabras.valido) {
+                    e.preventDefault();
+                    alert(palabras.mensaje);
+                    const peInput = document.getElementById('input_palabras_exigidas');
+                    if (peInput) peInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    return false;
+                }
             });
         }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const inputPalabrasExigidas = document.getElementById('input_palabras_exigidas');
+            if (inputPalabrasExigidas) {
+                inputPalabrasExigidas.addEventListener('input', function() {
+                    if (typeof window.reevaluarEstadoBotonGuardar === 'function') {
+                        window.reevaluarEstadoBotonGuardar();
+                    } else if (typeof actualizarBotonGuardar === 'function') {
+                        const palabras = validarPalabrasExigidas();
+                        actualizarBotonGuardar(palabras.valido, palabras.mensaje);
+                    }
+                });
+                if (typeof window.reevaluarEstadoBotonGuardar === 'function') {
+                    window.reevaluarEstadoBotonGuardar();
+                } else {
+                    const palabras = validarPalabrasExigidas();
+                    actualizarBotonGuardar(palabras.valido, palabras.mensaje);
+                }
+            }
+            const fieldsetInfo = inputPalabrasExigidas?.closest('fieldset');
+            const btnAyudaPalabras = fieldsetInfo?.querySelector('.tooltip-btn[data-tooltip]');
+            if (btnAyudaPalabras) {
+                let tooltipPalabrasActual = null;
+                btnAyudaPalabras.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const tooltipTexto = this.getAttribute('data-tooltip');
+                    if (tooltipPalabrasActual) {
+                        tooltipPalabrasActual.remove();
+                        tooltipPalabrasActual = null;
+                        return;
+                    }
+                    const tooltip = document.createElement('div');
+                    tooltip.className = 'fixed z-50 bg-gray-900 text-white text-xs rounded shadow-lg p-3 max-w-sm pointer-events-none leading-relaxed';
+                    tooltip.textContent = tooltipTexto;
+                    document.body.appendChild(tooltip);
+                    const rect = this.getBoundingClientRect();
+                    tooltip.style.left = Math.max(8, rect.left) + 'px';
+                    tooltip.style.top = (rect.top - tooltip.offsetHeight - 8) + 'px';
+                    if (tooltip.getBoundingClientRect().top < 8) {
+                        tooltip.style.top = (rect.bottom + 8) + 'px';
+                    }
+                    tooltipPalabrasActual = tooltip;
+                    const cerrar = (ev) => {
+                        if (tooltipPalabrasActual && ev.target !== btnAyudaPalabras && !tooltipPalabrasActual.contains(ev.target)) {
+                            tooltipPalabrasActual.remove();
+                            tooltipPalabrasActual = null;
+                            document.removeEventListener('click', cerrar);
+                        }
+                    };
+                    setTimeout(() => document.addEventListener('click', cerrar), 0);
+                });
+            }
+        });
 
         // Función para actualizar automáticamente los campos de categoría
         function actualizarCamposCategoriaAutomaticos(categoriaId, nombreCategoria = null) {
@@ -3284,18 +3403,8 @@
             window.validarNeo = validarNeo;
 
             function actualizarBotonGuardarSegunNeo() {
-                const r = validarNeo();
-                if (!r.valido) {
-                    if (typeof actualizarBotonGuardar === 'function') {
-                        actualizarBotonGuardar(false, r.mensaje);
-                    }
-                    return;
-                }
-                const catInput = document.getElementById('categoria-final');
-                if (catInput && catInput.value && typeof verificarCategoriaParaGuardar === 'function') {
-                    verificarCategoriaParaGuardar(catInput.value);
-                } else if (typeof actualizarBotonGuardar === 'function') {
-                    actualizarBotonGuardar(true, '');
+                if (typeof window.reevaluarEstadoBotonGuardar === 'function') {
+                    window.reevaluarEstadoBotonGuardar();
                 }
             }
 

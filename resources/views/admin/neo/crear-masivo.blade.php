@@ -235,8 +235,8 @@
     <div id="modal-producto-neo" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-2xl w-full max-h-[80vh] flex flex-col border border-gray-200 dark:border-gray-700">
             <div class="p-4 border-b border-gray-200 dark:border-gray-700 space-y-3">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-700 dark:text-gray-300">
+                <div class="flex items-start gap-3">
+                    <div class="flex-1 min-w-0 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-700 dark:text-gray-300">
                         <span>Total URLs disponibles: <strong id="modal-producto-neo-total-urls" class="text-gray-900 dark:text-white">&mdash;</strong></span>
                         <span class="hidden sm:inline text-gray-400 dark:text-gray-500">|</span>
                         <span class="inline-flex flex-wrap items-center gap-3">
@@ -255,8 +255,24 @@
                             </label>
                             <button type="button" id="modal-producto-neo-btn-buscar-tienda" class="px-2 py-0.5 text-xs font-medium rounded border border-blue-600 text-blue-700 bg-blue-50 hover:bg-blue-100 dark:border-blue-500 dark:text-blue-300 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 disabled:opacity-50" title="Rellenar tienda por host de la URL y categoría desde el producto si falta">Rellenar</button>
                         </span>
+                        <span class="hidden sm:inline text-gray-400 dark:text-gray-500">|</span>
+                        <span class="inline-flex flex-wrap items-center gap-3">
+                            <span class="font-medium text-gray-800 dark:text-gray-200">Categorías con mostrar</span>
+                            <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                                <input type="checkbox" id="modal-producto-neo-chk-cat-mostrar-si" checked class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                <span>Sí</span>
+                            </label>
+                            <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                                <input type="checkbox" id="modal-producto-neo-chk-cat-mostrar-no" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                <span>No</span>
+                            </label>
+                            <label class="inline-flex items-center gap-1.5 cursor-pointer" title="Solo filas neo sin categoría (desmarca Sí y No). Con Sí o No marcados, también suma enlaces sin categoría.">
+                                <input type="checkbox" id="modal-producto-neo-chk-categoria-null" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                <span>null (<span id="modal-producto-neo-categoria-null-count">0</span>)</span>
+                            </label>
+                        </span>
                     </div>
-                    <button type="button" id="modal-producto-neo-cerrar" onclick="var m=document.getElementById('modal-producto-neo'); if(m){m.classList.add('hidden');}" class="text-2xl leading-none text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 shrink-0">&times;</button>
+                    <button type="button" id="modal-producto-neo-cerrar" onclick="var m=document.getElementById('modal-producto-neo'); if(m){m.classList.add('hidden');}" class="text-2xl leading-none text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 shrink-0 -mt-0.5">&times;</button>
                 </div>
                 <div id="modal-producto-neo-panel-tiendas-no" class="hidden w-full text-sm text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden">
                     <label class="flex items-center gap-2 cursor-pointer font-medium text-gray-900 dark:text-gray-100 px-3 py-2.5 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-600">
@@ -362,9 +378,57 @@
     <div id="modal-tienda-neo" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-2xl w-full max-h-[80vh] flex flex-col border border-gray-200 dark:border-gray-700">
             <div class="p-4 border-b border-gray-200 dark:border-gray-700 space-y-3">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <span class="text-sm text-gray-700 dark:text-gray-300">Total URLs disponibles: <strong id="modal-tienda-neo-total-urls" class="text-gray-900 dark:text-white">&mdash;</strong></span>
-                    <button type="button" id="modal-tienda-neo-cerrar" class="text-2xl leading-none text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 shrink-0 order-last sm:order-none">&times;</button>
+                <div class="flex items-start gap-3">
+                    <div class="flex-1 min-w-0 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-700 dark:text-gray-300">
+                        <span>Total URLs disponibles: <strong id="modal-tienda-neo-total-urls" class="text-gray-900 dark:text-white">&mdash;</strong></span>
+                        <span class="hidden sm:inline text-gray-400 dark:text-gray-500">|</span>
+                        <span class="inline-flex flex-wrap items-center gap-3">
+                            <span class="font-medium text-gray-800 dark:text-gray-200">Tiendas con mostrar</span>
+                            <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                                <input type="checkbox" id="modal-tienda-neo-chk-mostrar-si" checked class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500">
+                                <span>Sí</span>
+                            </label>
+                            <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                                <input type="checkbox" id="modal-tienda-neo-chk-mostrar-no" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500">
+                                <span>No</span>
+                            </label>
+                            <label class="inline-flex items-center gap-1.5 cursor-pointer" title="Solo filas neo sin tienda (desmarca Sí y No). Con Sí o No marcados, también suma enlaces sin tienda.">
+                                <input type="checkbox" id="modal-tienda-neo-chk-tienda-null" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500">
+                                <span>null (<span id="modal-tienda-neo-null-count">0</span>)</span>
+                            </label>
+                        </span>
+                        <span class="hidden sm:inline text-gray-400 dark:text-gray-500">|</span>
+                        <span class="inline-flex flex-wrap items-center gap-3">
+                            <span class="font-medium text-gray-800 dark:text-gray-200">Categorías con mostrar</span>
+                            <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                                <input type="checkbox" id="modal-tienda-neo-chk-cat-mostrar-si" checked class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500">
+                                <span>Sí</span>
+                            </label>
+                            <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                                <input type="checkbox" id="modal-tienda-neo-chk-cat-mostrar-no" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500">
+                                <span>No</span>
+                            </label>
+                            <label class="inline-flex items-center gap-1.5 cursor-pointer" title="Solo filas neo sin categoría (desmarca Sí y No). Con Sí o No marcados, también suma enlaces sin categoría.">
+                                <input type="checkbox" id="modal-tienda-neo-chk-categoria-null" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500">
+                                <span>null (<span id="modal-tienda-neo-categoria-null-count">0</span>)</span>
+                            </label>
+                        </span>
+                    </div>
+                    <button type="button" id="modal-tienda-neo-cerrar" class="text-2xl leading-none text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 shrink-0 -mt-0.5">&times;</button>
+                </div>
+                <div id="modal-tienda-neo-panel-tiendas-no" class="hidden w-full text-sm text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden">
+                    <label class="flex items-center gap-2 cursor-pointer font-medium text-gray-900 dark:text-gray-100 px-3 py-2.5 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-600">
+                        <input type="checkbox" id="modal-tienda-neo-chk-tiendas-no-todas" checked class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 shrink-0 modal-tienda-neo-tiendas-no-master">
+                        <span>Todas las tiendas</span>
+                    </label>
+                    <details id="modal-tienda-neo-details-tiendas-no-lista" class="group">
+                        <summary class="cursor-pointer select-none px-3 py-2 font-medium text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-700/50 list-none [&::-webkit-details-marker]:hidden flex items-center gap-2" title="Desplegar u ocultar el listado de tiendas">
+                            <svg class="w-4 h-4 shrink-0 text-gray-500 dark:text-gray-400 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                            <span>Elegir tiendas (mostrar «no»)</span>
+                            <span class="text-xs font-normal text-gray-500 dark:text-gray-400 ml-auto">desplegar</span>
+                        </summary>
+                        <div id="modal-tienda-neo-tiendas-no-lista" class="p-3 max-h-48 overflow-y-auto space-y-1.5 border-t border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800"></div>
+                    </details>
                 </div>
                 <div class="flex justify-between items-center gap-3">
                     <div class="flex items-center gap-2 min-w-0 flex-1">
@@ -409,13 +473,12 @@
                 <button type="button" id="modal-categoria-fila-cerrar" class="text-2xl leading-none text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">&times;</button>
             </div>
             <div class="flex-1 overflow-y-auto p-4 min-h-0">
-                <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">La búsqueda de productos se limitará a esta categoría y sus subcategorías.</p>
-                <fieldset class="bg-gray-50 dark:bg-gray-900/40 rounded-xl p-4 space-y-2 border border-gray-200 dark:border-gray-700">
-                    <legend class="text-sm font-semibold text-gray-700 dark:text-gray-200 px-1">Categorías</legend>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Abre ramas pulsando la fila. En categorías finales, pulsa el <strong class="text-gray-700 dark:text-gray-200">nombre</strong> o <strong class="text-gray-700 dark:text-gray-200">Seleccionar</strong>. En el recorrido URL a URL, al elegir una categoría se pasa a la siguiente.</p>
+                <div id="modal-categoria-fila-arbol" class="space-y-1">
                     @foreach ($categoriasRaiz ?? [] as $categoria)
                         @include('admin.categorias.partial-categoria', ['categoria' => $categoria, 'nivel' => 0, 'esPickerCrearMasivo' => true])
                     @endforeach
-                </fieldset>
+                </div>
             </div>
             <div class="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-end flex-shrink-0">
                 <button type="button" id="modal-categoria-fila-cerrar-btn" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600">Cerrar</button>
@@ -1150,6 +1213,19 @@
     const NEO_PANEL_PRODUCTOS_BASE = @json(rtrim(url('/panel-privado/productos'), '/'));
     window.__modalProductoNeoMainReady = false;
     window.__crearMasivoImagenesSublinea = {};
+
+    function cacheKeyImagenesSublineaCrearMasivo(productoId, principalId, subId) {
+        return String(productoId) + '::' + String(principalId) + '::' + String(subId);
+    }
+
+    function limpiarCacheImagenesSublineaProductoCrearMasivo(productoId) {
+        if (!productoId || !window.__crearMasivoImagenesSublinea) return;
+        const prefix = String(productoId) + '::';
+        Object.keys(window.__crearMasivoImagenesSublinea).forEach(function(k) {
+            if (k.indexOf(prefix) === 0) delete window.__crearMasivoImagenesSublinea[k];
+        });
+    }
+
     window.__mismoProductoSeleccionado = null;
     // Contexto de categoría cargada desde Neo (id, nombre) para acotar la búsqueda de producto.
     window.__neoCategoriaFiltro = null;
@@ -1611,12 +1687,39 @@
 
     function parseRespuestaProductosNeoApi(raw) {
         if (Array.isArray(raw)) {
-            return { productos: raw, filas_neo_tienda_id_null: 0 };
+            return { productos: raw, filas_neo_tienda_id_null: 0, filas_neo_categoria_id_null: 0 };
         }
         return {
             productos: Array.isArray(raw.productos) ? raw.productos : [],
             filas_neo_tienda_id_null: parseInt(String(raw.filas_neo_tienda_id_null ?? 0), 10) || 0,
+            filas_neo_categoria_id_null: parseInt(String(raw.filas_neo_categoria_id_null ?? 0), 10) || 0,
         };
+    }
+
+    function queryMostrarCategoriaModalProductoNeo() {
+        const chkSi = document.getElementById('modal-producto-neo-chk-cat-mostrar-si');
+        const chkNo = document.getElementById('modal-producto-neo-chk-cat-mostrar-no');
+        const chkNull = document.getElementById('modal-producto-neo-chk-categoria-null');
+        const si = chkSi && chkSi.checked;
+        const no = chkNo && chkNo.checked;
+        const incluirNull = chkNull && chkNull.checked;
+        let q = 'categoria_mostrar_si=' + (si ? '1' : '0') + '&categoria_mostrar_no=' + (no ? '1' : '0');
+        if (incluirNull) {
+            q += '&categoria_mostrar_null=1';
+        }
+        return q;
+    }
+
+    function ajustarChecksMostrarCategoriaModalProductoNeo(ev) {
+        const t = ev && ev.target ? ev.target.id : '';
+        const si = document.getElementById('modal-producto-neo-chk-cat-mostrar-si');
+        const no = document.getElementById('modal-producto-neo-chk-cat-mostrar-no');
+        if (!si || !no || t !== 'modal-producto-neo-chk-cat-mostrar-no') {
+            return;
+        }
+        if (no.checked && si.checked) {
+            si.checked = false;
+        }
     }
 
     function queryMostrarTiendaModalProductoNeo() {
@@ -1658,7 +1761,12 @@
     }
 
     function queryModalProductoNeoFiltros() {
-        return queryMostrarTiendaModalProductoNeo() + queryTiendasNoSeleccionadasModalProductoNeo();
+        const parts = [
+            queryMostrarTiendaModalProductoNeo(),
+            queryMostrarCategoriaModalProductoNeo(),
+            queryTiendasNoSeleccionadasModalProductoNeo().replace(/^&/, ''),
+        ].filter(Boolean);
+        return parts.join('&');
     }
 
     const urlTplUrlsPorProductoNeo = '{{ route("admin.neo.crear-masivo.urls-por-producto", ["productoId" => "__ID__"]) }}';
@@ -1916,6 +2024,10 @@
         if (nuloCountEl) {
             nuloCountEl.textContent = String(parsedList.filas_neo_tienda_id_null);
         }
+        const catNuloCountEl = document.getElementById('modal-producto-neo-categoria-null-count');
+        if (catNuloCountEl) {
+            catNuloCountEl.textContent = String(parsedList.filas_neo_categoria_id_null);
+        }
         if (!Array.isArray(productos) || productos.length === 0) {
             lista.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-sm">No hay productos con filas neo (añadida=no) para este filtro.</p>';
             setTotalUrlsDisponiblesNeo('modal-producto-neo-total-urls', 0);
@@ -1985,6 +2097,12 @@
         if (chkNoOpen) chkNoOpen.checked = false;
         const chkNullOpen = document.getElementById('modal-producto-neo-chk-tienda-null');
         if (chkNullOpen) chkNullOpen.checked = false;
+        const chkCatSiOpen = document.getElementById('modal-producto-neo-chk-cat-mostrar-si');
+        const chkCatNoOpen = document.getElementById('modal-producto-neo-chk-cat-mostrar-no');
+        const chkCatNullOpen = document.getElementById('modal-producto-neo-chk-categoria-null');
+        if (chkCatSiOpen) chkCatSiOpen.checked = true;
+        if (chkCatNoOpen) chkCatNoOpen.checked = false;
+        if (chkCatNullOpen) chkCatNullOpen.checked = false;
         ocultarBuscadorModalNeo('modal-producto-neo');
         btn.disabled = true;
         modal.classList.remove('hidden');
@@ -2014,6 +2132,33 @@
                 if (nulo) nulo.checked = false;
             }
             ajustarChecksMostrarTiendaModalProductoNeo(ev);
+            try {
+                const soloNo = esSoloMostrarNoModalProductoNeo();
+                await recargarListaModalProductoNeo({
+                    reiniciarSeleccion: soloNo,
+                    mantenerDesplegableAbierto: soloNo,
+                });
+            } catch (err) {
+                console.error(err);
+                document.getElementById('modal-producto-neo-lista').innerHTML = '<p class="text-red-500 text-sm">Error al cargar: ' + err.message + '</p>';
+            }
+        });
+    });
+    ['modal-producto-neo-chk-cat-mostrar-si', 'modal-producto-neo-chk-cat-mostrar-no', 'modal-producto-neo-chk-categoria-null'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('change', async function(ev) {
+            if (document.getElementById('modal-producto-neo').classList.contains('hidden')) return;
+            if (id === 'modal-producto-neo-chk-categoria-null' && el.checked) {
+                const si = document.getElementById('modal-producto-neo-chk-cat-mostrar-si');
+                const no = document.getElementById('modal-producto-neo-chk-cat-mostrar-no');
+                if (si) si.checked = false;
+                if (no) no.checked = false;
+            } else if ((id === 'modal-producto-neo-chk-cat-mostrar-si' || id === 'modal-producto-neo-chk-cat-mostrar-no') && el.checked) {
+                const nulo = document.getElementById('modal-producto-neo-chk-categoria-null');
+                if (nulo) nulo.checked = false;
+            }
+            ajustarChecksMostrarCategoriaModalProductoNeo(ev);
             try {
                 const soloNo = esSoloMostrarNoModalProductoNeo();
                 await recargarListaModalProductoNeo({
@@ -2660,6 +2805,222 @@
         tiendaSeleccionada: null,
     };
 
+    function parseRespuestaTiendasNeoApi(raw) {
+        if (Array.isArray(raw)) {
+            return { tiendas: raw, filas_neo_categoria_id_null: 0 };
+        }
+        return {
+            tiendas: Array.isArray(raw.tiendas) ? raw.tiendas : [],
+            filas_neo_categoria_id_null: parseInt(String(raw.filas_neo_categoria_id_null ?? 0), 10) || 0,
+        };
+    }
+
+    function queryMostrarTiendaModalTiendaNeo() {
+        const chkSi = document.getElementById('modal-tienda-neo-chk-mostrar-si');
+        const chkNo = document.getElementById('modal-tienda-neo-chk-mostrar-no');
+        const chkNull = document.getElementById('modal-tienda-neo-chk-tienda-null');
+        const si = chkSi && chkSi.checked;
+        const no = chkNo && chkNo.checked;
+        const incluirNull = chkNull && chkNull.checked;
+        let q = 'mostrar_si=' + (si ? '1' : '0') + '&mostrar_no=' + (no ? '1' : '0');
+        if (incluirNull) {
+            q += '&mostrar_null=1';
+        }
+        return q;
+    }
+
+    function queryMostrarCategoriaModalTiendaNeo() {
+        const chkSi = document.getElementById('modal-tienda-neo-chk-cat-mostrar-si');
+        const chkNo = document.getElementById('modal-tienda-neo-chk-cat-mostrar-no');
+        const chkNull = document.getElementById('modal-tienda-neo-chk-categoria-null');
+        const si = chkSi && chkSi.checked;
+        const no = chkNo && chkNo.checked;
+        const incluirNull = chkNull && chkNull.checked;
+        let q = 'categoria_mostrar_si=' + (si ? '1' : '0') + '&categoria_mostrar_no=' + (no ? '1' : '0');
+        if (incluirNull) {
+            q += '&categoria_mostrar_null=1';
+        }
+        return q;
+    }
+
+    function ajustarChecksMostrarCategoriaModalTiendaNeo(ev) {
+        const t = ev && ev.target ? ev.target.id : '';
+        const si = document.getElementById('modal-tienda-neo-chk-cat-mostrar-si');
+        const no = document.getElementById('modal-tienda-neo-chk-cat-mostrar-no');
+        if (!si || !no || t !== 'modal-tienda-neo-chk-cat-mostrar-no') {
+            return;
+        }
+        if (no.checked && si.checked) {
+            si.checked = false;
+        }
+    }
+
+    function ajustarChecksMostrarTiendaModalTiendaNeo(ev) {
+        const t = ev && ev.target ? ev.target.id : '';
+        const si = document.getElementById('modal-tienda-neo-chk-mostrar-si');
+        const no = document.getElementById('modal-tienda-neo-chk-mostrar-no');
+        if (!si || !no || t !== 'modal-tienda-neo-chk-mostrar-no') {
+            return;
+        }
+        if (no.checked && si.checked) {
+            si.checked = false;
+        }
+    }
+
+    function esSoloMostrarNoModalTiendaNeo() {
+        const si = document.getElementById('modal-tienda-neo-chk-mostrar-si');
+        const no = document.getElementById('modal-tienda-neo-chk-mostrar-no');
+        return !!(si && no && !si.checked && no.checked);
+    }
+
+    function queryTiendasNoSeleccionadasModalTiendaNeo() {
+        if (!esSoloMostrarNoModalTiendaNeo()) {
+            return '';
+        }
+        const container = document.getElementById('modal-tienda-neo-tiendas-no-lista');
+        if (!container || container.dataset.loaded !== '1') {
+            return '';
+        }
+        const checks = container.querySelectorAll('input[type="checkbox"].modal-tienda-neo-tienda-no-cb');
+        const parts = [];
+        checks.forEach(function(c) {
+            if (c.checked) {
+                parts.push('tienda_ids[]=' + encodeURIComponent(c.value));
+            }
+        });
+        return parts.length ? '&' + parts.join('&') : '';
+    }
+
+    function queryModalTiendaNeoFiltros() {
+        const parts = [
+            queryMostrarTiendaModalTiendaNeo(),
+            queryMostrarCategoriaModalTiendaNeo(),
+            queryTiendasNoSeleccionadasModalTiendaNeo().replace(/^&/, ''),
+        ].filter(Boolean);
+        return parts.join('&');
+    }
+
+    function registrarMasterTiendasMostrarNoModalTienda() {
+        const master = document.getElementById('modal-tienda-neo-chk-tiendas-no-todas');
+        const container = document.getElementById('modal-tienda-neo-tiendas-no-lista');
+        if (!master || master.__listenerMasterTiendasNo) return;
+        master.__listenerMasterTiendasNo = true;
+        master.addEventListener('change', function() {
+            const marcar = master.checked;
+            if (container) {
+                container.querySelectorAll('input.modal-tienda-neo-tienda-no-cb').forEach(function(c) {
+                    c.checked = marcar;
+                });
+            }
+            recargarContenidoModalTiendaNeo({ mantenerDesplegableAbierto: true });
+        });
+    }
+
+    async function cargarOpcionesTiendasMostrarNoModalTienda() {
+        const container = document.getElementById('modal-tienda-neo-tiendas-no-lista');
+        if (!container || container.dataset.loaded === '1') {
+            return;
+        }
+        container.innerHTML = '<p class="text-xs text-gray-500 dark:text-gray-400">Cargando tiendas...</p>';
+        let lista;
+        try {
+            const res = await fetch('{{ route("admin.neo.crear-masivo.tiendas-mostrar-no") }}' + '?_=' + Date.now(), { cache: 'no-store', headers: { 'Accept': 'application/json' } });
+            lista = await res.json();
+        } catch (e) {
+            console.error(e);
+            container.innerHTML = '<p class="text-xs text-red-500">Error al cargar tiendas.</p>';
+            return;
+        }
+        container.innerHTML = '';
+        if (!Array.isArray(lista) || lista.length === 0) {
+            container.innerHTML = '<p class="text-xs text-gray-500 dark:text-gray-400">No hay tiendas con mostrar «no».</p>';
+            container.dataset.loaded = '1';
+            return;
+        }
+        lista.forEach(function(t) {
+            const label = document.createElement('label');
+            label.className = 'flex items-center gap-2 cursor-pointer text-gray-800 dark:text-gray-200';
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.value = String(t.id);
+            cb.checked = true;
+            cb.className = 'rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 modal-tienda-neo-tienda-no-cb';
+            cb.addEventListener('change', function(ev) {
+                ev.stopPropagation();
+                const master = document.getElementById('modal-tienda-neo-chk-tiendas-no-todas');
+                const checks = document.querySelectorAll('#modal-tienda-neo-tiendas-no-lista input.modal-tienda-neo-tienda-no-cb');
+                if (master && checks.length) {
+                    master.checked = Array.from(checks).every(function(c) { return c.checked; });
+                }
+                recargarContenidoModalTiendaNeo({ mantenerDesplegableAbierto: true });
+            });
+            label.addEventListener('click', function(ev) { ev.stopPropagation(); });
+            const span = document.createElement('span');
+            span.textContent = t.nombre || ('Tienda #' + t.id);
+            label.appendChild(cb);
+            label.appendChild(span);
+            container.appendChild(label);
+        });
+        container.dataset.loaded = '1';
+        registrarMasterTiendasMostrarNoModalTienda();
+    }
+
+    async function actualizarVisibilidadPanelTiendasNoModalTienda(opciones) {
+        opciones = opciones || {};
+        const reiniciarSeleccion = opciones.reiniciarSeleccion === true;
+        const mantenerDesplegableAbierto = opciones.mantenerDesplegableAbierto === true;
+        const panel = document.getElementById('modal-tienda-neo-panel-tiendas-no');
+        const detailsLista = document.getElementById('modal-tienda-neo-details-tiendas-no-lista');
+        if (!panel) {
+            return;
+        }
+        const soloNo = esSoloMostrarNoModalTiendaNeo();
+        panel.classList.toggle('hidden', !soloNo);
+        if (soloNo) {
+            const master = document.getElementById('modal-tienda-neo-chk-tiendas-no-todas');
+            const container = document.getElementById('modal-tienda-neo-tiendas-no-lista');
+            if (reiniciarSeleccion && master) {
+                master.checked = true;
+                if (container) {
+                    container.querySelectorAll('input.modal-tienda-neo-tienda-no-cb').forEach(function(c) {
+                        c.checked = true;
+                    });
+                }
+            }
+            if (detailsLista && !mantenerDesplegableAbierto) {
+                detailsLista.open = false;
+            }
+            await cargarOpcionesTiendasMostrarNoModalTienda();
+            registrarMasterTiendasMostrarNoModalTienda();
+        } else if (detailsLista) {
+            detailsLista.open = false;
+        }
+    }
+
+    async function recargarListaTiendasModalTiendaNeo(opciones) {
+        await actualizarVisibilidadPanelTiendasNoModalTienda(opciones);
+        const lista = document.getElementById('modal-tienda-neo-lista');
+        lista.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-sm">Cargando...</p>';
+        setTotalUrlsDisponiblesNeo('modal-tienda-neo-total-urls', '\u2014');
+        const urlListado = '{{ route("admin.neo.crear-masivo.tiendas") }}' + '?' + queryModalTiendaNeoFiltros() + '&_=' + Date.now();
+        const res = await fetch(urlListado, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
+        const parsed = parseRespuestaTiendasNeoApi(await res.json());
+        estadoModalTiendaNeo.tiendas = parsed.tiendas;
+        const catNuloCountEl = document.getElementById('modal-tienda-neo-categoria-null-count');
+        if (catNuloCountEl) {
+            catNuloCountEl.textContent = String(parsed.filas_neo_categoria_id_null);
+        }
+        renderTiendasModalNeo();
+    }
+
+    async function recargarContenidoModalTiendaNeo(opciones) {
+        if (estadoModalTiendaNeo.tiendaSeleccionada) {
+            await renderCategoriasDeTiendaModalNeo(estadoModalTiendaNeo.tiendaSeleccionada);
+        } else {
+            await recargarListaTiendasModalTiendaNeo(opciones);
+        }
+    }
+
     function pegarUrlsEnTextareaCrearMasivo(urls) {
         document.getElementById('urls').value = (Array.isArray(urls) ? urls : []).join('\n');
         actualizarEstadoLotesDesdeTextarea();
@@ -2717,10 +3078,11 @@
      * Pega URLs desde neo por tienda (opcionalmente por categoría) y guarda contexto para Siguiente.
      */
     async function aplicarTiendaNeoUrlsAlFormulario(item, categoriaId, categoriaNombre) {
+        const fq = queryModalTiendaNeoFiltros();
         const routeBase = categoriaId == null
             ? '{{ route("admin.neo.crear-masivo.urls-por-tienda", ["tiendaId" => "__TID__"]) }}'.replace('__TID__', item.tienda_id)
             : '{{ route("admin.neo.crear-masivo.urls-por-tienda-categoria", ["tiendaId" => "__TID__", "categoriaId" => "__CID__"]) }}'.replace('__TID__', item.tienda_id).replace('__CID__', categoriaId);
-        const resUrl = await fetch(routeBase, { headers: { 'Accept': 'application/json' } });
+        const resUrl = await fetch(routeBase + '?' + (fq ? fq + '&' : '') + '_=' + Date.now(), { cache: 'no-store', headers: { 'Accept': 'application/json' } });
         const dataUrl = await resUrl.json();
         if (categoriaId == null) {
             window.__neoCategoriaFiltro = null;
@@ -2756,9 +3118,13 @@
         if (!ctx || ctx.tipo !== 'tienda') {
             return;
         }
-        const urlTiendas = '{{ route("admin.neo.crear-masivo.tiendas") }}' + '?_=' + Date.now();
-        const resTiendas = await fetch(urlTiendas, { headers: { 'Accept': 'application/json' } });
-        const tiendas = await resTiendas.json();
+        const fq = typeof queryModalTiendaNeoFiltros === 'function' ? queryModalTiendaNeoFiltros() : '';
+        const urlTiendas = '{{ route("admin.neo.crear-masivo.tiendas") }}' + '?' + (fq ? fq + '&' : '') + '_=' + Date.now();
+        const resTiendas = await fetch(urlTiendas, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
+        const parsedTiendas = typeof parseRespuestaTiendasNeoApi === 'function'
+            ? parseRespuestaTiendasNeoApi(await resTiendas.json())
+            : { tiendas: await resTiendas.json() };
+        const tiendas = parsedTiendas.tiendas;
         if (!Array.isArray(tiendas) || tiendas.length === 0) {
             alert('No quedan tiendas pendientes.');
             return;
@@ -2769,7 +3135,7 @@
         const preferredCat = ctx.categoria_id != null ? parseInt(String(ctx.categoria_id), 10) : null;
 
         if (preferredCat != null && curTienda) {
-            const resCat = await fetch('{{ route("admin.neo.crear-masivo.categorias-por-tienda", ["tiendaId" => "__ID__"]) }}'.replace('__ID__', curTienda.tienda_id), { headers: { 'Accept': 'application/json' } } );
+            const resCat = await fetch('{{ route("admin.neo.crear-masivo.categorias-por-tienda", ["tiendaId" => "__ID__"]) }}'.replace('__ID__', curTienda.tienda_id) + '?' + (fq ? fq + '&' : '') + '_=' + Date.now(), { cache: 'no-store', headers: { 'Accept': 'application/json' } });
             const rawCats = await resCat.json();
             const cats = Array.isArray(rawCats) ? rawCats : [];
             const ci = cats.findIndex(function(c) { return parseInt(String(c.categoria_id), 10) === preferredCat; });
@@ -2795,7 +3161,7 @@
             return;
         }
 
-        const resCat2 = await fetch('{{ route("admin.neo.crear-masivo.categorias-por-tienda", ["tiendaId" => "__ID__"]) }}'.replace('__ID__', nextTienda.tienda_id), { headers: { 'Accept': 'application/json' } } );
+        const resCat2 = await fetch('{{ route("admin.neo.crear-masivo.categorias-por-tienda", ["tiendaId" => "__ID__"]) }}'.replace('__ID__', nextTienda.tienda_id) + '?' + (fq ? fq + '&' : '') + '_=' + Date.now(), { cache: 'no-store', headers: { 'Accept': 'application/json' } });
         const rawCats2 = await resCat2.json();
         const cats2 = Array.isArray(rawCats2) ? rawCats2 : [];
         if (cats2.length > 0) {
@@ -2814,7 +3180,8 @@
         lista.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-sm">Cargando categorías...</p>';
         setTotalUrlsDisponiblesNeo('modal-tienda-neo-total-urls', '…');
         try {
-            const res = await fetch('{{ route("admin.neo.crear-masivo.categorias-por-tienda", ["tiendaId" => "__ID__"]) }}'.replace('__ID__', item.tienda_id), { headers: { 'Accept': 'application/json' } });
+            const fq = queryModalTiendaNeoFiltros();
+            const res = await fetch('{{ route("admin.neo.crear-masivo.categorias-por-tienda", ["tiendaId" => "__ID__"]) }}'.replace('__ID__', item.tienda_id) + '?' + fq + '&_=' + Date.now(), { cache: 'no-store', headers: { 'Accept': 'application/json' } });
             const categorias = await res.json();
             const cats = Array.isArray(categorias) ? categorias : [];
             const sumaCats = sumarConteosListaNeo(cats, 'count');
@@ -2859,38 +3226,105 @@
     document.getElementById('btnTiendaNeo').addEventListener('click', async function() {
         const btn = this;
         const modal = document.getElementById('modal-tienda-neo');
-        const lista = document.getElementById('modal-tienda-neo-lista');
+        const chkSiOpen = document.getElementById('modal-tienda-neo-chk-mostrar-si');
+        const chkNoOpen = document.getElementById('modal-tienda-neo-chk-mostrar-no');
+        const tiendasLista = document.getElementById('modal-tienda-neo-tiendas-no-lista');
+        if (tiendasLista) {
+            tiendasLista.innerHTML = '';
+            delete tiendasLista.dataset.loaded;
+        }
+        const panelTiendasNo = document.getElementById('modal-tienda-neo-panel-tiendas-no');
+        const detTiendas = document.getElementById('modal-tienda-neo-details-tiendas-no-lista');
+        const masterTiendasNo = document.getElementById('modal-tienda-neo-chk-tiendas-no-todas');
+        if (panelTiendasNo) panelTiendasNo.classList.add('hidden');
+        if (detTiendas) detTiendas.open = false;
+        if (masterTiendasNo) masterTiendasNo.checked = true;
+        if (chkSiOpen) chkSiOpen.checked = true;
+        if (chkNoOpen) chkNoOpen.checked = false;
+        const chkNullOpen = document.getElementById('modal-tienda-neo-chk-tienda-null');
+        if (chkNullOpen) chkNullOpen.checked = false;
+        const chkCatSiOpen = document.getElementById('modal-tienda-neo-chk-cat-mostrar-si');
+        const chkCatNoOpen = document.getElementById('modal-tienda-neo-chk-cat-mostrar-no');
+        const chkCatNullOpen = document.getElementById('modal-tienda-neo-chk-categoria-null');
+        if (chkCatSiOpen) chkCatSiOpen.checked = true;
+        if (chkCatNoOpen) chkCatNoOpen.checked = false;
+        if (chkCatNullOpen) chkCatNullOpen.checked = false;
         ocultarBuscadorModalNeo('modal-tienda-neo');
         btn.disabled = true;
         estadoModalTiendaNeo.tiendaSeleccionada = null;
         actualizarHeaderModalTiendaNeo();
-        lista.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-sm">Cargando...</p>';
         modal.classList.remove('hidden');
         try {
-            const res = await fetch('{{ route("admin.neo.crear-masivo.tiendas") }}', { headers: { 'Accept': 'application/json' } });
-            const tiendas = await res.json();
-            estadoModalTiendaNeo.tiendas = Array.isArray(tiendas) ? tiendas : [];
-            renderTiendasModalNeo();
+            await recargarListaTiendasModalTiendaNeo();
         } catch (err) {
             console.error(err);
-            lista.innerHTML = '<p class="text-red-500 text-sm">Error al cargar: ' + err.message + '</p>';
+            document.getElementById('modal-tienda-neo-lista').innerHTML = '<p class="text-red-500 text-sm">Error al cargar: ' + err.message + '</p>';
+            setTotalUrlsDisponiblesNeo('modal-tienda-neo-total-urls', '\u2014');
         }
         btn.disabled = false;
+    });
+    ['modal-tienda-neo-chk-mostrar-si', 'modal-tienda-neo-chk-mostrar-no', 'modal-tienda-neo-chk-tienda-null'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('change', async function(ev) {
+            if (document.getElementById('modal-tienda-neo').classList.contains('hidden')) return;
+            if (id === 'modal-tienda-neo-chk-tienda-null' && el.checked) {
+                const si = document.getElementById('modal-tienda-neo-chk-mostrar-si');
+                const no = document.getElementById('modal-tienda-neo-chk-mostrar-no');
+                if (si) si.checked = false;
+                if (no) no.checked = false;
+            } else if ((id === 'modal-tienda-neo-chk-mostrar-si' || id === 'modal-tienda-neo-chk-mostrar-no') && el.checked) {
+                const nulo = document.getElementById('modal-tienda-neo-chk-tienda-null');
+                if (nulo) nulo.checked = false;
+            }
+            ajustarChecksMostrarTiendaModalTiendaNeo(ev);
+            try {
+                const soloNo = esSoloMostrarNoModalTiendaNeo();
+                await recargarContenidoModalTiendaNeo({
+                    reiniciarSeleccion: soloNo,
+                    mantenerDesplegableAbierto: soloNo,
+                });
+            } catch (err) {
+                console.error(err);
+                document.getElementById('modal-tienda-neo-lista').innerHTML = '<p class="text-red-500 text-sm">Error al cargar: ' + err.message + '</p>';
+            }
+        });
+    });
+    ['modal-tienda-neo-chk-cat-mostrar-si', 'modal-tienda-neo-chk-cat-mostrar-no', 'modal-tienda-neo-chk-categoria-null'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('change', async function(ev) {
+            if (document.getElementById('modal-tienda-neo').classList.contains('hidden')) return;
+            if (id === 'modal-tienda-neo-chk-categoria-null' && el.checked) {
+                const si = document.getElementById('modal-tienda-neo-chk-cat-mostrar-si');
+                const no = document.getElementById('modal-tienda-neo-chk-cat-mostrar-no');
+                if (si) si.checked = false;
+                if (no) no.checked = false;
+            } else if ((id === 'modal-tienda-neo-chk-cat-mostrar-si' || id === 'modal-tienda-neo-chk-cat-mostrar-no') && el.checked) {
+                const nulo = document.getElementById('modal-tienda-neo-chk-categoria-null');
+                if (nulo) nulo.checked = false;
+            }
+            ajustarChecksMostrarCategoriaModalTiendaNeo(ev);
+            try {
+                const soloNo = esSoloMostrarNoModalTiendaNeo();
+                await recargarContenidoModalTiendaNeo({
+                    reiniciarSeleccion: soloNo,
+                    mantenerDesplegableAbierto: soloNo,
+                });
+            } catch (err) {
+                console.error(err);
+                document.getElementById('modal-tienda-neo-lista').innerHTML = '<p class="text-red-500 text-sm">Error al cargar: ' + err.message + '</p>';
+            }
+        });
     });
     document.getElementById('modal-tienda-neo-atras').addEventListener('click', async function() {
         estadoModalTiendaNeo.tiendaSeleccionada = null;
         actualizarHeaderModalTiendaNeo();
-        const lista = document.getElementById('modal-tienda-neo-lista');
-        lista.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-sm">Cargando...</p>';
-        setTotalUrlsDisponiblesNeo('modal-tienda-neo-total-urls', '…');
         try {
-            const res = await fetch('{{ route("admin.neo.crear-masivo.tiendas") }}' + '?_=' + Date.now(), { cache: 'no-store', headers: { 'Accept': 'application/json' } });
-            const tiendas = await res.json();
-            estadoModalTiendaNeo.tiendas = Array.isArray(tiendas) ? tiendas : [];
-            renderTiendasModalNeo();
+            await recargarListaTiendasModalTiendaNeo();
         } catch (err) {
             console.error(err);
-            lista.innerHTML = '<p class="text-red-500 text-sm">Error al cargar: ' + err.message + '</p>';
+            document.getElementById('modal-tienda-neo-lista').innerHTML = '<p class="text-red-500 text-sm">Error al recargar tiendas: ' + err.message + '</p>';
         }
     });
     document.getElementById('modal-tienda-neo-cerrar').addEventListener('click', function() {
@@ -3428,6 +3862,29 @@
         return set;
     }
 
+    function aplicarEspecificacionesMarcadasEnFilaCrearMasivo(div, especsMarcadas) {
+        if (!div || !especsMarcadas || typeof especsMarcadas !== 'object') return;
+        Object.keys(especsMarcadas).forEach(function(principalId) {
+            const subIds = especsMarcadas[principalId];
+            if (!Array.isArray(subIds)) return;
+            subIds.forEach(function(subId) {
+                const cb = div.querySelector('.spec-checkbox[data-principal-id="' + principalId + '"][data-sublinea-id="' + subId + '"]');
+                if (cb) cb.checked = true;
+            });
+        });
+        actualizarEstadoBotonGenerar(div);
+        renderUrlResaltadaFilaCrearMasivo(div);
+        actualizarConteosOpcionesEspecsFila(div);
+        actualizarAvisosSinImagenEspecsFila(div);
+    }
+
+    function urlRecargarEspecificacionesCrearMasivo(productoId, urlOferta) {
+        let u = '{{ route("admin.ofertas.crear-masivo.recargar-especificaciones", ["producto" => "__ID__"]) }}'.replace('__ID__', productoId);
+        const url = String(urlOferta || '').trim();
+        if (url) u += (u.indexOf('?') >= 0 ? '&' : '?') + 'url=' + encodeURIComponent(url);
+        return u;
+    }
+
     function obtenerSetTokensSpecsMarcadasFilaCrearMasivo(div) {
         const set = new Set();
         div.querySelectorAll('.spec-checkbox:checked').forEach(cb => {
@@ -3552,10 +4009,28 @@
         }
     }
 
-    function abrirModalCategoriaFilaCrearMasivo(div) {
+    async function abrirModalCategoriaFilaCrearMasivo(div) {
         window.__filaModalCategoriaCrearMasivo = div;
         const modal = document.getElementById('modal-categoria-fila-crear-masivo');
-        if (modal) modal.classList.remove('hidden');
+        const arbol = document.getElementById('modal-categoria-fila-arbol');
+        if (!modal) return;
+        modal.classList.remove('hidden');
+        if (!arbol) return;
+        arbol.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400 py-2">Cargando categorías…</p>';
+        try {
+            const res = await fetch('{{ route("admin.categorias.arbol-picker-crear-masivo") }}?_=' + Date.now(), {
+                cache: 'no-store',
+                headers: { 'Accept': 'text/html' },
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            arbol.innerHTML = await res.text();
+            if (typeof window.Alpine !== 'undefined' && typeof window.Alpine.initTree === 'function') {
+                window.Alpine.initTree(arbol);
+            }
+        } catch (err) {
+            console.error(err);
+            arbol.innerHTML = '<p class="text-sm text-red-600 dark:text-red-400 py-2">No se pudieron cargar las categorías. Inténtalo de nuevo.</p>';
+        }
     }
 
     function cerrarModalCategoriaFilaCrearMasivo() {
@@ -3597,6 +4072,13 @@
         }
         div.__rowData = Object.assign({}, div.__rowData, { categoria_fila: { id: id, nombre: nombre } });
         actualizarToolbarCategoriaFila(div);
+
+        const flujo = window.__flujoModalUrlsCrearMasivo;
+        if (flujo && !flujo.modoFinal && div === flujo.filaActualEnModal) {
+            avanzarASiguienteUrlEnFlujoModalCrearMasivo();
+            return;
+        }
+
         const inp = div.querySelector('.producto-search-input');
         if (inp && inp.value.trim().length >= 2) buscarProductosCrearMasivo(div, inp.value.trim());
     }
@@ -4153,7 +4635,9 @@
                 estadoText = 'Lista para crear';
             }
 
-            let especsHtml = buildEspecsHtml(r.producto, r.especificaciones, r.tiene_especificaciones);
+            let especsHtml = r.producto
+                ? buildEspecsHtml(r.producto, r.especificaciones, r.tiene_especificaciones)
+                : '';
             let buscadorProductoHtml = '';
             if (necesitaProducto || noEntreOpciones) {
                 buscadorProductoHtml = buildBuscadorProductoHtmlCrearMasivo(r.url_normalizada || r.url || '', r.categoria_fila || null);
@@ -4283,8 +4767,11 @@
             div.__rowData = r;
             renderUrlResaltadaFilaCrearMasivo(div);
             if (puedeCrear) actualizarEstadoBotonGenerar(div);
-            if (r.producto && r.tiene_especificaciones && !r.producto_asignado_desde_neo) {
-                setTimeout(() => actualizarConteosOpcionesEspecsFila(div), 50);
+            if (r.producto && r.tiene_especificaciones) {
+                setTimeout(function() {
+                    actualizarConteosOpcionesEspecsFila(div);
+                    actualizarAvisosSinImagenEspecsFila(div);
+                }, 50);
             }
 
             const especsMarcadasAuto = !r.producto_asignado_desde_neo
@@ -4293,17 +4780,7 @@
                     : ((r.especificaciones_marcadas && typeof r.especificaciones_marcadas === 'object') ? r.especificaciones_marcadas : null))
                 : null;
             if (especsMarcadasAuto) {
-                Object.keys(especsMarcadasAuto).forEach(function(principalId) {
-                    const subIds = especsMarcadasAuto[principalId];
-                    if (!Array.isArray(subIds)) return;
-                    subIds.forEach(function(subId) {
-                        const cb = div.querySelector('.spec-checkbox[data-principal-id="' + principalId + '"][data-sublinea-id="' + subId + '"]');
-                        if (cb) cb.checked = true;
-                    });
-                });
-                actualizarEstadoBotonGenerar(div);
-                renderUrlResaltadaFilaCrearMasivo(div);
-                actualizarConteosOpcionesEspecsFila(div);
+                aplicarEspecificacionesMarcadasEnFilaCrearMasivo(div, especsMarcadasAuto);
             }
 
             // Re-render al final del ciclo por si otros procesos del render afectan checkboxes.
@@ -4329,6 +4806,7 @@
                 actualizarEstadoBotonGenerar(div);
                 renderUrlResaltadaFilaCrearMasivo(div);
                 actualizarConteosOpcionesEspecsFila(div);
+                actualizarAvisosSinImagenEspecsFila(div);
                 clearTimeout(div.__mismasEspecsTimeout);
                 div.__mismasEspecsTimeout = setTimeout(() => buscarOfertasMismasEspecsYMostrar(div), 400);
             });
@@ -4603,6 +5081,7 @@
         if (div.__rowData?.ofertaGenerada) return;
         const r = div.__rowData;
         if (!r || !r.tienda) return;
+        if (r.producto && r.producto.id) limpiarCacheImagenesSublineaProductoCrearMasivo(r.producto.id);
         div.__rowData = Object.assign({}, r, { producto: null, especificaciones: null, tiene_especificaciones: false });
         div.dataset.esUnidadUnica = '0';
         div.dataset.columnasIds = '[]';
@@ -4694,8 +5173,8 @@
         const searchContainer = div.querySelector('.producto-search-container');
         if (searchContainer) searchContainer.remove();
         try {
-            const url = '{{ route("admin.ofertas.crear-masivo.recargar-especificaciones", ["producto" => "__ID__"]) }}'.replace('__ID__', producto.id);
-            const res = await fetch(url, { headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content } });
+            const urlFetch = urlRecargarEspecificacionesCrearMasivo(producto.id, r.url_normalizada || r.url);
+            const res = await fetch(urlFetch, { headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content } });
             const data = await res.json();
             const especs = data.success ? (data.especificaciones || null) : null;
             const tieneEspecs = data.success && (data.tiene_especificaciones || false);
@@ -4721,7 +5200,12 @@
                     return '<div>' + prodLink + ' — ' + (o.tienda || '') + verBtn + editarBtn + '</div>';
                 }).join('') + '</div>' : '');
             }
-            div.__rowData = Object.assign({}, r, { producto: productoCompleto, especificaciones: especs, tiene_especificaciones: tieneEspecs });
+            div.__rowData = Object.assign({}, r, {
+                producto: productoCompleto,
+                especificaciones: especs,
+                tiene_especificaciones: tieneEspecs,
+                producto_asignado_desde_neo: false,
+            });
             div.dataset.esUnidadUnica = (especs && especs.unidad_de_medida === 'unidadUnica') ? '1' : '0';
             div.dataset.columnasIds = (especs && especs.columnas_ids) ? JSON.stringify(especs.columnas_ids) : '[]';
             div.classList.remove('bg-amber-50', 'dark:bg-amber-900/20', 'border-amber-200', 'dark:border-amber-700');
@@ -4760,8 +5244,13 @@
             if (!tieneEspecs) {
                 setTimeout(function() { buscarOfertasMismasEspecsYMostrar(div); }, 300);
             }
-            renderUrlResaltadaFilaCrearMasivo(div);
-            actualizarConteosOpcionesEspecsFila(div);
+            if (data.success && data.especificaciones_marcadas) {
+                aplicarEspecificacionesMarcadasEnFilaCrearMasivo(div, data.especificaciones_marcadas);
+            } else {
+                renderUrlResaltadaFilaCrearMasivo(div);
+                actualizarConteosOpcionesEspecsFila(div);
+                actualizarAvisosSinImagenEspecsFila(div);
+            }
             adjuntarListenerGenerarOfertaCrearMasivo(div);
         } catch (err) {
             alert('Error al cargar: ' + err.message);
@@ -4775,49 +5264,120 @@
         return '<button type="button" class="btn-recargar-especs ml-2 inline-flex items-center gap-1 px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 rounded transition" data-producto-id="' + productoId + '" title="Recargar especificaciones">' + iconoRecargarEspecsCrearMasivo + '<span>Recargar</span></button>';
     }
 
+    const FORMATOS_SPEC_REQUIEREN_IMAGEN_CREAR_MASIVO = ['imagen', 'imagen_texto', 'imagen_precio', 'imagen_texto_precio'];
+
+    function grupoSpecRequiereImagenCrearMasivo(filtro, formatosGrupo) {
+        if (!filtro) return false;
+        const formato = formatosGrupo[String(filtro.id)] || '';
+        return FORMATOS_SPEC_REQUIEREN_IMAGEN_CREAR_MASIVO.includes(formato);
+    }
+
+    function opcionSpecTieneImagenesCrearMasivo(div, cb) {
+        if (!cb) return true;
+        if (cb.dataset.usarImagenesProducto === '1') {
+            const imgs = div && div.__rowData && div.__rowData.producto && Array.isArray(div.__rowData.producto.imagenes_producto)
+                ? div.__rowData.producto.imagenes_producto
+                : [];
+            return imgs.length > 0;
+        }
+        const key = cb.dataset.imagenesKey || '';
+        if (key && window.__crearMasivoImagenesSublinea && Array.isArray(window.__crearMasivoImagenesSublinea[key])) {
+            return window.__crearMasivoImagenesSublinea[key].length > 0;
+        }
+        return cb.dataset.tieneImagenes === '1';
+    }
+
+    function actualizarAvisosSinImagenEspecsFila(div) {
+        if (!div) return;
+        div.querySelectorAll('.spec-checkbox').forEach(function(cb) {
+            const label = cb.closest('label');
+            if (!label) return;
+            const aviso = label.querySelector('.spec-sin-imagen-aviso');
+            if (!aviso) return;
+            const mostrar = cb.checked
+                && cb.dataset.requiereImagen === '1'
+                && !opcionSpecTieneImagenesCrearMasivo(div, cb);
+            aviso.classList.toggle('hidden', !mostrar);
+        });
+    }
+
     function buildEspecsHtml(producto, especificaciones, tieneEspecificaciones) {
+        if (!producto) return '';
         const filtros = (especificaciones && especificaciones.filtros) ? especificaciones.filtros : [];
-        if (!producto && !(tieneEspecificaciones && filtros.length)) return '';
         const esUnidadUnica = especificaciones && especificaciones.unidad_de_medida === 'unidadUnica';
         const columnasIds = (especificaciones && especificaciones.columnas_ids) ? especificaciones.columnas_ids : [];
         if (tieneEspecificaciones && filtros.length) {
             const productoId = producto && producto.id ? producto.id : null;
+            if (productoId) limpiarCacheImagenesSublineaProductoCrearMasivo(productoId);
             const btnRecargar = htmlBotonRecargarEspecsCrearMasivo(productoId);
             let h = '<div class="mt-3 spec-selector-container"><span class="flex items-center flex-wrap gap-1"><strong class="text-sm text-gray-700 dark:text-gray-300">Especificaciones a marcar:</strong>' + btnRecargar + '</span><div class="mt-2 space-y-3">';
-            const imagenesProducto = (producto && producto.imagenes_producto) ? producto.imagenes_producto : [];
+            const imagenesProducto = (producto && Array.isArray(producto.imagenes_producto)) ? producto.imagenes_producto : [];
+            const formatosGrupo = (especificaciones && especificaciones.formatos && typeof especificaciones.formatos === 'object')
+                ? especificaciones.formatos
+                : {};
             filtros.forEach((f) => {
                 const subprincipales = f.subprincipales || [];
                 const esColumna = esUnidadUnica && columnasIds.includes(f.id);
+                const esGrupoProducto = f.es_producto === true;
+                const permiteNuevaOpcion = !esGrupoProducto;
+                const grupoRequiereImagen = grupoSpecRequiereImagenCrearMasivo(f, formatosGrupo);
                 if (subprincipales.length === 0) return;
                 const grupoLabelEsc = String(f.texto || f.id || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
-                h += '<div class="spec-line border-l-2 border-gray-300 dark:border-gray-600 pl-3" data-principal-id="' + f.id + '" data-es-columna="' + (esColumna ? '1' : '0') + '">';
+                h += '<div class="spec-line border-l-2 border-gray-300 dark:border-gray-600 pl-3" data-principal-id="' + f.id + '" data-es-columna="' + (esColumna ? '1' : '0') + '" data-es-producto="' + (esGrupoProducto ? '1' : '0') + '">';
                 h += '<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">' + (f.texto || f.id) + (esColumna ? ' <span class="text-orange-600 dark:text-orange-400 text-xs">(Columna)</span>' : '') + '</label><div class="flex flex-wrap gap-2 items-center">';
-                h += '<button type="button" class="btn-toggle-nueva-opcion-cm inline-flex items-center p-1 shrink-0 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-xs transition focus:outline-none focus:ring-2 focus:ring-indigo-400" data-principal-id="' + f.id + '" data-insert-first="1" title="Añadir opción en primera posición"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg></button>';
+                if (permiteNuevaOpcion) {
+                    h += '<button type="button" class="btn-toggle-nueva-opcion-cm inline-flex items-center p-1 shrink-0 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-xs transition focus:outline-none focus:ring-2 focus:ring-indigo-400" data-principal-id="' + f.id + '" data-insert-first="1" title="Añadir opción en primera posición"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg></button>';
+                }
                 subprincipales.forEach((sub) => {
-                    let imagenes = Array.isArray(sub.imagenes) ? sub.imagenes : [];
-                    if (sub.usar_imagenes_producto && imagenesProducto.length) imagenes = imagenesProducto;
-                    const keyImg = String(f.id) + '::' + String(sub.id);
-                    if (imagenes.length) window.__crearMasivoImagenesSublinea[keyImg] = imagenes;
+                    let imagenes;
+                    if (sub.usar_imagenes_producto) {
+                        imagenes = imagenesProducto.slice();
+                    } else {
+                        imagenes = Array.isArray(sub.imagenes) ? sub.imagenes.slice() : [];
+                    }
+                    const keyImg = productoId ? cacheKeyImagenesSublineaCrearMasivo(productoId, f.id, sub.id) : (String(f.id) + '::' + String(sub.id));
+                    if (imagenes.length) {
+                        window.__crearMasivoImagenesSublinea[keyImg] = imagenes;
+                    } else {
+                        delete window.__crearMasivoImagenesSublinea[keyImg];
+                    }
                     const btnImgs = imagenes.length ? '<button type="button" class="btn-ver-imagenes-spec inline-flex items-center p-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs ml-0.5" data-key="' + keyImg + '" title="Ver ' + imagenes.length + ' imagen' + (imagenes.length !== 1 ? 'es' : '') + '"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg></button>' : '';
                     const subIdEsc = String(sub.id || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-                    h += '<label class="inline-flex items-center gap-1 cursor-pointer"><input type="checkbox" class="spec-checkbox rounded border-gray-300 text-green-600 focus:ring-green-500" data-principal-id="' + f.id + '" data-sublinea-id="' + sub.id + '" data-es-columna="' + (esColumna ? '1' : '0') + '"><span class="spec-option-text text-sm text-gray-600 dark:text-gray-400" data-principal-id="' + f.id + '" data-sublinea-id="' + sub.id + '">' + (sub.texto || sub.id) + '</span><span class="spec-count-badge text-xs text-gray-500 dark:text-gray-400" data-principal-id="' + f.id + '" data-sublinea-id="' + sub.id + '">(x)</span>' + btnImgs + '</label>';
-                    h += '<button type="button" class="btn-toggle-nueva-opcion-cm inline-flex items-center p-1 shrink-0 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-xs transition focus:outline-none focus:ring-2 focus:ring-indigo-400 ml-0.5" data-principal-id="' + f.id + '" data-after-sub-id="' + subIdEsc + '" title="Añadir opción después de esta"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg></button>';
+                    const usarImgProd = !!sub.usar_imagenes_producto;
+                    const tieneImagenes = imagenes.length > 0;
+                    h += '<label class="inline-flex items-center gap-1 cursor-pointer flex-wrap">'
+                        + '<input type="checkbox" class="spec-checkbox rounded border-gray-300 text-green-600 focus:ring-green-500"'
+                        + ' data-principal-id="' + f.id + '" data-sublinea-id="' + sub.id + '" data-es-columna="' + (esColumna ? '1' : '0') + '"'
+                        + ' data-requiere-imagen="' + (grupoRequiereImagen ? '1' : '0') + '"'
+                        + ' data-tiene-imagenes="' + (tieneImagenes ? '1' : '0') + '"'
+                        + ' data-usar-imagenes-producto="' + (usarImgProd ? '1' : '0') + '"'
+                        + ' data-imagenes-key="' + keyImg + '">'
+                        + '<span class="spec-option-text text-sm text-gray-600 dark:text-gray-400" data-principal-id="' + f.id + '" data-sublinea-id="' + sub.id + '">' + (sub.texto || sub.id) + '</span>'
+                        + '<span class="spec-count-badge text-xs text-gray-500 dark:text-gray-400" data-principal-id="' + f.id + '" data-sublinea-id="' + sub.id + '">(x)</span>'
+                        + '<span class="spec-sin-imagen-aviso hidden text-xs font-medium text-amber-600 dark:text-amber-400">(No tiene imagen)</span>'
+                        + btnImgs + '</label>';
+                    if (permiteNuevaOpcion) {
+                        h += '<button type="button" class="btn-toggle-nueva-opcion-cm inline-flex items-center p-1 shrink-0 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-xs transition focus:outline-none focus:ring-2 focus:ring-indigo-400 ml-0.5" data-principal-id="' + f.id + '" data-after-sub-id="' + subIdEsc + '" title="Añadir opción después de esta"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg></button>';
+                    }
                 });
                 h += '</div>';
-                h += '<div class="nueva-opcion-cm-panel hidden mt-2 p-3 rounded-lg border border-indigo-200 dark:border-indigo-700 bg-indigo-50/60 dark:bg-indigo-950/30 space-y-2" data-principal-id="' + f.id + '">';
-                h += '<p class="text-xs text-indigo-900 dark:text-indigo-100">Nueva opción en «' + grupoLabelEsc + '»</p>';
-                h += '<input type="text" class="nueva-opcion-cm-texto w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white" placeholder="Nombre de la opción">';
-                h += '<label class="inline-flex items-center gap-2 cursor-pointer text-xs text-gray-700 dark:text-gray-300"><input type="checkbox" class="nueva-opcion-cm-usar-img-prod rounded border-gray-300 text-orange-600 focus:ring-orange-500"><span>Usar imágenes del producto</span></label>';
-                h += '<div class="flex flex-wrap gap-2 items-center nueva-opcion-cm-img-btns">';
-                h += '<button type="button" class="btn-cm-ver-imagenes-draft inline-flex items-center px-2 py-1 text-xs rounded bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-45 disabled:cursor-not-allowed" disabled>Ver imágenes (0)</button>';
-                h += '<button type="button" class="btn-cm-anadir-imagenes-draft inline-flex items-center px-2 py-1 text-xs rounded bg-green-600 hover:bg-green-700 text-white disabled:opacity-45 disabled:cursor-not-allowed">+ Imágenes</button>';
+                if (permiteNuevaOpcion) {
+                    h += '<div class="nueva-opcion-cm-panel hidden mt-2 p-3 rounded-lg border border-indigo-200 dark:border-indigo-700 bg-indigo-50/60 dark:bg-indigo-950/30 space-y-2" data-principal-id="' + f.id + '">';
+                    h += '<p class="text-xs text-indigo-900 dark:text-indigo-100">Nueva opción en «' + grupoLabelEsc + '»</p>';
+                    h += '<input type="text" class="nueva-opcion-cm-texto w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white" placeholder="Nombre de la opción">';
+                    h += '<label class="inline-flex items-center gap-2 cursor-pointer text-xs text-gray-700 dark:text-gray-300"><input type="checkbox" class="nueva-opcion-cm-usar-img-prod rounded border-gray-300 text-orange-600 focus:ring-orange-500"><span>Usar imágenes del producto</span></label>';
+                    h += '<div class="flex flex-wrap gap-2 items-center nueva-opcion-cm-img-btns">';
+                    h += '<button type="button" class="btn-cm-ver-imagenes-draft inline-flex items-center px-2 py-1 text-xs rounded bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-45 disabled:cursor-not-allowed" disabled>Ver imágenes (0)</button>';
+                    h += '<button type="button" class="btn-cm-anadir-imagenes-draft inline-flex items-center px-2 py-1 text-xs rounded bg-green-600 hover:bg-green-700 text-white disabled:opacity-45 disabled:cursor-not-allowed">+ Imágenes</button>';
+                    h += '</div>';
+                    h += '<div class="flex flex-wrap gap-2">';
+                    h += '<button type="button" class="btn-cm-guardar-nueva-opcion inline-flex items-center px-3 py-1.5 text-xs font-medium rounded bg-indigo-700 hover:bg-indigo-800 text-white">Guardar y marcar</button>';
+                    h += '<button type="button" class="btn-cm-cancelar-nueva-opcion px-3 py-1.5 text-xs rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800">Cancelar</button>';
+                    h += '</div>';
+                    h += '<p class="nueva-opcion-cm-msg text-xs hidden"></p>';
+                    h += '</div>';
+                }
                 h += '</div>';
-                h += '<div class="flex flex-wrap gap-2">';
-                h += '<button type="button" class="btn-cm-guardar-nueva-opcion inline-flex items-center px-3 py-1.5 text-xs font-medium rounded bg-indigo-700 hover:bg-indigo-800 text-white">Guardar y marcar</button>';
-                h += '<button type="button" class="btn-cm-cancelar-nueva-opcion px-3 py-1.5 text-xs rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800">Cancelar</button>';
-                h += '</div>';
-                h += '<p class="nueva-opcion-cm-msg text-xs hidden"></p>';
-                h += '</div></div>';
             });
             return h + '</div></div>';
         }
@@ -4861,6 +5421,7 @@
                     actualizarEstadoBotonGenerar(fila);
                     renderUrlResaltadaFilaCrearMasivo(fila);
                     actualizarConteosOpcionesEspecsFila(fila);
+                    actualizarAvisosSinImagenEspecsFila(fila);
                 }
 
                 const r = div.__rowData;
@@ -4888,8 +5449,8 @@
         const r = div.__rowData;
         if (!r || !r.tienda) return;
         try {
-            const url = '{{ route("admin.ofertas.crear-masivo.recargar-especificaciones", ["producto" => "__ID__"]) }}'.replace('__ID__', candidato.id);
-            const res = await fetch(url, { headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content } });
+            const urlFetch = urlRecargarEspecificacionesCrearMasivo(candidato.id, r.url_normalizada || r.url);
+            const res = await fetch(urlFetch, { headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content } });
             const data = await res.json();
             const especs = data.success ? (data.especificaciones || null) : candidato.especificaciones;
             const tieneEspecs = data.success ? (data.tiene_especificaciones || false) : (candidato.tiene_especificaciones || false);
@@ -4918,7 +5479,12 @@
             }
             div.dataset.esUnidadUnica = (especs && especs.unidad_de_medida === 'unidadUnica') ? '1' : '0';
             div.dataset.columnasIds = (especs && especs.columnas_ids) ? JSON.stringify(especs.columnas_ids) : '[]';
-            div.__rowData = Object.assign({}, r, { producto: productoCompleto, especificaciones: especs, tiene_especificaciones: tieneEspecs });
+            div.__rowData = Object.assign({}, r, {
+                producto: productoCompleto,
+                especificaciones: especs,
+                tiene_especificaciones: tieneEspecs,
+                producto_asignado_desde_neo: false,
+            });
             const productDisplay = div.querySelector('.producto-display');
             const productLinkHtml = urlProducto ? '<a href="' + urlProducto + '" target="_blank" class="text-green-500 hover:underline font-medium">' + candidato.texto_completo + '</a>' : '<strong>' + candidato.texto_completo + '</strong>';
             const accionesProductoHtmlB = htmlBotonesProductoFilaCrearMasivo(candidato.id);
@@ -4940,8 +5506,13 @@
             if (!tieneEspecs) {
                 setTimeout(function() { buscarOfertasMismasEspecsYMostrar(div); }, 300);
             }
-            renderUrlResaltadaFilaCrearMasivo(div);
-            actualizarConteosOpcionesEspecsFila(div);
+            if (data.success && data.especificaciones_marcadas) {
+                aplicarEspecificacionesMarcadasEnFilaCrearMasivo(div, data.especificaciones_marcadas);
+            } else {
+                renderUrlResaltadaFilaCrearMasivo(div);
+                actualizarConteosOpcionesEspecsFila(div);
+                actualizarAvisosSinImagenEspecsFila(div);
+            }
             if (div.querySelector('.btn-generar') && !div.__rowData?.ofertaGenerada) {
                 ponerMensajeGeneradoPendienteCrearMasivo(div);
             }
@@ -5065,7 +5636,6 @@
 
     async function actualizarConteosOpcionesEspecsFila(div) {
         if (!div || !div.__rowData || !div.__rowData.producto || div.__rowData.ofertaGenerada) return;
-        if (div.__rowData.producto_asignado_desde_neo) return;
         const specLines = div.querySelectorAll('.spec-line');
         if (!specLines.length) {
             limpiarConteosOpcionesEspecsFila(div);
@@ -6285,6 +6855,7 @@
             actualizarEstadoBotonGenerar(ctxEl);
             renderUrlResaltadaFilaCrearMasivo(ctxEl);
             actualizarConteosOpcionesEspecsFila(ctxEl);
+            actualizarAvisosSinImagenEspecsFila(ctxEl);
             clearTimeout(ctxEl.__mismasEspecsTimeout);
             ctxEl.__mismasEspecsTimeout = setTimeout(function() { buscarOfertasMismasEspecsYMostrar(ctxEl); }, 400);
         }
@@ -6481,7 +7052,7 @@
             modalCatFila.addEventListener('click', function(e) {
                 if (e.target === modalCatFila) cerrarModalCategoriaFilaCrearMasivo();
             });
-            // Fase captura: el botón «Elegir» usa @click.stop (Alpine) y el evento no burbujea hasta el backdrop.
+            // Fase captura: solo «Seleccionar» en categorías sin hijos.
             modalCatFila.addEventListener('click', function(e) {
                 const btn = e.target.closest('.btn-elegir-categoria-arbol-crear-masivo');
                 if (!btn || !modalCatFila.contains(btn)) return;

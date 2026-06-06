@@ -11,7 +11,8 @@ use Illuminate\Support\Facades\DB;
  * Neobyte: extrae el precio desde JSON-LD schema.org ("price": "199") o desde
  * datos con "affiliation":"NEOBYTE" y "price":199.
  * Bloque #promociones / "Promociones incluidas" / .promociones_banners: +Juego si queda algún banner
- * que no sea solo Eneba, la promo "Actualiza" ni banners de "descuento" (se filtran por enlace).
+ * que no sea solo Eneba, la promo "Actualiza", banners de "descuento" ni vales para próxima compra
+ * (se filtran por enlace, título/alt e imagen del banner).
  */
 class NeobyteController extends PlantillaTiendaController
 {
@@ -58,7 +59,7 @@ class NeobyteController extends PlantillaTiendaController
 
     /**
      * #promociones + "Promociones incluidas" + .promociones_banners: al menos un &lt;a&gt; no excluido
-     * (excl.: texto href/title/img con eneba, actualiza o descuento).
+     * (excl.: eneba, actualiza, descuento, vale/próxima compra, banner genérico gift_sales).
      */
     private function detectarYGuardarDescuentoJuegoNeobyte(string $html, OfertaProducto $oferta): void
     {
@@ -154,8 +155,9 @@ class NeobyteController extends PlantillaTiendaController
     }
 
     /**
-     * Banner Eneba, promo "Actualiza" o texto "descuento" no cuentan para +Juego.
-     * Se revisa href, title del &lt;a&gt; y alt/title de &lt;img&gt; internas.
+     * Banners que no son juego regalo: Eneba, "Actualiza", descuento, vale para próxima compra
+     * (p. ej. AMD Radeon "Llévate un VALE de hasta 60€") o imagen genérica Neobyte_GIFT_SALES.
+     * Se revisa href, title del &lt;a&gt; y alt/title/src de &lt;img&gt; internas.
      */
     private function esBannerNeobyteExcluidoParaMasJuego(\DOMElement $a, \DOMXPath $xp): bool
     {
@@ -166,8 +168,13 @@ class NeobyteController extends PlantillaTiendaController
         $imgs = $xp->query('.//img', $a);
         if ($imgs !== false) {
             foreach ($imgs as $img) {
+                if (!$img instanceof \DOMElement) {
+                    continue;
+                }
                 $partes[] = $img->getAttribute('alt');
                 $partes[] = $img->getAttribute('title');
+                $partes[] = $img->getAttribute('src');
+                $partes[] = $img->getAttribute('data-src');
             }
         }
 
@@ -182,6 +189,20 @@ class NeobyteController extends PlantillaTiendaController
         }
 
         if (str_contains($blob, 'descuento')) {
+            return true;
+        }
+
+        // Vale / crédito para otra compra (no juego incluido): "llevate-un-vale-de-hasta-60", etc.
+        if (preg_match('/\bun[\s_-]*vale\b|\bvale[\s_-]*de[\s_-]*hasta\b|\bvale[\s_-]*de[\s_-]*\d/u', $blob)) {
+            return true;
+        }
+
+        if (str_contains($blob, 'próxima compra') || str_contains($blob, 'proxima compra') || str_contains($blob, 'proxima-compra')) {
+            return true;
+        }
+
+        // Banner genérico de campaña comercial Neobyte (no nombre concreto de juego regalo).
+        if (str_contains($blob, 'gift_sales')) {
             return true;
         }
 

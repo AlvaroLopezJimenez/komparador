@@ -377,7 +377,7 @@ class OfertasController extends Controller
      * Recarga las especificaciones internas de un producto (para crear-masivo, sin recargar página)
      * GET /panel-privado/ofertas/crear-masivo/recargar-especificaciones/{producto}
      */
-    public function recargarEspecificaciones($productoId)
+    public function recargarEspecificaciones(Request $request, $productoId)
     {
         $producto = Producto::with('categoria')->find($productoId);
         $urlProducto = null;
@@ -396,10 +396,23 @@ class OfertasController extends Controller
         $especificaciones = $this->obtenerEspecificacionesProducto($productoId);
         $tieneEspecificaciones = $especificaciones && !empty($especificaciones['filtros'] ?? []);
 
+        $especificacionesMarcadas = null;
+        $urlOferta = trim((string) $request->query('url', ''));
+        if ($urlOferta !== '' && $tieneEspecificaciones) {
+            $detectadas = $this->detectarEspecificacionesProductoDesdeUrl(
+                ['especificaciones' => $especificaciones],
+                $urlOferta
+            );
+            if ($detectadas !== []) {
+                $especificacionesMarcadas = $detectadas;
+            }
+        }
+
         return response()->json([
             'success' => true,
             'especificaciones' => $especificaciones,
             'tiene_especificaciones' => $tieneEspecificaciones,
+            'especificaciones_marcadas' => $especificacionesMarcadas,
             'url_producto' => $urlProducto,
             'imagenes_producto' => $imagenesProducto,
         ]);
@@ -850,21 +863,6 @@ class OfertasController extends Controller
                     }
                 } elseif ($noProductosSugeridos) {
                     $item['sin_producto_sugerido'] = true;
-                    $catIdForSpecs = $categoriaUrlId ?? $categoriaCatalogoId;
-                    if ($catIdForSpecs !== null) {
-                        $especsCat = $this->obtenerEspecificacionesDesdeCategoria($catIdForSpecs);
-                        if ($especsCat && !empty($especsCat['filtros'])) {
-                            $item['especificaciones'] = $especsCat;
-                            $item['tiene_especificaciones'] = true;
-                            $especsDetectadas = $this->detectarEspecificacionesProductoDesdeUrl(
-                                ['especificaciones' => $especsCat],
-                                $urlParaBuscar
-                            );
-                            if (!empty($especsDetectadas)) {
-                                $item['especificaciones_marcadas'] = $especsDetectadas;
-                            }
-                        }
-                    }
                 } else {
                     $productos = $this->buscarProductoPorUrl($urlParaBuscar, $categoriaUrlId, $vocabularioUrl);
                     if (!empty($productos)) {
@@ -2547,10 +2545,17 @@ Responde ÚNICAMENTE con el JSON.";
             $filtrosProducto = $especificacionesElegidas['_producto']['filtros'];
         }
         $filtrosCombinados = array_merge($filtrosCategoria, $filtrosProducto);
+        $idsFiltrosProducto = [];
+        foreach ($filtrosProducto as $fp) {
+            if (!empty($fp['id'])) {
+                $idsFiltrosProducto[(string) $fp['id']] = true;
+            }
+        }
 
         $resultado = [
             'unidad_de_medida' => $producto->unidadDeMedida ?? 'unidad',
             'columnas_ids' => $columnasIds,
+            'formatos' => $this->normalizarFormatosEspecificacionesProducto($especificacionesElegidas),
             'filtros' => [],
         ];
 
@@ -2566,22 +2571,24 @@ Responde ÚNICAMENTE con el JSON.";
                     if ((string) $itemId === (string) $subId) {
                         $esOferta = is_array($item) && isset($item['o']) && (int) $item['o'] === 1;
                         if ($esOferta) {
-                            $imagenes = [];
-                            foreach ([$sub['imagenes'] ?? [], $sub['imagen'] ?? []] as $v) {
-                                $imagenes = array_merge($imagenes, is_array($v) ? $v : ($v ? [$v] : []));
-                            }
-                            if (is_array($item) && isset($item['img'])) {
-                                $imgs = is_array($item['img']) ? $item['img'] : [$item['img']];
-                                $imagenes = array_merge($imagenes, $imgs);
-                            }
-                            if (is_array($item) && isset($item['imagenes'])) {
-                                $imgs = is_array($item['imagenes']) ? $item['imagenes'] : [$item['imagenes']];
-                                $imagenes = array_merge($imagenes, $imgs);
-                            }
-                            if (is_array($item) && isset($item['imagen'])) {
-                                $imagenes[] = $item['imagen'];
-                            }
                             $usarImagenesProducto = is_array($item) && !empty($item['usarImagenesProducto']);
+                            $imagenes = [];
+                            if (! $usarImagenesProducto) {
+                                foreach ([$sub['imagenes'] ?? [], $sub['imagen'] ?? []] as $v) {
+                                    $imagenes = array_merge($imagenes, is_array($v) ? $v : ($v ? [$v] : []));
+                                }
+                                if (is_array($item) && isset($item['img'])) {
+                                    $imgs = is_array($item['img']) ? $item['img'] : [$item['img']];
+                                    $imagenes = array_merge($imagenes, $imgs);
+                                }
+                                if (is_array($item) && isset($item['imagenes'])) {
+                                    $imgs = is_array($item['imagenes']) ? $item['imagenes'] : [$item['imagenes']];
+                                    $imagenes = array_merge($imagenes, $imgs);
+                                }
+                                if (is_array($item) && isset($item['imagen'])) {
+                                    $imagenes[] = $item['imagen'];
+                                }
+                            }
                             $sublineasOferta[] = array_merge($sub, [
                                 'imagenes' => array_values(array_unique(array_filter($imagenes))),
                                 'usar_imagenes_producto' => $usarImagenesProducto,
@@ -2595,12 +2602,38 @@ Responde ÚNICAMENTE con el JSON.";
                 $resultado['filtros'][] = [
                     'id' => $f['id'],
                     'texto' => $f['texto'] ?? '',
+                    'es_producto' => isset($idsFiltrosProducto[(string) ($f['id'] ?? '')]),
                     'subprincipales' => $sublineasOferta,
                 ];
             }
         }
 
         return $resultado;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function normalizarFormatosEspecificacionesProducto(array $especificacionesElegidas): array
+    {
+        $formatosRaw = $especificacionesElegidas['_formatos'] ?? [];
+        $formatos = [];
+        if (!is_array($formatosRaw)) {
+            return $formatos;
+        }
+        foreach ($formatosRaw as $k => $v) {
+            $key = (string) $k;
+            if ($key === '' || str_starts_with($key, '_')) {
+                continue;
+            }
+            if (is_array($v) && isset($v['id']) && is_string($v['id'])) {
+                $formatos[$key] = $v['id'];
+            } elseif (is_string($v)) {
+                $formatos[$key] = $v;
+            }
+        }
+
+        return $formatos;
     }
 
     /**

@@ -41,10 +41,6 @@
                     class="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-3 rounded-md shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed">
                     Detener
                 </button>
-                <button onclick="limpiarLog()" 
-                    class="bg-gray-600 hover:bg-gray-700 text-white font-semibold px-6 py-3 rounded-md shadow-md transition">
-                    Limpiar Log
-                </button>
             </div>
         </div>
 
@@ -57,45 +53,21 @@
             <div class="mt-2 text-sm text-gray-600 dark:text-gray-400">
                 <span id="progresoTexto">0%</span> completado
             </div>
-        </div>
-
-        <!-- Log en Tiempo Real -->
-        <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-            <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-4">Log de ejecución</h3>
-            <div id="logContainer" class="bg-gray-100 dark:bg-gray-700 rounded-lg p-4 h-64 overflow-y-auto font-mono text-sm">
-                <div class="text-gray-500 dark:text-gray-400">Esperando inicio de ejecución...</div>
-            </div>
-        </div>
-
-        <!-- Producto focalizado (ej. ID 107) -->
-        <div id="panelProductoFocalizado" class="hidden bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 border-2 border-blue-500 dark:border-blue-400">
-            <h3 class="text-lg font-semibold text-blue-700 dark:text-blue-300 mb-2">Análisis producto focalizado</h3>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Detalle paso a paso para depurar un producto concreto (incluido en el JSON al copiar).</p>
-            <pre id="productoFocalizadoJson" class="bg-gray-100 dark:bg-gray-700 rounded-lg p-4 text-xs overflow-x-auto max-h-[28rem] overflow-y-auto whitespace-pre-wrap font-mono text-gray-800 dark:text-gray-200"></pre>
-        </div>
-
-        <!-- Diagnóstico global -->
-        <div id="panelDepuracion" class="hidden bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 border border-amber-300 dark:border-amber-600">
-            <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-2">Diagnóstico (paso global)</h3>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Por qué entra o no cada producto/variante. Hasta 8 ejemplos por motivo.</p>
-            <pre id="depuracionResumen" class="bg-gray-100 dark:bg-gray-700 rounded-lg p-4 text-xs overflow-x-auto mb-4 whitespace-pre-wrap font-mono text-gray-800 dark:text-gray-200"></pre>
-            <div id="depuracionMuestras" class="space-y-4 max-h-96 overflow-y-auto text-sm"></div>
+            <p id="estadoEjecucion" class="mt-3 text-sm text-gray-600 dark:text-gray-400">
+                Esperando inicio de ejecución…
+            </p>
         </div>
 
         <!-- Resumen productos hot -->
         <div id="panelResumen" class="hidden bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 border border-gray-200 dark:border-gray-700">
             <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
                 <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200">
-                    Depuración: listado global guardado (top 60)
+                    Resultado: listado global guardado (top 60)
                     <span id="badgeTotalHot" class="ml-2 text-sm font-normal text-orange-600 dark:text-orange-400"></span>
                 </h3>
-                <button type="button" onclick="copiarJsonDepuracion()"
-                    class="bg-gray-700 hover:bg-gray-800 text-white text-sm font-medium px-4 py-2 rounded-md">
-                    Copiar JSON para revisión
-                </button>
             </div>
             <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                Misma lista que se guarda en «Precios Hot». Columnas extra solo en pantalla (mín. 3 meses, precio actual, % rebaja).
+                Productos que se han guardado en «Precios Hot» en esta ejecución.
             </p>
             <div class="overflow-x-auto max-h-[32rem] overflow-y-auto border border-gray-200 dark:border-gray-600 rounded-lg">
                 <table class="min-w-full text-sm text-left">
@@ -115,7 +87,7 @@
                 </table>
             </div>
             <p id="sinProductosHot" class="hidden mt-4 text-gray-500 dark:text-gray-400 text-sm">
-                Ningún producto cumple el criterio en esta ejecución. Revisa el log o que exista histórico de precios en los últimos 3 meses.
+                Ningún producto cumple el criterio en esta ejecución.
             </p>
         </div>
 
@@ -128,7 +100,18 @@
         let inserciones = 0;
         let errores = 0;
         let pollingInterval = null;
-        let ultimaRespuestaDepuracion = null;
+
+        function setEstadoEjecucion(mensaje, tipo = 'info') {
+            const el = document.getElementById('estadoEjecucion');
+            const clases = {
+                info: 'text-gray-600 dark:text-gray-400',
+                success: 'text-green-700 dark:text-green-400',
+                error: 'text-red-600 dark:text-red-400',
+                warning: 'text-yellow-700 dark:text-yellow-400',
+            };
+            el.className = 'mt-3 text-sm font-medium ' + (clases[tipo] || clases.info);
+            el.textContent = mensaje;
+        }
 
         function iniciarEjecucion() {
             if (ejecucionActiva) return;
@@ -143,10 +126,9 @@
             inserciones = 0;
             errores = 0;
             actualizarContadores();
-            
-            agregarLog('🚀 Iniciando ejecución de precios hot...', 'info');
-            
-            // Iniciar ejecución real en el servidor
+            setEstadoEjecucion('Iniciando ejecución…', 'info');
+            actualizarProgreso(0);
+
             iniciarEjecucionServidor();
         }
 
@@ -160,17 +142,15 @@
                 pollingInterval = null;
             }
             
-            agregarLog('⏹️ Ejecución detenida por el usuario', 'warning');
+            setEstadoEjecucion('Ejecución detenida por el usuario.', 'warning');
         }
 
         function iniciarEjecucionServidor() {
             const token = "{{ $tokenScraper }}";
             document.getElementById('panelResumen').classList.add('hidden');
-            document.getElementById('panelDepuracion').classList.add('hidden');
-            document.getElementById('panelProductoFocalizado').classList.add('hidden');
             document.getElementById('tablaProductosHot').innerHTML = '';
             document.getElementById('sinProductosHot').classList.add('hidden');
-            agregarLog('⏳ Procesando en el servidor (puede tardar varios minutos)...', 'info');
+            setEstadoEjecucion('Procesando en el servidor (puede tardar varios minutos)…', 'info');
 
             fetch('/admin/precios-hot/ejecutar-segundo-plano?token=' + encodeURIComponent(token), {
                 method: 'GET',
@@ -196,84 +176,25 @@
                     actualizarContadores();
                     actualizarProgreso(100);
 
-                    if (Array.isArray(data.log)) {
-                        data.log.forEach(linea => agregarLog(linea, 'info'));
-                    }
+                    const totalHot = data.total_productos_hot ?? 0;
+                    setEstadoEjecucion(
+                        `Completado: ${inserciones} listas guardadas, ${errores} errores, ${totalHot} productos hot en el listado global.`,
+                        errores > 0 ? 'warning' : 'success'
+                    );
 
-                    agregarLog('🎉 Ejecución completada', 'success');
-                    agregarLog(`📈 Resumen: ${inserciones} listas guardadas, ${errores} errores, ${data.total_productos_hot ?? 0} productos hot detectados`, 'info');
-
-                    ultimaRespuestaDepuracion = data;
-                    mostrarProductoFocalizado(data.depuracion?.productos_focalizados || null);
-                    mostrarDepuracion(data.depuracion || null);
                     mostrarTablaProductosHot(data.productos_hot || []);
 
                     ejecucionActiva = false;
                     document.getElementById('btnIniciar').disabled = false;
                     document.getElementById('btnDetener').disabled = true;
                 } else {
-                    agregarLog('❌ Error: ' + (data.message || 'Error desconocido'), 'error');
+                    setEstadoEjecucion('Error: ' + (data.message || 'Error desconocido'), 'error');
                     detenerEjecucion();
                 }
             })
             .catch(error => {
-                agregarLog('❌ Error de conexión: ' + error.message, 'error');
+                setEstadoEjecucion('Error de conexión: ' + error.message, 'error');
                 detenerEjecucion();
-            });
-        }
-
-        function mostrarProductoFocalizado(productosFocalizados) {
-            const panel = document.getElementById('panelProductoFocalizado');
-            const pre = document.getElementById('productoFocalizadoJson');
-
-            if (!productosFocalizados || Object.keys(productosFocalizados).length === 0) {
-                panel.classList.add('hidden');
-                return;
-            }
-
-            panel.classList.remove('hidden');
-            pre.textContent = JSON.stringify(productosFocalizados, null, 2);
-
-            Object.keys(productosFocalizados).forEach(id => {
-                const p = productosFocalizados[id];
-                agregarLog('🔍 Producto ' + id + ': ' + (p.conclusion || p.error || '—'), p.entro_en_listado_hot_top60_esta_ejecucion ? 'success' : 'warning');
-            });
-        }
-
-        function mostrarDepuracion(depuracion) {
-            const panel = document.getElementById('panelDepuracion');
-            const resumen = document.getElementById('depuracionResumen');
-            const muestras = document.getElementById('depuracionMuestras');
-
-            if (!depuracion) {
-                panel.classList.add('hidden');
-                return;
-            }
-
-            panel.classList.remove('hidden');
-            const lineas = depuracion.resumen_texto || [];
-            const criterios = depuracion.criterios || {};
-            let texto = 'Criterios: ' + JSON.stringify(criterios, null, 2) + '\n\n';
-            texto += lineas.join('\n');
-            if (depuracion.contadores) {
-                texto += '\n\nContadores:\n' + JSON.stringify(depuracion.contadores, null, 2);
-            }
-            resumen.textContent = texto;
-
-            muestras.innerHTML = '';
-            const porMotivo = depuracion.muestras || {};
-            Object.keys(porMotivo).forEach(motivo => {
-                const bloque = document.createElement('div');
-                bloque.className = 'border border-gray-200 dark:border-gray-600 rounded-lg p-3';
-                const titulo = document.createElement('h4');
-                titulo.className = 'font-semibold text-gray-800 dark:text-gray-100 mb-2';
-                titulo.textContent = motivo + ' (' + porMotivo[motivo].length + ' ejemplos)';
-                bloque.appendChild(titulo);
-                const pre = document.createElement('pre');
-                pre.className = 'text-xs bg-gray-50 dark:bg-gray-900 p-2 rounded overflow-x-auto text-gray-700 dark:text-gray-300';
-                pre.textContent = JSON.stringify(porMotivo[motivo], null, 2);
-                bloque.appendChild(pre);
-                muestras.appendChild(bloque);
             });
         }
 
@@ -347,62 +268,6 @@
             document.getElementById('progresoTexto').textContent = Math.round(porcentaje) + '%';
         }
 
-        function agregarLog(mensaje, tipo = 'info') {
-            const container = document.getElementById('logContainer');
-            const timestamp = new Date().toLocaleTimeString();
-            
-            let icono = 'ℹ️';
-            let clase = 'text-gray-700 dark:text-gray-300';
-            
-            switch(tipo) {
-                case 'success':
-                    icono = '✅';
-                    clase = 'text-green-600 dark:text-green-400';
-                    break;
-                case 'error':
-                    icono = '❌';
-                    clase = 'text-red-600 dark:text-red-400';
-                    break;
-                case 'warning':
-                    icono = '⚠️';
-                    clase = 'text-yellow-600 dark:text-yellow-400';
-                    break;
-            }
-            
-            const logEntry = document.createElement('div');
-            logEntry.className = `mb-1 ${clase}`;
-            logEntry.innerHTML = `<span class="text-gray-500 dark:text-gray-400">[${timestamp}]</span> ${icono} ${mensaje}`;
-            
-            container.appendChild(logEntry);
-            container.scrollTop = container.scrollHeight;
-        }
-
-        function copiarJsonDepuracion() {
-            if (!ultimaRespuestaDepuracion) {
-                agregarLog('No hay datos: ejecuta el cron primero.', 'warning');
-                return;
-            }
-            const payload = {
-                ejecucion_id: ultimaRespuestaDepuracion.ejecucion_id,
-                total_productos_hot: ultimaRespuestaDepuracion.total_productos_hot,
-                log: ultimaRespuestaDepuracion.log,
-                productos_focalizados: ultimaRespuestaDepuracion.depuracion?.productos_focalizados ?? null,
-                depuracion: ultimaRespuestaDepuracion.depuracion,
-                productos_hot: ultimaRespuestaDepuracion.productos_hot,
-            };
-            navigator.clipboard.writeText(JSON.stringify(payload, null, 2))
-                .then(() => agregarLog('JSON copiado al portapapeles.', 'success'))
-                .catch(() => agregarLog('No se pudo copiar. Usa la tabla o exporta manualmente.', 'error'));
-        }
-
-        function limpiarLog() {
-            document.getElementById('logContainer').innerHTML = '<div class="text-gray-500 dark:text-gray-400">Log limpiado...</div>';
-            document.getElementById('panelResumen').classList.add('hidden');
-            document.getElementById('panelDepuracion').classList.add('hidden');
-            document.getElementById('panelProductoFocalizado').classList.add('hidden');
-            document.getElementById('tablaProductosHot').innerHTML = '';
-            ultimaRespuestaDepuracion = null;
-        }
     </script>
     {{-- EVITAR TENER QUE PINCHAR DOS VECES EN LOS ENLACES PARA QUE FUNCIONEN--}}
     <script>

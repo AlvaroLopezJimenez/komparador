@@ -41,6 +41,58 @@
         }
     }
 
+    if (!function_exists('formatearEnvioDefectoTiendaAvisos')) {
+        /**
+         * Misma lógica que actualizarEnvioSegunTienda en ofertas/formulario.blade.php.
+         * Devuelve "(-)" si el envío es gratis o vacío, o "(4,90)" si hay precio por defecto.
+         */
+        function formatearEnvioDefectoTiendaAvisos($tienda): string {
+            if (!$tienda) {
+                return '(-)';
+            }
+
+            $texto = trim((string) ($tienda->envio_gratis ?? ''));
+            if ($texto === '') {
+                $texto = trim((string) ($tienda->envio_normal ?? ''));
+            }
+
+            if ($texto === '' || stripos($texto, 'gratis') !== false) {
+                return '(-)';
+            }
+
+            $textoNorm = str_replace(['‚', '，', '٫', "\xC2\xA0"], [',', ',', ',', ' '], $texto);
+
+            if (preg_match('/(\d+[.,]\d+)/', $textoNorm, $coincidencia)) {
+                $valor = (float) str_replace(',', '.', $coincidencia[1]);
+                if ($valor > 0) {
+                    return '(' . number_format($valor, 2, ',', '') . ')';
+                }
+            }
+
+            if (preg_match('/(\d+[,.]?\d*)\s*€?/', $textoNorm, $coincidencia) && ($coincidencia[1] ?? '') !== '') {
+                $valor = (float) str_replace(',', '.', $coincidencia[1]);
+                if ($valor > 0) {
+                    return '(' . number_format($valor, 2, ',', '') . ')';
+                }
+            }
+
+            return '(-)';
+        }
+    }
+
+    if (!function_exists('motivoOfertaResucitadaCoincideTextoAviso')) {
+        function motivoOfertaResucitadaCoincideTextoAviso(?string $textoAviso, string $etiquetaBoton): bool {
+            $texto = strtolower(trim($textoAviso ?? ''));
+            $etiqueta = strtolower(trim($etiquetaBoton));
+
+            if ($texto === '' || $etiqueta === '') {
+                return false;
+            }
+
+            return $texto === $etiqueta || str_starts_with($texto, $etiqueta . ' ') || str_starts_with($texto, $etiqueta . '-');
+        }
+    }
+
     /**
      * Obtiene la primera oferta de un producto consultando la tabla producto_oferta_mas_barata_por_producto
      * Consulta el oferta_id desde la tabla y luego obtiene todos los datos de la oferta desde la tabla de ofertas
@@ -464,6 +516,12 @@
             };
             $claseSubtabActiva = 'inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md border border-pink-500 text-pink-400 bg-gray-700 transition-colors';
             $claseSubtabInactiva = 'inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md border border-gray-600 text-gray-300 hover:border-pink-500 hover:text-pink-500 transition-colors';
+            $botonesOfertaResucitada = [
+                ['motivo' => 'sin_stock', 'etiqueta' => 'Sin stock'],
+                ['motivo' => 'segunda_mano', 'etiqueta' => 'Segunda mano'],
+                ['motivo' => 'reacondicionado', 'etiqueta' => 'Reacondicionado'],
+                ['motivo' => '404', 'etiqueta' => '404'],
+            ];
         @endphp
 
         <!-- Pestañas -->
@@ -677,8 +735,11 @@
                                         <span class="text-gray-200 dark:text-gray-200 break-words text-sm">Aviso Correo</span>
                                         <div class="flex items-center space-x-1 flex-wrap gap-1">
                                             <button type="button" onclick="event.stopPropagation(); editarAviso({{ $aviso->id }}, {{ json_encode($aviso->texto_aviso) }}, '{{ $aviso->fecha_aviso->format('Y-m-d\TH:i') }}', {{ $aviso->oculto ? 'true' : 'false' }})" 
-                                                class="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors">
-                                                Editar
+                                                class="inline-flex items-center justify-center p-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                                                title="Editar" aria-label="Editar">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                                </svg>
                                             </button>
                                             @if($urlWebCorreo)
                                                 <button type="button" onclick="event.stopPropagation(); window.open('{{ $urlWebCorreo }}', '_blank')" 
@@ -717,7 +778,7 @@
                                             @endphp
                                             <div class="bg-gray-700 rounded text-gray-300 avisos-oferta-block" style="margin-top:2px;margin-bottom:0;padding:3px 6px;">
                                                 <div class="flex flex-wrap items-center gap-1 text-xs avisos-oferta-inner">
-                                                    <span class="font-medium">{{ $ofertaMasBarata->tienda->nombre ?? 'Tienda ID: ' . $ofertaMasBarata->tienda_id }}</span>
+                                                    <span class="font-medium">{{ $ofertaMasBarata->tienda->nombre ?? 'Tienda ID: ' . $ofertaMasBarata->tienda_id }}<span class="text-yellow-400">{{ formatearEnvioDefectoTiendaAvisos($ofertaMasBarata->tienda) }}</span></span>
                                                     <span>•</span>
                                                     <span class="flex items-center gap-1 text-orange-500">
                                                         <img src="{{ asset('images/van.png') }}" loading="lazy" alt="Van" class="w-4 h-4">
@@ -765,7 +826,7 @@
                                     @elseif($aviso->avisoable_type === 'App\Models\OfertaProducto' && $aviso->avisoable_id && $aviso->avisoable_id !== null && $aviso->avisoable)
                                         <div class="bg-gray-700 rounded text-gray-300 avisos-oferta-block" style="margin-top:2px;margin-bottom:0;padding:3px 6px;">
                                             <div class="flex flex-wrap items-center gap-1 text-xs avisos-oferta-inner">
-                                                <span class="font-medium">{{ $aviso->avisoable->tienda->nombre ?? 'Tienda ID: ' . $aviso->avisoable->tienda_id }}</span>
+                                                <span class="font-medium">{{ $aviso->avisoable->tienda->nombre ?? 'Tienda ID: ' . $aviso->avisoable->tienda_id }}<span class="text-yellow-400">{{ formatearEnvioDefectoTiendaAvisos($aviso->avisoable->tienda) }}</span></span>
                                                 <span>•</span>
                                                 <span class="flex items-center gap-1 text-orange-500">
                                                     <img src="{{ asset('images/van.png') }}" loading="lazy" alt="Van" class="w-4 h-4">
@@ -834,9 +895,12 @@
                                         </button>
                                     @else
                                         @unless($aviso->avisoable_type === 'App\Models\CorreoAvisoPrecio')
-                                        <button onclick="editarAviso({{ $aviso->id }}, {{ json_encode($aviso->texto_aviso) }}, '{{ $aviso->fecha_aviso->format('Y-m-d\TH:i') }}', {{ $aviso->oculto ? 'true' : 'false' }})" 
-                                            class="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors">
-                                            Editar
+                                        <button type="button" onclick="editarAviso({{ $aviso->id }}, {{ json_encode($aviso->texto_aviso) }}, '{{ $aviso->fecha_aviso->format('Y-m-d\TH:i') }}', {{ $aviso->oculto ? 'true' : 'false' }})" 
+                                            class="text-blue-400 hover:text-blue-300 dark:text-blue-400 dark:hover:text-blue-300 p-0.5"
+                                            title="Editar" aria-label="Editar">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                            </svg>
                                         </button>
                                         @endunless
                                         @if($aviso->avisoable_type === 'App\Models\CorreoAvisoPrecio')
@@ -865,18 +929,20 @@
                                         @endif
                                         @if(in_array($aviso->avisoable_type, ['App\Models\OfertaProducto', 'App\Models\Producto']))
                                             <div class="w-full flex flex-wrap gap-1" onclick="event.stopPropagation()">
-                                                <button type="button" onclick="gestionarOfertaResucitada({{ $aviso->id }}, 'sin_stock', 'Sin stock')" class="inline-grid place-items-center h-6 px-2 text-[11px] leading-none font-bold text-center bg-gray-600 hover:bg-gray-700 text-white rounded-md transition-colors">
-                                                    Sin stock
-                                                </button>
-                                                <button type="button" onclick="gestionarOfertaResucitada({{ $aviso->id }}, 'segunda_mano', 'Segunda mano')" class="inline-grid place-items-center h-6 px-2 text-[11px] leading-none font-bold text-center bg-gray-600 hover:bg-gray-700 text-white rounded-md transition-colors">
-                                                    Segunda mano
-                                                </button>
-                                                <button type="button" onclick="gestionarOfertaResucitada({{ $aviso->id }}, 'reacondicionado', 'Reacondicionado')" class="inline-grid place-items-center h-6 px-2 text-[11px] leading-none font-bold text-center bg-gray-600 hover:bg-gray-700 text-white rounded-md transition-colors">
-                                                    Reacondicionado
-                                                </button>
-                                                <button type="button" onclick="gestionarOfertaResucitada({{ $aviso->id }}, '404', '404')" class="inline-grid place-items-center h-6 px-2 text-[11px] leading-none font-bold text-center bg-gray-600 hover:bg-gray-700 text-white rounded-md transition-colors">
-                                                    404
-                                                </button>
+                                                @foreach($botonesOfertaResucitada as $botonResucitada)
+                                                    @php
+                                                        $botonResucitadaDeshabilitado = $aviso->avisoable_type === 'App\Models\OfertaProducto'
+                                                            && motivoOfertaResucitadaCoincideTextoAviso($aviso->texto_aviso, $botonResucitada['etiqueta']);
+                                                    @endphp
+                                                    <button type="button"
+                                                        @unless($botonResucitadaDeshabilitado)
+                                                            onclick="gestionarOfertaResucitada({{ $aviso->id }}, '{{ $botonResucitada['motivo'] }}', '{{ $botonResucitada['etiqueta'] }}')"
+                                                        @endunless
+                                                        @if($botonResucitadaDeshabilitado) disabled @endif
+                                                        class="inline-grid place-items-center h-6 px-2 text-[11px] leading-none font-bold text-center rounded-md transition-colors {{ $botonResucitadaDeshabilitado ? 'bg-gray-700 text-gray-500 opacity-50 cursor-not-allowed' : 'bg-gray-600 hover:bg-gray-700 text-white' }}">
+                                                        {{ $botonResucitada['etiqueta'] }}
+                                                    </button>
+                                                @endforeach
                                             </div>
                                         @endif
                                     @endif
@@ -1030,8 +1096,11 @@
                                         <span class="text-gray-200 dark:text-gray-200 break-words text-sm">Aviso Correo</span>
                                         <div class="flex items-center space-x-1 flex-wrap gap-1">
                                             <button type="button" onclick="event.stopPropagation(); editarAviso({{ $aviso->id }}, {{ json_encode($aviso->texto_aviso) }}, '{{ $aviso->fecha_aviso->format('Y-m-d\TH:i') }}', {{ $aviso->oculto ? 'true' : 'false' }})" 
-                                                class="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors">
-                                                Editar
+                                                class="inline-flex items-center justify-center p-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                                                title="Editar" aria-label="Editar">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                                </svg>
                                             </button>
                                             @if($urlWebCorreo)
                                                 <button type="button" onclick="event.stopPropagation(); window.open('{{ $urlWebCorreo }}', '_blank')" 
@@ -1068,7 +1137,7 @@
                                             @endphp
                                             <div class="bg-gray-700 rounded text-gray-300 avisos-oferta-block" style="margin-top:2px;margin-bottom:0;padding:3px 6px;">
                                                 <div class="flex flex-wrap items-center gap-1 text-xs avisos-oferta-inner">
-                                                    <span class="font-medium">{{ $ofertaMasBarata->tienda->nombre ?? 'Tienda ID: ' . $ofertaMasBarata->tienda_id }}</span>
+                                                    <span class="font-medium">{{ $ofertaMasBarata->tienda->nombre ?? 'Tienda ID: ' . $ofertaMasBarata->tienda_id }}<span class="text-yellow-400">{{ formatearEnvioDefectoTiendaAvisos($ofertaMasBarata->tienda) }}</span></span>
                                                     <span>•</span>
                                                     <span class="flex items-center gap-1 text-orange-500">
                                                         <img src="{{ asset('images/van.png') }}" loading="lazy" alt="Van" class="w-4 h-4">
@@ -1116,7 +1185,7 @@
                                     @elseif($aviso->avisoable_type === 'App\Models\OfertaProducto' && $aviso->avisoable_id && $aviso->avisoable_id !== null && $aviso->avisoable)
                                         <div class="bg-gray-700 rounded text-gray-300 avisos-oferta-block" style="margin-top:2px;margin-bottom:0;padding:3px 6px;">
                                             <div class="flex flex-wrap items-center gap-2 text-xs avisos-oferta-inner">
-                                                <span class="font-medium">{{ $aviso->avisoable->tienda->nombre ?? 'Tienda ID: ' . $aviso->avisoable->tienda_id }}</span>
+                                                <span class="font-medium">{{ $aviso->avisoable->tienda->nombre ?? 'Tienda ID: ' . $aviso->avisoable->tienda_id }}<span class="text-yellow-400">{{ formatearEnvioDefectoTiendaAvisos($aviso->avisoable->tienda) }}</span></span>
                                                 <span>•</span>
                                                 <span class="flex items-center gap-1 text-orange-500">
                                                     <img src="{{ asset('images/van.png') }}" loading="lazy" alt="Van" class="w-4 h-4">
@@ -1165,9 +1234,12 @@
                                         </button>
                                     @else
                                         @unless($aviso->avisoable_type === 'App\Models\CorreoAvisoPrecio')
-                                        <button onclick="editarAviso({{ $aviso->id }}, {{ json_encode($aviso->texto_aviso) }}, '{{ $aviso->fecha_aviso->format('Y-m-d\TH:i') }}', {{ $aviso->oculto ? 'true' : 'false' }})" 
-                                            class="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors">
-                                            Editar
+                                        <button type="button" onclick="editarAviso({{ $aviso->id }}, {{ json_encode($aviso->texto_aviso) }}, '{{ $aviso->fecha_aviso->format('Y-m-d\TH:i') }}', {{ $aviso->oculto ? 'true' : 'false' }})" 
+                                            class="text-blue-400 hover:text-blue-300 dark:text-blue-400 dark:hover:text-blue-300 p-0.5"
+                                            title="Editar" aria-label="Editar">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                            </svg>
                                         </button>
                                         @endunless
                                         @if($aviso->avisoable_type === 'App\Models\CorreoAvisoPrecio')
@@ -1196,18 +1268,20 @@
                                         @endif
                                         @if(in_array($aviso->avisoable_type, ['App\Models\OfertaProducto', 'App\Models\Producto']))
                                             <div class="w-full flex flex-wrap gap-1" onclick="event.stopPropagation()">
-                                                <button type="button" onclick="gestionarOfertaResucitada({{ $aviso->id }}, 'sin_stock', 'Sin stock')" class="inline-grid place-items-center h-6 px-2 text-[11px] leading-none font-bold text-center bg-gray-600 hover:bg-gray-700 text-white rounded-md transition-colors">
-                                                    Sin stock
-                                                </button>
-                                                <button type="button" onclick="gestionarOfertaResucitada({{ $aviso->id }}, 'segunda_mano', 'Segunda mano')" class="inline-grid place-items-center h-6 px-2 text-[11px] leading-none font-bold text-center bg-gray-600 hover:bg-gray-700 text-white rounded-md transition-colors">
-                                                    Segunda mano
-                                                </button>
-                                                <button type="button" onclick="gestionarOfertaResucitada({{ $aviso->id }}, 'reacondicionado', 'Reacondicionado')" class="inline-grid place-items-center h-6 px-2 text-[11px] leading-none font-bold text-center bg-gray-600 hover:bg-gray-700 text-white rounded-md transition-colors">
-                                                    Reacondicionado
-                                                </button>
-                                                <button type="button" onclick="gestionarOfertaResucitada({{ $aviso->id }}, '404', '404')" class="inline-grid place-items-center h-6 px-2 text-[11px] leading-none font-bold text-center bg-gray-600 hover:bg-gray-700 text-white rounded-md transition-colors">
-                                                    404
-                                                </button>
+                                                @foreach($botonesOfertaResucitada as $botonResucitada)
+                                                    @php
+                                                        $botonResucitadaDeshabilitado = $aviso->avisoable_type === 'App\Models\OfertaProducto'
+                                                            && motivoOfertaResucitadaCoincideTextoAviso($aviso->texto_aviso, $botonResucitada['etiqueta']);
+                                                    @endphp
+                                                    <button type="button"
+                                                        @unless($botonResucitadaDeshabilitado)
+                                                            onclick="gestionarOfertaResucitada({{ $aviso->id }}, '{{ $botonResucitada['motivo'] }}', '{{ $botonResucitada['etiqueta'] }}')"
+                                                        @endunless
+                                                        @if($botonResucitadaDeshabilitado) disabled @endif
+                                                        class="inline-grid place-items-center h-6 px-2 text-[11px] leading-none font-bold text-center rounded-md transition-colors {{ $botonResucitadaDeshabilitado ? 'bg-gray-700 text-gray-500 opacity-50 cursor-not-allowed' : 'bg-gray-600 hover:bg-gray-700 text-white' }}">
+                                                        {{ $botonResucitada['etiqueta'] }}
+                                                    </button>
+                                                @endforeach
                                             </div>
                                         @endif
                                     @endif
@@ -1361,8 +1435,11 @@
                                         <span class="text-gray-200 dark:text-gray-200 break-words text-sm">Aviso Correo</span>
                                         <div class="flex items-center space-x-1 flex-wrap gap-1">
                                             <button type="button" onclick="event.stopPropagation(); editarAviso({{ $aviso->id }}, {{ json_encode($aviso->texto_aviso) }}, '{{ $aviso->fecha_aviso->format('Y-m-d\TH:i') }}', {{ $aviso->oculto ? 'true' : 'false' }})" 
-                                                class="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors">
-                                                Editar
+                                                class="inline-flex items-center justify-center p-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                                                title="Editar" aria-label="Editar">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                                </svg>
                                             </button>
                                             @if($urlWebCorreo)
                                                 <button type="button" onclick="event.stopPropagation(); window.open('{{ $urlWebCorreo }}', '_blank')" 
@@ -1399,7 +1476,7 @@
                                             @endphp
                                             <div class="bg-gray-700 rounded text-gray-300 avisos-oferta-block" style="margin-top:2px;margin-bottom:0;padding:3px 6px;">
                                                 <div class="flex flex-wrap items-center gap-1 text-xs avisos-oferta-inner">
-                                                    <span class="font-medium">{{ $ofertaMasBarata->tienda->nombre ?? 'Tienda ID: ' . $ofertaMasBarata->tienda_id }}</span>
+                                                    <span class="font-medium">{{ $ofertaMasBarata->tienda->nombre ?? 'Tienda ID: ' . $ofertaMasBarata->tienda_id }}<span class="text-yellow-400">{{ formatearEnvioDefectoTiendaAvisos($ofertaMasBarata->tienda) }}</span></span>
                                                     <span>•</span>
                                                     <span class="flex items-center gap-1 text-orange-500">
                                                         <img src="{{ asset('images/van.png') }}" loading="lazy" alt="Van" class="w-4 h-4">
@@ -1447,7 +1524,7 @@
                                     @elseif($aviso->avisoable_type === 'App\Models\OfertaProducto' && $aviso->avisoable_id && $aviso->avisoable_id !== null && $aviso->avisoable)
                                         <div class="bg-gray-700 rounded text-gray-300 avisos-oferta-block" style="margin-top:2px;margin-bottom:0;padding:3px 6px;">
                                             <div class="flex flex-wrap items-center gap-2 text-xs avisos-oferta-inner">
-                                                <span class="font-medium">{{ $aviso->avisoable->tienda->nombre ?? 'Tienda ID: ' . $aviso->avisoable->tienda_id }}</span>
+                                                <span class="font-medium">{{ $aviso->avisoable->tienda->nombre ?? 'Tienda ID: ' . $aviso->avisoable->tienda_id }}<span class="text-yellow-400">{{ formatearEnvioDefectoTiendaAvisos($aviso->avisoable->tienda) }}</span></span>
                                                 <span>•</span>
                                                 <span class="flex items-center gap-1 text-orange-500">
                                                     <img src="{{ asset('images/van.png') }}" loading="lazy" alt="Van" class="w-4 h-4">
@@ -1496,9 +1573,12 @@
                                         </button>
                                     @else
                                         @unless($aviso->avisoable_type === 'App\Models\CorreoAvisoPrecio')
-                                        <button onclick="editarAviso({{ $aviso->id }}, {{ json_encode($aviso->texto_aviso) }}, '{{ $aviso->fecha_aviso->format('Y-m-d\TH:i') }}', {{ $aviso->oculto ? 'true' : 'false' }})" 
-                                            class="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors">
-                                            Editar
+                                        <button type="button" onclick="editarAviso({{ $aviso->id }}, {{ json_encode($aviso->texto_aviso) }}, '{{ $aviso->fecha_aviso->format('Y-m-d\TH:i') }}', {{ $aviso->oculto ? 'true' : 'false' }})" 
+                                            class="text-blue-400 hover:text-blue-300 dark:text-blue-400 dark:hover:text-blue-300 p-0.5"
+                                            title="Editar" aria-label="Editar">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                            </svg>
                                         </button>
                                         @endunless
                                         @if($aviso->avisoable_type === 'App\Models\CorreoAvisoPrecio')
@@ -1527,18 +1607,20 @@
                                         @endif
                                         @if(in_array($aviso->avisoable_type, ['App\Models\OfertaProducto', 'App\Models\Producto']))
                                             <div class="w-full flex flex-wrap gap-1" onclick="event.stopPropagation()">
-                                                <button type="button" onclick="gestionarOfertaResucitada({{ $aviso->id }}, 'sin_stock', 'Sin stock')" class="inline-grid place-items-center h-6 px-2 text-[11px] leading-none font-bold text-center bg-gray-600 hover:bg-gray-700 text-white rounded-md transition-colors">
-                                                    Sin stock
-                                                </button>
-                                                <button type="button" onclick="gestionarOfertaResucitada({{ $aviso->id }}, 'segunda_mano', 'Segunda mano')" class="inline-grid place-items-center h-6 px-2 text-[11px] leading-none font-bold text-center bg-gray-600 hover:bg-gray-700 text-white rounded-md transition-colors">
-                                                    Segunda mano
-                                                </button>
-                                                <button type="button" onclick="gestionarOfertaResucitada({{ $aviso->id }}, 'reacondicionado', 'Reacondicionado')" class="inline-grid place-items-center h-6 px-2 text-[11px] leading-none font-bold text-center bg-gray-600 hover:bg-gray-700 text-white rounded-md transition-colors">
-                                                    Reacondicionado
-                                                </button>
-                                                <button type="button" onclick="gestionarOfertaResucitada({{ $aviso->id }}, '404', '404')" class="inline-grid place-items-center h-6 px-2 text-[11px] leading-none font-bold text-center bg-gray-600 hover:bg-gray-700 text-white rounded-md transition-colors">
-                                                    404
-                                                </button>
+                                                @foreach($botonesOfertaResucitada as $botonResucitada)
+                                                    @php
+                                                        $botonResucitadaDeshabilitado = $aviso->avisoable_type === 'App\Models\OfertaProducto'
+                                                            && motivoOfertaResucitadaCoincideTextoAviso($aviso->texto_aviso, $botonResucitada['etiqueta']);
+                                                    @endphp
+                                                    <button type="button"
+                                                        @unless($botonResucitadaDeshabilitado)
+                                                            onclick="gestionarOfertaResucitada({{ $aviso->id }}, '{{ $botonResucitada['motivo'] }}', '{{ $botonResucitada['etiqueta'] }}')"
+                                                        @endunless
+                                                        @if($botonResucitadaDeshabilitado) disabled @endif
+                                                        class="inline-grid place-items-center h-6 px-2 text-[11px] leading-none font-bold text-center rounded-md transition-colors {{ $botonResucitadaDeshabilitado ? 'bg-gray-700 text-gray-500 opacity-50 cursor-not-allowed' : 'bg-gray-600 hover:bg-gray-700 text-white' }}">
+                                                        {{ $botonResucitada['etiqueta'] }}
+                                                    </button>
+                                                @endforeach
                                             </div>
                                         @endif
                                     @endif
@@ -1673,7 +1755,241 @@
         </div>
     </div>
 
+    <!-- Modal alerta / confirmación (sustituye alert y confirm del navegador) -->
+    <div id="modal-alerta-avisos" class="hidden fixed inset-0 bg-black/30 flex items-start justify-center z-[60] px-4 pt-28 pb-4">
+        <div id="modal-alerta-avisos-panel"
+            class="max-w-lg w-full rounded-xl shadow-2xl overflow-hidden ring-4 animate-[alertaAvisosEntrada_0.25s_ease-out]"
+            role="dialog" aria-modal="true" aria-labelledby="modal-alerta-avisos-titulo">
+            <div id="modal-alerta-avisos-cabecera" class="flex items-center gap-3 px-5 py-4">
+                <div id="modal-alerta-avisos-icono" class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center"></div>
+                <h2 id="modal-alerta-avisos-titulo" class="text-lg font-bold tracking-tight">Aviso</h2>
+            </div>
+            <div class="px-5 py-4">
+                <p id="modal-alerta-avisos-mensaje" class="text-sm leading-relaxed whitespace-pre-wrap mb-5"></p>
+                <div class="flex justify-end space-x-3">
+                    <button type="button" id="btn-alerta-avisos-cancelar"
+                        class="hidden px-5 py-2.5 text-sm font-semibold rounded-lg border-2 transition-colors">
+                        Cancelar
+                    </button>
+                    <button type="button" id="btn-alerta-avisos-aceptar"
+                        class="px-5 py-2.5 text-sm font-semibold text-white rounded-lg shadow-md transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2">
+                        Aceptar <span class="font-normal opacity-90">(W)</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        @keyframes alertaAvisosEntrada {
+            from { opacity: 0; transform: translateY(-12px) scale(0.97); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+    </style>
+
     <script>
+        // Modal personalizado (reemplaza alert/confirm del navegador)
+        let modalAlertaAvisosResolver = null;
+        let modalAlertaAvisosTipo = 'alert';
+
+        function modalAlertaAvisosVisible() {
+            const modal = document.getElementById('modal-alerta-avisos');
+            return modal && !modal.classList.contains('hidden');
+        }
+
+        function cerrarModalAlertaAvisos(resultado) {
+            const modal = document.getElementById('modal-alerta-avisos');
+            modal.classList.add('hidden');
+            document.removeEventListener('keydown', manejarTeclasModalAlertaAvisos, true);
+
+            if (modalAlertaAvisosResolver) {
+                const resolver = modalAlertaAvisosResolver;
+                modalAlertaAvisosResolver = null;
+                resolver(resultado);
+            }
+        }
+
+        const iconoAlertaAvisos = `<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>`;
+        const iconoConfirmarAvisos = `<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`;
+
+        function aplicarEstiloModalAlertaAvisos(tipo) {
+            const panel = document.getElementById('modal-alerta-avisos-panel');
+            const cabecera = document.getElementById('modal-alerta-avisos-cabecera');
+            const icono = document.getElementById('modal-alerta-avisos-icono');
+            const titulo = document.getElementById('modal-alerta-avisos-titulo');
+            const mensaje = document.getElementById('modal-alerta-avisos-mensaje');
+            const btnCancelar = document.getElementById('btn-alerta-avisos-cancelar');
+            const btnAceptar = document.getElementById('btn-alerta-avisos-aceptar');
+
+            const clasesBotonAceptar = 'px-5 py-2.5 text-sm font-semibold text-stone-900 rounded-lg shadow-md bg-yellow-400 hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-offset-2 transition-colors';
+
+            if (tipo === 'confirm') {
+                panel.className = 'max-w-lg w-full rounded-xl shadow-2xl overflow-hidden border-2 border-yellow-400 animate-[alertaAvisosEntrada_0.25s_ease-out] bg-white';
+                cabecera.className = 'flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-sky-500 to-blue-600';
+                icono.className = 'flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center bg-white/20 text-white';
+                icono.innerHTML = iconoConfirmarAvisos;
+                titulo.className = 'text-lg font-bold tracking-tight text-white';
+                mensaje.className = 'text-sm leading-relaxed whitespace-pre-wrap mb-5 text-slate-800';
+                btnCancelar.className = 'px-5 py-2.5 text-sm font-semibold rounded-lg border-2 border-slate-300 text-slate-600 bg-white hover:bg-slate-50 transition-colors';
+                btnAceptar.className = clasesBotonAceptar;
+            } else {
+                panel.className = 'max-w-lg w-full rounded-xl shadow-2xl overflow-hidden border-2 border-yellow-400 animate-[alertaAvisosEntrada_0.25s_ease-out] bg-amber-50';
+                cabecera.className = 'flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-amber-500 to-orange-500';
+                icono.className = 'flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center bg-white/25 text-white';
+                icono.innerHTML = iconoAlertaAvisos;
+                titulo.className = 'text-lg font-bold tracking-tight text-white';
+                mensaje.className = 'text-sm leading-relaxed whitespace-pre-wrap mb-5 text-amber-950';
+                btnCancelar.className = 'hidden px-5 py-2.5 text-sm font-semibold rounded-lg border-2 transition-colors';
+                btnAceptar.className = clasesBotonAceptar;
+            }
+        }
+
+        function abrirModalAlertaAvisos(mensaje, tipo) {
+            return new Promise((resolve) => {
+                modalAlertaAvisosResolver = resolve;
+                modalAlertaAvisosTipo = tipo;
+
+                const modal = document.getElementById('modal-alerta-avisos');
+                const mensajeEl = document.getElementById('modal-alerta-avisos-mensaje');
+                const tituloEl = document.getElementById('modal-alerta-avisos-titulo');
+                const btnCancelar = document.getElementById('btn-alerta-avisos-cancelar');
+                const btnAceptar = document.getElementById('btn-alerta-avisos-aceptar');
+
+                aplicarEstiloModalAlertaAvisos(tipo);
+                mensajeEl.textContent = mensaje;
+                tituloEl.textContent = tipo === 'confirm' ? 'Confirmar acción' : 'Atención';
+                btnCancelar.classList.toggle('hidden', tipo !== 'confirm');
+
+                modal.classList.remove('hidden');
+                document.addEventListener('keydown', manejarTeclasModalAlertaAvisos, true);
+
+                setTimeout(() => btnAceptar.focus(), 50);
+            });
+        }
+
+        function manejarTeclasModalAlertaAvisos(e) {
+            if (!modalAlertaAvisosVisible()) {
+                return;
+            }
+
+            if (e.key === 'Enter' || e.key === 'w' || e.key === 'W') {
+                e.preventDefault();
+                e.stopPropagation();
+                cerrarModalAlertaAvisos(modalAlertaAvisosTipo === 'confirm');
+            } else if (e.key === 'Escape' && modalAlertaAvisosTipo === 'confirm') {
+                e.preventDefault();
+                e.stopPropagation();
+                cerrarModalAlertaAvisos(false);
+            }
+        }
+
+        function mostrarAlertaAvisos(mensaje) {
+            return abrirModalAlertaAvisos(mensaje, 'alert').then(() => {});
+        }
+
+        function mostrarConfirmacionAvisos(mensaje) {
+            return abrirModalAlertaAvisos(mensaje, 'confirm');
+        }
+
+        document.getElementById('btn-alerta-avisos-aceptar').addEventListener('click', function() {
+            cerrarModalAlertaAvisos(modalAlertaAvisosTipo === 'confirm');
+        });
+
+        document.getElementById('btn-alerta-avisos-cancelar').addEventListener('click', function() {
+            cerrarModalAlertaAvisos(false);
+        });
+
+        document.getElementById('modal-alerta-avisos').addEventListener('click', function(e) {
+            if (e.target === this && modalAlertaAvisosTipo === 'alert') {
+                cerrarModalAlertaAvisos(true);
+            }
+        });
+
+        function esTeclaSola(e, tecla) {
+            return (e.key === tecla || e.key === tecla.toUpperCase())
+                && !e.ctrlKey
+                && !e.metaKey
+                && !e.altKey
+                && !e.shiftKey;
+        }
+
+        function usuarioEscribiendoEnCampo() {
+            const el = document.activeElement;
+            if (!el) {
+                return false;
+            }
+            const tag = el.tagName;
+            return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
+        }
+
+        function algunModalAvisosBloqueaAtajos() {
+            if (modalAlertaAvisosVisible()) {
+                return true;
+            }
+            const modalEditar = document.getElementById('modal-editar-aviso');
+            const modalNuevo = document.getElementById('modal-nuevo-aviso-interno');
+            return (modalEditar && !modalEditar.classList.contains('hidden'))
+                || (modalNuevo && !modalNuevo.classList.contains('hidden'));
+        }
+
+        function obtenerContenidoTabAvisosActiva() {
+            for (const tab of ['vencidos', 'pendientes', 'ocultos']) {
+                const content = document.getElementById('content-' + tab);
+                if (content && !content.classList.contains('hidden')) {
+                    return content;
+                }
+            }
+            return null;
+        }
+
+        function obtenerPrimeraFilaAvisoVisible() {
+            const tabContent = obtenerContenidoTabAvisosActiva();
+            if (!tabContent) {
+                return null;
+            }
+
+            const primeraFila = tabContent.querySelector('tbody tr[data-aviso-id]');
+            if (!primeraFila || primeraFila.classList.contains('hidden')) {
+                return null;
+            }
+
+            return primeraFila;
+        }
+
+        function manejarAtajosTecladoAvisos(e) {
+            if (algunModalAvisosBloqueaAtajos()) {
+                return;
+            }
+
+            const primeraFila = obtenerPrimeraFilaAvisoVisible();
+            if (!primeraFila) {
+                return;
+            }
+
+            if (esTeclaSola(e, 'q')) {
+                const btnMostrar = primeraFila.querySelector('button[onclick*="mostrarOferta("]');
+                if (btnMostrar) {
+                    e.preventDefault();
+                    btnMostrar.click();
+                }
+                return;
+            }
+
+            if (usuarioEscribiendoEnCampo()) {
+                return;
+            }
+
+            if (esTeclaSola(e, 'w')) {
+                const btnEliminar = primeraFila.querySelector('button[onclick^="eliminarAviso("]');
+                if (btnEliminar) {
+                    e.preventDefault();
+                    btnEliminar.click();
+                }
+            }
+        }
+
+        document.addEventListener('keydown', manejarAtajosTecladoAvisos);
+
         // Funcionalidad de pestañas
         document.addEventListener('DOMContentLoaded', function() {
             const tabButtons = document.querySelectorAll('.tab-button');
@@ -1807,12 +2123,12 @@
                     cerrarModalEditar();
                     location.reload();
                 } else {
-                    alert('Error al actualizar el aviso');
+                    mostrarAlertaAvisos('Error al actualizar el aviso');
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Error al actualizar el aviso');
+                mostrarAlertaAvisos('Error al actualizar el aviso');
             });
         });
 
@@ -1879,7 +2195,7 @@
                     
                     // Comparar los textos
                     if (textoBD !== textoVistaTrim) {
-                        alert('Este aviso ha cambiado el texto. La página se recargará para mostrar los cambios.');
+                        await mostrarAlertaAvisos('Este aviso ha cambiado el texto. La página se recargará para mostrar los cambios.');
                         location.reload();
                         return false;
                     }
@@ -1897,7 +2213,7 @@
 
         // Función para eliminar avisos
         async function eliminarAviso(id) {
-            if (!confirm('¿Estás seguro de que quieres eliminar este aviso?')) {
+            if (!await mostrarConfirmacionAvisos('¿Estás seguro de que quieres eliminar este aviso?')) {
                 return;
             }
             
@@ -1922,19 +2238,19 @@
                 if (data.success) {
                     location.reload();
                 } else {
-                    alert('Error al eliminar el aviso');
+                    mostrarAlertaAvisos('Error al eliminar el aviso');
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Error al eliminar el aviso');
+                mostrarAlertaAvisos('Error al eliminar el aviso');
             });
         }
 
         // Función para eliminar aviso desde el modal
         async function eliminarAvisoDesdeModal() {
             const avisoId = document.getElementById('aviso-id').value;
-            if (!confirm('¿Estás seguro de que quieres eliminar este aviso?')) {
+            if (!await mostrarConfirmacionAvisos('¿Estás seguro de que quieres eliminar este aviso?')) {
                 return;
             }
             
@@ -1960,12 +2276,12 @@
                     cerrarModalEditar();
                     location.reload();
                 } else {
-                    alert('Error al eliminar el aviso');
+                    mostrarAlertaAvisos('Error al eliminar el aviso');
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Error al eliminar el aviso');
+                mostrarAlertaAvisos('Error al eliminar el aviso');
             });
         }
 
@@ -1978,7 +2294,7 @@
 
         // Cerrar modal con Escape
         document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
+            if (e.key === 'Escape' && !modalAlertaAvisosVisible()) {
                 cerrarModalEditar();
             }
         });
@@ -2132,7 +2448,7 @@
                 
                 // Validar que al menos un usuario esté seleccionado
                 if (userIds.length === 0) {
-                    alert('Por favor, selecciona al menos un usuario o marca "Todos"');
+                    mostrarAlertaAvisos('Por favor, selecciona al menos un usuario o marca "Todos"');
                     submitButton.disabled = false;
                     submitButton.textContent = originalText;
                     return;
@@ -2168,12 +2484,12 @@
                     location.reload();
                 } else {
                     console.error('Error del servidor:', data);
-                    alert('Error al crear el aviso interno: ' + (data.message || 'Error desconocido'));
+                    mostrarAlertaAvisos('Error al crear el aviso interno: ' + (data.message || 'Error desconocido'));
                 }
             })
             .catch(error => {
                 console.error('Error completo:', error);
-                alert('Error al crear el aviso interno: ' + error.message);
+                mostrarAlertaAvisos('Error al crear el aviso interno: ' + error.message);
             })
             .finally(() => {
                 // Restaurar botón
@@ -2191,7 +2507,7 @@
 
         // Cerrar modal de nuevo aviso interno con Escape
         document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
+            if (e.key === 'Escape' && !modalAlertaAvisosVisible()) {
                 cerrarModalNuevoAvisoInterno();
             }
         });
@@ -2298,8 +2614,8 @@
         }
 
         // Función para mostrar oferta y eliminar aviso
-        function mostrarOferta(ofertaId, avisoId) {
-            if (!confirm('¿Estás seguro de que quieres mostrar esta oferta y eliminar el aviso?')) {
+        async function mostrarOferta(ofertaId, avisoId) {
+            if (!await mostrarConfirmacionAvisos('¿Estás seguro de que quieres mostrar esta oferta y eliminar el aviso?')) {
                 return;
             }
 
@@ -2341,7 +2657,7 @@
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Error al procesar la solicitud');
+                mostrarAlertaAvisos('Error al procesar la solicitud');
             });
         }
 
@@ -2375,11 +2691,11 @@
             const avisosIds = Array.from(checkboxes).map(checkbox => checkbox.dataset.avisoId);
             
             if (avisosIds.length === 0) {
-                alert('No hay avisos seleccionados para eliminar.');
+                mostrarAlertaAvisos('No hay avisos seleccionados para eliminar.');
                 return;
             }
             
-            if (!confirm(`¿Estás seguro de que quieres eliminar ${avisosIds.length} avisos?`)) {
+            if (!await mostrarConfirmacionAvisos(`¿Estás seguro de que quieres eliminar ${avisosIds.length} avisos?`)) {
                 return;
             }
             
@@ -2446,10 +2762,10 @@
                 if (errores === 0) {
                     location.reload();
                 } else if (eliminados > 0) {
-                    alert(`Se eliminaron ${eliminados} avisos, pero ${errores} fallaron.`);
+                    mostrarAlertaAvisos(`Se eliminaron ${eliminados} avisos, pero ${errores} fallaron.`);
                     location.reload();
                 } else {
-                    alert('Error al eliminar los avisos.');
+                    mostrarAlertaAvisos('Error al eliminar los avisos.');
                     btnEliminar.disabled = false;
                     btnEliminar.textContent = originalText;
                 }
@@ -2477,11 +2793,11 @@
                 if (data.success) {
                     location.reload();
                 } else {
-                    alert('Error al marcar como comprobado: ' + (data.message || 'Error desconocido'));
+                    mostrarAlertaAvisos('Error al marcar como comprobado: ' + (data.message || 'Error desconocido'));
                 }
             } catch (error) {
                 console.error('Error:', error);
-                alert('Error al marcar como comprobado');
+                mostrarAlertaAvisos('Error al marcar como comprobado');
             }
         }
 
@@ -2499,12 +2815,12 @@
                 if (data.success) {
                     location.reload();
                 } else {
-                    alert('Error al aplazar el aviso: ' + data.message);
+                    mostrarAlertaAvisos('Error al aplazar el aviso: ' + data.message);
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Error de conexión al aplazar el aviso');
+                mostrarAlertaAvisos('Error de conexión al aplazar el aviso');
             });
         }
 
@@ -2567,14 +2883,14 @@
                     }
                 }
 
-                alert(mensaje);
+                await mostrarAlertaAvisos(mensaje);
 
                 if (data.success) {
                     window.location.reload();
                 }
             } catch (error) {
                 console.error('Error:', error);
-                alert('Error de conexión al enviar el correo: ' + (error.message || error));
+                mostrarAlertaAvisos('Error de conexión al enviar el correo: ' + (error.message || error));
             }
         }
 
@@ -2592,15 +2908,15 @@
                     window.location.reload();
                     return;
                 }
-                alert(data.message || 'No se pudo descartar el aviso');
+                mostrarAlertaAvisos(data.message || 'No se pudo descartar el aviso');
             })
             .catch(() => {
-                alert('Error al descartar el aviso');
+                mostrarAlertaAvisos('Error al descartar el aviso');
             });
         }
 
         async function gestionarOfertaResucitada(avisoId, motivo, etiqueta) {
-            if (!confirm(`¿Marcar este aviso como "${etiqueta}"?`)) {
+            if (!await mostrarConfirmacionAvisos(`¿Marcar este aviso como "${etiqueta}"?`)) {
                 return;
             }
 
@@ -2618,11 +2934,11 @@
                 if (data.success) {
                     location.reload();
                 } else {
-                    alert('Error al gestionar la oferta: ' + (data.message || 'Error desconocido'));
+                    mostrarAlertaAvisos('Error al gestionar la oferta: ' + (data.message || 'Error desconocido'));
                 }
             } catch (error) {
                 console.error('Error:', error);
-                alert('Error de conexión al gestionar la oferta');
+                mostrarAlertaAvisos('Error de conexión al gestionar la oferta');
             }
         }
 
@@ -2655,7 +2971,7 @@
             const envioInput = document.querySelector(`.envio-oferta-mas-barata[data-oferta-id="${ofertaId}"]`);
             
             if (!input || !precioUnidadDisplay) {
-                alert('Error: No se encontró el campo de precio');
+                mostrarAlertaAvisos('Error: No se encontró el campo de precio');
                 return;
             }
 
@@ -2665,13 +2981,13 @@
             const envio = envioInput ? (envioInput.value === '' ? null : parseFloat(envioInput.value)) : null;
 
             if (isNaN(precioTotal) || precioTotal < 0) {
-                alert('Por favor, introduce un precio válido');
+                mostrarAlertaAvisos('Por favor, introduce un precio válido');
                 input.value = input.dataset.precioOriginal;
                 return;
             }
 
             if (envio !== null && (isNaN(envio) || envio < 0)) {
-                alert('Por favor, introduce un envío válido');
+                mostrarAlertaAvisos('Por favor, introduce un envío válido');
                 if (envioInput) {
                     envioInput.value = envioInput.dataset.envioOriginal;
                 }
@@ -2679,7 +2995,7 @@
             }
 
             if (!productoId) {
-                alert('Error: No se encontró el producto asociado');
+                mostrarAlertaAvisos('Error: No se encontró el producto asociado');
                 return;
             }
 
@@ -2713,12 +3029,12 @@
                         location.reload();
                     }, 800);
                 } else {
-                    alert('Error al guardar el precio: ' + (data.error || 'Error desconocido'));
+                    mostrarAlertaAvisos('Error al guardar el precio: ' + (data.error || 'Error desconocido'));
                     input.value = input.dataset.precioOriginal;
                 }
             } catch (error) {
                 console.error('Error al guardar precio:', error);
-                alert('Error de conexión al guardar el precio');
+                mostrarAlertaAvisos('Error de conexión al guardar el precio');
                 input.value = input.dataset.precioOriginal;
             }
         }
@@ -2809,14 +3125,14 @@
                     // Recargar la página para mostrar los cambios
                     location.reload();
                 } else {
-                    alert('Error: ' + (data.message || 'Error desconocido'));
+                    mostrarAlertaAvisos('Error: ' + (data.message || 'Error desconocido'));
                     // Revertir el checkbox si hay error
                     document.getElementById('mostrar-todos-avisos').checked = !checked;
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Error de conexión al cambiar el filtro');
+                mostrarAlertaAvisos('Error de conexión al cambiar el filtro');
                 // Revertir el checkbox si hay error
                 document.getElementById('mostrar-todos-avisos').checked = !checked;
             });

@@ -3450,6 +3450,40 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
+    // Procesar URL inicial como si se hubiera pegado (limpieza, tienda, validación)
+    async function procesarUrlComoPegado(urlInicial) {
+        if (!urlInicial) return;
+
+        urlInput.value = urlInicial;
+
+        const btnIrUrlInit = document.getElementById('btn_ir_url');
+        if (btnIrUrlInit) {
+            btnIrUrlInit.href = urlInicial;
+            btnIrUrlInit.classList.remove('opacity-50', 'pointer-events-none');
+        }
+
+        const { url_limpia, es_pccomponentes_precio_cero } = await limpiarUrlViaApi(urlInicial);
+        if (es_pccomponentes_precio_cero) {
+            aplicarPccomponentesPrecioCero();
+        }
+
+        const urlFinal = url_limpia || urlInicial;
+        if (url_limpia && url_limpia !== urlInicial) {
+            urlInput.value = url_limpia;
+        }
+
+        if (btnIrUrlInit) {
+            btnIrUrlInit.href = urlFinal;
+        }
+
+        urlInput.dispatchEvent(new Event('input', { bubbles: true }));
+        await detectarTiendaPorUrl(urlFinal);
+
+        urlValidationInProgress = true;
+        actualizarEstadoBoton();
+        await validarUrl(urlFinal);
+    }
+
     // Event listener para pegar URL (limpieza vía servicio LimpiarUrlDeTiendas)
     urlInput.addEventListener('paste', function(e) {
         setTimeout(async () => {
@@ -3585,11 +3619,9 @@ document.addEventListener('DOMContentLoaded', function() {
         btnIrUrl.classList.add('opacity-50', 'pointer-events-none');
     }
     
-    // Validar URL inicial si existe
+    // Validar URL inicial si existe (p. ej. ?url= desde buscar-amazon)
     if (urlInput.value.trim()) {
-        urlValidationInProgress = true;
-        actualizarEstadoBoton();
-        validarUrl(urlInput.value.trim());
+        procesarUrlComoPegado(urlInput.value.trim());
     } else {
         // Si no hay URL inicial, actualizar estado del botón
         actualizarEstadoBoton();

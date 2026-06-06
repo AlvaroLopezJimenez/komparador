@@ -337,11 +337,21 @@ Route::prefix('admin')->group(function () {
         return app(\App\Http\Controllers\Crons\CronNeoObjetivosController::class)($request);
     })->name('admin.cron-neo-objetivos');
 
+    // Cron buscar productos: sesión web para redirigir al panel tras finalizar
+    Route::middleware('web')->group(function () {
+        Route::get('productos/buscar-amazon/cron', [\App\Http\Controllers\Crons\CronBuscarProductosAmazonController::class, 'ejecutarCronConResumen'])
+            ->name('admin.cron.buscar-amazon-productos');
+    });
+
 });
 
 // PARA PANEL ADMIN - NUEVO GRUPO CON MIDDLEWARE
 Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->name('admin.')->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+
+    // Antes del resource: productos/{producto} capturaría "buscar-amazon" como ID
+    Route::get('productos/buscar-amazon', [\App\Http\Controllers\Crons\CronBuscarProductosAmazonController::class, 'buscarAmazon'])->name('productos.buscar-amazon');
+    Route::post('productos/buscar-amazon', [\App\Http\Controllers\Crons\CronBuscarProductosAmazonController::class, 'buscarAmazonApi'])->name('productos.buscar-amazon.api');
 
     Route::resource('productos', ProductoController::class)->except(['destroy']); // destroy comentado por seguridad
     Route::resource('chollos', CholloController::class)->except(['show', 'destroy']); // destroy comentado por seguridad
@@ -493,6 +503,10 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
         ]);
     })->name('ejecuciones.avisos-sin-stock-scrapear');
 
+    // Ejecuciones: cron buscar productos Amazon
+    Route::get('ejecuciones/buscar-amazon-productos', [\App\Http\Controllers\Crons\CronBuscarProductosAmazonController::class, 'vistaHistorialEjecucionesBuscarAmazon'])
+        ->name('ejecuciones.buscar-amazon-productos');
+
     Route::get('neo', [NeoController::class, 'index'])->name('neo.index');
     Route::get('neo/prueba-neoobjetivos', [\App\Http\Controllers\Crons\CronNeoObjetivosController::class, 'pruebaNeoobjetivosForm'])->name('neo.prueba-neoobjetivos');
     Route::post('neo/prueba-neoobjetivos', [\App\Http\Controllers\Crons\CronNeoObjetivosController::class, 'pruebaNeoobjetivosEjecutar'])->name('neo.prueba-neoobjetivos.ejecutar');
@@ -629,6 +643,8 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
     Route::post('ofertas/reorganizar-update-at/distribucion-despues', [OfertaProductoController::class, 'obtenerDistribucionDespues'])->name('ofertas.reorganizar.update-at.distribucion-despues');
 
     //CATEGORIAS SUBCATEGORIAS SUBSUBCATEGORIAS
+    Route::get('categorias/arbol-picker-crear-masivo', [CategoriaController::class, 'arbolPickerCrearMasivo'])
+        ->name('categorias.arbol-picker-crear-masivo');
     Route::get('categorias/{parentId}/subcategorias', [CategoriaController::class, 'subcategorias'])
         ->name('categorias.subcategorias');
     Route::get('categorias/{categoriaId}/jerarquia', [CategoriaController::class, 'jerarquia'])

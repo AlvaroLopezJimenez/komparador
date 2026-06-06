@@ -48,6 +48,7 @@ class PeticionApiHTMLController extends Controller
     private $amazonCreatorsMarketplace;
     private $amazonCreatorsTokenUrl;
     private $amazonCreatorsApiUrl;
+    private $amazonCreatorsSearchApiUrl;
     private const AMAZON_CREATORS_CACHE_KEY = 'amazon_creators_api_token';
     private const AMAZON_CREATORS_TOKEN_TTL_SECONDS = 3500; // Renovar antes de 3600
 
@@ -95,6 +96,10 @@ class PeticionApiHTMLController extends Controller
         $this->amazonCreatorsMarketplace = env('SCRAPING_AMAZON_CREATORS_MARKETPLACE', 'www.amazon.es');
         $this->amazonCreatorsTokenUrl = env('SCRAPING_AMAZON_CREATORS_TOKEN_URL', 'https://api.amazon.co.uk/auth/o2/token');
         $this->amazonCreatorsApiUrl = env('SCRAPING_AMAZON_CREATORS_API_URL', 'https://creatorsapi.amazon/catalog/v1/getItems');
+        $this->amazonCreatorsSearchApiUrl = env(
+            'SCRAPING_AMAZON_CREATORS_SEARCH_API_URL',
+            'https://creatorsapi.amazon/catalog/v1/searchItems'
+        );
         $this->amazonProductInfoApiKey = env('SCRAPING_AMAZON_PRODUCT_INFO_API_KEY');
         $this->amazonProductInfoApiUrl = env('SCRAPING_AMAZON_PRODUCT_INFO_API_URL', 'https://amazon-product-info2.p.rapidapi.com/Amazon/details');
         $this->amazonPricingApiKey = env('SCRAPING_AMAZON_PRICING_API_KEY');
@@ -593,11 +598,7 @@ class PeticionApiHTMLController extends Controller
         if (!$this->aliAppKey || !$this->aliAppSecret) {
             return ['success' => false, 'error' => 'AliAffiliate: faltan app_key/app_secret', 'proveedor' => 'ALIEXPRESS_OPEN'];
         }
-    
-        // Método de afiliados (no OAuth)
-        $method = 'aliexpress.affiliate.productdetail.get';
-    
-        // Extraemos el productId de la URL (si no, devolvemos error)
+
         $itemId = $this->aliExtractItemId($url);
         if (!$itemId) {
             return [
@@ -606,34 +607,75 @@ class PeticionApiHTMLController extends Controller
                 'proveedor' => 'ALIEXPRESS_OPEN',
             ];
         }
-    
-        $biz = [
-            'product_ids'     => (string)$itemId,
+
+        return $this->aliExpressAffiliateRequest('aliexpress.affiliate.productdetail.get', [
+            'product_ids'     => (string) $itemId,
             'target_language' => 'es',
             'country'         => 'ES',
             'currency'        => 'EUR',
-            // 'tracking_id'   => 'TU_TRACKING_ID', // opcional si lo tienes
-            // 'get_sku'       => 'true',           // si tu método lo soporta
-        ];
-    
+        ]);
+    }
+
+    /**
+     * Búsqueda de productos AliExpress Affiliate API (product.query).
+     *
+     * @return array{success: bool, raw?: array, keywords?: string, page_no?: int, page_size?: int, proveedor?: string, error?: string}
+     */
+    public function buscarProductosAliexpress(string $keywords, int $pageNo = 1, int $pageSize = 20): array
+    {
+        $keywords = trim($keywords);
+        if ($keywords === '') {
+            return ['success' => false, 'error' => 'Introduce un texto de búsqueda'];
+        }
+
+        if (!$this->aliAppKey || !$this->aliAppSecret) {
+            return ['success' => false, 'error' => 'AliExpress: faltan app_key/app_secret', 'proveedor' => 'ALIEXPRESS_OPEN'];
+        }
+
+        $pageNo = max(1, $pageNo);
+        $pageSize = max(1, min(50, $pageSize));
+
+        $resultado = $this->aliExpressAffiliateRequest('aliexpress.affiliate.product.query', [
+            'keywords'        => $keywords,
+            'page_no'         => (string) $pageNo,
+            'page_size'       => (string) $pageSize,
+            'target_currency' => 'EUR',
+            'target_language' => 'ES',
+            'ship_to_country' => 'ES',
+        ]);
+
+        if ($resultado['success'] ?? false) {
+            $resultado['keywords'] = $keywords;
+            $resultado['page_no'] = $pageNo;
+            $resultado['page_size'] = $pageSize;
+        }
+
+        return $resultado;
+    }
+
+    /**
+     * @param array<string, string> $biz
+     * @return array{success: bool, raw?: array|string, proveedor?: string, error?: string}
+     */
+    private function aliExpressAffiliateRequest(string $method, array $biz): array
+    {
         $common = [
             'app_key'     => $this->aliAppKey,
             'timestamp'   => (string) round(microtime(true) * 1000),
             'sign_method' => 'sha256',
             'method'      => $method,
         ];
-    
+
         $all = array_merge($common, $biz);
         $all['sign'] = $this->aliSignBusiness($all);
-    
+
         try {
             $resp = Http::timeout(45)->acceptJson()->get($this->aliBaseSync, $all);
-    
-            // ⚠️ Siempre leemos el cuerpo como texto y decodificamos con JSON_BIGINT_AS_STRING
             $rawBody = (string) $resp->body();
-    
+
             if (!$resp->successful()) {
                 $parsed = json_decode($rawBody, true, 512, JSON_BIGINT_AS_STRING);
+
                 return [
                     'success'   => false,
                     'error'     => 'AliAffiliate HTTP ' . $resp->status(),
@@ -641,7 +683,7 @@ class PeticionApiHTMLController extends Controller
                     'proveedor' => 'ALIEXPRESS_OPEN',
                 ];
             }
-    
+
             $data = json_decode($rawBody, true, 512, JSON_BIGINT_AS_STRING);
             if (!is_array($data)) {
                 return [
@@ -651,17 +693,44 @@ class PeticionApiHTMLController extends Controller
                     'proveedor' => 'ALIEXPRESS_OPEN',
                 ];
             }
-    
-            // Devuelve SOLO el JSON crudo (ahora con bigints como strings)
+
+            $errorMsg = $this->aliExpressAffiliateErrorFromRaw($data);
+            if ($errorMsg !== null) {
+                return [
+                    'success'   => false,
+                    'error'     => $errorMsg,
+                    'raw'       => $data,
+                    'proveedor' => 'ALIEXPRESS_OPEN',
+                ];
+            }
+
             return [
                 'success'   => true,
                 'proveedor' => 'ALIEXPRESS_OPEN',
                 'raw'       => $data,
             ];
-    
         } catch (\Throwable $e) {
-            return ['success' => false, 'error' => 'AliAffiliate Exception: ' . $e->getMessage(), 'proveedor' => 'ALIEXPRESS_OPEN'];
+            return [
+                'success'   => false,
+                'error'     => 'AliAffiliate Exception: ' . $e->getMessage(),
+                'proveedor' => 'ALIEXPRESS_OPEN',
+            ];
         }
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private function aliExpressAffiliateErrorFromRaw(array $data): ?string
+    {
+        $errorResponse = $data['error_response'] ?? null;
+        if (is_array($errorResponse)) {
+            $msg = trim((string) ($errorResponse['msg'] ?? $errorResponse['sub_msg'] ?? ''));
+
+            return $msg !== '' ? $msg : 'AliExpress API error_response';
+        }
+
+        return null;
     }
 
     /* ===== Helpers AliOpen: firma, parseo, etc. ===== */
@@ -1019,6 +1088,209 @@ class PeticionApiHTMLController extends Controller
         } catch (\Throwable $e) {
             return ['success' => false, 'error' => 'Amazon API: ' . $e->getMessage()];
         }
+    }
+
+    /**
+     * Busca productos en Amazon por palabras clave (Creators API SearchItems).
+     * Devuelve la respuesta cruda de la API para inspección o procesado posterior.
+     *
+     * @return array{success: bool, raw?: array, keywords?: string, item_page?: int, error?: string}
+     */
+    public function buscarProductosAmazon(string $keywords, int $itemCount = 10, int $itemPage = 1): array
+    {
+        $keywords = trim($keywords);
+        if ($keywords === '') {
+            return ['success' => false, 'error' => 'Introduce un texto de búsqueda'];
+        }
+
+        if (!$this->amazonCreatorsCredentialId || !$this->amazonCreatorsCredentialSecret) {
+            return ['success' => false, 'error' => 'Amazon Creators API: faltan credenciales'];
+        }
+
+        $itemCount = max(1, min(10, $itemCount));
+        $itemPage = max(1, $itemPage);
+
+        try {
+            $token = $this->getAmazonCreatorsAccessToken();
+            if (!$token) {
+                return ['success' => false, 'error' => 'Amazon Creators API: no se pudo obtener access token'];
+            }
+
+            $payload = [
+                'keywords'              => $keywords,
+                'marketplace'           => $this->amazonCreatorsMarketplace,
+                'partnerTag'            => $this->amazonCreatorsPartnerTag,
+                'languagesOfPreference' => ['es_ES'],
+                'currencyOfPreference'  => 'EUR',
+                'itemCount'             => $itemCount,
+                'itemPage'              => $itemPage,
+                'resources'             => [
+                    'itemInfo.title',
+                    'itemInfo.features',
+                    'images.primary.small',
+                    'images.primary.medium',
+                    'images.primary.large',
+                    'offersV2.listings.price',
+                    'offersV2.listings.availability',
+                    'offersV2.listings.isBuyBoxWinner',
+                ],
+            ];
+
+            if ($this->amazonCreatorsEsperaSegundos > 0) {
+                sleep($this->amazonCreatorsEsperaSegundos);
+            }
+
+            $resp = Http::timeout(30)
+                ->withHeaders([
+                    'Authorization'  => 'Bearer ' . $token,
+                    'Content-Type'   => 'application/json',
+                    'x-marketplace'  => $this->amazonCreatorsMarketplace,
+                ])
+                ->post($this->amazonCreatorsSearchApiUrl, $payload);
+
+            if (!$resp->successful()) {
+                return [
+                    'success' => false,
+                    'error'   => 'Error al consultar la API de Amazon: ' . $resp->status() . ' — ' . $resp->body(),
+                ];
+            }
+
+            $json = $resp->json();
+
+            if (isset($json['errors']) && !empty($json['errors'])) {
+                $msg = $json['errors'][0]['message'] ?? 'Error desconocido';
+                return ['success' => false, 'error' => $msg, 'raw' => $json];
+            }
+
+            if (isset($json['Errors']) && !empty($json['Errors'])) {
+                $msg = $json['Errors'][0]['Message'] ?? 'Error desconocido';
+                return ['success' => false, 'error' => $msg, 'raw' => $json];
+            }
+
+            return [
+                'success'   => true,
+                'raw'       => $json,
+                'keywords'  => $keywords,
+                'item_page' => $itemPage,
+            ];
+        } catch (\Throwable $e) {
+            return ['success' => false, 'error' => 'Amazon API: ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * SearchItems paginado: página 1; si devuelve 10 items, página 2; etc. Máximo $maxPaginas (5).
+     * Entre páginas adicionales espera al menos $esperaEntrePaginasSegundos segundos.
+     *
+     * @return array{success: bool, raw?: array, keywords?: string, paginas_consultadas?: int, total_items_amazon?: int, error?: string}
+     */
+    public function buscarProductosAmazonMultipagina(
+        string $keywords,
+        int $maxPaginas = 5,
+        int $esperaEntrePaginasSegundos = 2
+    ): array {
+        $keywords = trim($keywords);
+        if ($keywords === '') {
+            return ['success' => false, 'error' => 'Introduce un texto de búsqueda'];
+        }
+
+        $maxPaginas = max(1, min(5, $maxPaginas));
+        $esperaEntrePaginasSegundos = max(0, $esperaEntrePaginasSegundos);
+
+        $itemsAcumulados = [];
+        $paginasConsultadas = 0;
+        $ultimoRaw = [];
+
+        for ($pagina = 1; $pagina <= $maxPaginas; $pagina++) {
+            if ($pagina > 1) {
+                sleep($esperaEntrePaginasSegundos);
+            }
+
+            $resultado = $this->buscarProductosAmazon($keywords, 10, $pagina);
+            if (!($resultado['success'] ?? false)) {
+                if ($pagina === 1) {
+                    return $resultado;
+                }
+                break;
+            }
+
+            $paginasConsultadas++;
+            $raw = $resultado['raw'] ?? [];
+            $ultimoRaw = is_array($raw) ? $raw : [];
+            $itemsPagina = $this->extraerItemsBusquedaAmazonRaw($ultimoRaw);
+            $itemsAcumulados = array_merge($itemsAcumulados, $itemsPagina);
+
+            if (count($itemsPagina) < 10) {
+                break;
+            }
+        }
+
+        $itemsAcumulados = $this->deduplicarItemsAmazonPorAsin($itemsAcumulados);
+        $rawMerged = $this->construirRawBusquedaAmazonMerged($ultimoRaw, $itemsAcumulados);
+
+        return [
+            'success'              => true,
+            'raw'                  => $rawMerged,
+            'keywords'             => $keywords,
+            'paginas_consultadas'  => $paginasConsultadas,
+            'total_items_amazon'   => count($itemsAcumulados),
+        ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function extraerItemsBusquedaAmazonRaw(array $raw): array
+    {
+        $items = $raw['searchResult']['items']
+            ?? $raw['SearchResult']['Items']
+            ?? [];
+
+        return is_array($items) ? $items : [];
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $items
+     * @return array<int, array<string, mixed>>
+     */
+    private function deduplicarItemsAmazonPorAsin(array $items): array
+    {
+        $vistos = [];
+        $unicos = [];
+
+        foreach ($items as $item) {
+            $asin = (string) ($item['asin'] ?? $item['ASIN'] ?? '');
+            if ($asin !== '' && isset($vistos[$asin])) {
+                continue;
+            }
+            if ($asin !== '') {
+                $vistos[$asin] = true;
+            }
+            $unicos[] = $item;
+        }
+
+        return $unicos;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $items
+     * @return array<string, mixed>
+     */
+    private function construirRawBusquedaAmazonMerged(array $ultimoRaw, array $items): array
+    {
+        if (isset($ultimoRaw['searchResult']) && is_array($ultimoRaw['searchResult'])) {
+            $ultimoRaw['searchResult']['items'] = $items;
+
+            return $ultimoRaw;
+        }
+
+        if (isset($ultimoRaw['SearchResult']) && is_array($ultimoRaw['SearchResult'])) {
+            $ultimoRaw['SearchResult']['Items'] = $items;
+
+            return $ultimoRaw;
+        }
+
+        return ['searchResult' => ['items' => $items]];
     }
 
     private function amazonExtractASIN(string $url): ?string

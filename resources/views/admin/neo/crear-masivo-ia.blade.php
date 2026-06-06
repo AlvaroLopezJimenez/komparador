@@ -787,7 +787,8 @@
     async function cargarTiendasNeoIa() {
         abrirModalListadoIa('Elegir tienda');
         const res = await fetch(rutasIa.neoTiendas, { headers: { 'Accept': 'application/json' } });
-        const tiendas = await res.json();
+        const rawTiendas = await res.json();
+        const tiendas = Array.isArray(rawTiendas) ? rawTiendas : (Array.isArray(rawTiendas.tiendas) ? rawTiendas.tiendas : []);
         renderListadoIa(ordenarTiendasRestringidasAlFinalIa(tiendas).map(t => ({
             id: t.tienda_id,
             texto: t.nombre || ('Tienda #' + t.tienda_id),

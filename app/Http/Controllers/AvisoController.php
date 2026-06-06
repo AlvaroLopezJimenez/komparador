@@ -88,7 +88,7 @@ class AvisoController extends Controller
         $this->aplicarFiltroTipoAvisos($avisosVencidosQuery, $vencidosTipo);
         
         $this->aplicarOrdenPrioridadAvisos($avisosVencidosQuery);
-        $avisosVencidosQuery->orderBy('fecha_aviso', 'desc');
+        $avisosVencidosQuery->orderBy('fecha_aviso', 'asc');
         
         $avisosVencidos = $avisosVencidosQuery->paginate($perPage, ['*'], 'vencidos_page');
         $avisosVencidos->appends($appendQuery);
@@ -123,7 +123,7 @@ class AvisoController extends Controller
         $this->aplicarFiltroTipoAvisos($avisosOcultosQuery, $ocultosTipo);
         
         $this->aplicarOrdenPrioridadAvisos($avisosOcultosQuery);
-        $avisosOcultosQuery->orderBy('fecha_aviso', 'desc');
+        $avisosOcultosQuery->orderBy('fecha_aviso', 'asc');
         
         $avisosOcultos = $avisosOcultosQuery->paginate($perPage, ['*'], 'ocultos_page');
         $avisosOcultos->appends($appendQuery);

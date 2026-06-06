@@ -172,6 +172,24 @@ class CategoriaController extends Controller
         return redirect()->route('admin.categorias.index')->with('success', 'Categoría actualizada correctamente.');
     }
 
+    /**
+     * HTML del árbol de categorías (admin) para el picker «Cambiar categoría» en neo crear-masivo.
+     */
+    public function arbolPickerCrearMasivo()
+    {
+        $categoriasRaiz = Categoria::categoriasRaizConConteosAdministracion();
+        $html = '';
+        foreach ($categoriasRaiz as $categoria) {
+            $html .= view('admin.categorias.partial-categoria', [
+                'categoria' => $categoria,
+                'nivel' => 0,
+                'esPickerCrearMasivo' => true,
+            ])->render();
+        }
+
+        return response($html, 200, ['Content-Type' => 'text/html; charset=UTF-8']);
+    }
+
     public function subcategorias($parentId)
     {
         return Categoria::where('parent_id', $parentId)->select('id', 'nombre')->get();
