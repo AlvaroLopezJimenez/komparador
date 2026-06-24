@@ -4,11 +4,95 @@
             <a href="{{ route('admin.dashboard') }}">
                 <h2 class="font-semibold text-xl text-white leading-tight">Inicio -></h2>
             </a>
-            <h2 class="font-semibold text-xl text-white leading-tight">Dashboard de Clicks</h2>
+            <h2 class="font-semibold text-xl text-white leading-tight">Analytics · Visitas y Clicks</h2>
         </div>
     </x-slot>
 
-         <div class="max-w-7xl mx-auto py-10 px-4 space-y-8 bg-gray-50 dark:bg-gray-900 rounded-lg shadow-md">
+    @php
+        $resumen = $resumen ?? [
+            'visitantes_unicos' => 0,
+            'sesiones' => 0,
+            'visitas_productos' => 0,
+            'clics_tiendas' => 0,
+            'ctr_global' => 0,
+        ];
+        $ipsSospechosas = $ipsSospechosas ?? [];
+        $ipsNuevas = $ipsNuevas ?? ['lista' => [], 'total' => 0];
+        $datosMapa = $datosMapa ?? ['puntos' => [], 'total_puntos' => 0, 'total_clicks' => 0];
+        $busqueda = $busqueda ?? '';
+        $porPagina = $porPagina ?? 20;
+        $filtroRapido = $filtroRapido ?? request('filtro_rapido', 'hoy');
+        $fechaDesde = $fechaDesde ?? now()->toDateString();
+        $fechaHasta = $fechaHasta ?? now()->toDateString();
+        $horaDesde = $horaDesde ?? '';
+        $horaHasta = $horaHasta ?? '';
+        $clicks = $clicks ?? new \Illuminate\Pagination\LengthAwarePaginator([], 0, 20);
+        $tops = [
+            ['id' => 'productos', 'titulo' => 'Top productos', 'icono' => '📦'],
+            ['id' => 'categorias', 'titulo' => 'Top categorías', 'icono' => '📂'],
+            ['id' => 'tiendas', 'titulo' => 'Top tiendas', 'icono' => '🏪'],
+        ];
+    @endphp
+
+    <style>
+        .rank-medal-1 { background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #fff; }
+        .rank-medal-2 { background: linear-gradient(135deg, #9ca3af, #6b7280); color: #fff; }
+        .rank-medal-3 { background: linear-gradient(135deg, #d97706, #b45309); color: #fff; }
+        .ctr-bar { height: 6px; border-radius: 999px; background: #e5e7eb; overflow: hidden; }
+        .dark .ctr-bar { background: #374151; }
+        .ctr-bar-fill { height: 100%; border-radius: 999px; transition: width .4s ease; }
+        .top-data-table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+        .top-data-table th,
+        .top-data-table td { padding: 0.5rem 0.4rem; vertical-align: middle; box-sizing: border-box; }
+        .top-data-table thead th { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #6b7280; border-bottom: 1px solid #e5e7eb; background: #f9fafb; }
+        .dark .top-data-table thead th { color: #9ca3af; border-bottom-color: #374151; background: rgba(55, 65, 81, 0.4); }
+        .top-data-table tbody tr { border-bottom: 1px solid #f3f4f6; }
+        .dark .top-data-table tbody tr { border-bottom-color: rgba(55, 65, 81, 0.6); }
+        .top-data-table tbody tr:hover { background: #f9fafb; }
+        .dark .top-data-table tbody tr:hover { background: rgba(55, 65, 81, 0.3); }
+        .top-data-table .col-rank {
+            width: 3.25rem;
+            min-width: 3.25rem;
+            max-width: 3.25rem;
+            padding-left: 1.25rem;
+            padding-right: 0.5rem;
+            text-align: center;
+            overflow: hidden;
+        }
+        .top-rank-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 1.25rem;
+            height: 1.25rem;
+            padding: 0 0.15rem;
+            font-size: 9px;
+            line-height: 1;
+            border-radius: 9999px;
+            flex-shrink: 0;
+            box-sizing: border-box;
+        }
+        .top-data-table .col-nombre {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            padding-left: 0.15rem;
+            padding-right: 0.5rem;
+        }
+        .top-data-table .col-num { width: 4.25rem; text-align: right; font-variant-numeric: tabular-nums; }
+        .top-data-table .col-ctr { width: 3.75rem; text-align: right; padding-right: 0.75rem; font-variant-numeric: tabular-nums; }
+        .top-data-table .col-cuota { width: 4.25rem; text-align: right; padding-right: 1.25rem; font-variant-numeric: tabular-nums; font-size: 11px; font-weight: 600; }
+        .top-data-table.top-solo-clics .col-num-clics { width: 5rem; }
+        .top-data-table.top-solo-clics .col-nombre { max-width: none; }
+        .top-orden-btn { padding: 0.375rem 0.625rem; font-size: 11px; font-weight: 500; border-radius: 0.375rem; border: 1px solid #d1d5db; background: #fff; color: #374151; transition: all 0.15s; white-space: nowrap; }
+        .dark .top-orden-btn { border-color: #4b5563; background: #374151; color: #d1d5db; }
+        .top-orden-btn:hover { background: #eff6ff; border-color: #93c5fd; }
+        .dark .top-orden-btn:hover { background: rgba(59, 130, 246, 0.15); border-color: #3b82f6; }
+        .top-orden-btn.active { background: #2563eb; border-color: #2563eb; color: #fff; }
+        .dark .top-orden-btn.active { background: #2563eb; border-color: #2563eb; color: #fff; }
+    </style>
+
+         <div class="max-w-7xl mx-auto py-10 px-4 space-y-8 bg-gray-50 dark:bg-gray-900 rounded-lg shadow-md" id="dashboard-analytics">
          
          <!-- Alerta de IPs sospechosas -->
          @if(count($ipsSospechosas) > 0)
@@ -164,65 +248,48 @@
             </div>
         </div>
 
-                 <!-- Estadísticas rápidas -->
-         <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-             <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-4">📊 Estadísticas</h3>
-             
-             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                 <div class="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-                     <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">{{ number_format($estadisticas['totalClicks']) }}</div>
-                     <div class="text-sm text-gray-600 dark:text-gray-400">Total Clicks</div>
-                 </div>
-                 <div class="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
-                     <div class="text-2xl font-bold text-green-600 dark:text-green-400">{{ number_format($estadisticas['totalProductos']) }}</div>
-                     <div class="text-sm text-gray-600 dark:text-gray-400">Productos</div>
-                 </div>
-                 <div class="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
-                     <div class="text-2xl font-bold text-purple-600 dark:text-purple-400">{{ number_format($estadisticas['totalTiendas']) }}</div>
-                     <div class="text-sm text-gray-600 dark:text-gray-400">Tiendas</div>
-                 </div>
-                 <div class="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-lg">
-                     <div class="text-2xl font-bold text-orange-600 dark:text-orange-400">{{ number_format($estadisticas['totalOfertas']) }}</div>
-                     <div class="text-sm text-gray-600 dark:text-gray-400">Ofertas</div>
-                 </div>
-                 <div class="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-lg">
-                     <div class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{{ number_format($ipsNuevas['total']) }}</div>
-                     <div class="text-sm text-gray-600 dark:text-gray-400">IPs Nuevas</div>
-                 </div>
-             </div>
-         </div>
-
-         <!-- Mapa de España con clicks -->
-         <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-             <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-4">🗺️ Mapa de Clicks en España</h3>
-             
-             @if($datosMapa['total_puntos'] > 0)
-                 <div class="mb-4 text-sm text-gray-600 dark:text-gray-400">
-                     <span class="font-medium">{{ $datosMapa['total_puntos'] }}</span> ubicaciones diferentes con 
-                     <span class="font-medium">{{ $datosMapa['total_clicks'] }}</span> clicks en total
-                 </div>
-                 
-                 <div id="mapaEspana" style="height: 500px; width: 100%; border-radius: 8px;"></div>
-             @else
-                 <div class="text-center py-12">
-                     <div class="text-gray-500 dark:text-gray-400 text-lg">📍 No hay datos de ubicación para mostrar</div>
-                     <p class="text-sm text-gray-400 dark:text-gray-500 mt-2">
-                         Los clicks nuevos incluirán automáticamente información de geolocalización.
-                     </p>
-                 </div>
-             @endif
-         </div>
-
-         <!-- Tabla de clicks -->
+        {{-- Resumen analítica visitas --}}
         <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200">📋 Listado de Clicks</h3>
+            <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-4">📊 Resumen del periodo</h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div class="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                    <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">{{ number_format($resumen['visitantes_unicos']) }}</div>
+                    <div class="text-sm text-gray-600 dark:text-gray-400">Visitantes únicos</div>
+                </div>
+                <div class="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-lg">
+                    <div class="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{{ number_format($resumen['sesiones']) }}</div>
+                    <div class="text-sm text-gray-600 dark:text-gray-400">Sesiones</div>
+                </div>
+                <div class="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
+                    <div class="text-2xl font-bold text-green-600 dark:text-green-400">{{ number_format($resumen['visitas_productos']) }}</div>
+                    <div class="text-sm text-gray-600 dark:text-gray-400">Visitas a productos</div>
+                </div>
+                <div class="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-lg">
+                    <div class="text-2xl font-bold text-orange-600 dark:text-orange-400">{{ number_format($resumen['clics_tiendas']) }}</div>
+                    <div class="text-sm text-gray-600 dark:text-gray-400">Clics a tiendas</div>
+                </div>
+                <div class="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
+                    <div class="text-2xl font-bold text-purple-600 dark:text-purple-400">{{ number_format($resumen['ctr_global'], 1, ',', '.') }}%</div>
+                    <div class="text-sm text-gray-600 dark:text-gray-400">CTR global</div>
+                </div>
+            </div>
+        </div>
+
+        {{-- Listado de clicks (desplegable) --}}
+        <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl border border-gray-200 dark:border-gray-700">
+            <div class="flex items-center justify-between p-6 cursor-pointer" onclick="toggleSeccion('contenidoClicks', 'iconoClicks')">
+                <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200">📋 Listado de Clicks <span class="text-sm font-normal text-gray-500">({{ number_format($clicks->total()) }})</span></h3>
+                <svg id="iconoClicks" class="w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+            </div>
+            <div id="contenidoClicks" class="hidden px-6 pb-6">
+            <div class="flex items-center justify-end mb-4">
                 <button id="btnEliminarSeleccionados" onclick="eliminarClicksSeleccionados()" disabled
                         class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-600">
                     🗑️ Eliminar Seleccionados
                 </button>
             </div>
-            
             @if($clicks->count() > 0)
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -354,7 +421,7 @@
                                                         🛒 Ir a Tienda
                                                     </a>
                                                     <div class="border-t border-gray-200 dark:border-gray-700"></div>
-                                                    <button onclick="eliminarClick({{ $click->id }}, '{{ $click->oferta->producto->nombre ?? 'Producto desconocido' }}')" 
+                                                    <button onclick="eliminarClick({{ $click->id }}, @json($click->oferta->producto->nombre ?? 'Producto desconocido'))" 
                                                        class="flex items-center w-full px-4 py-2 text-sm text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20" role="menuitem">
                                                         🗑️ Eliminar Click
                                                     </button>
@@ -380,296 +447,103 @@
                      </p>
                  </div>
              @endif
-         </div>
+            </div>
+        </div>
 
-         <!-- Gráficos -->
-         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                          <!-- Gráfico de clicks por hora -->
-              <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-                  <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-4">📈 Clicks por Hora del Día</h3>
-                  <div class="relative" style="height: 300px;">
-                      <canvas id="graficoHoras"></canvas>
-                  </div>
-              </div>
-             
-                          <!-- Gráfico de clicks por día -->
-              <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-                  <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-4">📅 Clicks por Día</h3>
-                  <div class="relative" style="height: 300px;">
-                      <canvas id="graficoDias"></canvas>
-                  </div>
-              </div>
-         </div>
+        {{-- Mapa (desplegable) --}}
+        <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl border border-gray-200 dark:border-gray-700">
+            <div class="flex items-center justify-between p-6 cursor-pointer" onclick="toggleSeccionMapa()">
+                <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200">🗺️ Mapa de Clicks <span class="text-sm font-normal text-gray-500">({{ number_format($datosMapa['total_puntos']) }} ubicaciones)</span></h3>
+                <svg id="iconoMapa" class="w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+            </div>
+            <div id="contenidoMapa" class="hidden px-6 pb-6">
+                @if($datosMapa['total_puntos'] > 0)
+                    <div class="mb-4 text-sm text-gray-600 dark:text-gray-400">
+                        <span class="font-medium">{{ $datosMapa['total_puntos'] }}</span> ubicaciones con
+                        <span class="font-medium">{{ $datosMapa['total_clicks'] }}</span> clicks en total
+                    </div>
+                    <div id="mapaEspana" style="height: 500px; width: 100%; border-radius: 8px;"></div>
+                @else
+                    <div class="text-center py-12">
+                        <div class="text-gray-500 dark:text-gray-400 text-lg">📍 No hay datos de ubicación</div>
+                        <p class="text-sm text-gray-400 dark:text-gray-500 mt-2">Los clicks nuevos incluirán geolocalización automáticamente.</p>
+                    </div>
+                @endif
+            </div>
+        </div>
 
-         <!-- Listado de clicks por tienda -->
-         <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-             <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-4">🏪 Clicks por Tienda</h3>
-             
-             @if($estadisticas['clicksPorTienda']->count() > 0)
-                 <div class="overflow-x-auto">
-                     <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                         <thead class="bg-gray-50 dark:bg-gray-700">
-                             <tr>
-                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Tienda</th>
-                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Total Clicks</th>
-                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Rango de Posiciones</th>
-                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">% del Total</th>
-                             </tr>
-                         </thead>
-                         <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                             @foreach($estadisticas['clicksPorTienda'] as $tienda)
-                                 @php
-                                     $porcentaje = $estadisticas['totalClicks'] > 0 
-                                         ? round(($tienda->total / $estadisticas['totalClicks']) * 100, 1) 
-                                         : 0;
-                                 @endphp
-                                 <tr>
-                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
-                                         {{ $tienda->nombre }}
-                                     </td>
-                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                                         <span class="text-lg font-bold text-blue-600 dark:text-blue-400">{{ $tienda->total }}</span>
-                                     </td>
-                                                                           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                                          @if($tienda->posicion_min && $tienda->posicion_max)
-                                              @if($tienda->posicion_min == $tienda->posicion_max)
-                                                  <button onclick="mostrarModalPosiciones('{{ $tienda->nombre }}', {{ $tienda->id }})" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors cursor-pointer">
-                                                      {{ $tienda->posicion_min }}º
-                                                  </button>
-                                              @else
-                                                  <button onclick="mostrarModalPosiciones('{{ $tienda->nombre }}', {{ $tienda->id }})" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-800 transition-colors cursor-pointer">
-                                                      {{ $tienda->posicion_min }}º - {{ $tienda->posicion_max }}º
-                                                  </button>
-                                              @endif
-                                          @else
-                                              <span class="text-gray-400">-</span>
-                                          @endif
-                                      </td>
-                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                                         <span class="text-purple-600 dark:text-purple-400 font-semibold">{{ $porcentaje }}%</span>
-                                     </td>
-                                 </tr>
-                             @endforeach
-                         </tbody>
-                     </table>
-                 </div>
-             @else
-                 <div class="text-center py-8">
-                     <div class="text-gray-500 dark:text-gray-400 text-lg">📝 No hay clicks por tienda para mostrar</div>
-                     <p class="text-sm text-gray-400 dark:text-gray-500 mt-2">
-                         No se encontraron clicks para los filtros seleccionados.
-                     </p>
-                 </div>
-             @endif
-         </div>
+        {{-- Gráfica temporal visitas / clics / CTR (desplegable) --}}
+        <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl border border-gray-200 dark:border-gray-700">
+            <div class="flex items-center justify-between p-6 cursor-pointer" onclick="toggleSeccionGrafica()">
+                <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200">📈 Evolución temporal <span class="text-sm font-normal text-gray-500 dark:text-gray-400">(visitas, clics y CTR)</span></h3>
+                <svg id="iconoGrafica" class="w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+            </div>
+            <div id="contenidoGrafica" class="hidden px-6 pb-6">
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                    <p id="graficaTemporalSubtitulo" class="text-sm text-gray-500 dark:text-gray-400">Cargando…</p>
+                    <div class="grafica-granularidad-group inline-flex flex-wrap items-center gap-1 rounded-md" onclick="event.stopPropagation()">
+                        <button type="button" class="top-orden-btn grafica-granularidad-btn" data-granularidad="15min">15 min</button>
+                        <button type="button" class="top-orden-btn grafica-granularidad-btn" data-granularidad="hour">Hora</button>
+                        <button type="button" class="top-orden-btn grafica-granularidad-btn" data-granularidad="day">Día</button>
+                        <button type="button" class="top-orden-btn grafica-granularidad-btn" data-granularidad="month">Mes</button>
+                        <button type="button" class="top-orden-btn grafica-granularidad-btn" data-granularidad="year">Año</button>
+                    </div>
+                </div>
+                <div id="graficaTemporalLoading" class="py-16 text-center text-sm text-gray-500 dark:text-gray-400">
+                    <div class="inline-block w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-2"></div>
+                    <div>Cargando gráfica…</div>
+                </div>
+                <div id="graficaTemporalEmpty" class="hidden py-16 text-center text-sm text-gray-500 dark:text-gray-400">
+                    Sin datos en el periodo seleccionado
+                </div>
+                <div id="graficaTemporalWrap" class="hidden" style="height: 420px; position: relative;">
+                    <canvas id="graficaTemporal"></canvas>
+                </div>
+            </div>
+        </div>
 
-                   <!-- Listado de clicks por producto -->
-          <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-              <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-4">📦 Clicks por Producto</h3>
-              
-              @if($estadisticas['clicksPorProducto']->count() > 0)
-                  <div class="overflow-x-auto">
-                      <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                          <thead class="bg-gray-50 dark:bg-gray-700">
-                              <tr>
-                                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Producto</th>
-                                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Total Clicks</th>
-                                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Rango de Posiciones</th>
-                                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">% del Total</th>
-                                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Acciones</th>
-                              </tr>
-                          </thead>
-                          <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                              @foreach($estadisticas['clicksPorProducto'] as $producto)
-                                  @php
-                                      $porcentaje = $estadisticas['totalClicks'] > 0 
-                                          ? round(($producto->total / $estadisticas['totalClicks']) * 100, 1) 
-                                          : 0;
-                                  @endphp
-                                  <tr>
-                                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                                          <div class="flex flex-col">
-                                              <span class="font-medium">{{ $producto->nombre }}</span>
-                                              <span class="text-xs text-gray-500 dark:text-gray-400">
-                                                  {{ $producto->marca ?? '' }} 
-                                                  @if($producto->talla)
-                                                      - {{ $producto->talla }}
-                                                  @endif
-                                              </span>
-                                          </div>
-                                      </td>
-                                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                                          <span class="text-lg font-bold text-blue-600 dark:text-blue-400">{{ $producto->total }}</span>
-                                      </td>
-                                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                                          @if($producto->posicion_min && $producto->posicion_max)
-                                              @if($producto->posicion_min == $producto->posicion_max)
-                                                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                                                      {{ $producto->posicion_min }}º
-                                                  </span>
-                                              @else
-                                                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                                                      {{ $producto->posicion_min }}º - {{ $producto->posicion_max }}º
-                                                  </span>
-                                              @endif
-                                          @else
-                                              <span class="text-gray-400">-</span>
-                                          @endif
-                                      </td>
-                                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                                          <span class="text-purple-600 dark:text-purple-400 font-semibold">{{ $porcentaje }}%</span>
-                                      </td>
-                                                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                                           <div class="flex space-x-2">
-                                               <a href="/productos/{{ $producto->slug ?? 'producto-' . $producto->id }}" target="_blank" 
-                                                  class="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded text-green-700 bg-green-100 hover:bg-green-200 dark:text-green-300 dark:bg-green-900/20 dark:hover:bg-green-900/40 transition-colors">
-                                                   🌐 Ir a Producto
-                                               </a>
-                                               <a href="{{ route('admin.productos.edit', $producto->id) }}" target="_blank" 
-                                                  class="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded text-blue-700 bg-blue-100 hover:bg-blue-200 dark:text-blue-300 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 transition-colors">
-                                                   ✏️ Editar
-                                               </a>
-                                           </div>
-                                       </td>
-                                  </tr>
-                              @endforeach
-                          </tbody>
-                      </table>
-                  </div>
-              @else
-                  <div class="text-center py-8">
-                      <div class="text-gray-500 dark:text-gray-400 text-lg">📝 No hay clicks por producto para mostrar</div>
-                      <p class="text-sm text-gray-400 dark:text-gray-500 mt-2">
-                          No se encontraron clicks para los filtros seleccionados.
-                      </p>
-                  </div>
-              @endif
-          </div>
+        {{-- Rankings analítica --}}
+        <div class="grid grid-cols-1 gap-6">
+            @foreach($tops as $top)
+            <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl border border-gray-200 dark:border-gray-700 top-section" data-tipo="{{ $top['id'] }}">
+                <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200">
+                            {{ $top['icono'] }} {{ $top['titulo'] }}
+                            <span class="text-sm font-normal text-gray-500 dark:text-gray-400 top-total" data-tipo="{{ $top['id'] }}">…</span>
+                        </h3>
+                        @if($top['id'] !== 'tiendas')
+                        <div class="top-orden-group inline-flex items-center gap-1 rounded-md" data-tipo="{{ $top['id'] }}">
+                            <button type="button" class="top-orden-btn active" data-orden="ctr">Más CTR</button>
+                            <button type="button" class="top-orden-btn" data-orden="visitas">Más visitadas</button>
+                            <button type="button" class="top-orden-btn" data-orden="clicks">Más clics</button>
+                        </div>
+                        @else
+                        <span class="text-xs text-gray-500 dark:text-gray-400">Ordenado por clics</span>
+                        @endif
+                    </div>
+                </div>
+                <div class="top-list min-h-[180px]" data-tipo="{{ $top['id'] }}">
+                    <div class="px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
+                        <div class="inline-block w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-2"></div>
+                        <div>Cargando…</div>
+                    </div>
+                </div>
+                <div class="px-6 py-4 bg-gray-50 dark:bg-gray-700/50 flex items-center justify-between top-paginacion border-t border-gray-200 dark:border-gray-700" data-tipo="{{ $top['id'] }}">
+                    <button type="button" class="top-prev px-4 py-2 text-sm rounded-md bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" disabled>← Anterior</button>
+                    <span class="text-xs text-gray-500 dark:text-gray-400 top-page-info font-medium">Pág. 1</span>
+                    <button type="button" class="top-next px-4 py-2 text-sm rounded-md bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">Siguiente →</button>
+                </div>
+            </div>
+            @endforeach
+        </div>
 
-          
-
-
-         <!-- Listado de clicks por IP -->
-         <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-             <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-4">🌐 Clicks por IP</h3>
-             
-             @if($clicksPorIP->count() > 0)
-                 <div class="overflow-x-auto">
-                     <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                         <thead class="bg-gray-50 dark:bg-gray-700">
-                             <tr>
-                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">IP</th>
-                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Total Clicks</th>
-                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Rango de Posiciones</th>
-                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">% del Total</th>
-                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actividad</th>
-                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Estado</th>
-                             </tr>
-                         </thead>
-                         <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                             @foreach($clicksPorIP as $ip)
-                                 @php
-                                     $porcentaje = $estadisticas['totalClicks'] > 0 
-                                         ? round(($ip->total / $estadisticas['totalClicks']) * 100, 1) 
-                                         : 0;
-                                     
-                                     // Determinar si la IP es sospechosa
-                                     $esSospechosa = $ip->total > 50; // Más de 50 clicks
-                                     $esMuySospechosa = $ip->total > 100; // Más de 100 clicks
-                                     
-                                     // Calcular tiempo entre primer y último click
-                                     $primerClick = \Carbon\Carbon::parse($ip->primer_click);
-                                     $ultimoClick = \Carbon\Carbon::parse($ip->ultimo_click);
-                                     $duracion = $primerClick->diffForHumans($ultimoClick, true);
-                                 @endphp
-                                 <tr class="{{ $esMuySospechosa ? 'bg-red-50 dark:bg-red-900/20' : ($esSospechosa ? 'bg-yellow-50 dark:bg-yellow-900/20' : '') }}">
-                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
-                                         <div class="flex items-center">
-                                             <span class="font-mono">{{ $ip->ip }}</span>
-                                             @if($esMuySospechosa)
-                                                 <span class="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
-                                                     ⚠️ Muy alta
-                                                 </span>
-                                             @elseif($esSospechosa)
-                                                 <span class="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
-                                                     ⚠️ Alta
-                                                 </span>
-                                             @endif
-                                         </div>
-                                     </td>
-                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                                         <span class="text-lg font-bold {{ $esMuySospechosa ? 'text-red-600 dark:text-red-400' : ($esSospechosa ? 'text-yellow-600 dark:text-yellow-400' : 'text-blue-600 dark:text-blue-400') }}">{{ $ip->total }}</span>
-                                     </td>
-                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                                         @if($ip->posicion_min && $ip->posicion_max)
-                                             @if($ip->posicion_min == $ip->posicion_max)
-                                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                                                     {{ $ip->posicion_min }}º
-                                                 </span>
-                                             @else
-                                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                                                     {{ $ip->posicion_min }}º - {{ $ip->posicion_max }}º
-                                                 </span>
-                                             @endif
-                                         @else
-                                             <span class="text-gray-400">-</span>
-                                         @endif
-                                     </td>
-                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                                         <span class="text-purple-600 dark:text-purple-400 font-semibold">{{ $porcentaje }}%</span>
-                                     </td>
-                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                                         <div class="flex flex-col">
-                                             <span class="text-xs text-gray-500 dark:text-gray-400">
-                                                 <strong>Primer:</strong> {{ $primerClick->format('d/m/Y H:i') }}
-                                             </span>
-                                             <span class="text-xs text-gray-500 dark:text-gray-400">
-                                                 <strong>Último:</strong> {{ $ultimoClick->format('d/m/Y H:i') }}
-                                             </span>
-                                             <span class="text-xs text-gray-500 dark:text-gray-400">
-                                                 <strong>Duración:</strong> {{ $duracion }}
-                                             </span>
-                                         </div>
-                                     </td>
-                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                                         @if($esMuySospechosa)
-                                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
-                                                 🔴 Muy sospechosa
-                                             </span>
-                                         @elseif($esSospechosa)
-                                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
-                                                 🟡 Sospechosa
-                                             </span>
-                                         @else
-                                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                                                 🟢 Normal
-                                             </span>
-                                         @endif
-                                     </td>
-                                 </tr>
-                             @endforeach
-                         </tbody>
-                     </table>
-                 </div>
-                 
-                 <!-- Paginación -->
-                 <div class="mt-6">
-                     {{ $clicksPorIP->appends(request()->query())->links() }}
-                 </div>
-             @else
-                 <div class="text-center py-8">
-                     <div class="text-gray-500 dark:text-gray-400 text-lg">📝 No hay clicks por IP para mostrar</div>
-                     <p class="text-sm text-gray-400 dark:text-gray-500 mt-2">
-                         No se encontraron clicks para los filtros seleccionados.
-                     </p>
-                 </div>
-             @endif
-         </div>
     </div>
 
-    <!-- Scripts para los gráficos -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    
     <!-- Scripts para el mapa -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -678,6 +552,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
     <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <!-- Estilos adicionales para el desplegable y el mapa -->
     <style>
@@ -770,242 +645,89 @@
                 });
             }
             
-            // Datos para el gráfico de horas
-            const datosHoras = @json($estadisticas['clicksPorHora']);
-            const labelsHoras = [];
-            const valuesHoras = [];
-            
-            // Crear array completo de 24 horas
-            for (let i = 0; i < 24; i++) {
-                labelsHoras.push(i.toString().padStart(2, '0') + ':00');
-                valuesHoras.push(0);
+        });
+
+        let mapaInstance = null;
+        let mapaInicializado = false;
+
+        @if($datosMapa['total_puntos'] > 0)
+        const puntosMapa = @json($datosMapa['puntos']);
+
+        function inicializarMapa() {
+            if (mapaInicializado || typeof L === 'undefined') return;
+            const contenedor = document.getElementById('mapaEspana');
+            if (!contenedor) return;
+
+            mapaInicializado = true;
+            mapaInstance = L.map('mapaEspana').setView([40.4637, -3.7492], 6);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 18
+            }).addTo(mapaInstance);
+
+            const marcadoresCluster = L.markerClusterGroup({
+                chunkedLoading: true,
+                maxClusterRadius: 50,
+                spiderfyOnMaxZoom: true,
+                showCoverageOnHover: false,
+                zoomToBoundsOnClick: true,
+                iconCreateFunction: function(cluster) {
+                    let totalClicks = 0;
+                    cluster.getAllChildMarkers().forEach(marker => {
+                        totalClicks += marker._totalClicks || 1;
+                    });
+                    let className = 'marker-cluster ';
+                    if (totalClicks < 10) className += 'marker-cluster-small';
+                    else if (totalClicks < 100) className += 'marker-cluster-medium';
+                    else className += 'marker-cluster-large';
+                    return L.divIcon({
+                        html: '<div><span>' + totalClicks + '</span></div>',
+                        className: className,
+                        iconSize: L.point(40, 40)
+                    });
+                }
+            });
+
+            puntosMapa.forEach(punto => {
+                const iconSize = Math.min(20 + (punto.total_clicks * 2), 40);
+                const iconColor = punto.total_clicks > 10 ? 'red' : punto.total_clicks > 5 ? 'orange' : 'blue';
+                const icono = L.divIcon({
+                    html: `<div style="background-color:${iconColor};width:${iconSize}px;height:${iconSize}px;border-radius:50%;border:2px solid white;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:${Math.min(iconSize * 0.4, 14)}px;box-shadow:0 2px 4px rgba(0,0,0,0.3);">${punto.total_clicks}</div>`,
+                    className: 'marcador-personalizado',
+                    iconSize: [iconSize, iconSize],
+                    iconAnchor: [iconSize/2, iconSize/2]
+                });
+                const marcador = L.marker([punto.latitud, punto.longitud], { icon: icono });
+                marcador._totalClicks = punto.total_clicks;
+                marcador.bindPopup(`<div style="min-width:200px;"><h4 style="margin:0 0 8px 0;font-weight:bold;">📍 ${punto.ciudad}</h4><div><strong>Clicks:</strong> ${punto.total_clicks}</div><div><strong>IPs:</strong> ${punto.ips_unicas}</div></div>`);
+                marcadoresCluster.addLayer(marcador);
+            });
+
+            mapaInstance.addLayer(marcadoresCluster);
+            if (puntosMapa.length > 0) {
+                mapaInstance.fitBounds(marcadoresCluster.getBounds().pad(0.1));
             }
-            
-            // Llenar con datos reales
-            datosHoras.forEach(item => {
-                valuesHoras[item.hora] = item.total;
-            });
-            
-            // Gráfico de clicks por hora
-            const ctxHoras = document.getElementById('graficoHoras').getContext('2d');
-            new Chart(ctxHoras, {
-                type: 'bar',
-                data: {
-                    labels: labelsHoras,
-                    datasets: [{
-                        label: 'Clicks',
-                        data: valuesHoras,
-                        backgroundColor: 'rgba(59, 130, 246, 0.5)',
-                        borderColor: 'rgba(59, 130, 246, 1)',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    layout: {
-                        padding: {
-                            top: 10,
-                            bottom: 10
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                stepSize: 1
-                            }
-                        }
-                    },
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    }
+        }
+        @endif
+
+        window.toggleSeccion = function(contenidoId, iconoId) {
+            const contenido = document.getElementById(contenidoId);
+            const icono = document.getElementById(iconoId);
+            if (!contenido) return;
+            contenido.classList.toggle('hidden');
+            if (icono) icono.style.transform = contenido.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(180deg)';
+        };
+
+        window.toggleSeccionMapa = function() {
+            toggleSeccion('contenidoMapa', 'iconoMapa');
+            setTimeout(() => {
+                if (!document.getElementById('contenidoMapa').classList.contains('hidden')) {
+                    inicializarMapa();
+                    if (mapaInstance) mapaInstance.invalidateSize();
                 }
-            });
-            
-                         // Gráfico de clicks por día
-             const datosDias = @json($estadisticas['clicksPorDia']);
-             if (datosDias.length > 0) {
-                 const labelsDias = datosDias.map(item => {
-                     const fecha = new Date(item.fecha);
-                     return fecha.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
-                 });
-                 const valuesDias = datosDias.map(item => item.total);
-                 
-                 const ctxDias = document.getElementById('graficoDias').getContext('2d');
-                 new Chart(ctxDias, {
-                     type: 'line',
-                     data: {
-                         labels: labelsDias,
-                         datasets: [{
-                             label: 'Clicks',
-                             data: valuesDias,
-                             backgroundColor: 'rgba(34, 197, 94, 0.1)',
-                             borderColor: 'rgba(34, 197, 94, 1)',
-                             borderWidth: 2,
-                             fill: true,
-                             tension: 0.4
-                         }]
-                     },
-                     options: {
-                         responsive: true,
-                         maintainAspectRatio: false,
-                         layout: {
-                             padding: {
-                                 top: 10,
-                                 bottom: 10
-                             }
-                         },
-                         scales: {
-                             y: {
-                                 beginAtZero: true,
-                                 ticks: {
-                                     stepSize: 1
-                                 }
-                             }
-                         },
-                         plugins: {
-                             legend: {
-                                 display: false
-                             }
-                         }
-                     }
-                 });
-             } else {
-                 // Si no hay datos, mostrar mensaje en el gráfico
-                 const ctxDias = document.getElementById('graficoDias').getContext('2d');
-                 ctxDias.font = '16px Arial';
-                 ctxDias.fillStyle = '#6B7280';
-                 ctxDias.textAlign = 'center';
-                 ctxDias.fillText('No hay datos para mostrar', ctxDias.canvas.width / 2, ctxDias.canvas.height / 2);
-             }
-            
-            // ===== INICIALIZAR MAPA CON CLUSTERING =====
-            @if($datosMapa['total_puntos'] > 0)
-                // Datos del mapa desde el controlador
-                const puntosMapa = @json($datosMapa['puntos']);
-                
-                // Inicializar mapa centrado en España
-                const mapa = L.map('mapaEspana').setView([40.4637, -3.7492], 6);
-                
-                // Añadir capa de OpenStreetMap (gratuita)
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '© OpenStreetMap contributors',
-                    maxZoom: 18
-                }).addTo(mapa);
-                
-                // Crear grupo de clustering con configuración personalizada
-                const marcadoresCluster = L.markerClusterGroup({
-                    // Configuración del clustering
-                    chunkedLoading: true,           // Carga en chunks para mejor rendimiento
-                    maxClusterRadius: 50,          // Radio máximo para agrupar marcadores (en píxeles)
-                    spiderfyOnMaxZoom: true,       // Mostrar spider cuando se alcanza el zoom máximo
-                    showCoverageOnHover: false,    // No mostrar cobertura al hacer hover
-                    zoomToBoundsOnClick: true,     // Zoom a los bounds del cluster al hacer click
-                    
-                    // Configuración de iconos del cluster
-                    iconCreateFunction: function(cluster) {
-                        const childCount = cluster.getChildCount();
-                        const childMarkers = cluster.getAllChildMarkers();
-                        
-                        // Sumar todos los clicks de todos los marcadores en el cluster
-                        let totalClicks = 0;
-                        childMarkers.forEach(marker => {
-                            // Obtener el número de clicks del marcador
-                            const clicks = marker._totalClicks || 1;
-                            totalClicks += clicks;
-                        });
-                        
-                        let className = 'marker-cluster ';
-                        
-                        // Clases CSS según el número total de clicks en el cluster
-                        if (totalClicks < 10) {
-                            className += 'marker-cluster-small';
-                        } else if (totalClicks < 100) {
-                            className += 'marker-cluster-medium';
-                        } else {
-                            className += 'marker-cluster-large';
-                        }
-                        
-                        return L.divIcon({
-                            html: '<div><span>' + totalClicks + '</span></div>',
-                            className: className,
-                            iconSize: L.point(40, 40)
-                        });
-                    }
-                });
-                
-                // Añadir cada punto como marcador individual al cluster
-                puntosMapa.forEach(punto => {
-                    // Crear icono personalizado para cada marcador individual
-                    const iconSize = Math.min(20 + (punto.total_clicks * 2), 40);
-                    const iconColor = punto.total_clicks > 10 ? 'red' : 
-                                    punto.total_clicks > 5 ? 'orange' : 'blue';
-                    
-                    const icono = L.divIcon({
-                        html: `<div style="
-                            background-color: ${iconColor};
-                            width: ${iconSize}px;
-                            height: ${iconSize}px;
-                            border-radius: 50%;
-                            border: 2px solid white;
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                            color: white;
-                            font-weight: bold;
-                            font-size: ${Math.min(iconSize * 0.4, 14)}px;
-                            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-                        ">${punto.total_clicks}</div>`,
-                        className: 'marcador-personalizado',
-                        iconSize: [iconSize, iconSize],
-                        iconAnchor: [iconSize/2, iconSize/2]
-                    });
-                    
-                    // Crear marcador individual
-                    const marcador = L.marker([punto.latitud, punto.longitud], { 
-                        icon: icono
-                    });
-                    
-                    // Almacenar el número de clicks como propiedad del marcador
-                    marcador._totalClicks = punto.total_clicks;
-                    
-                    // Crear popup con información detallada
-                    const popupContent = `
-                        <div style="min-width: 200px;">
-                            <h4 style="margin: 0 0 8px 0; color: #1f2937; font-weight: bold;">📍 ${punto.ciudad}</h4>
-                            <div style="font-size: 14px; color: #6b7280;">
-                                <div style="margin-bottom: 4px;">
-                                    <strong>Total clicks:</strong> ${punto.total_clicks}
-                                </div>
-                                <div style="margin-bottom: 4px;">
-                                    <strong>IPs únicas:</strong> ${punto.ips_unicas}
-                                </div>
-                                <div style="margin-bottom: 4px;">
-                                    <strong>Coordenadas:</strong> ${punto.latitud.toFixed(4)}, ${punto.longitud.toFixed(4)}
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                    
-                    marcador.bindPopup(popupContent);
-                    
-                    // Añadir marcador al grupo de clustering
-                    marcadoresCluster.addLayer(marcador);
-                });
-                
-                // Añadir el grupo de clustering al mapa
-                mapa.addLayer(marcadoresCluster);
-                
-                // Ajustar vista del mapa para mostrar todos los marcadores
-                if (puntosMapa.length > 0) {
-                    mapa.fitBounds(marcadoresCluster.getBounds().pad(0.1));
-                }
-            @endif
-            
-                 });
+            }, 200);
+        };
          
          // Cerrar modales con tecla Escape
          document.addEventListener('keydown', function(e) {
@@ -1485,6 +1207,439 @@
                 });
         }
      </script>
+
+    <script>
+    (function () {
+        const TOP_URL = @json(route('admin.clicks.dashboard.top'));
+        const filtros = {
+            filtro_rapido: @json($filtroRapido),
+            fecha_desde: @json($fechaDesde),
+            fecha_hasta: @json($fechaHasta),
+            hora_desde: @json($horaDesde),
+            hora_hasta: @json($horaHasta),
+        };
+        const PER_PAGE = 10;
+        const estadoTops = {};
+        const tipos = ['productos', 'categorias', 'tiendas'];
+        tipos.forEach(t => { estadoTops[t] = { page: 1, orden: t === 'tiendas' ? 'clicks' : 'ctr' }; });
+
+        function fmt(n) { return new Intl.NumberFormat('es-ES').format(n); }
+        function fmtMetric(n) {
+            const num = Number(n);
+            if (!Number.isFinite(num)) return '0';
+            if (Math.abs(num - Math.round(num)) < 0.001) return fmt(Math.round(num));
+            return new Intl.NumberFormat('es-ES', { minimumFractionDigits: 1, maximumFractionDigits: 2 }).format(num);
+        }
+        function fmtCtr(n) { return new Intl.NumberFormat('es-ES', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(n) + '%'; }
+        function truncarNombre(nombre, max = 48) {
+            if (!nombre) return '(sin nombre)';
+            return nombre.length > max ? nombre.substring(0, max) + '…' : nombre;
+        }
+        function ctrColor(ctr) {
+            if (ctr >= 15) return 'bg-green-500';
+            if (ctr >= 5) return 'bg-orange-500';
+            return 'bg-gray-400';
+        }
+        function ctrTextColor(ctr) {
+            if (ctr >= 15) return 'text-green-600 dark:text-green-400';
+            if (ctr >= 5) return 'text-orange-600 dark:text-orange-400';
+            return 'text-gray-500 dark:text-gray-400';
+        }
+        function rankClass(pos, page) {
+            const globalPos = (page - 1) * PER_PAGE + pos;
+            if (globalPos === 1) return 'rank-medal-1';
+            if (globalPos === 2) return 'rank-medal-2';
+            if (globalPos === 3) return 'rank-medal-3';
+            return 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300';
+        }
+        function cuotaColumnTitle(orden) {
+            if (orden === 'visitas') return 'Cuota';
+            return 'Cuota';
+        }
+        function cuotaTextColor(orden) {
+            if (orden === 'visitas') return 'text-blue-600 dark:text-blue-400';
+            return 'text-orange-600 dark:text-orange-400';
+        }
+        function fmtCuotaPct(n) {
+            return new Intl.NumberFormat('es-ES', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(n) + '%';
+        }
+        function renderCuotaCell(row, orden) {
+            const pct = Number(row.barra_pct ?? 0);
+            const textColor = cuotaTextColor(orden);
+            return `<td class="col-cuota"><span class="${textColor}">${fmtCuotaPct(pct)}</span></td>`;
+        }
+        function renderTableHeader(orden, soloClics = false) {
+            if (soloClics) {
+                return `<table class="top-data-table top-solo-clics">
+                    <colgroup>
+                        <col class="col-rank">
+                        <col class="col-nombre">
+                        <col class="col-num-clics">
+                        <col class="col-cuota">
+                    </colgroup>
+                    <thead><tr>
+                        <th class="col-rank">#</th>
+                        <th class="col-nombre">Nombre</th>
+                        <th class="col-num-clics">Clics</th>
+                        <th class="col-cuota">Cuota</th>
+                    </tr></thead><tbody>`;
+            }
+            return `<table class="top-data-table">
+                <colgroup>
+                    <col class="col-rank">
+                    <col class="col-nombre">
+                    <col class="col-num">
+                    <col class="col-num">
+                    <col class="col-num">
+                    <col class="col-ctr">
+                    <col class="col-cuota">
+                </colgroup>
+                <thead><tr>
+                    <th class="col-rank">#</th>
+                    <th class="col-nombre">Nombre</th>
+                    <th class="col-num">Visitas</th>
+                    <th class="col-num">Vis. ún.</th>
+                    <th class="col-num">Clics</th>
+                    <th class="col-ctr">CTR</th>
+                    <th class="col-cuota">${cuotaColumnTitle(orden)}</th>
+                </tr></thead><tbody>`;
+        }
+        function renderTableFooter() {
+            return `</tbody></table>`;
+        }
+        function renderItem(row, index, page, orden, soloClics = false) {
+            const pos = index + 1;
+            const nombre = (row.nombre || '').replace(/"/g, '&quot;');
+            const rank = (page - 1) * PER_PAGE + pos;
+            if (soloClics) {
+                return `<tr>
+                    <td class="col-rank"><span class="top-rank-badge font-bold ${rankClass(pos, page)}">${rank}</span></td>
+                    <td class="col-nombre text-sm font-medium text-gray-900 dark:text-gray-100" title="${nombre}">${truncarNombre(row.nombre)}</td>
+                    <td class="col-num-clics text-sm text-right text-gray-700 dark:text-gray-300">${fmt(row.clicks)}</td>
+                    ${renderCuotaCell(row, 'clicks')}
+                </tr>`;
+            }
+            return `<tr>
+                <td class="col-rank"><span class="top-rank-badge font-bold ${rankClass(pos, page)}">${rank}</span></td>
+                <td class="col-nombre text-sm font-medium text-gray-900 dark:text-gray-100" title="${nombre}">${truncarNombre(row.nombre)}</td>
+                <td class="col-num text-sm text-gray-700 dark:text-gray-300">${fmtMetric(row.visitas)}</td>
+                <td class="col-num text-sm text-gray-700 dark:text-gray-300">${fmt(row.visitantes)}</td>
+                <td class="col-num text-sm text-gray-700 dark:text-gray-300">${fmt(row.clicks)}</td>
+                <td class="col-ctr text-xs font-bold ${ctrTextColor(row.ctr)}">${fmtCtr(row.ctr)}</td>
+                ${renderCuotaCell(row, orden)}
+            </tr>`;
+        }
+        function setOrdenActivo(tipo, orden) {
+            const group = document.querySelector(`.top-orden-group[data-tipo="${tipo}"]`);
+            if (!group) return;
+            group.querySelectorAll('.top-orden-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.orden === orden);
+            });
+        }
+        async function cargarTop(tipo, page) {
+            const list = document.querySelector(`.top-list[data-tipo="${tipo}"]`);
+            const pagDiv = document.querySelector(`.top-paginacion[data-tipo="${tipo}"]`);
+            const totalSpan = document.querySelector(`.top-total[data-tipo="${tipo}"]`);
+            const orden = estadoTops[tipo].orden || 'ctr';
+            if (!list) return;
+            list.innerHTML = `<div class="px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400"><div class="inline-block w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-2"></div><div>Cargando…</div></div>`;
+            const params = new URLSearchParams({ tipo, orden, page, per_page: PER_PAGE, filtro_rapido: filtros.filtro_rapido || '', fecha_desde: filtros.fecha_desde || '', fecha_hasta: filtros.fecha_hasta || '', hora_desde: filtros.hora_desde || '', hora_hasta: filtros.hora_hasta || '' });
+            try {
+                const res = await fetch(`${TOP_URL}?${params}`, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' });
+                const json = await res.json();
+                const data = Array.isArray(json.data) ? json.data : [];
+                const currentPage = Number(json.current_page) || 1;
+                const lastPage = Number(json.last_page) || 1;
+                const total = Number(json.total) || 0;
+                const ordenActivo = json.orden || orden;
+                const soloClics = json.modo === 'clicks' || tipo === 'tiendas';
+                estadoTops[tipo].page = currentPage;
+                if (data.length === 0) {
+                    list.innerHTML = `<div class="px-6 py-12 text-center"><div class="text-gray-500 dark:text-gray-400 text-lg mb-2">📭</div><div class="text-sm text-gray-500 dark:text-gray-400">${json.error || (soloClics ? 'Sin clics a tiendas en este periodo' : 'Sin datos en este periodo')}</div></div>`;
+                } else {
+                    list.innerHTML = renderTableHeader(ordenActivo, soloClics) + data.map((row, i) => renderItem(row, i, currentPage, ordenActivo, soloClics)).join('') + renderTableFooter();
+                }
+                if (totalSpan) totalSpan.textContent = ' · ' + fmt(total) + ' total';
+                if (pagDiv) {
+                    pagDiv.querySelector('.top-prev').disabled = currentPage <= 1;
+                    pagDiv.querySelector('.top-next').disabled = currentPage >= lastPage;
+                    pagDiv.querySelector('.top-page-info').textContent = `Pág. ${currentPage} / ${lastPage}`;
+                }
+            } catch (e) {
+                list.innerHTML = `<div class="px-6 py-10 text-center text-sm text-red-600 dark:text-red-400">Error al cargar</div>`;
+                if (totalSpan) totalSpan.textContent = ' · 0 total';
+            }
+        }
+        tipos.forEach(tipo => {
+            cargarTop(tipo, 1);
+            const pagDiv = document.querySelector(`.top-paginacion[data-tipo="${tipo}"]`);
+            if (tipo !== 'tiendas') {
+                const ordenGroup = document.querySelector(`.top-orden-group[data-tipo="${tipo}"]`);
+                if (ordenGroup) {
+                    ordenGroup.querySelectorAll('.top-orden-btn').forEach(btn => {
+                        btn.addEventListener('click', () => {
+                            const orden = btn.dataset.orden;
+                            if (estadoTops[tipo].orden === orden) return;
+                            estadoTops[tipo].orden = orden;
+                            setOrdenActivo(tipo, orden);
+                            cargarTop(tipo, 1);
+                        });
+                    });
+                }
+            }
+            if (!pagDiv) return;
+            pagDiv.querySelector('.top-prev').addEventListener('click', () => { if (estadoTops[tipo].page > 1) cargarTop(tipo, estadoTops[tipo].page - 1); });
+            pagDiv.querySelector('.top-next').addEventListener('click', () => cargarTop(tipo, estadoTops[tipo].page + 1));
+        });
+    })();
+    </script>
+
+    <script>
+    (function () {
+        const GRAFICA_URL = @json(route('admin.clicks.dashboard.grafica'));
+        const filtrosGrafica = {
+            filtro_rapido: @json($filtroRapido),
+            fecha_desde: @json($fechaDesde),
+            fecha_hasta: @json($fechaHasta),
+            hora_desde: @json($horaDesde),
+            hora_hasta: @json($horaHasta),
+        };
+        const subtitulosGranularidad = {
+            '15min': 'Agrupado cada 15 minutos',
+            'hour': 'Agrupado por horas',
+            'day': 'Agrupado por días',
+            'month': 'Agrupado por meses',
+            'year': 'Agrupado por años',
+        };
+        const maxTicksGranularidad = {
+            '15min': 24,
+            'hour': 48,
+            'day': 31,
+            'month': 18,
+            'year': 12,
+        };
+        let graficaTemporalChart = null;
+        let graficaTemporalCargada = false;
+        let estadoGrafica = { granularidad: null };
+
+        function setGranularidadActiva(granularidad) {
+            document.querySelectorAll('.grafica-granularidad-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.granularidad === granularidad);
+            });
+        }
+
+        function maxTicksForGranularidad(granularidad) {
+            return maxTicksGranularidad[granularidad] || 31;
+        }
+
+        window.toggleSeccionGrafica = function() {
+            if (typeof toggleSeccion === 'function') {
+                toggleSeccion('contenidoGrafica', 'iconoGrafica');
+            }
+            setTimeout(() => {
+                const contenido = document.getElementById('contenidoGrafica');
+                if (!contenido || contenido.classList.contains('hidden')) return;
+                if (!graficaTemporalCargada) {
+                    cargarGraficaTemporal();
+                    graficaTemporalCargada = true;
+                } else if (graficaTemporalChart) {
+                    graficaTemporalChart.resize();
+                }
+            }, 200);
+        };
+
+        document.querySelectorAll('.grafica-granularidad-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const granularidad = btn.dataset.granularidad;
+                if (estadoGrafica.granularidad === granularidad) return;
+                estadoGrafica.granularidad = granularidad;
+                setGranularidadActiva(granularidad);
+                const contenido = document.getElementById('contenidoGrafica');
+                if (contenido && !contenido.classList.contains('hidden')) {
+                    cargarGraficaTemporal();
+                }
+            });
+        });
+
+        function fmtGrafica(n) {
+            return new Intl.NumberFormat('es-ES').format(n);
+        }
+
+        async function cargarGraficaTemporal() {
+            const loading = document.getElementById('graficaTemporalLoading');
+            const empty = document.getElementById('graficaTemporalEmpty');
+            const wrap = document.getElementById('graficaTemporalWrap');
+            const subtitle = document.getElementById('graficaTemporalSubtitulo');
+            if (!loading || typeof Chart === 'undefined') return;
+
+            loading.classList.remove('hidden');
+            empty.classList.add('hidden');
+            wrap.classList.add('hidden');
+            if (subtitle) subtitle.textContent = 'Cargando…';
+
+            const params = new URLSearchParams({
+                filtro_rapido: filtrosGrafica.filtro_rapido || '',
+                fecha_desde: filtrosGrafica.fecha_desde || '',
+                fecha_hasta: filtrosGrafica.fecha_hasta || '',
+                hora_desde: filtrosGrafica.hora_desde || '',
+                hora_hasta: filtrosGrafica.hora_hasta || '',
+            });
+            if (estadoGrafica.granularidad) {
+                params.set('granularidad', estadoGrafica.granularidad);
+            }
+
+            try {
+                const res = await fetch(`${GRAFICA_URL}?${params}`, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin',
+                });
+                const data = await res.json();
+                loading.classList.add('hidden');
+
+                const granularidadActiva = data.granularidad || data.granularidad_defecto || 'day';
+                estadoGrafica.granularidad = granularidadActiva;
+                setGranularidadActiva(granularidadActiva);
+
+                const esManual = granularidadActiva !== (data.granularidad_defecto || granularidadActiva);
+                const subtituloBase = subtitulosGranularidad[granularidadActiva] || 'Evolución del periodo';
+                const subtituloDefecto = subtitulosGranularidad[data.granularidad_defecto] || '';
+                if (subtitle) {
+                    subtitle.textContent = esManual && subtituloDefecto
+                        ? `${subtituloBase} (sugerido: ${subtituloDefecto.toLowerCase()})`
+                        : subtituloBase;
+                }
+
+                const visitas = Array.isArray(data.visitas) ? data.visitas : [];
+                const clicks = Array.isArray(data.clicks) ? data.clicks : [];
+                const labels = Array.isArray(data.labels) ? data.labels : [];
+                const ctr = Array.isArray(data.ctr) ? data.ctr : [];
+                const hasData = visitas.some(v => v > 0) || clicks.some(v => v > 0);
+
+                if (!labels.length || !hasData) {
+                    empty.classList.remove('hidden');
+                    return;
+                }
+
+                wrap.classList.remove('hidden');
+                if (graficaTemporalChart) graficaTemporalChart.destroy();
+
+                const isDark = document.documentElement.classList.contains('dark');
+                const gridColor = isDark ? 'rgba(156, 163, 175, 0.2)' : 'rgba(209, 213, 219, 0.8)';
+                const textColor = isDark ? '#9ca3af' : '#6b7280';
+                const ctx = document.getElementById('graficaTemporal').getContext('2d');
+                const muchosPuntos = labels.length > 60;
+                const granularidadChart = granularidadActiva;
+
+                graficaTemporalChart = new Chart(ctx, {
+                    data: {
+                        labels,
+                        datasets: [
+                            {
+                                type: 'line',
+                                label: 'Visitas',
+                                data: visitas,
+                                borderColor: 'rgba(59, 130, 246, 1)',
+                                backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                                borderWidth: 4,
+                                tension: 0.3,
+                                pointRadius: muchosPuntos ? 0 : 4,
+                                pointHoverRadius: 7,
+                                yAxisID: 'y',
+                                order: 1,
+                            },
+                            {
+                                type: 'line',
+                                label: 'Clics',
+                                data: clicks,
+                                borderColor: 'rgba(249, 115, 22, 1)',
+                                backgroundColor: 'rgba(249, 115, 22, 0.08)',
+                                borderWidth: 4,
+                                tension: 0.3,
+                                pointRadius: muchosPuntos ? 0 : 4,
+                                pointHoverRadius: 7,
+                                yAxisID: 'y',
+                                order: 2,
+                            },
+                            {
+                                type: 'bar',
+                                label: 'CTR',
+                                data: ctr,
+                                backgroundColor: 'rgba(34, 197, 94, 0.5)',
+                                borderColor: 'rgba(34, 197, 94, 1)',
+                                borderWidth: 1,
+                                borderRadius: 3,
+                                yAxisID: 'y1',
+                                order: 3,
+                            },
+                        ],
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                                labels: { color: textColor, usePointStyle: true },
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label(context) {
+                                        const label = context.dataset.label || '';
+                                        const value = context.parsed.y ?? 0;
+                                        if (context.dataset.yAxisID === 'y1') {
+                                            return `${label}: ${value.toFixed(1)}%`;
+                                        }
+                                        return `${label}: ${fmtGrafica(value)}`;
+                                    },
+                                },
+                            },
+                        },
+                        scales: {
+                            x: {
+                                ticks: {
+                                    color: textColor,
+                                    maxRotation: 45,
+                                    autoSkip: true,
+                                    maxTicksLimit: maxTicksForGranularidad(granularidadChart),
+                                },
+                                grid: { color: gridColor },
+                            },
+                            y: {
+                                type: 'linear',
+                                position: 'left',
+                                beginAtZero: true,
+                                ticks: { color: textColor, precision: 0 },
+                                grid: { color: gridColor },
+                                title: { display: true, text: 'Visitas / Clics', color: textColor },
+                            },
+                            y1: {
+                                type: 'linear',
+                                position: 'right',
+                                beginAtZero: true,
+                                suggestedMax: 100,
+                                ticks: {
+                                    color: textColor,
+                                    callback: (value) => value + '%',
+                                },
+                                grid: { drawOnChartArea: false },
+                                title: { display: true, text: 'CTR %', color: textColor },
+                            },
+                        },
+                    },
+                });
+            } catch (e) {
+                loading.classList.add('hidden');
+                if (empty) {
+                    empty.textContent = 'Error al cargar la gráfica';
+                    empty.classList.remove('hidden');
+                }
+            }
+        }
+
+    })();
+    </script>
      
      <!-- Modal para mostrar clicks por posición -->
      <div id="modalPosiciones" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="if(event.target === this) this.classList.add('hidden')">

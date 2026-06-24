@@ -367,11 +367,25 @@ class ImagenController extends Controller
         return array_values(array_unique($tokens));
     }
 
-    private function rutaImagenCoincideTokens(string $ruta, array $tokens): bool
+    /**
+     * Partes del nombre/ruta separadas por guiones, barras, puntos, etc.
+     * Evita que «5» coincida dentro de «5800» o «3500».
+     */
+    private function segmentosRutaImagenBusqueda(string $ruta): array
     {
         $haystack = mb_strtolower($ruta . ' ' . basename($ruta));
+        $segmentos = preg_split('/[^\p{L}\p{N}]+/u', $haystack, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+        return array_values(array_unique($segmentos));
+    }
+
+    private function rutaImagenCoincideTokens(string $ruta, array $tokens): bool
+    {
+        $segmentos = array_flip($this->segmentosRutaImagenBusqueda($ruta));
+
         foreach ($tokens as $token) {
-            if (!str_contains($haystack, mb_strtolower($token))) {
+            $tokenLower = mb_strtolower($token);
+            if (!isset($segmentos[$tokenLower])) {
                 return false;
             }
         }

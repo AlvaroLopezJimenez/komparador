@@ -2420,6 +2420,22 @@
                     })
                     ->values()
                     ->toArray();
+
+                  // En grupos con formato de imagen, ocultar sublíneas sin ofertas ni imagen
+                  $formatosConImagen = ['imagen', 'imagen_texto', 'imagen_precio', 'imagen_texto_precio'];
+                  if (in_array($formatoVisualizacion, $formatosConImagen)) {
+                    $filtro['subprincipales'] = collect($filtro['subprincipales'])
+                      ->filter(function($sub) {
+                        $tieneImagen = isset($sub['imagenes']) && is_array($sub['imagenes']) && count($sub['imagenes']) > 0;
+                        $tienePrecio = isset($sub['precio_mas_barato']) &&
+                                      $sub['precio_mas_barato'] !== null &&
+                                      $sub['precio_mas_barato'] !== '';
+                        return $tieneImagen || $tienePrecio;
+                      })
+                      ->values()
+                      ->toArray();
+                  }
+
                   // Poner en primera posición las especificaciones que vienen de la URL (solo las automáticas)
                   $idsDesdeUrl = ($filtrosAplicadosDesdeUrl ?? [])[$filtro['id']] ?? [];
                   if (!empty($idsDesdeUrl)) {
@@ -9363,6 +9379,30 @@ if (document.readyState === 'loading') {
 </div>
 
 {{-- JS PARA EL BUSCADOR DEL HEADER --}}
+<script>
+window.addEventListener('load', function () {
+  @guest
+  var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+  if (!csrfMeta) return;
+
+  fetch(@json(route('visitas.registrar')), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRF-TOKEN': csrfMeta.content,
+      'Accept': 'application/json',
+    },
+    credentials: 'same-origin',
+    keepalive: true,
+    body: JSON.stringify({
+      producto_id: {{ $producto->id }},
+      categoria_id: {{ $producto->categoria_id }},
+      origen: document.referrer || null,
+    }),
+  }).catch(function () {});
+  @endguest
+});
+</script>
 @stack('scripts')
 </body>
 

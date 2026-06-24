@@ -138,8 +138,8 @@
     </div>
 
     {{-- Modal flujo URL a URL (crear ofertas en masa) --}}
-    <div id="modal-url-crear-masivo" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[55] flex items-center justify-center p-4">
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-6xl w-full max-h-[92vh] flex flex-col border border-gray-200 dark:border-gray-700 relative">
+    <div id="modal-url-crear-masivo" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[55] flex items-center justify-center p-4 pointer-events-none">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-6xl w-full max-h-[92vh] flex flex-col border border-gray-200 dark:border-gray-700 relative pointer-events-auto">
             <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-start justify-between gap-3 shrink-0">
                 <div class="min-w-0">
                     <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Crear ofertas &mdash; URL por URL</h3>
@@ -149,9 +149,12 @@
             </div>
             <div id="modal-url-crear-masivo-prev-guardado" class="hidden shrink-0 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 p-4"></div>
             <div id="modal-url-crear-masivo-contenido" class="flex-1 overflow-y-auto p-4 min-h-0"></div>
-            <div id="modal-url-crear-masivo-pie" class="shrink-0 p-4 border-t border-gray-200 dark:border-gray-700 flex flex-col items-end gap-2">
-                <button type="button" id="modal-url-crear-masivo-siguiente" class="hidden px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600">Siguiente URL</button>
-                <button type="button" id="modal-url-crear-masivo-saltar" class="hidden px-4 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700" title="Pasar a la siguiente URL sin generar oferta ni descartar (la fila sigue en la lista)">Saltar URL</button>
+            <div id="modal-url-crear-masivo-pie" class="shrink-0 p-4 border-t border-gray-200 dark:border-gray-700 flex flex-row items-center justify-between gap-2">
+                <button type="button" id="modal-url-crear-masivo-anterior" class="hidden px-4 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700" title="Volver a la URL anterior del recorrido">Anterior URL</button>
+                <div class="flex items-center gap-2 ml-auto">
+                    <button type="button" id="modal-url-crear-masivo-saltar" class="hidden px-4 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700" title="Pasar a la siguiente URL sin generar oferta ni descartar (la fila sigue en la lista)">Saltar URL</button>
+                    <button type="button" id="modal-url-crear-masivo-siguiente" class="hidden px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600">Siguiente URL</button>
+                </div>
             </div>
         </div>
     </div>
@@ -174,7 +177,7 @@
     </div>
 
     {{-- Modal para ver imágenes de especificaciones internas --}}
-    <div id="modal-imagenes-spec-crear-masivo" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div id="modal-imagenes-spec-crear-masivo" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-center justify-center p-4">
         <div class="bg-white dark:bg-gray-900 rounded-lg p-6 max-w-5xl w-full relative shadow-xl max-h-[90vh] flex flex-col">
             <button type="button" onclick="cerrarModalImagenesSpecCrearMasivo()" class="absolute top-3 right-4 text-xl text-gray-800 dark:text-gray-100 hover:text-gray-600 dark:hover:text-gray-300 z-10">&times;</button>
             <div class="mb-4">
@@ -206,7 +209,7 @@
     </div>
 
     {{-- Modal Ver prompt / respuesta ChatGPT --}}
-    <div id="modal-ver-prompt-crear-masivo" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div id="modal-ver-prompt-crear-masivo" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[110] flex items-center justify-center p-4">
         <div class="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
             <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
                 <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Petición y respuesta ChatGPT</h3>
@@ -453,7 +456,7 @@
     </div>
 
     {{-- Modal elegir categoría para acotar búsqueda (mismo partial que admin/categorías index) --}}
-    <div id="modal-categoria-fila-crear-masivo" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4">
+    <div id="modal-categoria-fila-crear-masivo" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[110] flex items-center justify-center p-4">
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-3xl w-full max-h-[85vh] flex flex-col border border-gray-200 dark:border-gray-700"
             x-data="{
                 openCategorias: [],
@@ -487,7 +490,7 @@
     </div>
 
     {{-- Modal confirmar descartar URL --}}
-    <div id="modal-descartar-url-crear-masivo" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div id="modal-descartar-url-crear-masivo" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[110] flex items-center justify-center p-4">
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full border border-gray-200 dark:border-gray-700">
             <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
                 <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Confirmar descarte</h3>
@@ -1227,6 +1230,7 @@
     }
 
     window.__mismoProductoSeleccionado = null;
+    window.__mismoProductoUnidadDeMedida = null;
     // Contexto de categoría cargada desde Neo (id, nombre) para acotar la búsqueda de producto.
     window.__neoCategoriaFiltro = null;
 
@@ -1246,6 +1250,7 @@
     let descartarUrlPendienteCrearMasivo = null;
     let descartarFilaPendienteCrearMasivo = null;
     const CANTIDAD_LOTE_DEFECTO_CREAR_MASIVO = 20;
+    const LIMITE_URLS_TODAS_NEO_CREAR_MASIVO = 200;
     window.__modoProductoTodasNeo = false;
     window.__neoProductoPorUrlModoTodas = {};
     window.__cacheSpecsProductoModoTodas = {};
@@ -1440,15 +1445,73 @@
         console.groupEnd();
     }
 
+    /** Normalización básica para deduplicar URLs (alineada con analizarUrls: sin query/hash, sin /p final). */
+    function normalizarUrlBasicaCrearMasivo(url) {
+        let u = String(url || '').trim();
+        if (!u) return '';
+        if (!/^https?:\/\//i.test(u)) u = 'https://' + u;
+        try {
+            const parsed = new URL(u);
+            u = parsed.protocol + '//' + parsed.hostname + (parsed.pathname || '');
+        } catch (e) {
+            u = u.replace(/[?#].*$/, '');
+        }
+        return u;
+    }
+
+    function claveDedupeUrlCrearMasivo(url) {
+        let clave = normalizarUrlBasicaCrearMasivo(url);
+        if (!clave) return '';
+        clave = clave.replace(/\/$/, '');
+        if (clave.length > 2 && clave.endsWith('/p')) {
+            clave = clave.slice(0, -2);
+        }
+        return clave.toLowerCase();
+    }
+
+    function deduplicarListaUrlsCrearMasivo(urls) {
+        const visto = new Set();
+        const unicas = [];
+        let omitidas = 0;
+        (Array.isArray(urls) ? urls : []).forEach(function(raw) {
+            const trimmed = String(raw || '').trim();
+            if (!trimmed) return;
+            const clave = claveDedupeUrlCrearMasivo(trimmed);
+            if (!clave) return;
+            if (visto.has(clave)) {
+                omitidas += 1;
+                return;
+            }
+            visto.add(clave);
+            unicas.push(trimmed);
+        });
+        return { urls: unicas, omitidas: omitidas };
+    }
+
+    function aplicarDeduplicacionTextareaCrearMasivo(opciones) {
+        opciones = opciones || {};
+        const ta = document.getElementById('urls');
+        if (!ta) return { urls: [], omitidas: 0 };
+        const lineas = ta.value.split('\n').map(function(u) { return u.trim(); }).filter(Boolean);
+        const dedupe = deduplicarListaUrlsCrearMasivo(lineas);
+        if (dedupe.omitidas > 0 && opciones.reescribir !== false) {
+            ta.value = dedupe.urls.join('\n');
+        }
+        return dedupe;
+    }
+
     function obtenerUrlsLimpiasTextarea() {
-        return document.getElementById('urls').value
+        const ta = document.getElementById('urls');
+        if (!ta) return [];
+        return ta.value
             .split('\n')
-            .map(u => u.trim())
+            .map(function(u) { return u.trim(); })
             .filter(Boolean);
     }
 
     function actualizarEstadoLotesDesdeTextarea() {
-        const urls = obtenerUrlsLimpiasTextarea();
+        const dedupe = aplicarDeduplicacionTextareaCrearMasivo({ reescribir: true });
+        const urls = dedupe.urls.length ? dedupe.urls : obtenerUrlsLimpiasTextarea();
         const signature = urls.join('\n');
         const total = urls.length;
         const inputCantidad = document.getElementById('cantidad_urls_analizar');
@@ -1470,7 +1533,13 @@
         if (inputCantidad && (!inputCantidad.value || parseInt(inputCantidad.value, 10) <= 0)) {
             inputCantidad.value = totalActual > 0 ? CANTIDAD_LOTE_DEFECTO_CREAR_MASIVO : 0;
         }
-        if (infoTotal) infoTotal.textContent = 'Total URLs: ' + totalActual;
+        if (infoTotal) {
+            let txtTotal = 'Total URLs: ' + totalActual;
+            if (dedupe.omitidas > 0) {
+                txtTotal += ' (' + dedupe.omitidas + ' duplicada' + (dedupe.omitidas !== 1 ? 's' : '') + ' omitida' + (dedupe.omitidas !== 1 ? 's' : '') + ')';
+            }
+            infoTotal.textContent = txtTotal;
+        }
         const pendientes = Math.max(totalActual - estadoLotesAnalisis.cursor, 0);
         if (infoProgreso) infoProgreso.textContent = 'Pendientes: ' + pendientes;
         if (btnAnalizarTexto) btnAnalizarTexto.textContent = estadoLotesAnalisis.cursor > 0 && pendientes > 0 ? 'Analizar siguientes URLs' : 'Analizar URLs';
@@ -1568,15 +1637,40 @@
     const mismoProductoSearch = document.getElementById('mismo-producto-search');
     const mismoProductoSugerencias = document.getElementById('mismo-producto-sugerencias');
     let mismoProductoTimeout = null;
+    window.__mismoProductoIndiceSeleccionado = -1;
+
+    function actualizarHighlightSugerenciasMismoProducto() {
+        const cont = mismoProductoSugerencias;
+        if (!cont) return;
+        const idx = window.__mismoProductoIndiceSeleccionado ?? -1;
+        const items = cont.querySelectorAll('.producto-sugerencia-item-crear-masivo');
+        items.forEach(function(el, i) {
+            el.classList.toggle('bg-blue-100', i === idx);
+            el.classList.toggle('dark:bg-blue-700', i === idx);
+        });
+        if (idx >= 0 && items[idx]) {
+            items[idx].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+    }
+
+    function seleccionarMismoProductoPorIndice() {
+        const productos = window.__mismoProductosBusqueda || [];
+        const idx = window.__mismoProductoIndiceSeleccionado ?? -1;
+        if (idx >= 0 && idx < productos.length) {
+            seleccionarMismoProducto(productos[idx]);
+        }
+    }
+
     if (mismoProductoSearch && mismoProductoSugerencias) {
         mismoProductoSearch.addEventListener('input', function() {
             clearTimeout(mismoProductoTimeout);
             const query = this.value.trim();
             if (query.length < 2) {
                 mismoProductoSugerencias.classList.add('hidden');
+                window.__mismoProductoIndiceSeleccionado = -1;
                 return;
             }
-            mismoProductoTimeout = setTimeout(() => buscarProductosMismoProducto(query), 300);
+            mismoProductoTimeout = setTimeout(function() { buscarProductosMismoProducto(query); }, 300);
         });
         mismoProductoSearch.addEventListener('focus', function() {
             if (window.__mismoProductosBusqueda && window.__mismoProductosBusqueda.length) {
@@ -1584,7 +1678,28 @@
             }
         });
         mismoProductoSearch.addEventListener('blur', function() {
-            setTimeout(() => mismoProductoSugerencias.classList.add('hidden'), 200);
+            setTimeout(function() { mismoProductoSugerencias.classList.add('hidden'); }, 200);
+        });
+        mismoProductoSearch.addEventListener('keydown', function(e) {
+            if (!mismoProductoSugerencias || mismoProductoSugerencias.classList.contains('hidden')) return;
+            const productos = window.__mismoProductosBusqueda || [];
+            if (productos.length === 0) return;
+            let idx = window.__mismoProductoIndiceSeleccionado ?? 0;
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                idx = Math.min(idx + 1, productos.length - 1);
+                window.__mismoProductoIndiceSeleccionado = idx;
+                actualizarHighlightSugerenciasMismoProducto();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                idx = Math.max(idx - 1, 0);
+                window.__mismoProductoIndiceSeleccionado = idx;
+                actualizarHighlightSugerenciasMismoProducto();
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                e.stopPropagation();
+                seleccionarMismoProductoPorIndice();
+            }
         });
     }
 
@@ -1593,16 +1708,18 @@
             const res = await fetch(`{{ route('admin.ofertas.buscar.productos') }}?q=${encodeURIComponent(query)}`);
             const productos = await res.json();
             window.__mismoProductosBusqueda = Array.isArray(productos) ? productos : [];
+            window.__mismoProductoIndiceSeleccionado = window.__mismoProductosBusqueda.length ? 0 : -1;
             const cont = mismoProductoSugerencias;
             cont.innerHTML = '';
             if (window.__mismoProductosBusqueda.length === 0) {
                 cont.innerHTML = '<div class="px-4 py-2 text-gray-500 dark:text-gray-400 text-sm">No se encontraron productos</div>';
             } else {
-                window.__mismoProductosBusqueda.forEach((p, i) => {
+                window.__mismoProductosBusqueda.forEach(function(p, i) {
                     const el = document.createElement('div');
                     el.className = 'producto-sugerencia-item-crear-masivo px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-600 last:border-b-0 text-sm' + (i === 0 ? ' bg-blue-100 dark:bg-blue-700' : '');
                     el.textContent = p.texto_completo;
                     el.dataset.producto = JSON.stringify(p);
+                    el.dataset.index = String(i);
                     el.addEventListener('click', function(e) {
                         e.preventDefault();
                         try {
@@ -1616,6 +1733,7 @@
             cont.classList.remove('hidden');
         } catch (err) {
             console.error(err);
+            window.__mismoProductoIndiceSeleccionado = -1;
             mismoProductoSugerencias.classList.add('hidden');
         }
     }
@@ -1642,14 +1760,19 @@
                 imagenes_producto: imagenesProducto
             };
             window.__mismoProductoSeleccionado = productoCompleto;
-            document.getElementById('mismo-producto-nombre').textContent = productoCompleto.texto_completo;
+            window.__mismoProductoUnidadDeMedida = (especs && especs.unidad_de_medida) || data.unidad_de_medida || 'unidad';
+            document.getElementById('mismo-producto-nombre').textContent = textoMostrarProductoFilaCrearMasivo(productoCompleto);
             document.getElementById('mismo-producto-elegido').classList.remove('hidden');
             document.querySelector('#mismo-producto-block .producto-search-container').classList.add('hidden');
             const specContainer = document.getElementById('mismo-producto-spec-container');
             const especsHtml = buildEspecsHtml(productoCompleto, especs, tieneEspecs);
             specContainer.innerHTML = especsHtml;
             specContainer.dataset.columnasIds = (especs && especs.columnas_ids) ? JSON.stringify(especs.columnas_ids) : '[]';
-            specContainer.dataset.esUnidadUnica = (especs && especs.unidad_de_medida === 'unidadUnica') ? '1' : '0';
+            aplicarDatasetUnidadMedidaFilaCrearMasivo(specContainer, {
+                especificaciones: especs,
+                unidad_de_medida: data.unidad_de_medida,
+            });
+            enlazarBotonesVerImagenesSpecCrearMasivo(specContainer);
         } catch (err) {
             console.error(err);
             alert('Error al cargar: ' + err.message);
@@ -1661,6 +1784,7 @@
         window.__neoProductoPorUrlModoTodas = {};
         window.__cacheSpecsProductoModoTodas = {};
         window.__mismoProductoSeleccionado = null;
+        window.__mismoProductoUnidadDeMedida = null;
         const nombre = document.getElementById('mismo-producto-nombre');
         const elegido = document.getElementById('mismo-producto-elegido');
         const searchWrap = document.querySelector('#mismo-producto-block .producto-search-container');
@@ -1673,6 +1797,8 @@
         if (searchWrap) searchWrap.classList.remove('hidden');
         if (specContainer) specContainer.innerHTML = '';
         if (searchInput) searchInput.value = '';
+        window.__mismoProductoIndiceSeleccionado = -1;
+        window.__mismoProductosBusqueda = [];
         if (cbMismoProducto) cbMismoProducto.checked = false;
         if (blockMismoProducto) blockMismoProducto.classList.add('hidden');
         actualizarDisponibilidadMismoProductoCrearMasivo();
@@ -1834,12 +1960,13 @@
                     imagenes_producto: [],
                 };
             urls.forEach(function(u) {
-                if (!u) return;
+                if (!u || urlsTotal.length >= LIMITE_URLS_TODAS_NEO_CREAR_MASIVO) return;
                 const su = String(u);
                 urlsTotal.push(su);
                 const k = claveUrlProductoTodasNeo(su);
                 if (k && p && p.id) mapTmp[k] = p;
             });
+            if (urlsTotal.length >= LIMITE_URLS_TODAS_NEO_CREAR_MASIVO) break;
         }
 
         window.__neoCategoriaFiltro = null;
@@ -1848,10 +1975,7 @@
         window.__modoProductoTodasNeo = true;
         window.__neoProductoPorUrlModoTodas = mapTmp;
         actualizarDisponibilidadMismoProductoCrearMasivo();
-        document.getElementById('urls').value = urlsTotal.join('\n');
-        actualizarEstadoLotesDesdeTextarea();
-        const cantidadInput = document.getElementById('cantidad_urls_analizar');
-        if (cantidadInput) cantidadInput.value = urlsTotal.length > 0 ? urlsTotal.length : 0;
+        pegarUrlsEnTextareaCrearMasivo(urlsTotal, { esTodas: true });
         window.__crearMasivoOrigenNeo = null;
     }
 
@@ -2672,7 +2796,7 @@
                     const dataUrl = await resUrl.json();
                     window.__neoCategoriaFiltro = { id: item.categoria_id, nombre: item.nombre || ('Categoría #' + item.categoria_id) };
                     actualizarIndicadorCategoriaFiltroNeo();
-                    pegarUrlsEnTextareaCrearMasivo(dataUrl.urls || []);
+                    pegarUrlsEnTextareaCrearMasivo(dataUrl.urls || [], { esTodas: true });
                     window.__crearMasivoOrigenNeo = null;
                     actualizarVisibilidadFooterSiguienteNeo();
                     modal.classList.add('hidden');
@@ -3021,9 +3145,21 @@
         }
     }
 
-    function pegarUrlsEnTextareaCrearMasivo(urls) {
-        document.getElementById('urls').value = (Array.isArray(urls) ? urls : []).join('\n');
+    function pegarUrlsEnTextareaCrearMasivo(urls, opciones) {
+        opciones = opciones || {};
+        let lista = Array.isArray(urls) ? urls.filter(function(u) { return u; }).map(String) : [];
+        lista = deduplicarListaUrlsCrearMasivo(lista).urls;
+        let truncado = false;
+        if (opciones.esTodas && lista.length > LIMITE_URLS_TODAS_NEO_CREAR_MASIVO) {
+            truncado = true;
+            lista = lista.slice(0, LIMITE_URLS_TODAS_NEO_CREAR_MASIVO);
+        }
+        document.getElementById('urls').value = lista.join('\n');
         actualizarEstadoLotesDesdeTextarea();
+        const info = document.getElementById('info_progreso_lote');
+        if (truncado && info) {
+            info.textContent = 'Solo se han cargado las primeras ' + LIMITE_URLS_TODAS_NEO_CREAR_MASIVO + ' URLs.';
+        }
     }
 
     const btnLimpiarNeoCategoriaFiltro = document.getElementById('neo-categoria-filtro-limpiar');
@@ -3077,7 +3213,8 @@
     /**
      * Pega URLs desde neo por tienda (opcionalmente por categoría) y guarda contexto para Siguiente.
      */
-    async function aplicarTiendaNeoUrlsAlFormulario(item, categoriaId, categoriaNombre) {
+    async function aplicarTiendaNeoUrlsAlFormulario(item, categoriaId, categoriaNombre, opciones) {
+        opciones = opciones || {};
         const fq = queryModalTiendaNeoFiltros();
         const routeBase = categoriaId == null
             ? '{{ route("admin.neo.crear-masivo.urls-por-tienda", ["tiendaId" => "__TID__"]) }}'.replace('__TID__', item.tienda_id)
@@ -3093,7 +3230,7 @@
             };
         }
         actualizarIndicadorCategoriaFiltroNeo();
-        pegarUrlsEnTextareaCrearMasivo(dataUrl.urls || []);
+        pegarUrlsEnTextareaCrearMasivo(dataUrl.urls || [], { esTodas: !!opciones.esTodas });
         window.__crearMasivoOrigenNeo = {
             tipo: 'tienda',
             tienda_id: item.tienda_id,
@@ -3105,7 +3242,7 @@
     async function cargarUrlsDeTiendaYCerrarModal(item, categoriaId, categoriaNombre) {
         const modal = document.getElementById('modal-tienda-neo');
         try {
-            await aplicarTiendaNeoUrlsAlFormulario(item, categoriaId, categoriaNombre);
+            await aplicarTiendaNeoUrlsAlFormulario(item, categoriaId, categoriaNombre, { esTodas: categoriaId == null });
             modal.classList.add('hidden');
         } catch (err) {
             console.error(err);
@@ -3358,6 +3495,189 @@
         ejecutarAnalisisLote(false);
     });
 
+    function construirPayloadAnalisisCrearMasivo(urlsLista) {
+        const payload = {
+            urls: (Array.isArray(urlsLista) ? urlsLista : []).join('\n'),
+            usar_chatgpt: document.getElementById('usar_chatgpt').checked,
+            incluir_contenido_pagina: document.getElementById('incluir_contenido_pagina').checked,
+            no_productos_sugeridos: document.getElementById('no_productos_sugeridos').checked,
+            chatgpt_model: document.getElementById('usar_chatgpt').checked && document.getElementById('chatgpt_model').value ? document.getElementById('chatgpt_model').value : null,
+        };
+        if (window.__neoCategoriaFiltro && window.__neoCategoriaFiltro.id) {
+            payload.categoria_id = window.__neoCategoriaFiltro.id;
+        }
+        if (document.getElementById('mismo_producto').checked && window.__mismoProductoSeleccionado && window.__mismoProductoSeleccionado.id) {
+            payload.producto_id = window.__mismoProductoSeleccionado.id;
+            const specContainer = document.getElementById('mismo-producto-spec-container');
+            if (specContainer) {
+                const especs = buildEspecificacionesFromRow(specContainer);
+                if (especs) payload.especificaciones_internas = JSON.stringify(especs);
+            }
+        }
+        return payload;
+    }
+
+    async function solicitarAnalisisUrlsCrearMasivo(urlsLista) {
+        const res = await fetch('{{ route("admin.ofertas.crear-masivo.analizar") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify(construirPayloadAnalisisCrearMasivo(urlsLista)),
+        });
+        return await res.json();
+    }
+
+    function actualizarProgresoAnalisisLoteCrearMasivo(actual, total) {
+        const info = document.getElementById('info_progreso_lote');
+        if (!info) return;
+        if (total > 1) {
+            info.textContent = 'Analizando URL ' + actual + ' de ' + total + '…';
+        }
+    }
+
+    function filaDebeOmitirModalCrearMasivo(fila) {
+        if (!fila || !fila.__rowData) return false;
+        if (fila.__rowData.existe) return true;
+        if (fila.__rowData.url_duplicada_textarea) return true;
+        return false;
+    }
+
+    function htmlOfertasExistentesCrearMasivo(ofertas) {
+        if (!Array.isArray(ofertas) || !ofertas.length) return '';
+        return '<div class="mt-2 text-sm text-amber-700 dark:text-amber-300 space-y-1 ofertas-existentes-url"><span class="font-medium">Existe en:</span>' +
+            ofertas.map(function(o) {
+                const prodLink = o.url_producto
+                    ? '<a href="' + o.url_producto + '" target="_blank" class="text-green-500 hover:underline font-medium">' + escapeHtmlCrearMasivo(o.producto || '') + '</a>'
+                    : escapeHtmlCrearMasivo(o.producto || '');
+                const verBtn = o.url ? ' <a href="' + o.url + '" target="_blank" class="inline-flex items-center px-2 py-0.5 bg-gray-600 hover:bg-gray-700 text-white text-xs font-medium rounded">Ver</a>' : '';
+                const editarBtn = o.oferta_edit_url ? ' <a href="' + o.oferta_edit_url + '" target="_blank" class="inline-flex items-center px-2 py-0.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded">Editar oferta</a>' : '';
+                return '<div>' + prodLink + ' — ' + escapeHtmlCrearMasivo(o.tienda || '') + verBtn + editarBtn + '</div>';
+            }).join('') + '</div>';
+    }
+
+    function marcarFilaUrlExistenteCrearMasivo(fila, dataVerificacion) {
+        if (!fila) return;
+        if (!fila.__rowData) fila.__rowData = {};
+        const tipo = dataVerificacion && dataVerificacion.tipo;
+        fila.__rowData.existe = true;
+        fila.__rowData.descartada = tipo === 'descartada' || !!(dataVerificacion && dataVerificacion.descartada);
+        fila.__rowData.existe_otros_productos = tipo === 'otros_productos' || !!(dataVerificacion && dataVerificacion.existe_otros_productos);
+        fila.__rowData.ofertas_existentes = (dataVerificacion && dataVerificacion.ofertas_existentes) || [];
+
+        fila.classList.remove('bg-green-50', 'dark:bg-green-900/20', 'border-green-200', 'dark:border-green-700');
+        fila.classList.add('bg-amber-50', 'dark:bg-amber-900/20', 'border', 'border-amber-200', 'dark:border-amber-700');
+
+        const tituloEstado = fila.querySelector('.flex-1 .font-medium');
+        if (tituloEstado) {
+            let estadoText = (dataVerificacion && dataVerificacion.mensaje) || 'URL ya existe';
+            if (fila.__rowData.descartada) estadoText = 'URL descartada';
+            else if (fila.__rowData.existe_otros_productos) estadoText = 'URL ya existe en otros productos';
+            else if (tipo === 'mismo_producto') estadoText = 'URL ya existe';
+            tituloEstado.childNodes[0].textContent = estadoText + ' ';
+        }
+
+        const wrapGenerar = fila.querySelector('.generar-oferta-wrap');
+        if (wrapGenerar) wrapGenerar.remove();
+        const btnGen = fila.querySelector('.btn-generar');
+        if (btnGen) btnGen.remove();
+
+        const container = fila.querySelector('.spec-and-ofertas-container');
+        if (container && !container.querySelector('.ofertas-existentes-url')) {
+            let extraHtml = '';
+            if (fila.__rowData.ofertas_existentes.length) {
+                extraHtml = htmlOfertasExistentesCrearMasivo(fila.__rowData.ofertas_existentes);
+            } else if (dataVerificacion && Array.isArray(dataVerificacion.productos) && dataVerificacion.productos.length) {
+                extraHtml = '<div class="mt-2 text-sm text-amber-700 dark:text-amber-300 space-y-1 ofertas-existentes-url"><span class="font-medium">Existe en otros productos:</span>' +
+                    dataVerificacion.productos.map(function(p) {
+                        return '<div>' + escapeHtmlCrearMasivo(p.nombre || ('Producto #' + p.id)) + '</div>';
+                    }).join('') + '</div>';
+            }
+            if (extraHtml) container.insertAdjacentHTML('beforeend', extraHtml);
+        }
+
+        const msgEl = fila.querySelector('.generado-msg');
+        if (msgEl) {
+            msgEl.classList.remove('hidden');
+            msgEl.className = 'mt-2 generado-msg text-sm font-medium text-amber-700 dark:text-amber-300';
+            msgEl.textContent = (dataVerificacion && dataVerificacion.mensaje)
+                || (fila.__rowData.descartada ? 'Esta URL está descartada.' : 'Esta URL ya existe en ofertas. No se puede generar otra.');
+        }
+        actualizarEstadoBotonGenerar(fila);
+    }
+
+    /** Misma verificación que el formulario de ofertas (admin.ofertas.verificar.url). */
+    async function verificarUrlExistenteRemotoCrearMasivo(url, productoId) {
+        if (!url) return { success: false };
+        try {
+            const res = await fetch('{{ route("admin.ofertas.verificar.url") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({
+                    url: url,
+                    producto_id: productoId || null,
+                }),
+            });
+            const data = await res.json();
+            const bloquea = ['mismo_producto', 'otros_productos', 'descartada'].includes(data.tipo);
+            return {
+                success: true,
+                existe: bloquea,
+                tipo: data.tipo,
+                mensaje: data.mensaje,
+                descartada: data.tipo === 'descartada',
+                existe_otros_productos: data.tipo === 'otros_productos',
+                productos: data.productos || [],
+            };
+        } catch (e) {
+            console.error('[Crear-masivo] Error verificando URL:', e);
+            return { success: false };
+        }
+    }
+
+    function iniciarOActualizarFlujoModalUrlsCrearMasivo() {
+        const almacen = document.getElementById('resultadosLista');
+        if (!almacen) return;
+        const filas = Array.from(almacen.querySelectorAll('.crear-masivo-fila'));
+        if (!filas.length) return;
+        const flujoPrev = window.__flujoModalUrlsCrearMasivo;
+        if (!flujoPrev || !flujoPrev.filaActualEnModal) {
+            window.__flujoModalUrlsCrearMasivo = {
+                filas: filas,
+                indice: flujoPrev ? flujoPrev.indice : 0,
+                generacionesEnCola: flujoPrev && Array.isArray(flujoPrev.generacionesEnCola) ? flujoPrev.generacionesEnCola.slice() : [],
+                bannerParaEsteModal: [],
+                filaActualEnModal: null,
+                modoFinal: false,
+                generacionesPendientes: flujoPrev ? (flujoPrev.generacionesPendientes || 0) : 0,
+            };
+            mostrarModalUrlActualCrearMasivo();
+            return;
+        }
+        if (flujoPrev.filaActualEnModal && !filas.includes(flujoPrev.filaActualEnModal)) {
+            const merged = filas.slice();
+            merged.splice(Math.min(flujoPrev.indice, merged.length), 0, flujoPrev.filaActualEnModal);
+            flujoPrev.filas = merged;
+        } else {
+            flujoPrev.filas = filas;
+        }
+        const progreso = document.getElementById('modal-url-crear-masivo-progreso');
+        if (progreso) {
+            let txt = 'URL ' + (flujoPrev.indice + 1) + ' de ' + filas.length;
+            if (window.__analisisLoteEnCurso) txt += ' (cargando más en segundo plano…)';
+            progreso.textContent = txt;
+        }
+        if (!flujoPrev.filaActualEnModal && flujoPrev.indice < filas.length) {
+            mostrarModalUrlActualCrearMasivo();
+        }
+    }
+
     async function ejecutarAnalisisLote(repetirUltimo) {
         actualizarEstadoLotesDesdeTextarea();
         const lote = obtenerLoteSegunCantidad(repetirUltimo);
@@ -3372,95 +3692,84 @@
         const textoNormal = document.getElementById('btnAnalizarTexto') ? document.getElementById('btnAnalizarTexto').textContent : 'Analizar URLs';
         btn.innerHTML = '<svg class="w-5 h-5 mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> Analizando...';
         prepararNuevaPestanaUrlCrearMasivo();
+        window.__analisisLoteEnCurso = true;
+
+        const contenedorResultados = document.getElementById('resultados');
+        let primerResultado = true;
+        let ultimoDataOk = null;
 
         try {
-            const res = await fetch('{{ route("admin.ofertas.crear-masivo.analizar") }}', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                    'Accept': 'application/json',
-                },
-                body: JSON.stringify((function() {
-                    const payload = {
-                        urls: lote.urls.join('\n'),
-                        usar_chatgpt: document.getElementById('usar_chatgpt').checked,
-                        incluir_contenido_pagina: document.getElementById('incluir_contenido_pagina').checked,
-                        no_productos_sugeridos: document.getElementById('no_productos_sugeridos').checked,
-                        chatgpt_model: document.getElementById('usar_chatgpt').checked && document.getElementById('chatgpt_model').value ? document.getElementById('chatgpt_model').value : null,
-                    };
-                    if (window.__neoCategoriaFiltro && window.__neoCategoriaFiltro.id) {
-                        payload.categoria_id = window.__neoCategoriaFiltro.id;
-                    }
-                    if (document.getElementById('mismo_producto').checked && window.__mismoProductoSeleccionado && window.__mismoProductoSeleccionado.id) {
-                        payload.producto_id = window.__mismoProductoSeleccionado.id;
-                        const specContainer = document.getElementById('mismo-producto-spec-container');
-                        if (specContainer) {
-                            const especs = buildEspecificacionesFromRow(specContainer);
-                            if (especs) payload.especificaciones_internas = JSON.stringify(especs);
-                        }
-                    }
-                    return payload;
-                })()),
-            });
-            const data = await res.json();
+            const urlsVistasEnLote = new Set();
+            for (let ui = 0; ui < lote.urls.length; ui++) {
+                const claveLote = claveDedupeUrlCrearMasivo(lote.urls[ui]);
+                if (claveLote && urlsVistasEnLote.has(claveLote)) {
+                    continue;
+                }
+                if (claveLote) urlsVistasEnLote.add(claveLote);
+                actualizarProgresoAnalisisLoteCrearMasivo(ui + 1, lote.urls.length);
+                const data = await solicitarAnalisisUrlsCrearMasivo([lote.urls[ui]]);
 
-            // Diagnóstico: por qué cada URL se envía o no a ChatGPT (solo si ChatGPT estaba activado)
-            if (data.success && document.getElementById('usar_chatgpt').checked && Array.isArray(data.resultados)) {
-                console.log('[Crear-masivo] ChatGPT activado. Diagnóstico por URL:');
-                let enviadas = 0;
-                data.resultados.forEach(function(r, idx) {
-                    const url = (r.url_normalizada || r.url || '').substring(0, 80) + (r.url && r.url.length > 80 ? '...' : '');
-                    if (r.existe) {
-                        console.log('[Crear-masivo] URL ' + idx + ': NO se envia a ChatGPT - ' + (r.descartada ? 'URL descartada' : 'ya existe oferta para esta URL'));
-                    } else if (!r.tienda) {
-                        console.log('[Crear-masivo] URL ' + idx + ': NO se envia a ChatGPT - tienda no detectada. URL: ' + url);
-                    } else if (!r.productos_candidatos || r.productos_candidatos.length === 0) {
-                        console.log('[Crear-masivo] URL ' + idx + ': NO se envia a ChatGPT - sin productos candidatos (revisar slug o coincidencias en BD). URL: ' + url);
-                    } else {
-                        console.log('[Crear-masivo] URL ' + idx + ': SÍ se envía a ChatGPT (' + r.productos_candidatos.length + ' candidatos). URL: ' + url);
-                        enviadas++;
+                if (document.getElementById('usar_chatgpt').checked && data.success && Array.isArray(data.resultados)) {
+                    const r = data.resultados[0];
+                    const urlDiag = (r && (r.url_normalizada || r.url) || '').substring(0, 80);
+                    if (r && r.existe) {
+                        console.log('[Crear-masivo] URL ' + ui + ': NO ChatGPT - ya existe/descartada. ' + urlDiag);
+                    } else if (r && !r.tienda) {
+                        console.log('[Crear-masivo] URL ' + ui + ': NO ChatGPT - sin tienda. ' + urlDiag);
+                    } else if (r && (!r.productos_candidatos || r.productos_candidatos.length === 0)) {
+                        console.log('[Crear-masivo] URL ' + ui + ': NO ChatGPT - sin candidatos. ' + urlDiag);
+                    } else if (r) {
+                        console.log('[Crear-masivo] URL ' + ui + ': SÍ ChatGPT (' + r.productos_candidatos.length + ' candidatos). ' + urlDiag);
                     }
-                });
-                console.log('[Crear-masivo] Total URLs enviadas a ChatGPT: ' + enviadas + ' de ' + data.resultados.length);
-            }
+                }
 
-            if (data.chatgpt_raw_response) {
-                if (data.chatgpt_raw_response.por_url) {
+                if (data.chatgpt_raw_response && data.chatgpt_raw_response.por_url) {
                     Object.keys(data.chatgpt_raw_response.por_url).forEach(function(idx) {
                         const u = data.chatgpt_raw_response.por_url[idx];
-                        console.log('[Crear-masivo] URL índice ' + idx + ' — Prompt:', u.prompt);
-                        console.log('[Crear-masivo] URL índice ' + idx + ' — Respuesta:', u.raw_content);
-                        console.log('[Crear-masivo] URL índice ' + idx + ' — Parsed:', u.parsed_resultados);
+                        console.log('[Crear-masivo] URL índice ' + ui + ' — Prompt:', u.prompt);
+                        console.log('[Crear-masivo] URL índice ' + ui + ' — Respuesta:', u.raw_content);
+                        console.log('[Crear-masivo] URL índice ' + ui + ' — Parsed:', u.parsed_resultados);
                     });
-                } else {
-                    console.log('[Crear-masivo] Prompt enviado a ChatGPT:', data.chatgpt_raw_response.prompt);
-                    console.log('[Crear-masivo] Respuesta ChatGPT (raw_content):', data.chatgpt_raw_response.raw_content);
-                    console.log('[Crear-masivo] Respuesta ChatGPT (parsed_resultados):', data.chatgpt_raw_response.parsed_resultados);
                 }
+
+                if (!data.success) {
+                    alert(data.message || 'Error al analizar');
+                    return false;
+                }
+
+                let resultados = Array.isArray(data.resultados) ? data.resultados : [];
+                if (window.__modoProductoTodasNeo && resultados.length) {
+                    resultados = await enriquecerResultadosModoTodasConSpecs(resultados);
+                }
+
+                mostrarResultados(resultados, {
+                    append: !primerResultado,
+                    omitirInicioModal: true,
+                });
+                primerResultado = false;
+                ultimoDataOk = data;
+
+                if (contenedorResultados) contenedorResultados.classList.remove('hidden');
+                iniciarOActualizarFlujoModalUrlsCrearMasivo();
             }
 
-            if (data.success) {
-                if (window.__modoProductoTodasNeo && Array.isArray(data.resultados)) {
-                    data.resultados = await enriquecerResultadosModoTodasConSpecs(data.resultados);
-                }
+            if (ultimoDataOk) {
                 estadoLotesAnalisis.lastStart = lote.start;
                 estadoLotesAnalisis.lastEnd = lote.end;
                 if (!lote.repetir) estadoLotesAnalisis.cursor = lote.end;
-                mostrarResultados(data.resultados);
-                actualizarEstadoLotesDesdeTextarea();
-                return true;
             }
-            alert(data.message || 'Error al analizar');
-            return false;
+            actualizarEstadoLotesDesdeTextarea();
+            return !!ultimoDataOk;
         } catch (err) {
             alert('Error de conexión: ' + err.message);
             return false;
         } finally {
+            window.__analisisLoteEnCurso = false;
             btn.disabled = false;
             if (btnRepetir) btnRepetir.disabled = false;
             btn.innerHTML = '<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg> <span id="btnAnalizarTexto">' + textoNormal + '</span>';
             actualizarEstadoLotesDesdeTextarea();
+            iniciarOActualizarFlujoModalUrlsCrearMasivo();
         }
     }
 
@@ -3468,15 +3777,17 @@
 
     function htmlBotonesProductoFilaCrearMasivo(productoId) {
         const iconoImgComoEspecs = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>';
-        const quitarYImg = '<button type="button" class="btn-quitar-producto inline-flex items-center justify-center w-6 h-6 rounded bg-red-500 hover:bg-red-600 text-white text-xs font-bold transition" title="Quitar producto y elegir otro">&times;</button><button type="button" class="btn-ver-imagenes-producto-crear-masivo inline-flex items-center p-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs ml-0.5" title="Ver imágenes del producto">' + iconoImgComoEspecs + '</button>';
+        const clsBtnGris = 'inline-flex items-center px-2 py-1 ml-0.5 text-xs font-medium rounded bg-gray-500 hover:bg-gray-600 dark:bg-gray-600 dark:hover:bg-gray-500 text-white transition';
+        const clsIconGris = 'inline-flex items-center p-1 bg-gray-500 hover:bg-gray-600 dark:bg-gray-600 dark:hover:bg-gray-500 text-white rounded text-xs ml-0.5 shrink-0';
+        const quitarYImg = '<button type="button" class="btn-quitar-producto inline-flex items-center justify-center w-6 h-6 rounded bg-gray-500 hover:bg-gray-600 dark:bg-gray-600 dark:hover:bg-gray-500 text-white text-xs font-bold transition" title="Quitar producto y elegir otro">&times;</button><button type="button" class="btn-ver-imagenes-producto-crear-masivo ' + clsIconGris + '" title="Ver imágenes del producto" onclick="event.preventDefault();event.stopPropagation();verImagenesProductoCrearMasivo(this);">' + iconoImgComoEspecs + '</button>';
         const pid = (productoId !== undefined && productoId !== null && productoId !== '') ? String(productoId) : '';
         if (!pid) {
             return quitarYImg;
         }
         const uEdit = NEO_PANEL_PRODUCTOS_BASE + '/' + encodeURIComponent(pid) + '/edit';
         const uOfertas = NEO_PANEL_PRODUCTOS_BASE + '/' + encodeURIComponent(pid) + '/ofertas';
-        const btnEditar = '<a href="' + uEdit + '" target="_blank" rel="noopener noreferrer" class="inline-flex items-center px-2 py-1 ml-0.5 text-xs font-medium rounded bg-indigo-600 hover:bg-indigo-700 text-white transition" title="Editar producto en el panel">Editar</a>';
-        const btnOfertas = '<a href="' + uOfertas + '" target="_blank" rel="noopener noreferrer" class="inline-flex items-center px-2 py-1 ml-0.5 text-xs font-medium rounded bg-teal-600 hover:bg-teal-700 text-white transition" title="Listado de ofertas del producto">Ofertas</a>';
+        const btnEditar = '<a href="' + uEdit + '" target="_blank" rel="noopener noreferrer" class="' + clsBtnGris + '" title="Editar producto en el panel">Editar</a>';
+        const btnOfertas = '<a href="' + uOfertas + '" target="_blank" rel="noopener noreferrer" class="' + clsBtnGris + '" title="Listado de ofertas del producto">Ofertas</a>';
         return quitarYImg + btnEditar + btnOfertas;
     }
 
@@ -3487,6 +3798,35 @@
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
+    }
+
+    /** En filas de resultados: solo `nombre` (texto_completo repite marca/modelo/talla). */
+    function textoMostrarProductoFilaCrearMasivo(producto) {
+        if (!producto) return '';
+        const nombre = producto.nombre != null ? String(producto.nombre).trim() : '';
+        if (nombre) return nombre;
+        const fallback = producto.texto_completo != null ? String(producto.texto_completo).trim() : '';
+        if (fallback) return fallback;
+        if (producto.id != null && producto.id !== '') return 'Producto #' + producto.id;
+        return '';
+    }
+
+    function htmlEnlaceProductoFilaCrearMasivo(producto, urlOverride) {
+        if (!producto) return '';
+        const texto = escapeHtmlCrearMasivo(textoMostrarProductoFilaCrearMasivo(producto));
+        const url = urlOverride != null ? urlOverride : (producto.url_producto || '');
+        if (url) {
+            return '<a href="' + String(url).replace(/"/g, '&quot;') + '" target="_blank" class="text-green-500 hover:underline font-medium">' + texto + '</a>';
+        }
+        return '<strong>' + texto + '</strong>';
+    }
+
+    function htmlBloqueProductoDisplayFilaCrearMasivo(producto, urlOverride) {
+        if (!producto) return '';
+        const prodEnlace = urlOverride != null
+            ? Object.assign({}, producto, { url_producto: urlOverride })
+            : producto;
+        return '<div class="mt-1 text-sm text-gray-600 dark:text-gray-400 producto-display flex items-center gap-2 flex-wrap"><span>Producto: ' + htmlEnlaceProductoFilaCrearMasivo(prodEnlace) + '</span>' + htmlBotonesProductoFilaCrearMasivo(producto.id) + '</div>';
     }
 
     /** Texto para el input de envío (€) según envio_sugerido del análisis; vacío si gratis / sin dato (no 0). */
@@ -3528,9 +3868,8 @@
         if (!div || div.__rowData?.ofertaGenerada) return;
         const msg = div.querySelector('.generado-msg');
         if (!msg) return;
-        msg.classList.remove('hidden');
-        msg.className = 'mt-2 generado-msg text-sm font-medium text-gray-600 dark:text-gray-400';
-        msg.textContent = 'URL pendiente de añadir';
+        msg.classList.add('hidden');
+        msg.textContent = '';
     }
 
     /** Reemplaza el botón «Generar oferta»: icono editar a la izquierda y resumen envío/precio a la derecha (misma fila que el input de envío debajo). */
@@ -3555,6 +3894,207 @@
 
     const HTML_BTN_GENERAR_OFERTA_CREAR_MASIVO = '<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg> Generar oferta';
     const HTML_BTN_GENERAR_SPINNER_CREAR_MASIVO = '<svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> Creando...';
+
+    function htmlOpcionesGenerarSinPrecioCrearMasivo(claseExtra) {
+        const extra = claseExtra ? (' ' + claseExtra) : '';
+        return '<label class="generar-sin-precio-wrap inline-flex items-start gap-2 cursor-pointer text-xs text-amber-700 dark:text-amber-300' + extra + '">' +
+            '<input type="checkbox" class="generar-sin-precio-cb mt-0.5 rounded border-gray-300 text-amber-600 focus:ring-amber-500">' +
+            '<span>Sin stock</span></label>' +
+            '<label class="generar-segunda-mano-wrap inline-flex items-start gap-2 cursor-pointer text-xs text-amber-700 dark:text-amber-300' + extra + '">' +
+            '<input type="checkbox" class="generar-segunda-mano-cb mt-0.5 rounded border-gray-300 text-amber-600 focus:ring-amber-500">' +
+            '<span>Segunda mano</span></label>';
+    }
+
+    function htmlWrapOpcionesStockGenerarCrearMasivo(claseExtra) {
+        return '<div class="generar-opciones-stock-wrap flex flex-col gap-1 w-full">' +
+            htmlOpcionesGenerarSinPrecioCrearMasivo(claseExtra) + '</div>';
+    }
+
+    /** Sin stock / Segunda mano: visible salvo tienda sin mostrar y sin scraping (precio 9999 automático). */
+    function permitirOpcionesStockGenerarCrearMasivo(tienda) {
+        if (!tienda) return false;
+        const noMostrar = String(tienda.mostrar_tienda || '').toLowerCase() === 'no';
+        const noScraping = String(tienda.scrapear || '').toLowerCase() === 'no';
+        return !(noMostrar && noScraping);
+    }
+
+    /** Garantiza Sin stock / Segunda mano si faltan (p. ej. filas antiguas o tras actualizar unidades). */
+    function asegurarOpcionesStockGenerarEnFilaCrearMasivo(div) {
+        if (!div || div.__rowData?.ofertaGenerada) return;
+        const goWrap = div.querySelector('.generar-oferta-wrap');
+        if (!goWrap || !div.querySelector('.btn-generar')) return;
+        if (!permitirOpcionesStockGenerarCrearMasivo(div.__rowData && div.__rowData.tienda)) return;
+        if (goWrap.querySelector('.generar-sin-precio-wrap') || goWrap.querySelector('.generar-opciones-precio-cero-wrap')) return;
+
+        let metaWrap = goWrap.querySelector('.generar-oferta-meta-wrap');
+        if (!metaWrap) {
+            metaWrap = document.createElement('div');
+            metaWrap.className = 'generar-oferta-meta-wrap flex flex-col items-start gap-2';
+            const filaBtn = goWrap.querySelector('.cm-generar-oferta-fila');
+            if (filaBtn) {
+                while (filaBtn.nextSibling) {
+                    metaWrap.appendChild(filaBtn.nextSibling);
+                }
+            }
+            goWrap.appendChild(metaWrap);
+        }
+        metaWrap.insertAdjacentHTML('beforeend', htmlWrapOpcionesStockGenerarCrearMasivo(''));
+    }
+
+    const ETIQUETAS_UNIDAD_MEDIDA_CREAR_MASIVO = {
+        unidad: 'Unidades',
+        kilos: 'Kilos',
+        litros: 'Litros',
+        unidadMilesima: 'Unidad milésima',
+        unidadUnica: 'Unidad única',
+        '800gramos': '800 gramos',
+        '100ml': '100 ml',
+    };
+
+    function etiquetaUnidadMedidaCrearMasivo(codigo) {
+        return ETIQUETAS_UNIDAD_MEDIDA_CREAR_MASIVO[codigo] || 'Unidades';
+    }
+
+    function unidadDeMedidaDesdeFuentesCrearMasivo(fuentes) {
+        const f = fuentes || {};
+        if (f.especificaciones && f.especificaciones.unidad_de_medida) {
+            return f.especificaciones.unidad_de_medida;
+        }
+        if (f.producto) {
+            if (f.producto.unidad_de_medida) return f.producto.unidad_de_medida;
+            if (f.producto.especificaciones && f.producto.especificaciones.unidad_de_medida) {
+                return f.producto.especificaciones.unidad_de_medida;
+            }
+        }
+        if (f.unidad_de_medida) return f.unidad_de_medida;
+        if (window.__mismoProductoUnidadDeMedida) return window.__mismoProductoUnidadDeMedida;
+        return 'unidad';
+    }
+
+    function especificacionesEfectivasResultadoCrearMasivo(r) {
+        const base = (r && r.especificaciones && typeof r.especificaciones === 'object')
+            ? Object.assign({}, r.especificaciones)
+            : { filtros: [], columnas_ids: [], formatos: {} };
+        if (!base.unidad_de_medida) {
+            base.unidad_de_medida = unidadDeMedidaDesdeFuentesCrearMasivo(r);
+        }
+        return base;
+    }
+
+    function esUnidadMedidaUnicaCrearMasivo(especificaciones) {
+        return unidadDeMedidaDesdeFuentesCrearMasivo({ especificaciones: especificaciones }) === 'unidadUnica';
+    }
+
+    function aplicarDatasetUnidadMedidaFilaCrearMasivo(div, fuentes) {
+        if (!div) return;
+        const um = unidadDeMedidaDesdeFuentesCrearMasivo(fuentes);
+        div.dataset.esUnidadUnica = um === 'unidadUnica' ? '1' : '0';
+        div.dataset.unidadDeMedida = um;
+    }
+
+    function htmlCampoUnidadesOfertaCrearMasivo(unidadMedida) {
+        const etiqueta = escapeHtmlCrearMasivo(etiquetaUnidadMedidaCrearMasivo(unidadMedida || 'unidad'));
+        return '<label class="cm-unidades-oferta-wrap inline-flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300 shrink-0">' +
+            '<span class="cm-unidades-oferta-label whitespace-nowrap">' + etiqueta + ' *</span>' +
+            '<textarea class="cm-unidades-oferta-input w-[5.5rem] h-[2.375rem] min-h-0 px-2 py-0 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm resize-none leading-normal overflow-hidden" rows="1" autocomplete="off" placeholder="p. ej. 1,5"></textarea>' +
+            '</label>';
+    }
+
+    function htmlBloqueGenerarOfertaWrapCrearMasivo(opts) {
+        const url = opts.url || '';
+        const productoId = opts.productoId || '';
+        const tiendaId = opts.tiendaId || '';
+        const especsEfectivas = especificacionesEfectivasResultadoCrearMasivo({
+            especificaciones: opts.especificaciones,
+            producto: opts.producto,
+            unidad_de_medida: opts.unidad_de_medida,
+        });
+        const esUnidadUnica = esUnidadMedidaUnicaCrearMasivo(especsEfectivas);
+        const unidadMedida = especsEfectivas.unidad_de_medida || 'unidad';
+        const envioVal = opts.envioVal != null ? opts.envioVal : '';
+        const permitirOpcionesStock = typeof opts.permitirOpcionesStock === 'boolean'
+            ? opts.permitirOpcionesStock
+            : permitirOpcionesStockGenerarCrearMasivo(opts.tienda);
+        const unidadesHtml = esUnidadUnica ? '' : htmlCampoUnidadesOfertaCrearMasivo(unidadMedida);
+        const btnGenHtml = '<button type="button" class="btn-generar inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded transition"' +
+            ' data-url="' + String(url).replace(/"/g, '&quot;') + '"' +
+            ' data-producto-id="' + productoId + '"' +
+            ' data-tienda-id="' + tiendaId + '">' +
+            '<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg> Generar oferta</button>';
+        const envioHtml = '<label class="inline-flex flex-col gap-0.5 text-xs text-gray-600 dark:text-gray-300 shrink-0"><span>Envío (€)</span><input type="text" class="cm-envio-oferta-input w-[5.5rem] px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm" value="' + escapeHtmlCrearMasivo(envioVal) + '" autocomplete="off" inputmode="decimal" /></label>';
+        const opcionesStockHtml = permitirOpcionesStock ? htmlWrapOpcionesStockGenerarCrearMasivo('') : '';
+        return '<div class="generar-oferta-wrap flex flex-col items-start gap-2">' +
+            '<div class="cm-generar-oferta-fila flex items-center gap-2 flex-wrap">' + unidadesHtml + btnGenHtml + '</div>' +
+            '<div class="generar-oferta-meta-wrap flex flex-col items-start gap-2">' + envioHtml + opcionesStockHtml + '</div>' +
+            '</div>';
+    }
+
+    function parsearUnidadesTextoCrearMasivo(texto) {
+        const t = String(texto || '').trim().replace(',', '.');
+        if (!t) return null;
+        const n = parseFloat(t);
+        if (Number.isFinite(n) && n > 0) return n;
+        const m = t.match(/[\d.]+/);
+        if (!m) return null;
+        const n2 = parseFloat(m[0]);
+        return (Number.isFinite(n2) && n2 > 0) ? n2 : null;
+    }
+
+    function esFilaUnidadUnicaCrearMasivo(div) {
+        return div && div.dataset.esUnidadUnica === '1';
+    }
+
+    function unidadesOfertaValidasEnFila(div) {
+        if (esFilaUnidadUnicaCrearMasivo(div)) return true;
+        const inp = div.querySelector('.cm-unidades-oferta-input');
+        if (!inp) return false;
+        return parsearUnidadesTextoCrearMasivo(inp.value) !== null;
+    }
+
+    function enlazarInputUnidadesOfertaEnFila(div) {
+        const ta = div.querySelector('.cm-unidades-oferta-input');
+        if (!ta || ta.__cmUnidadesBound) return;
+        ta.__cmUnidadesBound = true;
+        ta.addEventListener('input', function() { actualizarEstadoBotonGenerar(div); });
+        ta.addEventListener('keydown', function(e) {
+            if (e.key !== 'Enter' || e.shiftKey) return;
+            e.preventDefault();
+            const btnGen = div.querySelector('.btn-generar');
+            if (!btnGen || btnGen.disabled) return;
+            onClickGenerarOfertaCrearMasivo(div, btnGen);
+        });
+    }
+
+    function actualizarCampoUnidadesOfertaEnFila(div) {
+        const goWrap = div.querySelector('.generar-oferta-wrap');
+        if (!goWrap || div.__rowData?.ofertaGenerada) return;
+        const btnGen = goWrap.querySelector('.btn-generar');
+        if (!btnGen) return;
+        let fila = goWrap.querySelector('.cm-generar-oferta-fila');
+        if (!fila) {
+            fila = document.createElement('div');
+            fila.className = 'cm-generar-oferta-fila flex items-center gap-2 flex-wrap';
+            goWrap.insertBefore(fila, btnGen);
+            fila.appendChild(btnGen);
+        }
+        const esUnica = esFilaUnidadUnicaCrearMasivo(div);
+        let unidadesWrap = fila.querySelector('.cm-unidades-oferta-wrap');
+        if (esUnica) {
+            if (unidadesWrap) unidadesWrap.remove();
+            actualizarEstadoBotonGenerar(div);
+            return;
+        }
+        const unidadMedida = unidadDeMedidaDesdeFuentesCrearMasivo(div.__rowData || {});
+        if (!unidadesWrap) {
+            fila.insertAdjacentHTML('afterbegin', htmlCampoUnidadesOfertaCrearMasivo(unidadMedida));
+            enlazarInputUnidadesOfertaEnFila(div);
+        } else {
+            const lbl = unidadesWrap.querySelector('.cm-unidades-oferta-label');
+            if (lbl) lbl.textContent = etiquetaUnidadMedidaCrearMasivo(unidadMedida) + ' *';
+        }
+        asegurarOpcionesStockGenerarEnFilaCrearMasivo(div);
+        actualizarEstadoBotonGenerar(div);
+    }
 
     function esErrorPrecioCrearOfertaCrearMasivo(errTxt) {
         const t = String(errTxt || '').toLowerCase();
@@ -3603,7 +4143,18 @@
             logCrearOfertaBulkDiagnostico('[CrearOfertaBulk]', res, responseText, data);
         }
         if (data.success) {
-            return { success: true, data: data, esPrecioCero: false };
+            const esPrecioCero = !!(body.generar_sin_precio || body.generar_segunda_mano || data.precio_cero);
+            return { success: true, data: data, esPrecioCero: esPrecioCero };
+        }
+        if (data.codigo === 'url_ya_existe') {
+            return {
+                success: false,
+                error: data.error || 'Esta URL ya existe en ofertas.',
+                urlYaExiste: true,
+                mensaje: data.error || 'Esta URL ya existe en ofertas.',
+                descartada: false,
+                tipo: 'mismo_producto',
+            };
         }
         if (esErrorPrecioCrearOfertaCrearMasivo(data.error)) {
             const bodyRetry = Object.assign({}, body, { generar_sin_precio: true });
@@ -3628,6 +4179,15 @@
 
     async function prepararBodyGeneracionOfertaCrearMasivo(div, btnGen) {
         const msgEl = div.querySelector('.generado-msg');
+        const urlGenerar = btnGen && btnGen.dataset.url;
+        const productoIdGenerar = btnGen && btnGen.dataset.productoId;
+        if (urlGenerar) {
+            const checkUrl = await verificarUrlExistenteRemotoCrearMasivo(urlGenerar, productoIdGenerar);
+            if (checkUrl.success && checkUrl.existe) {
+                marcarFilaUrlExistenteCrearMasivo(div, checkUrl);
+                return { ok: false };
+            }
+        }
         const specLines = div.querySelectorAll('.spec-line');
         if (specLines.length) {
             let gruposSinSeleccion = 0;
@@ -3645,9 +4205,11 @@
         }
         const especs = buildEspecificacionesFromRow(div);
         const confirmoNoEsMisma = div.querySelector('.confirmo-no-es-misma:checked');
-        if (!confirmoNoEsMisma && especs && div.__rowData && div.__rowData.producto && div.__rowData.tienda) {
+        const tieneBloqueOfertasDup = !!div.querySelector('.ofertas-mismas-especs');
+        if (!confirmoNoEsMisma && tieneBloqueOfertasDup && div.__rowData && div.__rowData.producto && div.__rowData.tienda) {
             try {
-                const dupBody = { producto_id: div.__rowData.producto.id, tienda_id: div.__rowData.tienda.id, especificaciones_internas: JSON.stringify(especs) };
+                const dupBody = { producto_id: div.__rowData.producto.id, tienda_id: div.__rowData.tienda.id };
+                if (especs) dupBody.especificaciones_internas = JSON.stringify(especs);
                 const dupRes = await fetch('{{ route("admin.ofertas.crear-masivo.buscar-mismas-especificaciones") }}', {
                     method: 'POST',
                     headers: {
@@ -3692,9 +4254,24 @@
             especificaciones_internas: especs ? JSON.stringify(especs) : null,
         };
         aplicarEnvioInputAlBodyCrearMasivo(div, body);
+        const cbSegundaMano = div.querySelector('.generar-segunda-mano-cb');
         const cbGenerarSinPrecio = div.querySelector('.generar-sin-precio-cb');
-        if (cbGenerarSinPrecio && cbGenerarSinPrecio.checked) {
+        if (cbSegundaMano && cbSegundaMano.checked) {
+            body.generar_segunda_mano = true;
+        } else if (cbGenerarSinPrecio && cbGenerarSinPrecio.checked) {
             body.generar_sin_precio = true;
+        }
+        if (!esFilaUnidadUnicaCrearMasivo(div)) {
+            const unidades = parsearUnidadesTextoCrearMasivo(div.querySelector('.cm-unidades-oferta-input')?.value);
+            if (!unidades) {
+                if (msgEl) {
+                    msgEl.classList.remove('hidden');
+                    msgEl.className = 'mt-2 generado-msg text-sm font-medium text-red-600 dark:text-red-400';
+                    msgEl.textContent = 'Debes indicar las unidades de la oferta (litros, kilos, etc.).';
+                }
+                return { ok: false };
+            }
+            body.unidades = unidades;
         }
         return { ok: true, body: body };
     }
@@ -3703,6 +4280,8 @@
         const msgEl = div.querySelector('.generado-msg');
         const wrapSinPrecio = div.querySelector('.generar-sin-precio-wrap');
         if (wrapSinPrecio) wrapSinPrecio.classList.add('hidden');
+        const wrapSegundaMano = div.querySelector('.generar-segunda-mano-wrap');
+        if (wrapSegundaMano) wrapSegundaMano.classList.add('hidden');
         div.classList.remove('bg-green-50', 'dark:bg-green-900/20', 'border-green-200', 'dark:border-green-700');
         div.classList.add('bg-gray-50', 'dark:bg-gray-800', 'border-gray-200', 'dark:border-gray-700');
         if (div.__rowData) div.__rowData.ofertaGenerada = true;
@@ -3734,14 +4313,14 @@
             msgEl.textContent = errorMsg || 'Error al crear';
         }
         if (mostrarOpcionPrecioCero && msgEl) {
-            let wrapSinPrecioErr = div.querySelector('.generar-sin-precio-wrap');
-            if (!wrapSinPrecioErr) {
-                wrapSinPrecioErr = document.createElement('div');
-                wrapSinPrecioErr.className = 'generar-sin-precio-wrap mt-2 flex flex-wrap items-center gap-3';
-                wrapSinPrecioErr.innerHTML = '<label class="inline-flex items-center gap-2 cursor-pointer text-sm text-amber-700 dark:text-amber-300"><input type="checkbox" class="generar-sin-precio-cb rounded border-gray-300 text-amber-600 focus:ring-amber-500"> <span>Generar con precio 0, no mostrar y con aviso de sin stock a 4 días</span></label>';
-                msgEl.after(wrapSinPrecioErr);
+            let wrapOpcionesErr = div.querySelector('.generar-opciones-precio-cero-wrap');
+            if (!wrapOpcionesErr) {
+                wrapOpcionesErr = document.createElement('div');
+                wrapOpcionesErr.className = 'generar-opciones-precio-cero-wrap mt-2 flex flex-col gap-1.5';
+                wrapOpcionesErr.innerHTML = htmlOpcionesGenerarSinPrecioCrearMasivo('text-sm');
+                msgEl.after(wrapOpcionesErr);
             }
-            wrapSinPrecioErr.classList.remove('hidden');
+            wrapOpcionesErr.classList.remove('hidden');
         }
         if (btnGen) {
             btnGen.disabled = false;
@@ -3778,6 +4357,8 @@
             const result = await ejecutarPostCrearOfertaCrearMasivo(prep.body);
             if (result.success) {
                 aplicarExitoGeneracionEnFilaCrearMasivo(div, btnGen, result.data, result.esPrecioCero);
+            } else if (result.urlYaExiste) {
+                marcarFilaUrlExistenteCrearMasivo(div, result);
             } else {
                 aplicarErrorGeneracionEnFilaCrearMasivo(div, btnGen, result.error, true);
             }
@@ -3855,11 +4436,225 @@
 
     function obtenerSetTokensProductoFilaCrearMasivo(rowData) {
         const set = new Set();
-        const p = rowData && rowData.producto ? rowData.producto : null;
-        if (!p) return set;
-        const texto = [p.nombre, p.marca, p.modelo, p.talla, p.texto_completo].filter(Boolean).join(' ');
-        tokensDesdeTextoUrlHighlightCrearMasivo(texto).forEach(t => set.add(t));
+        obtenerMapaColoresTokensProductoFilaCrearMasivo(rowData).forEach(function(_color, token) {
+            set.add(token);
+        });
         return set;
+    }
+
+    const URL_HIGHLIGHT_PALETTE_PRODUCTO_CREAR_MASIVO = [
+        { bg: 'bg-yellow-200', text: 'text-yellow-950', border: 'border-yellow-500/70', darkBg: 'dark:bg-yellow-700/70', darkText: 'dark:text-yellow-100' },
+        { bg: 'bg-amber-200', text: 'text-amber-950', border: 'border-amber-500/70', darkBg: 'dark:bg-amber-700/70', darkText: 'dark:text-amber-100' },
+        { bg: 'bg-lime-200', text: 'text-lime-950', border: 'border-lime-500/70', darkBg: 'dark:bg-lime-700/70', darkText: 'dark:text-lime-100' },
+        { bg: 'bg-emerald-200', text: 'text-emerald-950', border: 'border-emerald-500/70', darkBg: 'dark:bg-emerald-700/70', darkText: 'dark:text-emerald-100' },
+        { bg: 'bg-teal-200', text: 'text-teal-950', border: 'border-teal-500/70', darkBg: 'dark:bg-teal-700/70', darkText: 'dark:text-teal-100' },
+        { bg: 'bg-cyan-200', text: 'text-cyan-950', border: 'border-cyan-500/70', darkBg: 'dark:bg-cyan-700/70', darkText: 'dark:text-cyan-100' },
+    ];
+
+    const URL_HIGHLIGHT_PALETTE_SPECS_CREAR_MASIVO = [
+        { bg: 'bg-orange-300', text: 'text-orange-950', border: 'border-orange-500/80', darkBg: 'dark:bg-orange-600/80', darkText: 'dark:text-orange-50' },
+        { bg: 'bg-sky-200', text: 'text-sky-950', border: 'border-sky-500/70', darkBg: 'dark:bg-sky-700/70', darkText: 'dark:text-sky-100' },
+        { bg: 'bg-violet-200', text: 'text-violet-950', border: 'border-violet-500/70', darkBg: 'dark:bg-violet-700/70', darkText: 'dark:text-violet-100' },
+        { bg: 'bg-pink-200', text: 'text-pink-950', border: 'border-pink-500/70', darkBg: 'dark:bg-pink-700/70', darkText: 'dark:text-pink-100' },
+        { bg: 'bg-rose-200', text: 'text-rose-950', border: 'border-rose-500/70', darkBg: 'dark:bg-rose-700/70', darkText: 'dark:text-rose-100' },
+        { bg: 'bg-indigo-200', text: 'text-indigo-950', border: 'border-indigo-500/70', darkBg: 'dark:bg-indigo-700/70', darkText: 'dark:text-indigo-100' },
+    ];
+
+    function clasesSpanHighlightUrlCrearMasivo(paletteEntry) {
+        if (!paletteEntry) return '';
+        return [
+            paletteEntry.bg,
+            paletteEntry.darkBg,
+            paletteEntry.text,
+            paletteEntry.darkText,
+            'px-0.5 rounded border font-semibold',
+            paletteEntry.border,
+        ].filter(Boolean).join(' ');
+    }
+
+    function obtenerTextoLabelSpecCheckboxCrearMasivo(cb) {
+        const label = cb.closest('label');
+        const span = label ? label.querySelector('.spec-option-text') : null;
+        if (span && span.textContent) return span.textContent;
+        if (!label) return '';
+        return Array.from(label.querySelectorAll('span'))
+            .filter(function(s) { return !s.classList.contains('spec-count-badge'); })
+            .map(function(s) { return s.textContent || ''; })
+            .join(' ');
+    }
+
+    function obtenerMapaColoresTokensProductoFilaCrearMasivo(rowData) {
+        const map = new Map();
+        const p = rowData && rowData.producto ? rowData.producto : null;
+        if (!p || !p.nombre) return map;
+        let colorIdx = 0;
+        const vistos = new Set();
+        String(p.nombre).split(/[\s\-_\/|]+/).map(function(x) { return x.trim(); }).filter(Boolean).forEach(function(palabra) {
+            const key = normalizarTokenUrlHighlightCrearMasivo(palabra);
+            if (!key || vistos.has(key)) return;
+            vistos.add(key);
+            const color = URL_HIGHLIGHT_PALETTE_PRODUCTO_CREAR_MASIVO[colorIdx % URL_HIGHLIGHT_PALETTE_PRODUCTO_CREAR_MASIVO.length];
+            colorIdx++;
+            expandirTokenMixtoUrlHighlightCrearMasivo(palabra).forEach(function(token) {
+                if (!map.has(token)) map.set(token, color);
+            });
+        });
+        return map;
+    }
+
+    function obtenerMapaColoresTokensSpecsMarcadasFilaCrearMasivo(div) {
+        const map = new Map();
+        if (!div) return map;
+        let colorIdx = 0;
+        div.querySelectorAll('.spec-checkbox:checked').forEach(function(cb) {
+            const txt = obtenerTextoLabelSpecCheckboxCrearMasivo(cb);
+            if (!txt) return;
+            const color = URL_HIGHLIGHT_PALETTE_SPECS_CREAR_MASIVO[colorIdx % URL_HIGHLIGHT_PALETTE_SPECS_CREAR_MASIVO.length];
+            colorIdx++;
+            tokensDesdeTextoUrlHighlightCrearMasivo(txt).forEach(function(token) {
+                if (!map.has(token)) map.set(token, color);
+            });
+        });
+        return map;
+    }
+
+    function buscarColorTokenEnMapaHighlightCrearMasivo(expandedTokens, tokenColorMap) {
+        for (let i = 0; i < expandedTokens.length; i++) {
+            const color = tokenColorMap.get(expandedTokens[i]);
+            if (color) return color;
+        }
+        return null;
+    }
+
+    function todasClasesHighlightUrlCrearMasivo() {
+        const classes = new Set(['px-0.5', 'rounded', 'border', 'font-semibold']);
+        URL_HIGHLIGHT_PALETTE_PRODUCTO_CREAR_MASIVO.concat(URL_HIGHLIGHT_PALETTE_SPECS_CREAR_MASIVO).forEach(function(p) {
+            [p.bg, p.text, p.border, p.darkBg, p.darkText].forEach(function(c) {
+                if (c) classes.add(c);
+            });
+        });
+        return Array.from(classes);
+    }
+
+    function quitarClasesHighlightUrlElCrearMasivo(el) {
+        if (!el) return;
+        el.classList.remove.apply(el.classList, todasClasesHighlightUrlCrearMasivo());
+    }
+
+    function aplicarClasesHighlightUrlElCrearMasivo(el, paletteEntry) {
+        if (!el || !paletteEntry) return;
+        quitarClasesHighlightUrlElCrearMasivo(el);
+        clasesSpanHighlightUrlCrearMasivo(paletteEntry).split(/\s+/).filter(Boolean).forEach(function(c) {
+            el.classList.add(c);
+        });
+    }
+
+    function obtenerSetTokensSlugUrlFilaCrearMasivo(rowData) {
+        const set = new Set();
+        const url = String((rowData && (rowData.url_normalizada || rowData.url)) || '').trim();
+        extraerPalabrasSlugDesdeUrlCrearMasivo(url).forEach(function(pal) {
+            expandirTokenMixtoUrlHighlightCrearMasivo(pal).forEach(function(t) { set.add(t); });
+        });
+        return set;
+    }
+
+    function tokensCoincidenConSlugUrlCrearMasivo(tokens, slugTokens) {
+        for (let i = 0; i < tokens.length; i++) {
+            if (slugTokens.has(tokens[i])) return true;
+        }
+        return false;
+    }
+
+    function palabraPerteneceAlNombreProductoCrearMasivo(palabra, producto) {
+        if (!producto || !producto.nombre) return false;
+        const expPal = expandirTokenMixtoUrlHighlightCrearMasivo(palabra);
+        if (!expPal.length) return false;
+        return String(producto.nombre).split(/[\s\-_\/|]+/).map(function(x) { return x.trim(); }).filter(Boolean).some(function(part) {
+            const expPart = expandirTokenMixtoUrlHighlightCrearMasivo(part);
+            return expPal.some(function(t) { return expPart.indexOf(t) !== -1; });
+        });
+    }
+
+    function htmlTextoConHighlightPalabrasCrearMasivo(texto, mapColoresProducto, slugTokens, productoSoloNombre) {
+        const raw = String(texto || '');
+        if (!raw) return '';
+        const re = /[\s\-_\/|]+/g;
+        let out = '';
+        let last = 0;
+        let m;
+        while ((m = re.exec(raw)) !== null) {
+            out += htmlFragmentoHighlightPalabraCrearMasivo(raw.slice(last, m.index), mapColoresProducto, slugTokens, productoSoloNombre);
+            out += escapeHtmlCrearMasivo(m[0]);
+            last = m.index + m[0].length;
+        }
+        out += htmlFragmentoHighlightPalabraCrearMasivo(raw.slice(last), mapColoresProducto, slugTokens, productoSoloNombre);
+        return out;
+    }
+
+    function htmlFragmentoHighlightPalabraCrearMasivo(palabra, mapColoresProducto, slugTokens, productoSoloNombre) {
+        if (!palabra) return '';
+        const safe = escapeHtmlCrearMasivo(palabra);
+        if (productoSoloNombre && !palabraPerteneceAlNombreProductoCrearMasivo(palabra, productoSoloNombre)) return safe;
+        const expanded = expandirTokenMixtoUrlHighlightCrearMasivo(palabra);
+        if (!tokensCoincidenConSlugUrlCrearMasivo(expanded, slugTokens)) return safe;
+        const color = buscarColorTokenEnMapaHighlightCrearMasivo(expanded, mapColoresProducto);
+        if (!color) return safe;
+        return '<span class="' + clasesSpanHighlightUrlCrearMasivo(color) + '">' + safe + '</span>';
+    }
+
+    function obtenerMapaColoresSpecsMarcadasPorOpcionFilaCrearMasivo(div) {
+        const map = new Map();
+        if (!div) return map;
+        let colorIdx = 0;
+        div.querySelectorAll('.spec-checkbox:checked').forEach(function(cb) {
+            const pid = String(cb.dataset.principalId || '');
+            const sid = String(cb.dataset.sublineaId || '');
+            if (!pid || !sid) return;
+            map.set(pid + '::' + sid, URL_HIGHLIGHT_PALETTE_SPECS_CREAR_MASIVO[colorIdx % URL_HIGHLIGHT_PALETTE_SPECS_CREAR_MASIVO.length]);
+            colorIdx++;
+        });
+        return map;
+    }
+
+    function aplicarHighlightNombreProductoFilaCrearMasivo(div) {
+        const rowData = div.__rowData || {};
+        const p = rowData.producto;
+        if (!p) return;
+        const productDisplay = div.querySelector('.producto-display');
+        if (!productDisplay) return;
+        const textoPlano = textoMostrarProductoFilaCrearMasivo(p);
+        if (!textoPlano) return;
+        const slugTokens = obtenerSetTokensSlugUrlFilaCrearMasivo(rowData);
+        const mapColores = obtenerMapaColoresTokensProductoFilaCrearMasivo(rowData);
+        const textoHtml = htmlTextoConHighlightPalabrasCrearMasivo(textoPlano, mapColores, slugTokens);
+        const target = productDisplay.querySelector('a[href], strong');
+        if (target) {
+            target.innerHTML = textoHtml;
+        }
+    }
+
+    function aplicarHighlightSpecsMarcadasFilaCrearMasivo(div) {
+        const rowData = div.__rowData || {};
+        const slugTokens = obtenerSetTokensSlugUrlFilaCrearMasivo(rowData);
+        const mapColoresPorOpcion = obtenerMapaColoresSpecsMarcadasPorOpcionFilaCrearMasivo(div);
+        div.querySelectorAll('.spec-option-text').forEach(function(el) {
+            const pid = String(el.dataset.principalId || '');
+            const sid = String(el.dataset.sublineaId || '');
+            const cb = div.querySelector('.spec-checkbox[data-principal-id="' + pid + '"][data-sublinea-id="' + sid + '"]');
+            const estaMarcada = !!(cb && cb.checked);
+            quitarClasesHighlightUrlElCrearMasivo(el);
+            if (!estaMarcada) return;
+            const specTokens = tokensDesdeTextoUrlHighlightCrearMasivo(el.textContent || '');
+            if (!tokensCoincidenConSlugUrlCrearMasivo(specTokens, slugTokens)) return;
+            const color = mapColoresPorOpcion.get(pid + '::' + sid);
+            if (color) aplicarClasesHighlightUrlElCrearMasivo(el, color);
+        });
+    }
+
+    function aplicarHighlightCoincidenciasProductoSpecFilaCrearMasivo(div) {
+        if (!div) return;
+        aplicarHighlightNombreProductoFilaCrearMasivo(div);
+        aplicarHighlightSpecsMarcadasFilaCrearMasivo(div);
     }
 
     function aplicarEspecificacionesMarcadasEnFilaCrearMasivo(div, especsMarcadas) {
@@ -3887,18 +4682,8 @@
 
     function obtenerSetTokensSpecsMarcadasFilaCrearMasivo(div) {
         const set = new Set();
-        div.querySelectorAll('.spec-checkbox:checked').forEach(cb => {
-            const label = cb.closest('label');
-            const span = label ? label.querySelector('.spec-option-text') : null;
-            let txt = span ? span.textContent : '';
-            if (!txt && label) {
-                // Fallback defensivo por si cambia el HTML interno del label.
-                txt = Array.from(label.querySelectorAll('span'))
-                    .filter(s => !s.classList.contains('spec-count-badge'))
-                    .map(s => s.textContent || '')
-                    .join(' ');
-            }
-            tokensDesdeTextoUrlHighlightCrearMasivo(txt).forEach(t => set.add(t));
+        obtenerMapaColoresTokensSpecsMarcadasFilaCrearMasivo(div).forEach(function(_color, token) {
+            set.add(token);
         });
         return set;
     }
@@ -3909,25 +4694,17 @@
         const anchor = div.querySelector('.url-fila-link');
         const span = div.querySelector('.url-fila-texto');
         if (!url || !anchor || !span) return;
-        if (rowData.producto_asignado_desde_neo) {
-            span.textContent = url;
-            anchor.title = url;
-            anchor.href = url;
-            return;
-        }
-        const tokensProducto = obtenerSetTokensProductoFilaCrearMasivo(rowData);
-        const tokensSpecs = obtenerSetTokensSpecsMarcadasFilaCrearMasivo(div);
+        const mapColoresProducto = obtenerMapaColoresTokensProductoFilaCrearMasivo(rowData);
+        const mapColoresSpecs = obtenerMapaColoresTokensSpecsMarcadasFilaCrearMasivo(div);
         const palabrasSlug = extraerPalabrasSlugDesdeUrlCrearMasivo(url);
         const highlightedSlug = palabrasSlug.map((pal) => {
             const expanded = expandirTokenMixtoUrlHighlightCrearMasivo(pal);
-            const hitSpec = expanded.some(t => tokensSpecs.has(t));
-            const hitProd = expanded.some(t => tokensProducto.has(t));
             const safe = escapeHtmlCrearMasivo(pal);
-            if (hitSpec) {
-                return '<span class="bg-orange-300 dark:bg-orange-600/80 text-orange-950 dark:text-orange-50 px-0.5 rounded border border-orange-500/70 font-semibold">' + safe + '</span>';
-            }
-            if (hitProd) {
-                return '<span class="bg-yellow-200 dark:bg-yellow-700/60 text-yellow-900 dark:text-yellow-100 px-0.5 rounded">' + safe + '</span>';
+            const colorSpec = buscarColorTokenEnMapaHighlightCrearMasivo(expanded, mapColoresSpecs);
+            const colorProd = buscarColorTokenEnMapaHighlightCrearMasivo(expanded, mapColoresProducto);
+            const color = colorSpec || colorProd;
+            if (color) {
+                return '<span class="' + clasesSpanHighlightUrlCrearMasivo(color) + '">' + safe + '</span>';
             }
             return safe;
         }).join('-');
@@ -3947,6 +4724,7 @@
         span.innerHTML = shown;
         anchor.title = url;
         anchor.href = url;
+        aplicarHighlightCoincidenciasProductoSpecFilaCrearMasivo(div);
     }
 
     function obtenerCategoriaIdFiltroBusquedaProductoCrearMasivo(row) {
@@ -3958,6 +4736,14 @@
             return parseInt(String(row.categoria_id), 10);
         }
         return null;
+    }
+
+    function productoBusquedaAplicaFiltroCategoriaCrearMasivo(div) {
+        if (!div) return true;
+        const cb = div.querySelector('.cb-buscar-producto-todas-categorias');
+        if (cb && cb.checked) return false;
+        if (div.__buscarProductoTodasCategorias) return false;
+        return true;
     }
 
     function normalizarCategoriaFilaEnResultadoCrearMasivo(r) {
@@ -3983,8 +4769,9 @@
             : '';
         const cf = categoriaFila && categoriaFila.id ? categoriaFila : null;
         const nombreCat = cf && cf.nombre ? escapeHtmlCrearMasivo(String(cf.nombre)) : '';
-        const toolbarHtml = '<div class="mb-2 flex flex-wrap items-center gap-2 categoria-fila-toolbar">' +
+        const toolbarHtml = '<div class="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 categoria-fila-toolbar">' +
             '<span class="categoria-fila-badge text-xs text-gray-600 dark:text-gray-400' + (cf ? '' : ' hidden') + '">Categoría: <strong class="categoria-fila-nombre">' + nombreCat + '</strong></span>' +
+            (cf ? '<label class="cb-buscar-todas-categorias-wrap inline-flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400 cursor-pointer"><input type="checkbox" class="cb-buscar-producto-todas-categorias rounded border-gray-300 text-blue-600 focus:ring-blue-500"><span>Buscar en todas las categorías</span></label>' : '') +
             '</div>';
         return '<div class="mt-3 producto-search-container relative">' +
             toolbarHtml +
@@ -4000,12 +4787,24 @@
         const cf = r && r.categoria_fila && r.categoria_fila.id ? r.categoria_fila : null;
         const badge = toolbar.querySelector('.categoria-fila-badge');
         const nombreEl = toolbar.querySelector('.categoria-fila-nombre');
+        let wrapTodas = toolbar.querySelector('.cb-buscar-todas-categorias-wrap');
+        if (cf && !wrapTodas) {
+            wrapTodas = document.createElement('label');
+            wrapTodas.className = 'cb-buscar-todas-categorias-wrap inline-flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400 cursor-pointer';
+            wrapTodas.innerHTML = '<input type="checkbox" class="cb-buscar-producto-todas-categorias rounded border-gray-300 text-blue-600 focus:ring-blue-500"><span>Buscar en todas las categorías</span>';
+            toolbar.appendChild(wrapTodas);
+        }
+        const cbTodas = toolbar.querySelector('.cb-buscar-producto-todas-categorias');
         if (cf) {
             if (nombreEl) nombreEl.textContent = cf.nombre || '';
             if (badge) badge.classList.remove('hidden');
+            if (wrapTodas) wrapTodas.classList.remove('hidden');
+            if (cbTodas) cbTodas.checked = !!div.__buscarProductoTodasCategorias;
         } else {
             if (nombreEl) nombreEl.textContent = '';
             if (badge) badge.classList.add('hidden');
+            if (wrapTodas) wrapTodas.classList.add('hidden');
+            if (cbTodas) cbTodas.checked = false;
         }
     }
 
@@ -4014,7 +4813,7 @@
         const modal = document.getElementById('modal-categoria-fila-crear-masivo');
         const arbol = document.getElementById('modal-categoria-fila-arbol');
         if (!modal) return;
-        modal.classList.remove('hidden');
+        mostrarModalCapaCrearMasivo(modal, Z_INDEX_MODAL_SOBRE_URL_CREAR_MASIVO);
         if (!arbol) return;
         arbol.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400 py-2">Cargando categorías…</p>';
         try {
@@ -4035,8 +4834,7 @@
 
     function cerrarModalCategoriaFilaCrearMasivo() {
         window.__filaModalCategoriaCrearMasivo = null;
-        const modal = document.getElementById('modal-categoria-fila-crear-masivo');
-        if (modal) modal.classList.add('hidden');
+        ocultarModalCapaCrearMasivo(document.getElementById('modal-categoria-fila-crear-masivo'));
     }
 
     async function guardarCategoriaNeoServidorCrearMasivo(urlFila, categoriaId) {
@@ -4200,82 +4998,175 @@
 
     window.__flujoModalUrlsCrearMasivo = null;
 
-    function htmlResumenGeneracionBannerCrearMasivo(info, tituloSeccion) {
+    function htmlResumenGeneracionBannerCrearMasivo(info) {
         if (!info) return '';
-        const titulo = tituloSeccion || 'URL anterior';
-        const urlTxt = escapeHtmlCrearMasivo((info.url || '').substring(0, 120) + ((info.url || '').length > 120 ? '…' : ''));
-        let estadoHtml = '';
         if (info.status === 'generando') {
-            estadoHtml = '<p class="text-sm font-medium text-blue-600 dark:text-blue-400 flex items-center gap-2">' +
-                '<svg class="w-4 h-4 animate-spin shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>' +
-                '<span>Generando oferta…</span></p>';
-        } else if (info.success) {
-            const envioVal = info.envioVal || ((info.envio != null && info.envio !== '') ? parseFloat(info.envio).toFixed(2).replace('.', ',') + ' € env.' : 'gratis');
-            const precioVal = info.precioVal || (info.precio_unidad != null ? parseFloat(info.precio_unidad).toFixed(2).replace('.', ',') + ' €/ud' : '');
-            estadoHtml = '<p class="text-sm font-medium text-green-600 dark:text-green-400">' + escapeHtmlCrearMasivo(info.mensaje || 'Oferta generada') + '</p>';
-            if (precioVal || envioVal) {
-                estadoHtml += '<p class="text-sm text-gray-600 dark:text-gray-400 mt-0.5">' + escapeHtmlCrearMasivo((precioVal ? precioVal : '') + (precioVal && envioVal ? ' · ' : '') + envioVal) + '</p>';
-            }
-            if (info.oferta_id) {
-                estadoHtml += '<p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">ID oferta: ' + escapeHtmlCrearMasivo(String(info.oferta_id)) + '</p>';
-            }
-        } else {
-            estadoHtml = '<p class="text-sm font-medium text-red-600 dark:text-red-400">' + escapeHtmlCrearMasivo(info.mensaje || 'Error al generar') + '</p>';
+            return '<div class="flex flex-row items-center gap-2">' +
+                '<svg class="w-4 h-4 animate-spin shrink-0 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>' +
+                '<span class="text-sm font-medium text-blue-600 dark:text-blue-400">Generando oferta…</span>' +
+                '</div>';
         }
-        const btnEditar = (info.success && info.oferta_edit_url)
-            ? '<a href="' + info.oferta_edit_url + '" target="_blank" rel="noopener noreferrer" class="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded bg-blue-600 hover:bg-blue-700 text-white transition shrink-0">Editar oferta guardada</a>'
-            : '';
-        return '<div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">' +
-            '<div class="min-w-0 flex-1">' +
-            '<p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">' + escapeHtmlCrearMasivo(titulo) + '</p>' +
-            '<p class="text-xs break-all text-gray-600 dark:text-gray-300 mb-2">' + urlTxt + '</p>' +
-            estadoHtml +
-            '</div>' +
-            (btnEditar ? '<div class="flex shrink-0 items-start">' + btnEditar + '</div>' : '') +
+        if (info.success) {
+            const partes = [];
+            if (info.oferta_id) partes.push('ID ' + info.oferta_id);
+            if (info.precioVal) partes.push(info.precioVal);
+            if (info.envioVal) partes.push(info.envioVal);
+            const resumen = partes.length
+                ? '<span class="text-sm text-gray-600 dark:text-gray-400 min-w-0">' + partes.map(function(p) { return escapeHtmlCrearMasivo(p); }).join(' · ') + '</span>'
+                : '';
+            const btnEditar = info.oferta_edit_url
+                ? '<a href="' + info.oferta_edit_url + '" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center shrink-0 p-1.5 rounded bg-blue-600 hover:bg-blue-700 text-white transition" title="Editar oferta" aria-label="Editar oferta"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg></a>'
+                : '';
+            return '<div class="flex flex-row items-center gap-2 flex-wrap">' + resumen + btnEditar + '</div>';
+        }
+        return '<div class="flex flex-row items-center gap-3">' +
+            '<p class="text-sm font-medium text-red-600 dark:text-red-400">' + escapeHtmlCrearMasivo(info.mensaje || 'Error al generar') + '</p>' +
             '</div>';
     }
 
-    function renderPrevGuardadoModalCrearMasivo(info) {
+    function obtenerGeneracionesPendientesFlujoCrearMasivo(flujo) {
+        if (!flujo || !Array.isArray(flujo.generacionesEnCola)) return [];
+        return flujo.generacionesEnCola.filter(function(g) { return g && g.status === 'generando'; });
+    }
+
+    function hayGeneracionesPendientesFlujoCrearMasivo(flujo) {
+        return obtenerGeneracionesPendientesFlujoCrearMasivo(flujo).length > 0;
+    }
+
+    function clonarEntradaBannerGeneracionCrearMasivo(g) {
+        return Object.assign({}, g);
+    }
+
+    /** Snapshot del banner al entrar en un modal: solo las que aún se están generando. */
+    function inicializarBannerParaModalActualCrearMasivo(flujo) {
+        if (!flujo) return;
+        flujo.bannerParaEsteModal = obtenerGeneracionesPendientesFlujoCrearMasivo(flujo).map(clonarEntradaBannerGeneracionCrearMasivo);
+    }
+
+    function actualizarEntradaBannerModalActualCrearMasivo(flujo, genId, url, result) {
+        if (!flujo || !Array.isArray(flujo.bannerParaEsteModal)) return;
+        let item = genId ? flujo.bannerParaEsteModal.find(function(g) { return g.id === genId; }) : null;
+        if (!item && url) {
+            item = flujo.bannerParaEsteModal.find(function(g) {
+                return g.status === 'generando' && g.url === url;
+            });
+        }
+        if (!item) return;
+        item.status = 'completado';
+        if (result.success) {
+            const info = infoResumenDesdeRespuestaOfertaCrearMasivo(url, result.data, result.esPrecioCero);
+            Object.assign(item, info);
+            item.status = 'completado';
+            item.success = true;
+        } else {
+            item.success = false;
+            item.mensaje = result.error || 'Error al crear';
+        }
+    }
+
+    function htmlBannerGeneracionesPendientesCrearMasivo(flujo) {
+        const lista = (flujo && Array.isArray(flujo.bannerParaEsteModal)) ? flujo.bannerParaEsteModal : [];
+        if (!lista.length) return '';
+        return lista.map(function(info, i) {
+            const sep = i > 0 ? ' mt-3 pt-3 border-t border-gray-200 dark:border-gray-600' : '';
+            return '<div class="' + sep + '">' + htmlResumenGeneracionBannerCrearMasivo(info) + '</div>';
+        }).join('');
+    }
+
+    function registrarGeneracionPendienteFlujoCrearMasivo(flujo, div, url) {
+        if (!flujo) return '';
+        if (!Array.isArray(flujo.generacionesEnCola)) flujo.generacionesEnCola = [];
+        const genId = 'gen-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9);
+        if (div) div.__generacionPendienteId = genId;
+        flujo.generacionesEnCola.push({ id: genId, url: url, status: 'generando' });
+        return genId;
+    }
+
+    function quitarGeneracionDeColaFlujoCrearMasivo(flujo, div, url) {
+        if (!flujo || !Array.isArray(flujo.generacionesEnCola)) return;
+        const genId = div && div.__generacionPendienteId;
+        if (genId) {
+            flujo.generacionesEnCola = flujo.generacionesEnCola.filter(function(g) { return g.id !== genId; });
+            if (div) delete div.__generacionPendienteId;
+            return;
+        }
+        const u = String(url || '');
+        const idx = flujo.generacionesEnCola.findIndex(function(g) {
+            return g && g.status === 'generando' && g.url === u;
+        });
+        if (idx >= 0) flujo.generacionesEnCola.splice(idx, 1);
+    }
+
+    function renderPrevGuardadoModalCrearMasivo(flujo) {
         const prev = document.getElementById('modal-url-crear-masivo-prev-guardado');
         if (!prev) return;
-        if (!info) {
+        const html = htmlBannerGeneracionesPendientesCrearMasivo(flujo);
+        if (!html) {
             prev.classList.add('hidden');
             prev.innerHTML = '';
             return;
         }
-        prev.innerHTML = htmlResumenGeneracionBannerCrearMasivo(info, 'URL anterior');
+        prev.innerHTML = html;
         prev.classList.remove('hidden');
     }
 
-    function renderContenidoModalFinalCrearMasivo(info) {
+    function renderContenidoModalFinalCrearMasivo(flujo) {
         const cont = document.getElementById('modal-url-crear-masivo-final-contenido');
         if (!cont) return;
-        cont.innerHTML = htmlResumenGeneracionBannerCrearMasivo(info, 'Última URL');
+        const html = htmlBannerGeneracionesPendientesCrearMasivo(flujo);
+        if (html) {
+            cont.innerHTML = html;
+            return;
+        }
+        cont.innerHTML = '<p class="text-sm text-gray-600 dark:text-gray-400">Todas las ofertas se han guardado.</p>';
     }
 
     function actualizarBannerGeneracionPendienteCrearMasivo() {
         const flujo = window.__flujoModalUrlsCrearMasivo;
         if (!flujo) return;
+        const btnAceptar = document.getElementById('modal-url-crear-masivo-final-aceptar');
+        const hayPendientes = hayGeneracionesPendientesFlujoCrearMasivo(flujo);
         if (flujo.modoFinal) {
-            renderContenidoModalFinalCrearMasivo(flujo.ultimoGuardado);
-            const btnAceptar = document.getElementById('modal-url-crear-masivo-final-aceptar');
-            if (btnAceptar && flujo.ultimoGuardado && flujo.ultimoGuardado.status !== 'generando') {
-                btnAceptar.disabled = false;
-                btnAceptar.classList.remove('opacity-50', 'cursor-not-allowed');
-                btnAceptar.classList.add('hover:bg-blue-700');
+            renderContenidoModalFinalCrearMasivo(flujo);
+            if (btnAceptar) {
+                if (!hayPendientes) {
+                    btnAceptar.disabled = false;
+                    btnAceptar.classList.remove('opacity-50', 'cursor-not-allowed');
+                    btnAceptar.classList.add('hover:bg-blue-700');
+                } else {
+                    btnAceptar.disabled = true;
+                    btnAceptar.classList.add('opacity-50', 'cursor-not-allowed');
+                    btnAceptar.classList.remove('hover:bg-blue-700');
+                }
             }
         } else {
-            renderPrevGuardadoModalCrearMasivo(flujo.ultimoGuardado);
+            renderPrevGuardadoModalCrearMasivo(flujo);
         }
     }
 
     function actualizarPieModalUrlsCrearMasivo(opciones) {
+        const pieAnterior = document.getElementById('modal-url-crear-masivo-anterior');
         const pieSig = document.getElementById('modal-url-crear-masivo-siguiente');
         const pieSaltar = document.getElementById('modal-url-crear-masivo-saltar');
+        const mostrarAnterior = !!(opciones && opciones.mostrarAnterior);
         const mostrarSiguiente = !!(opciones && opciones.mostrarSiguiente);
         const mostrarSaltar = !!(opciones && opciones.mostrarSaltar);
+        if (pieAnterior) pieAnterior.classList.toggle('hidden', !mostrarAnterior);
         if (pieSig) pieSig.classList.toggle('hidden', !mostrarSiguiente);
         if (pieSaltar) pieSaltar.classList.toggle('hidden', !mostrarSaltar);
+    }
+
+    /** Retrocede a la URL anterior del recorrido (incluye generadas, descartadas o saltadas). */
+    function retrocederAUrlAnteriorEnFlujoModalCrearMasivo() {
+        const flujo = window.__flujoModalUrlsCrearMasivo;
+        if (!flujo || flujo.modoFinal || flujo.indice <= 0) return;
+        prepararNuevaPestanaUrlCrearMasivo();
+        if (flujo.filaActualEnModal) {
+            devolverFilaModalAAlmacenCrearMasivo(flujo.filaActualEnModal);
+            flujo.filaActualEnModal = null;
+        }
+        flujo.indice -= 1;
+        mostrarModalUrlActualCrearMasivo({ permitirAutoSkip: false });
     }
 
     /** Avanza al siguiente ítem del flujo modal sin generar ni descartar la URL actual. */
@@ -4328,8 +5219,10 @@
         if (contenido) contenido.innerHTML = '';
         const prev = document.getElementById('modal-url-crear-masivo-prev-guardado');
         if (prev) { prev.classList.add('hidden'); prev.innerHTML = ''; }
+        const pieAnterior = document.getElementById('modal-url-crear-masivo-anterior');
         const pieSig = document.getElementById('modal-url-crear-masivo-siguiente');
         const pieSaltar = document.getElementById('modal-url-crear-masivo-saltar');
+        if (pieAnterior) pieAnterior.classList.add('hidden');
         if (pieSig) pieSig.classList.add('hidden');
         if (pieSaltar) pieSaltar.classList.add('hidden');
         cerrarModalFinalGeneracionCrearMasivo();
@@ -4351,18 +5244,13 @@
         if (contenido) contenido.innerHTML = '';
         const modalFinal = document.getElementById('modal-url-crear-masivo-final');
         if (modalFinal) modalFinal.classList.remove('hidden');
-        renderContenidoModalFinalCrearMasivo(flujo.ultimoGuardado);
-        const btnAceptar = document.getElementById('modal-url-crear-masivo-final-aceptar');
-        if (btnAceptar) {
-            btnAceptar.disabled = true;
-            btnAceptar.classList.add('opacity-50', 'cursor-not-allowed');
-            btnAceptar.classList.remove('hover:bg-blue-700');
-        }
+        inicializarBannerParaModalActualCrearMasivo(flujo);
+        actualizarBannerGeneracionPendienteCrearMasivo();
         document.body.style.overflow = 'hidden';
         if (!window.__cmBeforeUnloadGenerandoHandler) {
             window.__cmBeforeUnloadGenerandoHandler = function(e) {
                 const f = window.__flujoModalUrlsCrearMasivo;
-                if (f && f.modoFinal && f.ultimoGuardado && f.ultimoGuardado.status === 'generando') {
+                if (f && f.modoFinal && hayGeneracionesPendientesFlujoCrearMasivo(f)) {
                     e.preventDefault();
                     e.returnValue = '';
                 }
@@ -4376,16 +5264,14 @@
         const url = (div && div.__rowData && (div.__rowData.url_normalizada || div.__rowData.url)) || (btnGen && btnGen.dataset.url) || '';
         if (result.success) {
             aplicarExitoGeneracionEnFilaCrearMasivo(div, btnGen, result.data, result.esPrecioCero);
-            if (flujo) {
-                flujo.ultimoGuardado = infoResumenDesdeRespuestaOfertaCrearMasivo(url, result.data, result.esPrecioCero);
-            }
+        } else if (result.urlYaExiste) {
+            marcarFilaUrlExistenteCrearMasivo(div, result);
         } else {
             aplicarErrorGeneracionEnFilaCrearMasivo(div, btnGen, result.error, false);
-            if (flujo) {
-                flujo.ultimoGuardado = { status: 'completado', url: url, success: false, mensaje: result.error || 'Error al crear' };
-            }
         }
         if (flujo) {
+            actualizarEntradaBannerModalActualCrearMasivo(flujo, div && div.__generacionPendienteId, url, result);
+            quitarGeneracionDeColaFlujoCrearMasivo(flujo, div, url);
             flujo.generacionesPendientes = Math.max((flujo.generacionesPendientes || 1) - 1, 0);
             actualizarBannerGeneracionPendienteCrearMasivo();
         }
@@ -4399,7 +5285,7 @@
         const esUltima = flujo.indice >= flujo.filas.length - 1;
         prepararNuevaPestanaUrlCrearMasivo();
 
-        flujo.ultimoGuardado = { status: 'generando', url: url };
+        registrarGeneracionPendienteFlujoCrearMasivo(flujo, div, url);
         flujo.generacionesPendientes = (flujo.generacionesPendientes || 0) + 1;
         marcarInicioGeneracionOfertaCrearMasivo();
 
@@ -4424,7 +5310,9 @@
         })();
     }
 
-    function mostrarModalUrlActualCrearMasivo() {
+    function mostrarModalUrlActualCrearMasivo(opciones) {
+        opciones = opciones || {};
+        const permitirAutoSkip = opciones.permitirAutoSkip !== false;
         const flujo = window.__flujoModalUrlsCrearMasivo;
         if (!flujo || !flujo.filas || !flujo.filas.length) return;
         if (flujo.modoFinal) return;
@@ -4440,25 +5328,50 @@
         }
         contenido.innerHTML = '';
 
+        if (permitirAutoSkip) {
+            while (flujo.indice < flujo.filas.length && filaDebeOmitirModalCrearMasivo(flujo.filas[flujo.indice])) {
+                flujo.indice += 1;
+            }
+        }
+
         if (flujo.indice >= flujo.filas.length) {
+            if (window.__analisisLoteEnCurso) return;
+            cerrarFlujoModalUrlsCrearMasivo();
             return;
         }
 
         const fila = flujo.filas[flujo.indice];
         flujo.filaActualEnModal = fila;
         contenido.appendChild(fila);
+        actualizarCampoUnidadesOfertaEnFila(fila);
+        asegurarOpcionesStockGenerarEnFilaCrearMasivo(fila);
+        if (fila.querySelector('.ofertas-mismas-especs') && !fila.querySelector('.confirmo-no-es-misma-wrap')) {
+            agregarCheckboxNoEsMisma(fila);
+        } else {
+            enlazarCheckboxNoEsMismaEnFilaCrearMasivo(fila);
+        }
+        actualizarEstadoBotonGenerar(fila);
         adjuntarListenerGenerarOfertaCrearMasivo(fila);
+        enlazarBotonesVerImagenesSpecCrearMasivo(fila);
+        renderUrlResaltadaFilaCrearMasivo(fila);
 
-        renderPrevGuardadoModalCrearMasivo(flujo.ultimoGuardado);
+        inicializarBannerParaModalActualCrearMasivo(flujo);
+        renderPrevGuardadoModalCrearMasivo(flujo);
 
         const total = flujo.filas.length;
-        if (progreso) progreso.textContent = 'URL ' + (flujo.indice + 1) + ' de ' + total;
+        if (progreso) {
+            let txt = 'URL ' + (flujo.indice + 1) + ' de ' + total;
+            if (window.__analisisLoteEnCurso) txt += ' (cargando más en segundo plano…)';
+            progreso.textContent = txt;
+        }
 
         const tieneGenerar = !!fila.querySelector('.btn-generar');
         const yaGenerada = !!(fila.__rowData && fila.__rowData.ofertaGenerada);
+        const descartada = !!(fila.__rowData && fila.__rowData.descartada);
         actualizarPieModalUrlsCrearMasivo({
-            mostrarSiguiente: !tieneGenerar || yaGenerada,
-            mostrarSaltar: true,
+            mostrarAnterior: flujo.indice > 0,
+            mostrarSiguiente: !tieneGenerar || yaGenerada || descartada,
+            mostrarSaltar: !yaGenerada && !descartada,
         });
 
         const urlAbrir = (fila.__rowData && (fila.__rowData.url_normalizada || fila.__rowData.url)) || '';
@@ -4466,6 +5379,7 @@
             abrirUrlModalEnNuevaPestanaCrearMasivo(urlAbrir);
         }
 
+        asegurarModalCapaCrearMasivoAlBody(modal);
         modal.classList.remove('hidden');
         document.body.style.overflow = 'hidden';
     }
@@ -4483,7 +5397,8 @@
         window.__flujoModalUrlsCrearMasivo = {
             filas: filas,
             indice: 0,
-            ultimoGuardado: null,
+            generacionesEnCola: [],
+            bannerParaEsteModal: [],
             filaActualEnModal: null,
             modoFinal: false,
             generacionesPendientes: 0,
@@ -4515,10 +5430,14 @@
         }, { passive: true });
         const btnXCerrar = document.getElementById('modal-url-crear-masivo-cerrar-x');
         const btnAceptarFinal = document.getElementById('modal-url-crear-masivo-final-aceptar');
+        const btnAnterior = document.getElementById('modal-url-crear-masivo-anterior');
         const btnSiguiente = document.getElementById('modal-url-crear-masivo-siguiente');
         const btnSaltar = document.getElementById('modal-url-crear-masivo-saltar');
         if (btnXCerrar) btnXCerrar.addEventListener('click', cerrarFlujoModalUrlsCrearMasivo);
         if (btnAceptarFinal) btnAceptarFinal.addEventListener('click', cerrarFlujoModalUrlsCrearMasivo);
+        if (btnAnterior) {
+            btnAnterior.addEventListener('click', retrocederAUrlAnteriorEnFlujoModalCrearMasivo);
+        }
         if (btnSiguiente) {
             btnSiguiente.addEventListener('click', avanzarASiguienteUrlEnFlujoModalCrearMasivo);
         }
@@ -4584,19 +5503,54 @@
         }
     }
 
-    function mostrarResultados(resultados) {
+    function mostrarResultados(resultados, opciones) {
+        opciones = opciones || {};
+        const append = !!opciones.append;
         const contenedor = document.getElementById('resultadosLista');
-        contenedor.innerHTML = '';
-        cerrarFlujoModalUrlsCrearMasivo();
+        if (!append) {
+            contenedor.innerHTML = '';
+            cerrarFlujoModalUrlsCrearMasivo();
+            window.__clavesUrlEnResultadosCrearMasivo = new Set();
+            window.__estadoGruposResultadosCrearMasivo = {
+                claveGrupoWrapperAbierto: null,
+                nodoWrapperGrupo: null,
+                indiceEstiloGrupo: 0,
+            };
+        }
+        if (!window.__clavesUrlEnResultadosCrearMasivo) {
+            window.__clavesUrlEnResultadosCrearMasivo = new Set();
+            if (append && contenedor) {
+                contenedor.querySelectorAll('.crear-masivo-fila').forEach(function(fila) {
+                    const k = claveDedupeUrlCrearMasivo(fila.__rowData && (fila.__rowData.url_normalizada || fila.__rowData.url));
+                    if (k) window.__clavesUrlEnResultadosCrearMasivo.add(k);
+                });
+            }
+        }
+        if (!window.__estadoGruposResultadosCrearMasivo) {
+            window.__estadoGruposResultadosCrearMasivo = {
+                claveGrupoWrapperAbierto: null,
+                nodoWrapperGrupo: null,
+                indiceEstiloGrupo: 0,
+            };
+        }
+        const estadoGr = window.__estadoGruposResultadosCrearMasivo;
+        let claveGrupoWrapperAbierto = estadoGr.claveGrupoWrapperAbierto;
+        let nodoWrapperGrupo = estadoGr.nodoWrapperGrupo;
+        let indiceEstiloGrupo = estadoGr.indiceEstiloGrupo;
 
         const ordenados = ordenarResultadosPorGrupoProductoCrearMasivo(resultados);
         const conteosGrupo = contarPorClaveGrupoCrearMasivo(ordenados);
-        let claveGrupoWrapperAbierto = null;
-        let nodoWrapperGrupo = null;
-        let indiceEstiloGrupo = 0;
 
         ordenados.forEach((r, idx) => {
             r = normalizarCategoriaFilaEnResultadoCrearMasivo(r);
+            const claveUrlResultado = claveDedupeUrlCrearMasivo(r.url_normalizada || r.url);
+            if (claveUrlResultado && window.__clavesUrlEnResultadosCrearMasivo.has(claveUrlResultado)) {
+                return;
+            }
+            if (claveUrlResultado) window.__clavesUrlEnResultadosCrearMasivo.add(claveUrlResultado);
+            if (r.producto) {
+                r.especificaciones = especificacionesEfectivasResultadoCrearMasivo(r);
+            }
             const div = document.createElement('div');
             const modoTodasConProducto = !!(window.__modoProductoTodasNeo && r && !r.existe && r.tienda && r.producto && !r.error);
             const puedeCrear = !r.existe && r.tienda && r.producto && !r.error;
@@ -4646,7 +5600,7 @@
             let selectorEmpateHtml = '';
             if (puedeCrear && r.hay_empate && r.candidatos_empatados && r.candidatos_empatados.length > 1 && !r.producto_asignado_desde_neo) {
                 selectorEmpateHtml = '<div class="mt-2 p-3 bg-amber-50 dark:bg-amber-900/20 rounded border border-amber-200 dark:border-amber-700"><span class="text-sm font-medium text-amber-800 dark:text-amber-200">Varios productos coinciden. Elige el correcto:</span><div class="mt-2 flex flex-wrap gap-2">' +
-                    r.candidatos_empatados.map((c, i) => '<button type="button" class="btn-elegir-producto px-3 py-1.5 text-sm rounded border transition ' + (i === 0 ? 'border-green-600 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200' : 'border-gray-300 dark:border-gray-600 hover:border-green-500') + '" data-candidato-idx="' + i + '">' + (c.texto_completo || c.nombre || c.id) + '</button>').join('') +
+                    r.candidatos_empatados.map((c, i) => '<button type="button" class="btn-elegir-producto px-3 py-1.5 text-sm rounded border transition ' + (i === 0 ? 'border-green-600 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200' : 'border-gray-300 dark:border-gray-600 hover:border-green-500') + '" data-candidato-idx="' + i + '">' + escapeHtmlCrearMasivo(textoMostrarProductoFilaCrearMasivo(c) || String(c.id || '')) + '</button>').join('') +
                     '</div></div>';
             }
 
@@ -4664,8 +5618,9 @@
             }
 
             div.className = 'crear-masivo-fila p-4 rounded-lg border ' + estadoClass;
-            div.dataset.esUnidadUnica = r.especificaciones && r.especificaciones.unidad_de_medida === 'unidadUnica' ? '1' : '0';
-            div.dataset.columnasIds = (r.especificaciones && r.especificaciones.columnas_ids) ? JSON.stringify(r.especificaciones.columnas_ids) : '[]';
+            const especsEfectivasFila = r.especificaciones || especificacionesEfectivasResultadoCrearMasivo(r);
+            aplicarDatasetUnidadMedidaFilaCrearMasivo(div, r);
+            div.dataset.columnasIds = (especsEfectivasFila.columnas_ids) ? JSON.stringify(especsEfectivasFila.columnas_ids) : '[]';
             const btnVerPromptHtml = (r.chatgpt_prompt ? '<button type="button" class="btn-ver-prompt-crear-masivo inline-flex items-center px-2 py-1 text-xs font-medium rounded border border-gray-400 dark:border-gray-500 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">Ver prompt</button>' : '');
             const btnAgregarProductoHtml = '<a href="{{ route("admin.productos.create") }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded transition"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>Añadir producto</a>';
             const btnCategoriaFilaHtml = '<button type="button" class="btn-elegir-categoria-fila-crear-masivo inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded border border-indigo-300 dark:border-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-200 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition">Cambiar Categoría</button>';
@@ -4689,10 +5644,20 @@
                 : '';
             const tiendaNoMostrar = String((r.tienda && r.tienda.mostrar_tienda) || '').toLowerCase() === 'no';
             const tiendaNoScraping = String((r.tienda && r.tienda.scrapear) || '').toLowerCase() === 'no';
-            const permitirCheckPrecioCero = !!r.tienda && !tiendaNoMostrar && !tiendaNoScraping;
+            const permitirOpcionesStock = permitirOpcionesStockGenerarCrearMasivo(r.tienda);
             const neoIdTagHtml = (puedeCrear && r.neo_id)
                 ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-xs font-medium">Neo ID: ' + r.neo_id + '</span>'
                 : '';
+            const htmlGenerarOfertaWrap = puedeCrear ? htmlBloqueGenerarOfertaWrapCrearMasivo({
+                url: r.url_normalizada || r.url,
+                productoId: r.producto.id,
+                tiendaId: r.tienda.id,
+                tienda: r.tienda,
+                especificaciones: especsEfectivasFila,
+                producto: r.producto,
+                envioVal: textoEnvioInputDesdeRowCrearMasivo(r),
+                permitirOpcionesStock: permitirOpcionesStock,
+            }) : '';
             div.innerHTML = `
                 <div class="flex justify-between items-start gap-4">
                     <div class="flex-1 min-w-0">
@@ -4705,7 +5670,7 @@
                         </div>
                         ${r.contenido_pagina_extraido ? '<div class="mt-1.5 text-xs text-gray-500 dark:text-gray-400 border-l-2 border-gray-300 dark:border-gray-600 pl-2 space-y-0.5">' + String(r.contenido_pagina_extraido).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>') + '</div>' : ''}
                         ${r.tienda ? '<div class="mt-1 text-sm text-gray-600 dark:text-gray-400">Tienda: <strong>' + r.tienda.nombre + '</strong>' + (tiendaFlagsHtml ? '<span class="ml-2 inline-flex items-center gap-1">' + tiendaFlagsHtml + '</span>' : '') + '</div>' : ''}
-                        ${r.producto && r.tienda ? '<div class="mt-1 text-sm text-gray-600 dark:text-gray-400 producto-display flex items-center gap-2 flex-wrap"><span>Producto: ' + (r.producto.url_producto ? '<a href="' + r.producto.url_producto + '" target="_blank" class="text-green-500 hover:underline font-medium">' + r.producto.texto_completo + '</a>' : '<strong>' + r.producto.texto_completo + '</strong>') + '</span>' + htmlBotonesProductoFilaCrearMasivo(r.producto.id) + '</div>' : (r.producto ? '<div class="mt-1 text-sm text-gray-600 dark:text-gray-400 producto-display flex items-center gap-2 flex-wrap"><span>Producto: ' + (r.producto.url_producto ? '<a href="' + r.producto.url_producto + '" target="_blank" class="text-green-500 hover:underline font-medium">' + r.producto.texto_completo + '</a>' : '<strong>' + r.producto.texto_completo + '</strong>') + '</span>' + htmlBotonesProductoFilaCrearMasivo(r.producto.id) + '</div>' : '')}
+                        ${r.producto ? htmlBloqueProductoDisplayFilaCrearMasivo(r.producto) : ''}
                         ${selectorEmpateHtml}
                         <div class="spec-and-ofertas-container">${buscadorProductoHtml}${especsHtml}
                         ${ofertasExistentesHtml}</div>
@@ -4714,31 +5679,11 @@
                     <div class="acciones-url-wrap flex-shrink-0 flex items-start gap-3">
                         ${btnDescartarHtml}
                         ${necesitaProducto || noEntreOpciones ? '<div class="flex flex-col items-stretch gap-2">' + btnAgregarProductoHtml + btnCategoriaFilaHtml + '</div>' : ''}
-                        ${puedeCrear ? `
-                        <div class="generar-oferta-wrap flex flex-col items-start gap-2">
-                            <button type="button" class="btn-generar inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded transition"
-                                data-url="${r.url_normalizada || r.url}"
-                                data-producto-id="${r.producto.id}"
-                                data-tienda-id="${r.tienda.id}">
-                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
-                                Generar oferta
-                            </button>
-                            <label class="inline-flex flex-col gap-0.5 text-xs text-gray-600 dark:text-gray-300 shrink-0">
-                                <span>Envío (€)</span>
-                                <input type="text" class="cm-envio-oferta-input w-[5.5rem] px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm" value="${escapeHtmlCrearMasivo(textoEnvioInputDesdeRowCrearMasivo(r))}" autocomplete="off" inputmode="decimal" />
-                            </label>
-                            ${permitirCheckPrecioCero ? `
-                            <label class="generar-sin-precio-wrap inline-flex items-start gap-2 cursor-pointer text-xs text-amber-700 dark:text-amber-300">
-                                <input type="checkbox" class="generar-sin-precio-cb mt-0.5 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
-                                <span>Precio 0</span>
-                            </label>
-                            ` : ''}
-                        </div>
-                        ` : ''}
+                        ${puedeCrear ? htmlGenerarOfertaWrap : ''}
                     </div>
                     ` : ''}
                 </div>
-                ${puedeCrear ? '<div class="mt-2 generado-msg text-sm font-medium text-gray-600 dark:text-gray-400">URL pendiente de añadir</div>' : '<div class="mt-2 generado-msg hidden text-sm font-medium"></div>'}
+                <div class="mt-2 generado-msg hidden text-sm font-medium"></div>
             `;
 
             const claveGr = claveGrupoProductoSugeridoCrearMasivo(r);
@@ -4752,7 +5697,7 @@
                     nodoWrapperGrupo.dataset.grupoProductoId = String(r.producto.id);
                     const etiquetaGrupo = document.createElement('div');
                     etiquetaGrupo.className = 'text-xs font-bold uppercase tracking-wide text-gray-800 dark:text-gray-100 -mb-1 pb-2 border-b-2 border-gray-400/70 dark:border-gray-500';
-                    etiquetaGrupo.textContent = 'Mismo producto sugerido (' + filasEnEsteGrupo + ' URL' + (filasEnEsteGrupo !== 1 ? 's' : '') + '): ' + (r.producto.texto_completo || ('#' + r.producto.id));
+                    etiquetaGrupo.textContent = 'Mismo producto sugerido (' + filasEnEsteGrupo + ' URL' + (filasEnEsteGrupo !== 1 ? 's' : '') + '): ' + (textoMostrarProductoFilaCrearMasivo(r.producto) || ('#' + r.producto.id));
                     nodoWrapperGrupo.appendChild(etiquetaGrupo);
                     indiceEstiloGrupo++;
                     contenedor.appendChild(nodoWrapperGrupo);
@@ -4766,7 +5711,11 @@
 
             div.__rowData = r;
             renderUrlResaltadaFilaCrearMasivo(div);
-            if (puedeCrear) actualizarEstadoBotonGenerar(div);
+            if (puedeCrear) {
+                enlazarInputUnidadesOfertaEnFila(div);
+                asegurarOpcionesStockGenerarEnFilaCrearMasivo(div);
+                actualizarEstadoBotonGenerar(div);
+            }
             if (r.producto && r.tiene_especificaciones) {
                 setTimeout(function() {
                     actualizarConteosOpcionesEspecsFila(div);
@@ -4774,11 +5723,9 @@
                 }, 50);
             }
 
-            const especsMarcadasAuto = !r.producto_asignado_desde_neo
-                ? ((r.especificaciones_marcadas_chatgpt && typeof r.especificaciones_marcadas_chatgpt === 'object')
-                    ? r.especificaciones_marcadas_chatgpt
-                    : ((r.especificaciones_marcadas && typeof r.especificaciones_marcadas === 'object') ? r.especificaciones_marcadas : null))
-                : null;
+            const especsMarcadasAuto = (r.especificaciones_marcadas_chatgpt && typeof r.especificaciones_marcadas_chatgpt === 'object')
+                ? r.especificaciones_marcadas_chatgpt
+                : ((r.especificaciones_marcadas && typeof r.especificaciones_marcadas === 'object') ? r.especificaciones_marcadas : null);
             if (especsMarcadasAuto) {
                 aplicarEspecificacionesMarcadasEnFilaCrearMasivo(div, especsMarcadasAuto);
             }
@@ -4798,7 +5745,33 @@
                     }
                     return;
                 }
-                if (e.target.classList.contains('confirmo-no-es-misma')) {
+                if (e.target.classList.contains('cb-buscar-producto-todas-categorias')) {
+                    div.__buscarProductoTodasCategorias = e.target.checked;
+                    const inp = div.querySelector('.producto-search-input');
+                    if (inp && inp.value.trim().length >= 2) {
+                        buscarProductosCrearMasivo(div, inp.value.trim());
+                    } else {
+                        ocultarSugerenciasCrearMasivo(div);
+                    }
+                    return;
+                }
+                if (e.target.classList.contains('generar-sin-precio-cb')) {
+                    if (e.target.checked) {
+                        const otro = div.querySelector('.generar-segunda-mano-cb');
+                        if (otro) otro.checked = false;
+                    }
+                    actualizarEstadoBotonGenerar(div);
+                    return;
+                }
+                if (e.target.classList.contains('generar-segunda-mano-cb')) {
+                    if (e.target.checked) {
+                        const otro = div.querySelector('.generar-sin-precio-cb');
+                        if (otro) otro.checked = false;
+                    }
+                    actualizarEstadoBotonGenerar(div);
+                    return;
+                }
+                if (e.target.classList.contains('confirmo-no-es-misma') || (e.target.closest && e.target.closest('.confirmo-no-es-misma'))) {
                     actualizarEstadoBotonGenerar(div);
                     return;
                 }
@@ -4821,23 +5794,8 @@
                 const btnImgProd = e.target.closest('.btn-ver-imagenes-producto-crear-masivo');
                 if (btnImgProd) {
                     e.preventDefault();
-                    (async function() {
-                        let imgs = (div.__rowData && div.__rowData.producto && Array.isArray(div.__rowData.producto.imagenes_producto))
-                            ? div.__rowData.producto.imagenes_producto.slice() : [];
-                        const pid = div.__rowData && div.__rowData.producto && div.__rowData.producto.id;
-                        if ((!imgs || imgs.length === 0) && pid) {
-                            try {
-                                const urlRec = '{{ route("admin.ofertas.crear-masivo.recargar-especificaciones", ["producto" => "__ID__"]) }}'.replace('__ID__', pid);
-                                const resRec = await fetch(urlRec, { headers: { 'Accept': 'application/json' } });
-                                const dataRec = await resRec.json();
-                                if (dataRec.success && Array.isArray(dataRec.imagenes_producto)) {
-                                    imgs = dataRec.imagenes_producto;
-                                    if (div.__rowData && div.__rowData.producto) div.__rowData.producto.imagenes_producto = imgs;
-                                }
-                            } catch (err) { console.error(err); }
-                        }
-                        abrirModalImagenesProductoCrearMasivo(imgs);
-                    })();
+                    e.stopPropagation();
+                    verImagenesProductoCrearMasivo(btnImgProd);
                     return;
                 }
                 const btnVerPrompt = e.target.closest('.btn-ver-prompt-crear-masivo');
@@ -4846,7 +5804,12 @@
                     return;
                 }
                 const btn = e.target.closest('.btn-ver-imagenes-spec');
-                if (btn && btn.dataset.key) abrirModalImagenesSpecCrearMasivo(btn.dataset.key);
+                if (btn && btn.dataset.key) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    abrirModalImagenesSpecCrearMasivo(btn.dataset.key);
+                    return;
+                }
                 const btnRecargar = e.target.closest('.btn-recargar-especs');
                 if (btnRecargar && btnRecargar.dataset.productoId) {
                     e.preventDefault();
@@ -4949,9 +5912,17 @@
             if (puedeCrear) {
                 adjuntarListenerGenerarOfertaCrearMasivo(div);
             }
+            enlazarBotonesVerImagenesSpecCrearMasivo(div);
         });
+
+        estadoGr.claveGrupoWrapperAbierto = claveGrupoWrapperAbierto;
+        estadoGr.nodoWrapperGrupo = nodoWrapperGrupo;
+        estadoGr.indiceEstiloGrupo = indiceEstiloGrupo;
+
         actualizarVisibilidadFooterSiguienteNeo();
-        iniciarFlujoModalUrlsCrearMasivo();
+        if (!opciones.omitirInicioModal) {
+            iniciarFlujoModalUrlsCrearMasivo();
+        }
     }
 
     function buscadorProductoEnModalUrlCrearMasivo(div) {
@@ -5012,9 +5983,11 @@
         try {
             const row = div.__rowData || {};
             let urlBus = `{{ route('admin.ofertas.buscar.productos') }}?q=${encodeURIComponent(query)}`;
-            const catIdFiltro = obtenerCategoriaIdFiltroBusquedaProductoCrearMasivo(row);
-            if (catIdFiltro) {
-                urlBus += '&categoria_id=' + encodeURIComponent(String(catIdFiltro));
+            if (productoBusquedaAplicaFiltroCategoriaCrearMasivo(div)) {
+                const catIdFiltro = obtenerCategoriaIdFiltroBusquedaProductoCrearMasivo(row);
+                if (catIdFiltro) {
+                    urlBus += '&categoria_id=' + encodeURIComponent(String(catIdFiltro));
+                }
             }
             const res = await fetch(urlBus);
             const productos = await res.json();
@@ -5188,9 +6161,15 @@
                 talla: producto.talla,
                 texto_completo: producto.texto_completo,
                 url_producto: urlProducto,
-                imagenes_producto: imagenesProducto
+                imagenes_producto: imagenesProducto,
+                unidad_de_medida: data.unidad_de_medida || (especs && especs.unidad_de_medida) || null,
             };
-            const especsHtml = buildEspecsHtml(productoCompleto, especs, tieneEspecs);
+            const especsEfectivas = especificacionesEfectivasResultadoCrearMasivo({
+                especificaciones: especs,
+                producto: productoCompleto,
+                unidad_de_medida: data.unidad_de_medida,
+            });
+            const especsHtml = buildEspecsHtml(productoCompleto, especsEfectivas, tieneEspecs);
             const specParent = div.querySelector('.spec-and-ofertas-container');
             if (specParent) {
                 specParent.innerHTML = especsHtml + (r.ofertas_existentes && r.ofertas_existentes.length ? '<div class="mt-2 text-sm text-amber-700 dark:text-amber-300 space-y-1"><span class="font-medium">Existe en:</span>' + r.ofertas_existentes.map(o => {
@@ -5202,18 +6181,16 @@
             }
             div.__rowData = Object.assign({}, r, {
                 producto: productoCompleto,
-                especificaciones: especs,
+                especificaciones: especsEfectivas,
                 tiene_especificaciones: tieneEspecs,
                 producto_asignado_desde_neo: false,
             });
-            div.dataset.esUnidadUnica = (especs && especs.unidad_de_medida === 'unidadUnica') ? '1' : '0';
-            div.dataset.columnasIds = (especs && especs.columnas_ids) ? JSON.stringify(especs.columnas_ids) : '[]';
+            aplicarDatasetUnidadMedidaFilaCrearMasivo(div, div.__rowData);
+            div.dataset.columnasIds = (especsEfectivas.columnas_ids) ? JSON.stringify(especsEfectivas.columnas_ids) : '[]';
             div.classList.remove('bg-amber-50', 'dark:bg-amber-900/20', 'border-amber-200', 'dark:border-amber-700');
             div.classList.add('bg-green-50', 'dark:bg-green-900/20', 'border', 'border-green-200', 'dark:border-green-700');
             div.querySelector('.font-medium').textContent = 'Lista para crear';
-            const productLinkHtml = urlProducto
-                ? '<a href="' + urlProducto + '" target="_blank" class="text-green-500 hover:underline font-medium">' + producto.texto_completo + '</a>'
-                : '<strong>' + producto.texto_completo + '</strong>';
+            const productLinkHtml = htmlEnlaceProductoFilaCrearMasivo(productoCompleto, urlProducto);
             const accionesProductoHtml = htmlBotonesProductoFilaCrearMasivo(producto.id);
             const productDisplay = div.querySelector('.producto-display');
             if (!productDisplay) {
@@ -5232,18 +6209,29 @@
             const urlFila = (r.url_normalizada || r.url || '').replace(/"/g, '&quot;');
             const tiendaNoMostrar = String((r.tienda && r.tienda.mostrar_tienda) || '').toLowerCase() === 'no';
             const tiendaNoScraping = String((r.tienda && r.tienda.scrapear) || '').toLowerCase() === 'no';
-            const permitirCheckPrecioCero = !!r.tienda && !tiendaNoMostrar && !tiendaNoScraping;
+            const permitirOpcionesStock = permitirOpcionesStockGenerarCrearMasivo(r.tienda);
             const btnWrap = document.createElement('div');
             btnWrap.className = 'acciones-url-wrap flex-shrink-0 flex items-start gap-3';
-            const envioLabelHtml = '<label class="inline-flex flex-col gap-0.5 text-xs text-gray-600 dark:text-gray-300 shrink-0"><span>Envío (€)</span><input type="text" class="cm-envio-oferta-input w-[5.5rem] px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm" value="' + escapeHtmlCrearMasivo(textoEnvioInputDesdeRowCrearMasivo(r)) + '" autocomplete="off" inputmode="decimal" /></label>';
-            btnWrap.innerHTML = '<button type="button" class="btn-descartar-url ' + (mostrarBotonDescartar ? '' : 'hidden ') + 'inline-flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded transition" data-url="' + urlFila + '"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 7h12M9 7V5h6v2m-7 4v6m4-6v6"></path></svg>Descartar URL</button><div class="generar-oferta-wrap flex flex-col items-start gap-2"><button type="button" class="btn-generar inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded transition" data-url="' + (r.url_normalizada || r.url) + '" data-producto-id="' + producto.id + '" data-tienda-id="' + r.tienda.id + '"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg> Generar oferta</button>' + envioLabelHtml + (permitirCheckPrecioCero ? '<label class="generar-sin-precio-wrap inline-flex items-start gap-2 cursor-pointer text-xs text-amber-700 dark:text-amber-300"><input type="checkbox" class="generar-sin-precio-cb mt-0.5 rounded border-gray-300 text-amber-600 focus:ring-amber-500"><span>Precio 0</span></label>' : '') + '</div>';
+            btnWrap.innerHTML = '<button type="button" class="btn-descartar-url ' + (mostrarBotonDescartar ? '' : 'hidden ') + 'inline-flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded transition" data-url="' + urlFila + '"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 7h12M9 7V5h6v2m-7 4v6m4-6v6"></path></svg>Descartar URL</button>' + htmlBloqueGenerarOfertaWrapCrearMasivo({
+                url: r.url_normalizada || r.url,
+                productoId: producto.id,
+                tiendaId: r.tienda.id,
+                tienda: r.tienda,
+                especificaciones: especsEfectivas,
+                producto: productoCompleto,
+                envioVal: textoEnvioInputDesdeRowCrearMasivo(r),
+                permitirOpcionesStock: permitirOpcionesStock,
+            });
             div.querySelector('.flex.justify-between').appendChild(btnWrap);
             const btnGen = div.querySelector('.btn-generar');
+            enlazarInputUnidadesOfertaEnFila(div);
+            asegurarOpcionesStockGenerarEnFilaCrearMasivo(div);
             actualizarEstadoBotonGenerar(div);
             ponerMensajeGeneradoPendienteCrearMasivo(div);
             if (!tieneEspecs) {
                 setTimeout(function() { buscarOfertasMismasEspecsYMostrar(div); }, 300);
             }
+            enlazarBotonesVerImagenesSpecCrearMasivo(div);
             if (data.success && data.especificaciones_marcadas) {
                 aplicarEspecificacionesMarcadasEnFilaCrearMasivo(div, data.especificaciones_marcadas);
             } else {
@@ -5318,8 +6306,8 @@
             filtros.forEach((f) => {
                 const subprincipales = f.subprincipales || [];
                 const esColumna = esUnidadUnica && columnasIds.includes(f.id);
-                const esGrupoProducto = f.es_producto === true;
-                const permiteNuevaOpcion = !esGrupoProducto;
+                const esGrupoProducto = !!f.es_producto;
+                const permiteNuevaOpcion = esGrupoProducto;
                 const grupoRequiereImagen = grupoSpecRequiereImagenCrearMasivo(f, formatosGrupo);
                 if (subprincipales.length === 0) return;
                 const grupoLabelEsc = String(f.texto || f.id || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
@@ -5341,11 +6329,13 @@
                     } else {
                         delete window.__crearMasivoImagenesSublinea[keyImg];
                     }
-                    const btnImgs = imagenes.length ? '<button type="button" class="btn-ver-imagenes-spec inline-flex items-center p-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs ml-0.5" data-key="' + keyImg + '" title="Ver ' + imagenes.length + ' imagen' + (imagenes.length !== 1 ? 'es' : '') + '"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg></button>' : '';
+                    const keyImgAttr = String(keyImg).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+                    const btnImgs = imagenes.length ? '<button type="button" class="btn-ver-imagenes-spec inline-flex items-center p-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs shrink-0" data-key="' + keyImgAttr + '" title="Ver ' + imagenes.length + ' imagen' + (imagenes.length !== 1 ? 'es' : '') + '" onclick="event.preventDefault();event.stopPropagation();abrirModalImagenesSpecCrearMasivo(this.getAttribute(\'data-key\'));"><svg class="w-3.5 h-3.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg></button>' : '';
                     const subIdEsc = String(sub.id || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
                     const usarImgProd = !!sub.usar_imagenes_producto;
                     const tieneImagenes = imagenes.length > 0;
-                    h += '<label class="inline-flex items-center gap-1 cursor-pointer flex-wrap">'
+                    h += '<span class="spec-option-wrap inline-flex items-center gap-1 flex-wrap">'
+                        + '<label class="inline-flex items-center gap-1 cursor-pointer">'
                         + '<input type="checkbox" class="spec-checkbox rounded border-gray-300 text-green-600 focus:ring-green-500"'
                         + ' data-principal-id="' + f.id + '" data-sublinea-id="' + sub.id + '" data-es-columna="' + (esColumna ? '1' : '0') + '"'
                         + ' data-requiere-imagen="' + (grupoRequiereImagen ? '1' : '0') + '"'
@@ -5355,7 +6345,8 @@
                         + '<span class="spec-option-text text-sm text-gray-600 dark:text-gray-400" data-principal-id="' + f.id + '" data-sublinea-id="' + sub.id + '">' + (sub.texto || sub.id) + '</span>'
                         + '<span class="spec-count-badge text-xs text-gray-500 dark:text-gray-400" data-principal-id="' + f.id + '" data-sublinea-id="' + sub.id + '">(x)</span>'
                         + '<span class="spec-sin-imagen-aviso hidden text-xs font-medium text-amber-600 dark:text-amber-400">(No tiene imagen)</span>'
-                        + btnImgs + '</label>';
+                        + '</label>'
+                        + btnImgs + '</span>';
                     if (permiteNuevaOpcion) {
                         h += '<button type="button" class="btn-toggle-nueva-opcion-cm inline-flex items-center p-1 shrink-0 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-xs transition focus:outline-none focus:ring-2 focus:ring-indigo-400 ml-0.5" data-principal-id="' + f.id + '" data-after-sub-id="' + subIdEsc + '" title="Añadir opción después de esta"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg></button>';
                     }
@@ -5416,12 +6407,18 @@
                     const newHtml = buildEspecsHtml(prod, especs, tieneEspecs);
                     specBlock.outerHTML = newHtml;
                     fila.__rowData = Object.assign({}, r, { especificaciones: especs, tiene_especificaciones: tieneEspecs });
-                    fila.dataset.esUnidadUnica = (especs && especs.unidad_de_medida === 'unidadUnica') ? '1' : '0';
+                    aplicarDatasetUnidadMedidaFilaCrearMasivo(fila, {
+                        especificaciones: especs,
+                        producto: prod,
+                        unidad_de_medida: data.unidad_de_medida,
+                    });
                     fila.dataset.columnasIds = (especs && especs.columnas_ids) ? JSON.stringify(especs.columnas_ids) : '[]';
+                    actualizarCampoUnidadesOfertaEnFila(fila);
                     actualizarEstadoBotonGenerar(fila);
                     renderUrlResaltadaFilaCrearMasivo(fila);
                     actualizarConteosOpcionesEspecsFila(fila);
                     actualizarAvisosSinImagenEspecsFila(fila);
+                    enlazarBotonesVerImagenesSpecCrearMasivo(fila);
                 }
 
                 const r = div.__rowData;
@@ -5464,9 +6461,15 @@
                 talla: candidato.talla,
                 texto_completo: candidato.texto_completo,
                 url_producto: urlProducto,
-                imagenes_producto: imagenesProducto
+                imagenes_producto: imagenesProducto,
+                unidad_de_medida: data.unidad_de_medida || (especs && especs.unidad_de_medida) || null,
             };
-            const especsHtml = buildEspecsHtml(productoCompleto, especs, tieneEspecs);
+            const especsEfectivas = especificacionesEfectivasResultadoCrearMasivo({
+                especificaciones: especs,
+                producto: productoCompleto,
+                unidad_de_medida: data.unidad_de_medida,
+            });
+            const especsHtml = buildEspecsHtml(productoCompleto, especsEfectivas, tieneEspecs);
             const specParent = div.querySelector('.spec-and-ofertas-container');
             if (specParent) {
                 const ofertasHtml = (r.ofertas_existentes && r.ofertas_existentes.length) ? '<div class="mt-2 text-sm text-amber-700 dark:text-amber-300 space-y-1"><span class="font-medium">Existe en:</span>' + r.ofertas_existentes.map(o => {
@@ -5477,16 +6480,17 @@
                 }).join('') + '</div>' : '';
                 specParent.innerHTML = especsHtml + ofertasHtml;
             }
-            div.dataset.esUnidadUnica = (especs && especs.unidad_de_medida === 'unidadUnica') ? '1' : '0';
-            div.dataset.columnasIds = (especs && especs.columnas_ids) ? JSON.stringify(especs.columnas_ids) : '[]';
+            enlazarBotonesVerImagenesSpecCrearMasivo(div);
             div.__rowData = Object.assign({}, r, {
                 producto: productoCompleto,
-                especificaciones: especs,
+                especificaciones: especsEfectivas,
                 tiene_especificaciones: tieneEspecs,
                 producto_asignado_desde_neo: false,
             });
+            aplicarDatasetUnidadMedidaFilaCrearMasivo(div, div.__rowData);
+            div.dataset.columnasIds = (especsEfectivas.columnas_ids) ? JSON.stringify(especsEfectivas.columnas_ids) : '[]';
             const productDisplay = div.querySelector('.producto-display');
-            const productLinkHtml = urlProducto ? '<a href="' + urlProducto + '" target="_blank" class="text-green-500 hover:underline font-medium">' + candidato.texto_completo + '</a>' : '<strong>' + candidato.texto_completo + '</strong>';
+            const productLinkHtml = htmlEnlaceProductoFilaCrearMasivo(candidato, urlProducto);
             const accionesProductoHtmlB = htmlBotonesProductoFilaCrearMasivo(candidato.id);
             if (productDisplay) {
                 productDisplay.className = 'mt-1 text-sm text-gray-600 dark:text-gray-400 producto-display flex items-center gap-2 flex-wrap';
@@ -5500,6 +6504,7 @@
             }
             const btnGen = div.querySelector('.btn-generar');
             if (btnGen) btnGen.dataset.productoId = candidato.id;
+            actualizarCampoUnidadesOfertaEnFila(div);
             actualizarValorEnvioInputEnFilaCrearMasivo(div);
             const selectorEmpate = div.querySelector('.btn-elegir-producto')?.closest('.p-3');
             if (selectorEmpate) selectorEmpate.remove();
@@ -5527,6 +6532,15 @@
         if (wrap) wrap.remove();
     }
 
+    function enlazarCheckboxNoEsMismaEnFilaCrearMasivo(div) {
+        const cb = div.querySelector('.confirmo-no-es-misma');
+        if (!cb || cb.__listenerConfirmoNoEsMisma) return;
+        cb.__listenerConfirmoNoEsMisma = true;
+        cb.addEventListener('change', function() {
+            actualizarEstadoBotonGenerar(div);
+        });
+    }
+
     function agregarCheckboxNoEsMisma(div) {
         const btnGen = div.querySelector('.btn-generar');
         const wrap = div.querySelector('.confirmo-no-es-misma-wrap');
@@ -5539,12 +6553,17 @@
         const label = document.createElement('label');
         label.className = 'confirmo-no-es-misma-wrap flex items-center gap-2 cursor-pointer text-sm text-amber-700 dark:text-amber-300';
         label.innerHTML = '<input type="checkbox" class="confirmo-no-es-misma rounded border-gray-300 text-amber-600 focus:ring-amber-500"> <span>No es la misma oferta</span>';
-        const precioWrap = goWrap.querySelector('.generar-sin-precio-wrap');
-        if (precioWrap) {
-            goWrap.insertBefore(label, precioWrap);
+        const metaWrap = goWrap.querySelector('.generar-oferta-meta-wrap') || goWrap;
+        const anchor = metaWrap.querySelector('.generar-opciones-stock-wrap')
+            || metaWrap.querySelector('.generar-sin-precio-wrap')
+            || metaWrap.querySelector('.generar-segunda-mano-wrap');
+        if (anchor && anchor.parentNode) {
+            anchor.parentNode.insertBefore(label, anchor);
         } else {
-            goWrap.appendChild(label);
+            metaWrap.appendChild(label);
         }
+        enlazarCheckboxNoEsMismaEnFilaCrearMasivo(div);
+        actualizarEstadoBotonGenerar(div);
     }
 
     function actualizarEstadoBotonGenerar(div) {
@@ -5557,7 +6576,8 @@
         }
         const hasOfertasBlock = !!div.querySelector('.ofertas-mismas-especs');
         const checkboxChecked = !!div.querySelector('.confirmo-no-es-misma:checked');
-        const shouldDisable = specsIncomplete || (hasOfertasBlock && !checkboxChecked);
+        const unidadesInvalidas = !unidadesOfertaValidasEnFila(div);
+        const shouldDisable = specsIncomplete || (hasOfertasBlock && !checkboxChecked) || unidadesInvalidas;
         btn.disabled = shouldDisable;
         btn.classList.toggle('opacity-50', shouldDisable);
         btn.classList.toggle('cursor-not-allowed', shouldDisable);
@@ -5572,11 +6592,8 @@
             badge.textContent = '(x)';
         });
         div.querySelectorAll('.spec-option-text').forEach((el) => {
-            el.classList.remove(
-                'bg-yellow-200', 'dark:bg-yellow-700/60', 'text-yellow-900', 'dark:text-yellow-100',
-                'bg-orange-300', 'dark:bg-orange-600/80', 'text-orange-950', 'dark:text-orange-50',
-                'text-green-700', 'dark:text-green-300', 'font-semibold', 'px-0.5', 'rounded', 'border', 'border-orange-500/70'
-            );
+            quitarClasesHighlightUrlElCrearMasivo(el);
+            el.classList.remove('text-green-700', 'dark:text-green-300', 'font-semibold');
         });
     }
 
@@ -5614,24 +6631,17 @@
             const esTop = Number.isFinite(n) && max !== null && max > 0 && n === max;
             const sugerirVerde = !grupoYaMarcado && !estaMarcada && esTop;
 
-            // Si está marcada, siempre naranja (igual que coincidencia de URL por especificación)
-            el.classList.toggle('bg-orange-300', estaMarcada);
-            el.classList.toggle('dark:bg-orange-600/80', estaMarcada);
-            el.classList.toggle('text-orange-950', estaMarcada);
-            el.classList.toggle('dark:text-orange-50', estaMarcada);
-            el.classList.toggle('border', estaMarcada);
-            el.classList.toggle('border-orange-500/70', estaMarcada);
-            el.classList.toggle('px-0.5', estaMarcada || sugerirVerde);
-            el.classList.toggle('rounded', estaMarcada || sugerirVerde);
+            quitarClasesHighlightUrlElCrearMasivo(el);
+            el.classList.remove('text-green-700', 'dark:text-green-300', 'font-semibold', 'px-0.5', 'rounded');
 
-            // Sugerencia dominante: solo texto verde, sin fondo, y solo en grupos aún no marcados.
             el.classList.toggle('text-green-700', sugerirVerde);
             el.classList.toggle('dark:text-green-300', sugerirVerde);
-            el.classList.toggle('font-semibold', estaMarcada || sugerirVerde);
-
-            // Limpiar estilos amarillos antiguos.
-            el.classList.remove('bg-yellow-200', 'dark:bg-yellow-700/60', 'text-yellow-900', 'dark:text-yellow-100');
+            el.classList.toggle('font-semibold', sugerirVerde);
+            el.classList.toggle('px-0.5', sugerirVerde);
+            el.classList.toggle('rounded', sugerirVerde);
         });
+
+        aplicarHighlightSpecsMarcadasFilaCrearMasivo(div);
     }
 
     async function actualizarConteosOpcionesEspecsFila(div) {
@@ -5790,6 +6800,77 @@
         });
     }
 
+    const Z_INDEX_MODAL_IMAGENES_CREAR_MASIVO = 100;
+    const Z_INDEX_MODAL_SOBRE_URL_CREAR_MASIVO = 110;
+
+    function asegurarModalCapaCrearMasivoAlBody(modal) {
+        if (!modal) return;
+        if (modal.parentNode !== document.body) {
+            document.body.appendChild(modal);
+        }
+    }
+
+    function mostrarModalCapaCrearMasivo(modal, zIndex) {
+        if (!modal) return;
+        asegurarModalCapaCrearMasivoAlBody(modal);
+        modal.classList.remove('hidden');
+        modal.style.zIndex = String(zIndex != null ? zIndex : Z_INDEX_MODAL_SOBRE_URL_CREAR_MASIVO);
+    }
+
+    function ocultarModalCapaCrearMasivo(modal) {
+        if (!modal) return;
+        modal.classList.add('hidden');
+        modal.style.zIndex = '';
+    }
+
+    function mostrarModalCapaImagenesCrearMasivo(modal) {
+        mostrarModalCapaCrearMasivo(modal, Z_INDEX_MODAL_IMAGENES_CREAR_MASIVO);
+    }
+
+    function enlazarBotonesVerImagenesSpecCrearMasivo(scope) {
+        const root = (scope && typeof scope.querySelectorAll === 'function') ? scope : document;
+        root.querySelectorAll('.btn-ver-imagenes-spec').forEach(function(btn) {
+            if (btn.dataset.cmImgSpecBound === '1') return;
+            btn.dataset.cmImgSpecBound = '1';
+            btn.onclick = function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const key = btn.getAttribute('data-key');
+                if (key) abrirModalImagenesSpecCrearMasivo(key);
+            };
+        });
+        root.querySelectorAll('.btn-ver-imagenes-producto-crear-masivo').forEach(function(btn) {
+            if (btn.dataset.cmImgProdBound === '1') return;
+            btn.dataset.cmImgProdBound = '1';
+            btn.onclick = function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                verImagenesProductoCrearMasivo(btn);
+            };
+        });
+    }
+
+    async function verImagenesProductoCrearMasivo(btn) {
+        if (!btn) return;
+        const div = btn.closest('.crear-masivo-fila');
+        if (!div) return;
+        let imgs = (div.__rowData && div.__rowData.producto && Array.isArray(div.__rowData.producto.imagenes_producto))
+            ? div.__rowData.producto.imagenes_producto.slice() : [];
+        const pid = div.__rowData && div.__rowData.producto && div.__rowData.producto.id;
+        if ((!imgs || imgs.length === 0) && pid) {
+            try {
+                const urlRec = '{{ route("admin.ofertas.crear-masivo.recargar-especificaciones", ["producto" => "__ID__"]) }}'.replace('__ID__', pid);
+                const resRec = await fetch(urlRec, { headers: { 'Accept': 'application/json' } });
+                const dataRec = await resRec.json();
+                if (dataRec.success && Array.isArray(dataRec.imagenes_producto)) {
+                    imgs = dataRec.imagenes_producto;
+                    if (div.__rowData && div.__rowData.producto) div.__rowData.producto.imagenes_producto = imgs;
+                }
+            } catch (err) { console.error(err); }
+        }
+        abrirModalImagenesProductoCrearMasivo(imgs);
+    }
+
     function abrirModalImagenesSpecCrearMasivo(key) {
         const modal = document.getElementById('modal-imagenes-spec-crear-masivo');
         const titulo = document.getElementById('modal-imagenes-crear-masivo-titulo');
@@ -5800,7 +6881,7 @@
         const imagenes = (window.__crearMasivoImagenesSublinea && window.__crearMasivoImagenesSublinea[key]) ? window.__crearMasivoImagenesSublinea[key] : [];
         window.__crearMasivoImagenesActual = { key, imagenes: Array.isArray(imagenes) ? imagenes : [] };
         renderizarMiniaturasSpecCrearMasivo();
-        modal.classList.remove('hidden');
+        mostrarModalCapaImagenesCrearMasivo(modal);
     }
 
     function abrirModalImagenesProductoCrearMasivo(imagenes) {
@@ -5812,8 +6893,12 @@
         if (!modal) return;
         window.__crearMasivoImagenesActual = { key: 'producto', imagenes: Array.isArray(imagenes) ? imagenes : [] };
         renderizarMiniaturasSpecCrearMasivo();
-        modal.classList.remove('hidden');
+        mostrarModalCapaImagenesCrearMasivo(modal);
     }
+
+    window.abrirModalImagenesSpecCrearMasivo = abrirModalImagenesSpecCrearMasivo;
+    window.abrirModalImagenesProductoCrearMasivo = abrirModalImagenesProductoCrearMasivo;
+    window.verImagenesProductoCrearMasivo = verImagenesProductoCrearMasivo;
 
     function abrirModalVerPromptCrearMasivo(r) {
         const modal = document.getElementById('modal-ver-prompt-crear-masivo');
@@ -5879,7 +6964,7 @@
             htmlRespuesta += '<details class="mt-3"><summary class="cursor-pointer text-gray-500 dark:text-gray-400 text-xs">Ver JSON crudo</summary><pre class="mt-1 p-2 rounded bg-gray-100 dark:bg-gray-800 text-xs overflow-x-auto whitespace-pre-wrap break-words max-h-40 overflow-y-auto">' + (r.chatgpt_respuesta_raw || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre></details>';
         }
         contRespuesta.innerHTML = htmlRespuesta || '<p class="text-gray-500 dark:text-gray-400">Sin respuesta parseada</p>';
-        modal.classList.remove('hidden');
+        mostrarModalCapaCrearMasivo(modal, Z_INDEX_MODAL_SOBRE_URL_CREAR_MASIVO);
     }
 
     function abrirModalDescartarUrlCrearMasivo(url, div) {
@@ -5889,12 +6974,11 @@
         descartarUrlPendienteCrearMasivo = url;
         descartarFilaPendienteCrearMasivo = div || null;
         texto.textContent = url || '';
-        modal.classList.remove('hidden');
+        mostrarModalCapaCrearMasivo(modal, Z_INDEX_MODAL_SOBRE_URL_CREAR_MASIVO);
     }
 
     function cerrarModalDescartarUrlCrearMasivo() {
-        const modal = document.getElementById('modal-descartar-url-crear-masivo');
-        if (modal) modal.classList.add('hidden');
+        ocultarModalCapaCrearMasivo(document.getElementById('modal-descartar-url-crear-masivo'));
         descartarUrlPendienteCrearMasivo = null;
         descartarFilaPendienteCrearMasivo = null;
     }
@@ -5983,16 +7067,16 @@
     }
 
     function cerrarModalVerPromptCrearMasivo() {
-        const modal = document.getElementById('modal-ver-prompt-crear-masivo');
-        if (modal) modal.classList.add('hidden');
+        ocultarModalCapaCrearMasivo(document.getElementById('modal-ver-prompt-crear-masivo'));
     }
 
     function cerrarModalImagenesSpecCrearMasivo() {
         const modal = document.getElementById('modal-imagenes-spec-crear-masivo');
-        if (!modal) return;
-        modal.classList.add('hidden');
+        ocultarModalCapaCrearMasivo(modal);
         window.__crearMasivoImagenesActual = { key: null, imagenes: [] };
     }
+
+    window.cerrarModalImagenesSpecCrearMasivo = cerrarModalImagenesSpecCrearMasivo;
 
     function renderizarMiniaturasSpecCrearMasivo() {
         const container = document.getElementById('miniaturas-container-spec-crear-masivo');
@@ -6844,8 +7928,16 @@
         const especsHtml = buildEspecsHtml(p, data.especificaciones, data.tiene_especificaciones);
         specContainer.innerHTML = especsHtml;
         specContainer.dataset.columnasIds = (data.especificaciones && data.especificaciones.columnas_ids) ? JSON.stringify(data.especificaciones.columnas_ids) : '[]';
-        specContainer.dataset.esUnidadUnica = (data.especificaciones && data.especificaciones.unidad_de_medida === 'unidadUnica') ? '1' : '0';
+        aplicarDatasetUnidadMedidaFilaCrearMasivo(specContainer, {
+            especificaciones: data.especificaciones,
+            unidad_de_medida: data.unidad_de_medida,
+        });
+        window.__mismoProductoUnidadDeMedida = unidadDeMedidaDesdeFuentesCrearMasivo({
+            especificaciones: data.especificaciones,
+            unidad_de_medida: data.unidad_de_medida,
+        });
         if (Array.isArray(data.imagenes_producto)) p.imagenes_producto = data.imagenes_producto;
+        enlazarBotonesVerImagenesSpecCrearMasivo(specContainer);
     }
 
     function marcarNuevaOpcionTrasGuardarCm(ctxEl, principalId, subId, esFilaResultado) {
@@ -6926,12 +8018,14 @@
                 alert('Espera a que terminen de subirse todas las imágenes antes de guardar la opción.');
                 return;
             }
+            const specLine = panel.closest('.spec-line');
             const body = {
                 producto_id: ctx.productoId,
                 principal_id: principalId,
                 texto: texto,
                 usar_imagenes_producto: usarProd,
-                imagenes: (!usarProd && Array.isArray(panel.__cmDraftImagenes)) ? panel.__cmDraftImagenes : []
+                imagenes: (!usarProd && Array.isArray(panel.__cmDraftImagenes)) ? panel.__cmDraftImagenes : [],
+                es_grupo_producto: !!(specLine && specLine.dataset.esProducto === '1'),
             };
             if (panel.__cmInsertFirst) body.insert_first = true;
             else if (panel.__cmInsertAfterSubId) body.after_sub_id = panel.__cmInsertAfterSubId;
@@ -7028,6 +8122,13 @@
                 }
             });
         })();
+
+        ['modal-imagenes-spec-crear-masivo', 'modal-url-crear-masivo', 'modal-ver-prompt-crear-masivo', 'modal-descartar-url-crear-masivo'].forEach(function(modalId) {
+            const capa = document.getElementById(modalId);
+            if (capa && capa.parentNode !== document.body) {
+                document.body.appendChild(capa);
+            }
+        });
 
         const modal = document.getElementById('modal-imagenes-spec-crear-masivo');
         if (modal) {

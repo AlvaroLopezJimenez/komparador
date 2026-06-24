@@ -81,18 +81,32 @@
         <div class="max-w-7xl mx-auto px-4 py-3">
             <div class="flex items-center justify-between gap-4">
                 <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 flex-1">
-                <!-- Clicks de Hoy -->
-                <a href="{{ route('admin.clicks.dashboard') }}" class="flex items-center space-x-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors cursor-pointer">
-                    <div class="p-1.5 bg-blue-100 dark:bg-blue-800 rounded-md">
+                <!-- Visitas / Clics / CTR de hoy -->
+                <a href="{{ route('admin.clicks.dashboard') }}" class="flex items-center space-x-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors cursor-pointer" title="Visitas / Clics / CTR de hoy">
+                    <div class="p-1.5 bg-blue-100 dark:bg-blue-800 rounded-md shrink-0">
                         <svg class="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
                         </svg>
                     </div>
-                    <div class="min-w-0 flex-1">
-                        <div class="flex items-center justify-between">
-                            <span class="text-sm font-medium text-white">Clicks</span>
-                            <span class="text-lg font-bold text-blue-600 dark:text-blue-400">{{ number_format($estadisticasCompactas['clicksHoy']) }}</span>
+                    @php
+                        $ctrHoyCompacto = $estadisticasCompactas['ctrHoy'] ?? 0;
+                        $ctrHoyFmt = floor($ctrHoyCompacto) == $ctrHoyCompacto
+                            ? number_format($ctrHoyCompacto, 0, ',', '.')
+                            : number_format($ctrHoyCompacto, 1, ',', '.');
+                    @endphp
+                    <div class="min-w-0 flex-1 h-7 grid grid-cols-3 leading-none">
+                        <div class="flex flex-col justify-between items-center">
+                            <span class="text-[10px] font-medium text-gray-600 dark:text-gray-300">Visitas</span>
+                            <span class="text-xs font-bold text-blue-600 dark:text-blue-400 tabular-nums">{{ number_format($estadisticasCompactas['visitasHoy'] ?? 0) }}</span>
+                        </div>
+                        <div class="flex flex-col justify-between items-center">
+                            <span class="text-[10px] font-medium text-gray-600 dark:text-gray-300">Clics</span>
+                            <span class="text-xs font-bold text-blue-600 dark:text-blue-400 tabular-nums">{{ number_format($estadisticasCompactas['clicksHoy'] ?? 0) }}</span>
+                        </div>
+                        <div class="flex flex-col justify-between items-center">
+                            <span class="text-[10px] font-medium text-gray-600 dark:text-gray-300">CTR</span>
+                            <span class="text-xs font-bold text-blue-600 dark:text-blue-400 tabular-nums">{{ $ctrHoyFmt }}%</span>
                         </div>
                     </div>
                 </a>

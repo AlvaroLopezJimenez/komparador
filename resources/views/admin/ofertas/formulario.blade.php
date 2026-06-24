@@ -3380,20 +3380,71 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Función para normalizar la URL de una tienda (igual que extraerDominioNormalizado)
+    // Función para normalizar la URL de una tienda (dominio en campo url, p. ej. amazon.es)
     function normalizarUrlTienda(urlTienda) {
         if (!urlTienda || !urlTienda.trim()) {
             return null;
         }
 
-        // Normalizar: quitar www., https://, http:// y convertir a minúsculas
         let normalizada = urlTienda.trim().toLowerCase();
         normalizada = normalizada.replace(/^https?:\/\//, '');
         normalizada = normalizada.replace(/^www\./, '');
-        normalizada = normalizada.replace(/\/.*$/, ''); // Quitar cualquier path después del dominio
-        normalizada = normalizada.replace(/\/$/, ''); // Quitar barra final si existe
+        normalizada = normalizada.replace(/\/.*$/, '');
+        normalizada = normalizada.replace(/\/$/, '');
+
+        if (!normalizada || !normalizada.includes('.')) {
+            return null;
+        }
 
         return normalizada;
+    }
+
+    function normalizarClaveTiendaDetectar(texto) {
+        return String(texto || '')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .replace(/[^a-z0-9]/g, '');
+    }
+
+    function clavesHostTiendaDetectar(tienda) {
+        const claves = [];
+        const nombre = normalizarClaveTiendaDetectar(tienda && tienda.nombre);
+        if (nombre) claves.push(nombre);
+        const urlCampo = tienda && tienda.url ? String(tienda.url).trim() : '';
+        if (urlCampo && !urlCampo.includes('.')) {
+            const slug = normalizarClaveTiendaDetectar(urlCampo);
+            if (slug) claves.push(slug);
+        }
+        return [...new Set(claves)];
+    }
+
+    function buscarTiendaEnListaPorUrl(host, todasLasTiendas) {
+        if (!host || !Array.isArray(todasLasTiendas)) return null;
+
+        for (let i = 0; i < todasLasTiendas.length; i++) {
+            const tienda = todasLasTiendas[i];
+            const dominioTienda = normalizarUrlTienda(tienda && tienda.url);
+            if (!dominioTienda) continue;
+            if (host === dominioTienda || host.endsWith('.' + dominioTienda) || dominioTienda.endsWith('.' + host)) {
+                return tienda;
+            }
+        }
+
+        let mejor = null;
+        let mejorLongitud = 0;
+        for (let i = 0; i < todasLasTiendas.length; i++) {
+            const claves = clavesHostTiendaDetectar(todasLasTiendas[i]);
+            for (let j = 0; j < claves.length; j++) {
+                const clave = claves[j];
+                if (clave.length < 4) continue;
+                if (host.includes(clave) && clave.length > mejorLongitud) {
+                    mejor = todasLasTiendas[i];
+                    mejorLongitud = clave.length;
+                }
+            }
+        }
+        return mejor;
     }
 
     // Función para detectar y seleccionar automáticamente la tienda basándose en la URL
@@ -3414,34 +3465,17 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         try {
-            // Obtener todas las tiendas disponibles
             const response = await fetch('{{ route("admin.ofertas.tiendas.disponibles") }}');
             if (!response.ok) {
                 return;
             }
-            
-            const todasLasTiendas = await response.json();
 
+            const todasLasTiendas = await response.json();
             if (!Array.isArray(todasLasTiendas) || todasLasTiendas.length === 0) {
                 return;
             }
 
-            // Buscar tienda que coincida con el dominio
-            const tiendaEncontrada = todasLasTiendas.find(tienda => {
-                if (!tienda || !tienda.url || !tienda.url.trim()) {
-                    return false;
-                }
-
-                const dominioTienda = normalizarUrlTienda(tienda.url);
-                if (!dominioTienda) {
-                    return false;
-                }
-
-                // Comparar dominios normalizados (case-insensitive)
-                return dominioTienda.toLowerCase() === dominioUrl.toLowerCase();
-            });
-
-            // Si encontramos una tienda, seleccionarla automáticamente
+            const tiendaEncontrada = buscarTiendaEnListaPorUrl(dominioUrl, todasLasTiendas);
             if (tiendaEncontrada) {
                 seleccionarTienda(tiendaEncontrada);
             }

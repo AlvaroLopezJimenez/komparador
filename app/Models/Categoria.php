@@ -15,7 +15,8 @@ class Categoria extends Model
         'parent_id',
         'mostrar',
         'especificaciones_internas',
-        'info_adicional_chatgpt'
+        'info_adicional_chatgpt',
+        'unidad_de_medida',
     ];
 
     protected $casts = [

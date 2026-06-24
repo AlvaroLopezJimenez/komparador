@@ -14,15 +14,22 @@ use App\Jobs\GuardarClickJob;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Database\QueryException;
 use App\Services\SignedUrlService;
+use App\Services\VisitorTrackingService;
+use Carbon\Carbon;
 
 class ClickController extends Controller
 {
     protected $signedUrlService;
+    protected VisitorTrackingService $visitorTracking;
 
-    public function __construct(SignedUrlService $signedUrlService)
-    {
+    public function __construct(
+        SignedUrlService $signedUrlService,
+        VisitorTrackingService $visitorTracking
+    ) {
         $this->signedUrlService = $signedUrlService;
+        $this->visitorTracking = $visitorTracking;
     }
 
     //LISTAR TODOS LOS CLICKS
@@ -44,16 +51,317 @@ class ClickController extends Controller
         return view('admin.clics.index', compact('clics'));
     }
 
-    // NUEVO MÉTODO PARA EL DASHBOARD DE CLICKS
     public function dashboard(Request $request)
     {
-        // Obtener filtro rápido
+        $filtros = $this->resolverRangoFechasDashboard($request);
+        $fechaDesde = $filtros['fechaDesde'];
+        $fechaHasta = $filtros['fechaHasta'];
+        $horaDesde = $filtros['horaDesde'];
+        $horaHasta = $filtros['horaHasta'];
+        $filtroRapido = $filtros['filtroRapido'];
+        $busqueda = (string) ($request->input('busqueda') ?? '');
+        $porPagina = (int) $request->input('por_pagina', 20);
+
+        $resumen = $this->resumenGeneralDashboard($fechaDesde, $fechaHasta, $horaDesde, $horaHasta);
+
+        $clicks = $this->queryClicksDashboard($fechaDesde, $fechaHasta, $busqueda, $horaDesde, $horaHasta)
+            ->orderByDesc('created_at')
+            ->paginate($porPagina)
+            ->withQueryString();
+
+        $estadisticas = $this->obtenerEstadisticas($fechaDesde, $fechaHasta, $busqueda, $horaDesde, $horaHasta);
+        $ipsSospechosas = $this->detectarIPsSospechosas($estadisticas['clicksPorIP']);
+        $ipsNuevas = $this->detectarIPsNuevas($fechaDesde, $fechaHasta, $busqueda, $horaDesde, $horaHasta);
+        $datosMapa = $this->obtenerDatosMapa($fechaDesde, $fechaHasta, $busqueda, $horaDesde, $horaHasta);
+
+        return view('admin.clicks.dashboard', compact(
+            'resumen',
+            'filtroRapido',
+            'fechaDesde',
+            'fechaHasta',
+            'horaDesde',
+            'horaHasta',
+            'busqueda',
+            'porPagina',
+            'clicks',
+            'ipsSospechosas',
+            'ipsNuevas',
+            'datosMapa',
+        ));
+    }
+
+    public function dashboardTop(Request $request)
+    {
+        try {
+            $request->validate([
+                'tipo' => 'required|in:productos,categorias,tiendas',
+                'orden' => 'nullable|in:ctr,visitas,clicks',
+                'page' => 'nullable|integer|min:1',
+                'per_page' => 'nullable|integer|min:5|max:50',
+            ]);
+
+            $filtros = $this->resolverRangoFechasDashboard($request);
+
+            return response()->json(
+                $this->obtenerTopPaginadoDashboard(
+                    $request->input('tipo'),
+                    $filtros['fechaDesde'],
+                    $filtros['fechaHasta'],
+                    $filtros['horaDesde'],
+                    $filtros['horaHasta'],
+                    $request->input('orden', 'ctr'),
+                    (int) $request->input('page', 1),
+                    (int) $request->input('per_page', 10)
+                )
+            );
+        } catch (\Throwable $e) {
+            Log::error('Dashboard top error', [
+                'tipo' => $request->input('tipo'),
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'data' => [],
+                'current_page' => 1,
+                'last_page' => 1,
+                'per_page' => 10,
+                'total' => 0,
+                'error' => config('app.debug') ? $e->getMessage() : 'Error al cargar datos',
+            ], 200);
+        }
+    }
+
+    public function dashboardGrafica(Request $request)
+    {
+        try {
+            $filtros = $this->resolverRangoFechasDashboard($request);
+            $granularidad = $request->input('granularidad');
+
+            return response()->json(
+                $this->obtenerSerieTemporalDashboard(
+                    $filtros['fechaDesde'],
+                    $filtros['fechaHasta'],
+                    $filtros['horaDesde'],
+                    $filtros['horaHasta'],
+                    is_string($granularidad) && $granularidad !== '' ? $granularidad : null,
+                )
+            );
+        } catch (\Throwable $e) {
+            Log::error('Dashboard grafica error', ['error' => $e->getMessage()]);
+
+            return response()->json([
+                'granularidad' => 'day',
+                'granularidad_defecto' => 'day',
+                'labels' => [],
+                'visitas' => [],
+                'clicks' => [],
+                'ctr' => [],
+                'error' => config('app.debug') ? $e->getMessage() : 'Error al cargar datos',
+            ], 200);
+        }
+    }
+
+    private function resolverGranularidadPorDefectoDashboard(string $fechaDesde, string $fechaHasta): string
+    {
+        if ($fechaDesde === $fechaHasta) {
+            return 'hour';
+        }
+
+        $diffDays = Carbon::parse($fechaDesde)->diffInDays(Carbon::parse($fechaHasta));
+
+        if ($diffDays <= 7) {
+            return 'hour';
+        }
+
+        if ($diffDays <= 365) {
+            return 'day';
+        }
+
+        if ($diffDays <= 365 * 5) {
+            return 'month';
+        }
+
+        return 'year';
+    }
+
+    private function resolverGranularidadDashboard(string $fechaDesde, string $fechaHasta): string
+    {
+        return $this->resolverGranularidadPorDefectoDashboard($fechaDesde, $fechaHasta);
+    }
+
+    private function expresionBucketDashboard(string $granularidad, string $columna): string
+    {
+        return match ($granularidad) {
+            '15min' => "CONCAT(DATE({$columna}), ' ', LPAD(HOUR({$columna}), 2, '0'), ':', LPAD(FLOOR(MINUTE({$columna}) / 15) * 15, 2, '0'))",
+            'hour' => "CONCAT(DATE({$columna}), ' ', LPAD(HOUR({$columna}), 2, '0'), ':00')",
+            'month' => "DATE_FORMAT({$columna}, '%Y-%m')",
+            'year' => "DATE_FORMAT({$columna}, '%Y')",
+            default => "DATE({$columna})",
+        };
+    }
+
+    private function generarBucketsDashboard(
+        string $fechaDesde,
+        string $fechaHasta,
+        string $granularidad,
+        string $horaDesde,
+        string $horaHasta
+    ): array {
+        $buckets = [];
+
+        if ($granularidad === '15min') {
+            $inicio = Carbon::parse($fechaDesde)->startOfDay();
+            $fin = Carbon::parse($fechaDesde)->endOfDay();
+
+            if ($horaDesde !== '' && $horaHasta !== '') {
+                $inicio = Carbon::parse($fechaDesde . ' ' . $horaDesde);
+                $fin = Carbon::parse($fechaDesde . ' ' . $horaHasta);
+            }
+
+            $inicio->minute((int) (floor($inicio->minute / 15) * 15))->second(0);
+            $fin->second(59);
+
+            $cursor = $inicio->copy();
+            while ($cursor <= $fin) {
+                $key = $cursor->format('Y-m-d H:') . str_pad((string) ((int) (floor($cursor->minute / 15) * 15)), 2, '0', STR_PAD_LEFT);
+                $buckets[] = [
+                    'key' => $key,
+                    'label' => $cursor->format('H:i'),
+                ];
+                $cursor->addMinutes(15);
+            }
+
+            return $buckets;
+        }
+
+        if ($granularidad === 'hour') {
+            $inicio = Carbon::parse($fechaDesde)->startOfDay();
+            $fin = Carbon::parse($fechaHasta)->endOfDay();
+            $mismoDia = $fechaDesde === $fechaHasta;
+
+            if ($mismoDia && $horaDesde !== '' && $horaHasta !== '') {
+                $inicio = Carbon::parse($fechaDesde . ' ' . $horaDesde)->startOfHour();
+                $fin = Carbon::parse($fechaDesde . ' ' . $horaHasta)->endOfHour();
+            }
+
+            $cursor = $inicio->copy()->startOfHour();
+            while ($cursor <= $fin) {
+                $buckets[] = [
+                    'key' => $cursor->format('Y-m-d H:') . '00',
+                    'label' => $mismoDia ? $cursor->format('H:i') : $cursor->format('d/m H:i'),
+                ];
+                $cursor->addHour();
+            }
+
+            return $buckets;
+        }
+
+        if ($granularidad === 'month') {
+            $cursor = Carbon::parse($fechaDesde)->startOfMonth();
+            $fin = Carbon::parse($fechaHasta)->endOfMonth();
+
+            while ($cursor <= $fin) {
+                $buckets[] = [
+                    'key' => $cursor->format('Y-m'),
+                    'label' => $cursor->locale('es')->translatedFormat('M Y'),
+                ];
+                $cursor->addMonth();
+            }
+
+            return $buckets;
+        }
+
+        if ($granularidad === 'year') {
+            $cursor = Carbon::parse($fechaDesde)->startOfYear();
+            $fin = Carbon::parse($fechaHasta)->endOfYear();
+
+            while ($cursor <= $fin) {
+                $buckets[] = [
+                    'key' => $cursor->format('Y'),
+                    'label' => $cursor->format('Y'),
+                ];
+                $cursor->addYear();
+            }
+
+            return $buckets;
+        }
+
+        $cursor = Carbon::parse($fechaDesde)->startOfDay();
+        $fin = Carbon::parse($fechaHasta)->endOfDay();
+
+        while ($cursor <= $fin) {
+            $buckets[] = [
+                'key' => $cursor->format('Y-m-d'),
+                'label' => $cursor->format('d/m/Y'),
+            ];
+            $cursor->addDay();
+        }
+
+        return $buckets;
+    }
+
+    private function obtenerSerieTemporalDashboard(
+        string $fechaDesde,
+        string $fechaHasta,
+        string $horaDesde,
+        string $horaHasta,
+        ?string $granularidadSolicitada = null,
+    ): array {
+        [$inicio, $fin] = $this->rangoSqlDashboard($fechaDesde, $fechaHasta);
+        $granularidadDefecto = $this->resolverGranularidadPorDefectoDashboard($fechaDesde, $fechaHasta);
+        $granularidadesValidas = ['15min', 'hour', 'day', 'month', 'year'];
+        $granularidad = in_array($granularidadSolicitada, $granularidadesValidas, true)
+            ? $granularidadSolicitada
+            : $granularidadDefecto;
+        $expr = $this->expresionBucketDashboard($granularidad, 'created_at');
+
+        $visitasQ = DB::table('visitas_usuario')
+            ->whereBetween('created_at', [$inicio, $fin])
+            ->selectRaw("{$expr} as bucket, COUNT(*) as total")
+            ->groupByRaw($expr);
+        $this->aplicarFiltroHoraDashboard($visitasQ, 'created_at', $horaDesde, $horaHasta);
+
+        $clicksQ = DB::table('clicks')
+            ->whereBetween('created_at', [$inicio, $fin])
+            ->selectRaw("{$expr} as bucket, COUNT(*) as total")
+            ->groupByRaw($expr);
+        $this->aplicarFiltroHoraDashboard($clicksQ, 'created_at', $horaDesde, $horaHasta);
+
+        $visitasMap = $visitasQ->pluck('total', 'bucket')->map(fn ($v) => (int) $v);
+        $clicksMap = $clicksQ->pluck('total', 'bucket')->map(fn ($v) => (int) $v);
+
+        $buckets = $this->generarBucketsDashboard($fechaDesde, $fechaHasta, $granularidad, $horaDesde, $horaHasta);
+
+        $labels = [];
+        $visitas = [];
+        $clicks = [];
+        $ctr = [];
+
+        foreach ($buckets as $bucket) {
+            $v = (int) ($visitasMap[$bucket['key']] ?? 0);
+            $c = (int) ($clicksMap[$bucket['key']] ?? 0);
+            $labels[] = $bucket['label'];
+            $visitas[] = $v;
+            $clicks[] = $c;
+            $ctr[] = $this->calcularCtrDashboard($v, $c);
+        }
+
+        return [
+            'granularidad' => $granularidad,
+            'granularidad_defecto' => $granularidadDefecto,
+            'labels' => $labels,
+            'visitas' => $visitas,
+            'clicks' => $clicks,
+            'ctr' => $ctr,
+        ];
+    }
+
+    private function resolverRangoFechasDashboard(Request $request): array
+    {
         $filtroRapido = $request->input('filtro_rapido', 'hoy');
-        
-        // Procesar filtro rápido
         $hoy = now();
-        
-        switch($filtroRapido) {
+
+        switch ($filtroRapido) {
             case 'hoy':
                 $fechaDesde = $fechaHasta = $hoy->toDateString();
                 break;
@@ -81,92 +389,394 @@ class ClickController extends Controller
                 $fechaHasta = $hoy->toDateString();
                 break;
             case 'siempre':
-                $fechaDesde = '1900-01-01'; // Fecha muy antigua para incluir todo
+                $fechaDesde = '1900-01-01';
                 $fechaHasta = $hoy->toDateString();
                 break;
             default:
-                // Si no hay filtro rápido o es inválido, usar los valores por defecto o los enviados
                 $fechaDesde = $request->input('fecha_desde', $hoy->toDateString());
                 $fechaHasta = $request->input('fecha_hasta', $hoy->toDateString());
                 break;
         }
-        
-        $busqueda = $request->input('busqueda', '');
-        $porPagina = $request->input('por_pagina', 20);
-        
-        // Filtros de hora
-        $horaDesde = $request->input('hora_desde', '');
-        $horaHasta = $request->input('hora_hasta', '');
 
-        // Query base con relaciones
+        return [
+            'filtroRapido' => $filtroRapido,
+            'fechaDesde' => $fechaDesde,
+            'fechaHasta' => $fechaHasta,
+            'horaDesde' => (string) ($request->input('hora_desde') ?? ''),
+            'horaHasta' => (string) ($request->input('hora_hasta') ?? ''),
+        ];
+    }
+
+    private function queryClicksDashboard(string $fechaDesde, string $fechaHasta, string $busqueda, string $horaDesde, string $horaHasta)
+    {
         $query = Click::with(['oferta.producto', 'oferta.tienda'])
             ->whereBetween('created_at', [$fechaDesde . ' 00:00:00', $fechaHasta . ' 23:59:59']);
-        
-        // Aplicar filtro de hora si se especifica
-        if (!empty($horaDesde) && !empty($horaHasta)) {
+
+        $this->aplicarFiltrosBusquedaClicksDashboard($query, $busqueda, $horaDesde, $horaHasta);
+
+        return $query;
+    }
+
+    private function aplicarFiltrosBusquedaClicksDashboard($query, string $busqueda, string $horaDesde, string $horaHasta): void
+    {
+        if ($horaDesde !== '' && $horaHasta !== '') {
             $query->whereRaw('TIME(created_at) BETWEEN ? AND ?', [$horaDesde, $horaHasta]);
         }
 
-        // Aplicar búsqueda si existe
-        if (!empty($busqueda)) {
-            $terminos = array_map('trim', explode(',', $busqueda));
-            
-            $query->where(function($q) use ($terminos) {
-                foreach ($terminos as $termino) {
-                    $q->where(function($subQ) use ($termino) {
-                        $subQ->whereHas('oferta.producto', function($productoQ) use ($termino) {
-                            $productoQ->where(function($p) use ($termino) {
-                                $p->where('nombre', 'LIKE', '%' . $termino . '%')
-                                  ->orWhere('marca', 'LIKE', '%' . $termino . '%')
-                                  ->orWhere('talla', 'LIKE', '%' . $termino . '%')
-                                  ->orWhereRaw('CONCAT(nombre, " ", marca, " ", talla) LIKE ?', ['%' . $termino . '%'])
-                                  ->orWhereRaw('CONCAT(marca, " - ", talla) LIKE ?', ['%' . $termino . '%'])
-                                  ->orWhereRaw('CONCAT(nombre, " ", talla) LIKE ?', ['%' . $termino . '%']);
-                            });
-                        })
-                        ->orWhereHas('oferta.tienda', function($tiendaQ) use ($termino) {
-                            $tiendaQ->where('nombre', 'LIKE', '%' . $termino . '%');
-                        })
-                        ->orWhere('campaña', 'LIKE', '%' . $termino . '%')
-                        ->orWhere('ip', 'LIKE', '%' . $termino . '%');
-                    });
-                }
-            });
+        if ($busqueda === '') {
+            return;
         }
 
-        // Obtener clicks paginados
-        $clicks = $query->orderBy('created_at', 'desc')->paginate($porPagina);
+        $terminos = array_map('trim', explode(',', $busqueda));
 
-        // Estadísticas para gráficos
-        $estadisticas = $this->obtenerEstadisticas($fechaDesde, $fechaHasta, $busqueda, $horaDesde, $horaHasta);
+        $query->where(function ($q) use ($terminos) {
+            foreach ($terminos as $termino) {
+                $q->where(function ($subQ) use ($termino) {
+                    $subQ->whereHas('oferta.producto', function ($productoQ) use ($termino) {
+                        $productoQ->where(function ($p) use ($termino) {
+                            $p->where('nombre', 'LIKE', '%' . $termino . '%')
+                                ->orWhere('marca', 'LIKE', '%' . $termino . '%')
+                                ->orWhere('talla', 'LIKE', '%' . $termino . '%')
+                                ->orWhereRaw("CONCAT(nombre, ' ', marca, ' ', talla) LIKE ?", ['%' . $termino . '%'])
+                                ->orWhereRaw("CONCAT(marca, ' - ', talla) LIKE ?", ['%' . $termino . '%'])
+                                ->orWhereRaw("CONCAT(nombre, ' ', talla) LIKE ?", ['%' . $termino . '%']);
+                        });
+                    })
+                    ->orWhereHas('oferta.tienda', function ($tiendaQ) use ($termino) {
+                        $tiendaQ->where('nombre', 'LIKE', '%' . $termino . '%');
+                    })
+                    ->orWhere('campaña', 'LIKE', '%' . $termino . '%')
+                    ->orWhere('ip', 'LIKE', '%' . $termino . '%')
+                    ->orWhere('ciudad', 'LIKE', '%' . $termino . '%')
+                    ->orWhere('pais', 'LIKE', '%' . $termino . '%');
+                });
+            }
+        });
+    }
 
-        // Obtener clicks por IP paginados
-        $clicksPorIP = $this->obtenerClicksPorIPPaginados($fechaDesde, $fechaHasta, $busqueda, $horaDesde, $horaHasta, $porPagina);
+    private function rangoSqlDashboard(string $fechaDesde, string $fechaHasta): array
+    {
+        return [$fechaDesde . ' 00:00:00', $fechaHasta . ' 23:59:59'];
+    }
 
-        // Detectar IPs sospechosas
-        $ipsSospechosas = $this->detectarIPsSospechosas($estadisticas['clicksPorIP']);
+    private function resumenVacioDashboard(): array
+    {
+        return [
+            'visitantes_unicos' => 0,
+            'sesiones' => 0,
+            'visitas_productos' => 0,
+            'clics_tiendas' => 0,
+            'ctr_global' => 0,
+        ];
+    }
 
-        // Detectar IPs nuevas (primer registro en el rango de tiempo seleccionado)
-        $ipsNuevas = $this->detectarIPsNuevas($fechaDesde, $fechaHasta, $busqueda, $horaDesde, $horaHasta);
+    private function resumenGeneralDashboard(string $fechaDesde, string $fechaHasta, string $horaDesde = '', string $horaHasta = ''): array
+    {
+        try {
+            [$inicio, $fin] = $this->rangoSqlDashboard($fechaDesde, $fechaHasta);
 
-        // Obtener datos para el mapa
-        $datosMapa = $this->obtenerDatosMapa($fechaDesde, $fechaHasta, $busqueda, $horaDesde, $horaHasta);
+            $visitas = DB::table('visitas_usuario')->whereBetween('created_at', [$inicio, $fin]);
+            $this->aplicarFiltroHoraDashboard($visitas, 'created_at', $horaDesde, $horaHasta);
 
-        return view('admin.clicks.dashboard', compact(
-            'clicks',
-            'clicksPorIP',
-            'ipsSospechosas',
-            'ipsNuevas',
-            'fechaDesde',
-            'fechaHasta',
-            'busqueda',
-            'porPagina',
-            'horaDesde',
-            'horaHasta',
-            'estadisticas',
-            'filtroRapido',
-            'datosMapa'
-        ));
+            $visitasProductos = (clone $visitas)->count();
+            $visitantesUnicos = (clone $visitas)->distinct('visitor_id')->count('visitor_id');
+            $sesiones = (clone $visitas)->distinct('session_id')->count('session_id');
+
+            $clicks = DB::table('clicks')->whereBetween('created_at', [$inicio, $fin]);
+            $this->aplicarFiltroHoraDashboard($clicks, 'created_at', $horaDesde, $horaHasta);
+            $clicsTiendas = (clone $clicks)->count();
+
+            $ctrGlobal = $visitasProductos > 0
+                ? round(($clicsTiendas / $visitasProductos) * 100, 1)
+                : 0;
+
+            return [
+                'visitantes_unicos' => $visitantesUnicos,
+                'sesiones' => $sesiones,
+                'visitas_productos' => $visitasProductos,
+                'clics_tiendas' => $clicsTiendas,
+                'ctr_global' => $ctrGlobal,
+            ];
+        } catch (QueryException $e) {
+            Log::warning('Dashboard analytics: error al leer visitas_usuario', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->resumenVacioDashboard();
+        }
+    }
+
+    private function obtenerTopPaginadoDashboard(
+        string $tipo,
+        string $fechaDesde,
+        string $fechaHasta,
+        string $horaDesde,
+        string $horaHasta,
+        string $orden = 'ctr',
+        int $page = 1,
+        int $perPage = 10
+    ): array {
+        $query = match ($tipo) {
+            'productos' => $this->queryTopProductosDashboard($fechaDesde, $fechaHasta, $horaDesde, $horaHasta),
+            'categorias' => $this->queryTopCategoriasDashboard($fechaDesde, $fechaHasta, $horaDesde, $horaHasta),
+            'tiendas' => $this->queryTopTiendasDashboard($fechaDesde, $fechaHasta, $horaDesde, $horaHasta),
+            default => throw new \InvalidArgumentException("Tipo de top no válido: {$tipo}"),
+        };
+
+        if ($tipo === 'tiendas') {
+            $orden = 'clicks';
+        }
+
+        $todos = $query->get()->sort(function ($a, $b) use ($orden, $tipo) {
+            $visitasA = (float) ($a->visitas ?? 0);
+            $visitasB = (float) ($b->visitas ?? 0);
+            $clicksA = (int) ($a->total_clicks ?? $a->clicks ?? 0);
+            $clicksB = (int) ($b->total_clicks ?? $b->clicks ?? 0);
+
+            if ($orden === 'visitas') {
+                return $visitasB <=> $visitasA ?: $clicksB <=> $clicksA;
+            }
+            if ($orden === 'clicks') {
+                return $clicksB <=> $clicksA ?: $visitasB <=> $visitasA;
+            }
+
+            $ctrA = $this->calcularCtrDashboard($visitasA, $clicksA);
+            $ctrB = $this->calcularCtrDashboard($visitasB, $clicksB);
+
+            return $ctrB <=> $ctrA ?: $clicksB <=> $clicksA ?: $visitasB <=> $visitasA;
+        })->values();
+
+        $total = $todos->count();
+        $slice = $todos->slice(($page - 1) * $perPage, $perPage)->values();
+
+        $totalVisitasTop = (float) $todos->sum(fn ($row) => (float) ($row->visitas ?? 0));
+        $totalClicksTop = (int) $todos->sum(fn ($row) => (int) ($row->total_clicks ?? $row->clicks ?? 0));
+
+        $items = $slice->map(function ($row) use ($tipo, $orden, $totalVisitasTop, $totalClicksTop) {
+            $formatted = $this->formatearFilaTopDashboard($row, $tipo === 'tiendas');
+            $cuota = $this->calcularCuotaTopDashboard($row, $tipo, $orden, $totalVisitasTop, $totalClicksTop);
+            $formatted['barra_valor'] = $cuota['barra_valor'];
+            $formatted['barra_pct'] = $cuota['barra_pct'];
+
+            return $formatted;
+        });
+
+        return [
+            'data' => $items,
+            'current_page' => $page,
+            'last_page' => max(1, (int) ceil($total / $perPage)),
+            'per_page' => $perPage,
+            'total' => $total,
+            'orden' => $orden,
+            'modo' => $tipo === 'tiendas' ? 'clicks' : 'completo',
+        ];
+    }
+
+    private function calcularCuotaTopDashboard(
+        object $row,
+        string $tipo,
+        string $orden,
+        float $totalVisitasTop,
+        int $totalClicksTop
+    ): array {
+        if ($tipo === 'tiendas' || $orden === 'clicks' || $orden === 'ctr') {
+            $valor = (int) ($row->total_clicks ?? $row->clicks ?? 0);
+            $denominador = max(1.0, (float) $totalClicksTop);
+        } else {
+            $valor = (float) ($row->visitas ?? 0);
+            $denominador = max(1.0, $totalVisitasTop);
+        }
+
+        return [
+            'barra_valor' => $valor,
+            'barra_pct' => round($valor / $denominador * 100, 1),
+        ];
+    }
+
+    private function calcularCtrDashboard(float $visitas, int $clicks): float
+    {
+        if ($visitas > 0) {
+            $ctr = round(($clicks / $visitas) * 100, 1);
+
+            return min($ctr, 100.0);
+        }
+
+        return $clicks > 0 ? 100.0 : 0.0;
+    }
+
+    private function formatearFilaTopDashboard(object $row, bool $soloClics = false): array
+    {
+        $clicks = (int) ($row->total_clicks ?? $row->clicks ?? 0);
+
+        if ($soloClics) {
+            return [
+                'id' => $row->id ?? null,
+                'nombre' => $row->nombre ?? '(sin nombre)',
+                'clicks' => $clicks,
+            ];
+        }
+
+        $visitas = round((float) ($row->visitas ?? 0), 2);
+        $ctr = $this->calcularCtrDashboard($visitas, $clicks);
+
+        return [
+            'id' => $row->id ?? null,
+            'nombre' => $row->nombre ?? '(sin nombre)',
+            'visitantes' => (int) ($row->visitantes ?? 0),
+            'visitas' => $visitas,
+            'clicks' => $clicks,
+            'ctr' => $ctr,
+        ];
+    }
+
+    private function queryTopProductosDashboard(string $fechaDesde, string $fechaHasta, string $horaDesde, string $horaHasta)
+    {
+        [$inicio, $fin] = $this->rangoSqlDashboard($fechaDesde, $fechaHasta);
+
+        $visitasAgg = DB::table('visitas_usuario')
+            ->whereBetween('created_at', [$inicio, $fin])
+            ->when($horaDesde && $horaHasta, fn ($q) => $q->whereRaw('TIME(created_at) BETWEEN ? AND ?', [$horaDesde, $horaHasta]))
+            ->selectRaw('producto_id,
+                COUNT(*) as visitas,
+                COUNT(DISTINCT visitor_id) as visitantes,
+                COUNT(DISTINCT session_id) as sesiones')
+            ->groupBy('producto_id');
+
+        $clicksAgg = DB::table('clicks')
+            ->join('ofertas_producto', 'clicks.oferta_id', '=', 'ofertas_producto.id')
+            ->whereBetween('clicks.created_at', [$inicio, $fin])
+            ->when($horaDesde && $horaHasta, fn ($q) => $q->whereRaw('TIME(clicks.created_at) BETWEEN ? AND ?', [$horaDesde, $horaHasta]))
+            ->selectRaw('ofertas_producto.producto_id, COUNT(*) as clicks')
+            ->groupBy('ofertas_producto.producto_id');
+
+        $productosConActividad = DB::table('visitas_usuario')
+            ->whereBetween('created_at', [$inicio, $fin])
+            ->when($horaDesde && $horaHasta, fn ($q) => $q->whereRaw('TIME(created_at) BETWEEN ? AND ?', [$horaDesde, $horaHasta]))
+            ->select('producto_id')
+            ->union(
+                DB::table('clicks')
+                    ->join('ofertas_producto', 'clicks.oferta_id', '=', 'ofertas_producto.id')
+                    ->whereBetween('clicks.created_at', [$inicio, $fin])
+                    ->when($horaDesde && $horaHasta, fn ($q) => $q->whereRaw('TIME(clicks.created_at) BETWEEN ? AND ?', [$horaDesde, $horaHasta]))
+                    ->select('ofertas_producto.producto_id')
+            );
+
+        return DB::query()
+            ->fromSub($productosConActividad, 'p')
+            ->leftJoinSub($visitasAgg, 'v', 'p.producto_id', '=', 'v.producto_id')
+            ->leftJoinSub($clicksAgg, 'c', 'p.producto_id', '=', 'c.producto_id')
+            ->leftJoin('productos', 'productos.id', '=', 'p.producto_id')
+            ->selectRaw("p.producto_id as id,
+                COALESCE(productos.nombre, CONCAT('Producto #', p.producto_id)) as nombre,
+                COALESCE(v.visitantes, 0) as visitantes,
+                COALESCE(v.sesiones, 0) as sesiones,
+                COALESCE(v.visitas, 0) as visitas,
+                COALESCE(c.clicks, 0) as clicks,
+                CASE WHEN COALESCE(v.visitas, 0) > 0 THEN ROUND(COALESCE(c.clicks, 0) / v.visitas * 100, 1) ELSE 0 END as ctr");
+    }
+
+    private function queryTopCategoriasDashboard(string $fechaDesde, string $fechaHasta, string $horaDesde, string $horaHasta)
+    {
+        [$inicio, $fin] = $this->rangoSqlDashboard($fechaDesde, $fechaHasta);
+
+        $visitasAgg = DB::table('visitas_usuario')
+            ->whereBetween('created_at', [$inicio, $fin])
+            ->when($horaDesde && $horaHasta, fn ($q) => $q->whereRaw('TIME(created_at) BETWEEN ? AND ?', [$horaDesde, $horaHasta]))
+            ->selectRaw('categoria_id,
+                COUNT(*) as visitas,
+                COUNT(DISTINCT visitor_id) as visitantes,
+                COUNT(DISTINCT session_id) as sesiones')
+            ->groupBy('categoria_id');
+
+        $clicksAgg = DB::table('clicks')
+            ->join('ofertas_producto', 'clicks.oferta_id', '=', 'ofertas_producto.id')
+            ->join('productos', 'ofertas_producto.producto_id', '=', 'productos.id')
+            ->whereBetween('clicks.created_at', [$inicio, $fin])
+            ->when($horaDesde && $horaHasta, fn ($q) => $q->whereRaw('TIME(clicks.created_at) BETWEEN ? AND ?', [$horaDesde, $horaHasta]))
+            ->selectRaw('productos.categoria_id, COUNT(*) as clicks')
+            ->groupBy('productos.categoria_id');
+
+        $categoriasConActividad = DB::table('visitas_usuario')
+            ->whereBetween('created_at', [$inicio, $fin])
+            ->when($horaDesde && $horaHasta, fn ($q) => $q->whereRaw('TIME(created_at) BETWEEN ? AND ?', [$horaDesde, $horaHasta]))
+            ->select('categoria_id')
+            ->union(
+                DB::table('clicks')
+                    ->join('ofertas_producto', 'clicks.oferta_id', '=', 'ofertas_producto.id')
+                    ->join('productos', 'ofertas_producto.producto_id', '=', 'productos.id')
+                    ->whereBetween('clicks.created_at', [$inicio, $fin])
+                    ->when($horaDesde && $horaHasta, fn ($q) => $q->whereRaw('TIME(clicks.created_at) BETWEEN ? AND ?', [$horaDesde, $horaHasta]))
+                    ->select('productos.categoria_id')
+            );
+
+        return DB::query()
+            ->fromSub($categoriasConActividad, 'p')
+            ->leftJoinSub($visitasAgg, 'v', 'p.categoria_id', '=', 'v.categoria_id')
+            ->leftJoinSub($clicksAgg, 'c', 'p.categoria_id', '=', 'c.categoria_id')
+            ->leftJoin('categorias', 'categorias.id', '=', 'p.categoria_id')
+            ->selectRaw("p.categoria_id as id,
+                COALESCE(categorias.nombre, CONCAT('Categoría #', p.categoria_id)) as nombre,
+                COALESCE(v.visitantes, 0) as visitantes,
+                COALESCE(v.sesiones, 0) as sesiones,
+                COALESCE(v.visitas, 0) as visitas,
+                COALESCE(c.clicks, 0) as clicks");
+    }
+
+    private function queryTopTiendasDashboard(string $fechaDesde, string $fechaHasta, string $horaDesde, string $horaHasta)
+    {
+        [$inicio, $fin] = $this->rangoSqlDashboard($fechaDesde, $fechaHasta);
+
+        return DB::table('clicks')
+            ->join('ofertas_producto', 'clicks.oferta_id', '=', 'ofertas_producto.id')
+            ->join('tiendas', 'tiendas.id', '=', 'ofertas_producto.tienda_id')
+            ->whereBetween('clicks.created_at', [$inicio, $fin])
+            ->when($horaDesde && $horaHasta, fn ($q) => $q->whereRaw('TIME(clicks.created_at) BETWEEN ? AND ?', [$horaDesde, $horaHasta]))
+            ->groupBy('tiendas.id', 'tiendas.nombre')
+            ->selectRaw('tiendas.id as id, tiendas.nombre as nombre, COUNT(*) as total_clicks')
+            ->orderByDesc('total_clicks');
+    }
+
+    private function queryTopOrigenesDashboard(string $fechaDesde, string $fechaHasta, string $horaDesde, string $horaHasta)
+    {
+        [$inicio, $fin] = $this->rangoSqlDashboard($fechaDesde, $fechaHasta);
+
+        $visitasAgg = DB::table('visitas_usuario')
+            ->whereBetween('created_at', [$inicio, $fin])
+            ->when($horaDesde && $horaHasta, fn ($q) => $q->whereRaw('TIME(created_at) BETWEEN ? AND ?', [$horaDesde, $horaHasta]))
+            ->selectRaw("CASE WHEN origen IS NULL OR origen = '' THEN '(directo)' ELSE origen END as origen_key,
+                COUNT(*) as visitas,
+                COUNT(DISTINCT visitor_id) as visitantes,
+                COUNT(DISTINCT session_id) as sesiones")
+            ->groupByRaw("CASE WHEN origen IS NULL OR origen = '' THEN '(directo)' ELSE origen END");
+
+        $clicksAgg = DB::table('clicks as c')
+            ->whereBetween('c.created_at', [$inicio, $fin])
+            ->when($horaDesde && $horaHasta, fn ($q) => $q->whereRaw('TIME(c.created_at) BETWEEN ? AND ?', [$horaDesde, $horaHasta]))
+            ->whereNotNull('c.visitor_id')
+            ->join('visitas_usuario as v', function ($join) use ($inicio, $fin, $horaDesde, $horaHasta) {
+                $join->on('v.visitor_id', '=', 'c.visitor_id')
+                    ->whereBetween('v.created_at', [$inicio, $fin]);
+                if ($horaDesde && $horaHasta) {
+                    $join->whereRaw('TIME(v.created_at) BETWEEN ? AND ?', [$horaDesde, $horaHasta]);
+                }
+            })
+            ->selectRaw("CASE WHEN v.origen IS NULL OR v.origen = '' THEN '(directo)' ELSE v.origen END as origen_key, COUNT(DISTINCT c.id) as clicks")
+            ->groupByRaw("CASE WHEN v.origen IS NULL OR v.origen = '' THEN '(directo)' ELSE v.origen END");
+
+        return DB::table(DB::raw("({$visitasAgg->toSql()}) as v"))
+            ->mergeBindings($visitasAgg)
+            ->leftJoinSub($clicksAgg, 'c', 'v.origen_key', '=', 'c.origen_key')
+            ->selectRaw("v.origen_key as id, v.origen_key as nombre,
+                v.visitantes, v.sesiones, v.visitas,
+                COALESCE(c.clicks, 0) as clicks,
+                CASE WHEN v.visitas > 0 THEN ROUND(COALESCE(c.clicks, 0) / v.visitas * 100, 1) ELSE 0 END as ctr");
+    }
+
+    private function aplicarFiltroHoraDashboard($query, string $columna, string $horaDesde, string $horaHasta): void
+    {
+        if ($horaDesde && $horaHasta) {
+            $query->whereRaw("TIME({$columna}) BETWEEN ? AND ?", [$horaDesde, $horaHasta]);
+        }
     }
 
     // MÉTODO PRIVADO PARA OBTENER ESTADÍSTICAS
@@ -892,6 +1502,15 @@ class ClickController extends Controller
     }
 
 
+    private function respuestaRedireccion(array $viewData, array $cookies = []): \Illuminate\Http\Response
+    {
+        $response = response()
+            ->view('redireccion', $viewData)
+            ->header('X-Robots-Tag', 'noindex, nofollow');
+
+        return $this->visitorTracking->adjuntarCookies($response, $cookies);
+    }
+
     /**
      * MÉTODO PRINCIPAL QUE MANEJA LOS CLICKS EN OFERTAS
      * 
@@ -906,6 +1525,10 @@ class ClickController extends Controller
         $cam = $request->query('cam');                    // Parámetro de campaña (opcional)
         $oferta = OfertaProducto::with('producto.categoria')->findOrFail($ofertaId); // Buscamos la oferta
         $ip = $request->ip();                            // IP del usuario para evitar duplicados
+        $tracking = $this->visitorTracking->resolver($request);
+        $visitorId = $tracking['visitor_id'];
+        $sessionId = $tracking['session_id'];
+        $trackingCookies = $tracking['cookies'];
 
         // ===== VALIDACIÓN DE URL FIRMADA (para usuarios no autenticados) =====
         $usuarioAutenticado = auth()->check();
@@ -932,8 +1555,7 @@ class ClickController extends Controller
                     }
                 }
                 
-                return response()
-                    ->view('redireccion', [
+                return $this->respuestaRedireccion([
                         'requiereCaptcha' => false,
                         'bloqueadoMensual' => false,
                         'url' => null,
@@ -941,8 +1563,7 @@ class ClickController extends Controller
                         'cam' => $cam,
                         'error' => 'URL inválida o expirada. Por favor, vuelve a la página del producto.',
                         'urlProducto' => $urlProducto,
-                    ])
-                    ->header('X-Robots-Tag', 'noindex, nofollow');
+                    ], $trackingCookies);
             }
         } elseif (!$usuarioAutenticado && !$tokenFirmado) {
             // Usuario no autenticado sin token - bloquear acceso directo
@@ -962,8 +1583,7 @@ class ClickController extends Controller
                 }
             }
             
-            return response()
-                ->view('redireccion', [
+            return $this->respuestaRedireccion([
                     'requiereCaptcha' => false,
                     'bloqueadoMensual' => false,
                     'url' => null,
@@ -971,8 +1591,7 @@ class ClickController extends Controller
                     'cam' => $cam,
                     'error' => 'Acceso no autorizado. Por favor, vuelve a la página del producto.',
                     'urlProducto' => $urlProducto,
-                ])
-                ->header('X-Robots-Tag', 'noindex, nofollow');
+                ], $trackingCookies);
         }
         
         $captchaResuelto = false; // Flag para indicar si el CAPTCHA fue resuelto
@@ -981,13 +1600,11 @@ class ClickController extends Controller
         // Los bots de IA se bloquean siempre, sin límites
         if ($this->esBotIA($request)) {
             $this->bloquearIPMensual($ip, 0); // Bloqueo mensual inmediato
-            return response()
-                ->view('redireccion', [
+            return $this->respuestaRedireccion([
                     'bloqueadoMensual' => true,
                     'ofertaId' => $ofertaId,
                     'cam' => $cam,
-                ])
-                ->header('X-Robots-Tag', 'noindex, nofollow');
+                ], $trackingCookies);
         }
 
         // ===== VALIDACIONES DE SEGURIDAD PARA USUARIOS NO AUTENTICADOS =====
@@ -995,28 +1612,24 @@ class ClickController extends Controller
             // Si es un bot legítimo (Googlebot, Bingbot, etc.), redirigir sin restricciones
             if ($this->esBot($request) || $this->esIPExcluida($ip)) {
                 // Guardar click con lógica de duplicados (estadísticas)
-                $this->guardarClick($oferta, $ip, $cam);
+                $this->guardarClick($oferta, $ip, $cam, $visitorId, $sessionId);
                 $urlConAfiliado = $this->procesarUrlAfiliacion($oferta);
-                return response()
-                    ->view('redireccion', [
+                return $this->respuestaRedireccion([
                         'requiereCaptcha' => false,
                         'bloqueadoMensual' => false,
                         'url' => $urlConAfiliado,
                         'ofertaId' => $ofertaId,
                         'cam' => $cam,
-                    ])
-                    ->header('X-Robots-Tag', 'noindex, nofollow');
+                    ], $trackingCookies);
             }
 
             // ===== VALIDACIÓN DE BLOQUEO MENSUAL =====
             if ($this->estaIPBloqueadaMensual($ip)) {
-                return response()
-                    ->view('redireccion', [
+                return $this->respuestaRedireccion([
                         'bloqueadoMensual' => true,
                         'ofertaId' => $ofertaId,
                         'cam' => $cam,
-                    ])
-                    ->header('X-Robots-Tag', 'noindex, nofollow');
+                    ], $trackingCookies);
             }
 
             // ===== VALIDACIÓN DE BLOQUEO POR CAPTCHA =====
@@ -1029,14 +1642,12 @@ class ClickController extends Controller
                     $captchaResuelto = true;
                 } else {
                     // No tiene token o token inválido, mostrar CAPTCHA
-                    return response()
-                        ->view('redireccion', [
+                    return $this->respuestaRedireccion([
                             'requiereCaptcha' => true,
                             'bloqueadoMensual' => false,
                             'ofertaId' => $ofertaId,
                             'cam' => $cam,
-                        ])
-                        ->header('X-Robots-Tag', 'noindex, nofollow');
+                        ], $trackingCookies);
                 }
             }
 
@@ -1045,7 +1656,7 @@ class ClickController extends Controller
             // Esto guarda TODAS las redirecciones (incluso duplicados) para el conteo
             // PERO solo si NO acabamos de resolver un CAPTCHA (para evitar bloqueos inmediatos)
             if (!$captchaResuelto) {
-                $this->guardarClickParaBloqueo($oferta, $ip, $cam);
+                $this->guardarClickParaBloqueo($oferta, $ip, $cam, $visitorId, $sessionId);
 
                 // ===== DETECCIÓN DE PATRONES SOSPECHOSOS =====
                 // Verificar bloqueo mensual (200/semana)
@@ -1055,13 +1666,11 @@ class ClickController extends Controller
                         ->count();
                     $this->bloquearIPMensual($ip, $cantidad);
                     
-                    return response()
-                        ->view('redireccion', [
+                    return $this->respuestaRedireccion([
                             'bloqueadoMensual' => true,
                             'ofertaId' => $ofertaId,
                             'cam' => $cam,
-                        ])
-                        ->header('X-Robots-Tag', 'noindex, nofollow');
+                        ], $trackingCookies);
                 }
 
                 // Verificar bloqueo por CAPTCHA diario (100/día)
@@ -1071,14 +1680,12 @@ class ClickController extends Controller
                         ->count();
                     $this->bloquearIP($ip, 'CAPTCHA diario activado (100+ redirecciones en un día)', $cantidad);
                     
-                    return response()
-                        ->view('redireccion', [
+                    return $this->respuestaRedireccion([
                             'requiereCaptcha' => true,
                             'bloqueadoMensual' => false,
                             'ofertaId' => $ofertaId,
                             'cam' => $cam,
-                        ])
-                        ->header('X-Robots-Tag', 'noindex, nofollow');
+                        ], $trackingCookies);
                 }
 
                 // Verificar bloqueo por CAPTCHA (15/5min)
@@ -1088,14 +1695,12 @@ class ClickController extends Controller
                         ->count();
                     $this->bloquearIP($ip, 'CAPTCHA activado (15+ redirecciones en 5 minutos)', $cantidad);
                     
-                    return response()
-                        ->view('redireccion', [
+                    return $this->respuestaRedireccion([
                             'requiereCaptcha' => true,
                             'bloqueadoMensual' => false,
                             'ofertaId' => $ofertaId,
                             'cam' => $cam,
-                        ])
-                        ->header('X-Robots-Tag', 'noindex, nofollow');
+                        ], $trackingCookies);
                 }
             }
         }
@@ -1115,24 +1720,22 @@ class ClickController extends Controller
         // Si es bot legítimo o IP excluida, guardar con lógica de duplicados
         if (!$usuarioAutenticado) {
             if ($this->esBot($request) || $this->esIPExcluida($ip)) {
-                $this->guardarClick($oferta, $ip, $cam);
+                $this->guardarClick($oferta, $ip, $cam, $visitorId, $sessionId);
             } elseif (isset($captchaResuelto) && $captchaResuelto) {
                 // Si el CAPTCHA fue resuelto, guardar para estadísticas (con lógica de duplicados)
-                $this->guardarClick($oferta, $ip, $cam);
+                $this->guardarClick($oferta, $ip, $cam, $visitorId, $sessionId);
             }
         }
 
         // ===== REDIRECCIÓN NORMAL =====
         // El usuario es redirigido normalmente (sin bloqueos)
-        return response()
-        ->view('redireccion', [
+        return $this->respuestaRedireccion([
             'requiereCaptcha' => false,
             'bloqueadoMensual' => false,
             'url' => $urlConAfiliado,
             'ofertaId' => $ofertaId,
             'cam' => $cam,
-        ])
-        ->header('X-Robots-Tag', 'noindex, nofollow');
+        ], $trackingCookies);
     }
 
     /**
@@ -1400,7 +2003,7 @@ class ClickController extends Controller
      * Guarda un click en la base de datos (sin geolocalización) para conteo de bloqueos
      * Este método SIEMPRE guarda el click, sin verificar duplicados
      */
-    private function guardarClickParaBloqueo(OfertaProducto $oferta, string $ip, ?string $cam): void
+    private function guardarClickParaBloqueo(OfertaProducto $oferta, string $ip, ?string $cam, ?string $visitorId = null, ?string $sessionId = null): void
     {
         try {
             // Calcular posición de la oferta
@@ -1413,6 +2016,8 @@ class ClickController extends Controller
                 'ip' => $ip,
                 'precio_unidad' => $oferta->precio_unidad,
                 'posicion' => $posicion,
+                'visitor_id' => $visitorId,
+                'session_id' => $sessionId,
                 // NO guardamos geolocalización aquí - lo hará el cron
                 'ciudad' => null,
                 'pais' => null,
@@ -1434,7 +2039,7 @@ class ClickController extends Controller
      * Guarda un click en la base de datos (sin geolocalización)
      * Este método evita duplicados (IP + oferta + fecha) para estadísticas
      */
-    private function guardarClick(OfertaProducto $oferta, string $ip, ?string $cam): void
+    private function guardarClick(OfertaProducto $oferta, string $ip, ?string $cam, ?string $visitorId = null, ?string $sessionId = null): void
     {
         try {
             // Calcular posición de la oferta
@@ -1454,6 +2059,8 @@ class ClickController extends Controller
                     'ip' => $ip,
                     'precio_unidad' => $oferta->precio_unidad,
                     'posicion' => $posicion,
+                    'visitor_id' => $visitorId,
+                    'session_id' => $sessionId,
                     // NO guardamos geolocalización aquí - lo hará el cron
                     'ciudad' => null,
                     'pais' => null,
@@ -1507,6 +2114,10 @@ class ClickController extends Controller
         }  elseif ($oferta->tienda_id == 99999) {
             // Ejemplo Awin para cuando tengamos
             return 'https://www.awin1.com/cread.php?awinmid=25399&awinaffid=1302515&ued=' . $base;
+        
+        } elseif ($oferta->tienda_id == 3) {
+            // Coolmod
+            return 'https://www.awin1.com/cread.php?awinmid=124624&awinaffid=1302515&ued=' . $base;
         
         } else {
             // Otras tiendas - sin códigos de afiliación

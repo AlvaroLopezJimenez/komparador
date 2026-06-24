@@ -376,7 +376,13 @@
 
                 {{-- Contenedor para mostrar palabras clave relacionadas --}}
                 <div id="palabras-clave-relacionadas-container" class="mb-6 hidden">
-                    <label class="block mb-2 font-medium text-gray-700 dark:text-gray-200">Palabras clave disponibles</label>
+                    <div class="flex flex-wrap items-center gap-3 mb-2">
+                        <label for="palabras-clave-relacionadas-filtro" class="font-medium text-gray-700 dark:text-gray-200 shrink-0">Palabras clave disponibles</label>
+                        <textarea id="palabras-clave-relacionadas-filtro" rows="1"
+                            class="flex-1 min-w-[12rem] px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 text-sm leading-normal focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none overflow-hidden h-[42px]"
+                            placeholder="Escribe para filtrar palabras clave..."
+                            autocomplete="off"></textarea>
+                    </div>
                     <div id="palabras-clave-relacionadas-botones" class="flex flex-wrap gap-2">
                         <!-- Los botones se generarán dinámicamente aquí -->
                     </div>
@@ -2164,6 +2170,7 @@
             document.getElementById('categoria-final').value = categoria.id;
             categoriaProducto = categoria.id;
             verificarCategoriaParaGuardar(categoria.id);
+            aplicarUnidadMedidaDesdeCategoria(categoria.id);
             
             // Si estamos en la pestaña manual, también actualizar allí
             if (pestañaActiva === 'manual') {
@@ -2431,6 +2438,7 @@
                     
                     // Verificar si la categoría tiene subcategorías
                     verificarCategoriaParaGuardar(nuevaCategoriaId);
+                    aplicarUnidadMedidaDesdeCategoria(nuevaCategoriaId);
                     
                     mostrarJerarquiaEnBuscador(nuevaCategoriaId);
                     actualizarIndicadorBotonAgregar();
@@ -2749,6 +2757,9 @@
                 
                 // Verificar si la categoría tiene subcategorías y validar el botón de guardar
                 verificarCategoriaParaGuardar(categoriaFinal);
+
+                // Aplicar unidad de medida de la categoría hoja seleccionada
+                aplicarUnidadMedidaDesdeCategoria(categoriaFinal);
             } else {
                 // Si no hay categoría, habilitar el botón de guardar (se validará en el submit)
                 actualizarBotonGuardar(true, '');
@@ -2756,6 +2767,33 @@
             
             // Actualizar indicador visual del botón agregar
             actualizarIndicadorBotonAgregar();
+        }
+
+        // Aplica la unidad de medida configurada en la categoría hoja (última de la jerarquía)
+        function aplicarUnidadMedidaDesdeCategoria(categoriaId) {
+            if (!categoriaId) return;
+
+            fetch(`/panel-privado/categorias/${categoriaId}/jerarquia`, {
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(res => res.json())
+            .then(data => {
+                const unidadMedida = data.unidad_de_medida;
+                if (!unidadMedida) return;
+
+                const select = document.getElementById('unidadDeMedida');
+                if (select && select.querySelector(`option[value="${unidadMedida}"]`)) {
+                    select.value = unidadMedida;
+                    select.dispatchEvent(new Event('change'));
+                }
+            })
+            .catch(error => {
+                console.error('Error cargando unidad de medida de la categoría:', error);
+            });
         }
 
         // Función para verificar si la categoría tiene subcategorías y validar el botón de guardar
@@ -3574,10 +3612,14 @@
         async function cargarPalabrasClaveRelacionadas(categoriaId) {
             const contenedor = document.getElementById('palabras-clave-relacionadas-container');
             const botonesContainer = document.getElementById('palabras-clave-relacionadas-botones');
+            const filtroInput = document.getElementById('palabras-clave-relacionadas-filtro');
             const productoId = document.getElementById('form-producto').dataset.productoId || null;
             
             // Mostrar contenedor
             contenedor.classList.remove('hidden');
+            if (filtroInput) {
+                filtroInput.value = '';
+            }
             botonesContainer.innerHTML = '<div class="text-sm text-gray-500">Cargando palabras clave...</div>';
             
             try {
@@ -3596,6 +3638,23 @@
             }
         }
         
+        // Filtrar botones de palabras clave según el texto del textarea
+        function filtrarPalabrasClaveRelacionadas() {
+            const filtroInput = document.getElementById('palabras-clave-relacionadas-filtro');
+            const botonesContainer = document.getElementById('palabras-clave-relacionadas-botones');
+            if (!filtroInput || !botonesContainer) return;
+
+            const termino = filtroInput.value.trim().toLowerCase();
+            const items = botonesContainer.querySelectorAll('.palabra-clave-relacionada-item');
+
+            items.forEach(item => {
+                const boton = item.querySelector('button[data-palabra]');
+                const palabra = (boton?.dataset.palabra || '').toLowerCase();
+                const coincide = !termino || palabra.includes(termino);
+                item.classList.toggle('hidden', !coincide);
+            });
+        }
+
         // Función para mostrar las palabras clave como botones
         function mostrarPalabrasClaveRelacionadas(palabrasClave) {
             const botonesContainer = document.getElementById('palabras-clave-relacionadas-botones');
@@ -3604,7 +3663,7 @@
             palabrasClave.forEach(palabraData => {
                 // Contenedor para el botón y el icono
                 const contenedorBoton = document.createElement('div');
-                contenedorBoton.className = 'inline-flex items-center gap-1';
+                contenedorBoton.className = 'palabra-clave-relacionada-item inline-flex items-center gap-1';
                 
                 const boton = document.createElement('button');
                 boton.type = 'button';
@@ -3646,6 +3705,7 @@
             
             // Resaltar botones de palabras clave que coinciden con sublíneas marcadas
             resaltarBotonesPalabrasClaveMarcadas();
+            filtrarPalabrasClaveRelacionadas();
         }
         
         // Función para abrir el modal de productos de una palabra clave
@@ -3911,6 +3971,11 @@
                 setTimeout(() => {
                     cargarPalabrasClaveRelacionadas(categoriaId);
                 }, 500);
+            }
+
+            const filtroPalabrasClave = document.getElementById('palabras-clave-relacionadas-filtro');
+            if (filtroPalabrasClave) {
+                filtroPalabrasClave.addEventListener('input', filtrarPalabrasClaveRelacionadas);
             }
         });
 
@@ -11588,7 +11653,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Verificar si es columna: primero en _columnas, luego en _esColumna
                 const esColumna = columnasGuardadas.includes(String(filtro.id)) || filtro._esColumna === true;
                 // Obtener formato guardado para esta línea principal
-                const formatoGuardado = (typeof formatosGuardados[filtro.id] === 'string') ? formatosGuardados[filtro.id] : 'texto';
+                const formatoGuardado = (typeof formatosGuardados[filtro.id] === 'string') ? formatosGuardados[filtro.id] : 'imagen_texto_precio';
                 crearLineaPrincipalProducto(filtro.texto || '', filtro.importante || false, filtro.subprincipales || [], filtro.id || null, filtro.slug || null, esColumna, formatoGuardado);
             });
         }
@@ -11606,8 +11671,61 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 300);
     }
     
+    // Ocultar botón eliminar en la primera sublínea (un grupo no puede quedar sin sublíneas)
+    function actualizarBotonesEliminarSublineasProducto(lineaPrincipal) {
+        const containerSub = lineaPrincipal.querySelector('.subprincipales-producto-container');
+        if (!containerSub) return;
+        containerSub.querySelectorAll('.linea-intermedia-producto').forEach((sublinea, index) => {
+            const btnEliminar = sublinea.querySelector('.btn-eliminar-intermedia-producto');
+            if (btnEliminar) {
+                btnEliminar.classList.toggle('hidden', index === 0);
+            }
+        });
+    }
+
+    // Marcar sublínea como activa, Mostrar y Oferta (y Columna oferta si es la primera del grupo)
+    function marcarSublineaProductoMostrarOferta(divIntermedia, lineaPrincipal) {
+        const checkboxPrincipal = divIntermedia.querySelector('.especificacion-producto-checkbox');
+        const mostrarCheckbox = divIntermedia.querySelector('.especificacion-producto-mostrar-checkbox');
+        const ofertaCheckbox = divIntermedia.querySelector('.especificacion-producto-oferta-checkbox');
+        const containerSub = lineaPrincipal.querySelector('.subprincipales-producto-container');
+        const sublineas = containerSub ? Array.from(containerSub.querySelectorAll('.linea-intermedia-producto')) : [];
+        const esPrimeraSublinea = sublineas[0] === divIntermedia;
+        const principalId = lineaPrincipal.dataset.idUnico;
+
+        if (checkboxPrincipal && !checkboxPrincipal.checked) {
+            checkboxPrincipal.checked = true;
+            checkboxPrincipal.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        if (mostrarCheckbox && !mostrarCheckbox.disabled) {
+            if (!mostrarCheckbox.checked) {
+                mostrarCheckbox.checked = true;
+                mostrarCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+            } else if (ofertaCheckbox && !ofertaCheckbox.disabled && !ofertaCheckbox.checked) {
+                ofertaCheckbox.checked = true;
+                ofertaCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        }
+
+        // Primera sublínea del grupo: marcar también Columna oferta
+        if (esPrimeraSublinea && esUnidadUnica) {
+            const columnaCheckbox = lineaPrincipal.querySelector(`.columna-oferta-producto-checkbox[data-principal-id="${principalId}"]`);
+            if (columnaCheckbox && !columnaCheckbox.checked) {
+                const columnasMarcadas = Array.from(container.querySelectorAll('.columna-oferta-producto-checkbox:checked'));
+                if (columnasMarcadas.length < 4) {
+                    columnaCheckbox.checked = true;
+                    columnaCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            }
+        }
+
+        actualizarJSONProducto();
+        actualizarVisibilidadFormatoProducto(lineaPrincipal);
+    }
+
     // Crear una línea principal del producto
-    function crearLineaPrincipalProducto(texto = '', importante = false, subprincipales = [], idUnico = null, slugUnico = null, esColumna = false, formatoGuardado = 'texto') {
+    function crearLineaPrincipalProducto(texto = '', importante = false, subprincipales = [], idUnico = null, slugUnico = null, esColumna = false, formatoGuardado = 'imagen_texto_precio') {
         const idPrincipal = `principal-producto-${contadorPrincipalProducto++}`;
         const idUnicoLinea = idUnico || generarIdUnicoProducto();
         const slugLinea = slugUnico || (texto ? generarSlugProducto(texto) : '');
@@ -11697,6 +11815,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 validarEspecificacionesInternas();
             }
         });
+
+        inputTexto.addEventListener('keydown', function(e) {
+            if (e.key === 'Tab' && !e.shiftKey) {
+                const containerSub = divPrincipal.querySelector('.subprincipales-producto-container');
+                const primeraSublinea = containerSub?.querySelector('.linea-intermedia-producto');
+                if (primeraSublinea) {
+                    e.preventDefault();
+                    const checkbox = primeraSublinea.querySelector('.especificacion-producto-checkbox');
+                    const inputSub = primeraSublinea.querySelector('.linea-intermedia-producto-texto');
+                    if (checkbox && !checkbox.checked) {
+                        checkbox.checked = true;
+                        checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                    if (inputSub) {
+                        inputSub.focus();
+                    }
+                }
+            }
+        });
         
         checkboxImportante.addEventListener('change', actualizarJSONProducto);
         
@@ -11762,6 +11899,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Actualizar visibilidad del selector de formato después de cargar sublíneas
         setTimeout(() => {
             actualizarVisibilidadFormatoProducto(divPrincipal);
+            actualizarBotonesEliminarSublineasProducto(divPrincipal);
         }, 100);
         
         return divPrincipal;
@@ -11885,7 +12023,67 @@ document.addEventListener('DOMContentLoaded', function() {
             if (textoActual) {
                 divIntermedia.dataset.slug = generarSlugProducto(textoActual);
             }
+            if (checkboxPrincipal) {
+                checkboxPrincipal.dataset.sublineaTexto = textoActual;
+            }
             actualizarJSONProducto();
+        });
+
+        inputTexto.addEventListener('keydown', function(e) {
+            if (e.key !== 'Tab' || e.shiftKey) return;
+
+            e.preventDefault();
+
+            const containerSub = lineaPrincipal.querySelector('.subprincipales-producto-container');
+            const sublineas = containerSub ? Array.from(containerSub.querySelectorAll('.linea-intermedia-producto')) : [];
+            const esPrimera = sublineas[0] === divIntermedia;
+            const esUltima = sublineas.length > 0 && sublineas[sublineas.length - 1] === divIntermedia;
+            const tieneTexto = this.value.trim() !== '';
+
+            if (!tieneTexto && !esPrimera) {
+                const indice = sublineas.indexOf(divIntermedia);
+                const sublineaAnterior = indice > 0 ? sublineas[indice - 1] : null;
+                divIntermedia.remove();
+                actualizarJSONProducto();
+                actualizarBotonesEliminarSublineasProducto(lineaPrincipal);
+                actualizarVisibilidadFormatoProducto(lineaPrincipal);
+                if (sublineaAnterior) {
+                    const inputAnterior = sublineaAnterior.querySelector('.linea-intermedia-producto-texto');
+                    if (inputAnterior) {
+                        inputAnterior.focus();
+                    }
+                }
+                return;
+            }
+
+            if (!tieneTexto && esPrimera) {
+                marcarSublineaProductoMostrarOferta(divIntermedia, lineaPrincipal);
+                return;
+            }
+
+            const mostrarYaMarcado = mostrarCheckbox && mostrarCheckbox.checked;
+            const ofertaYaMarcado = ofertaCheckbox && ofertaCheckbox.checked;
+
+            if (!mostrarYaMarcado || !ofertaYaMarcado) {
+                marcarSublineaProductoMostrarOferta(divIntermedia, lineaPrincipal);
+                return;
+            }
+
+            if (tieneTexto && esUltima) {
+                const nuevaLinea = crearLineaIntermediaProducto(containerPadre, lineaPrincipal, '');
+                divIntermedia.insertAdjacentElement('afterend', nuevaLinea);
+                actualizarBotonesEliminarSublineasProducto(lineaPrincipal);
+
+                const checkboxNueva = nuevaLinea.querySelector('.especificacion-producto-checkbox');
+                const inputNueva = nuevaLinea.querySelector('.linea-intermedia-producto-texto');
+                if (checkboxNueva && !checkboxNueva.checked) {
+                    checkboxNueva.checked = true;
+                    checkboxNueva.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                if (inputNueva) {
+                    inputNueva.focus();
+                }
+            }
         });
         
         checkboxPrincipal.addEventListener('change', function() {
@@ -12033,6 +12231,7 @@ document.addEventListener('DOMContentLoaded', function() {
         btnEliminar.addEventListener('click', () => {
             divIntermedia.remove();
             actualizarJSONProducto();
+            actualizarBotonesEliminarSublineasProducto(lineaPrincipal);
             // Actualizar visibilidad del selector de formato
             actualizarVisibilidadFormatoProducto(lineaPrincipal);
         });
@@ -12041,6 +12240,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const nuevaLinea = crearLineaIntermediaProducto(containerPadre, lineaPrincipal, '');
             divIntermedia.insertAdjacentElement('afterend', nuevaLinea);
             actualizarJSONProducto();
+            actualizarBotonesEliminarSublineasProducto(lineaPrincipal);
         });
         
         // Configurar event listeners para botones de imágenes
@@ -12092,6 +12292,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // Configurar drag and drop
         const dragHandle = divIntermedia.querySelector('.drag-handle-intermedia-producto');
         configurarDragAndDropDesdeIconoProducto(dragHandle, divIntermedia, 'intermedia');
+
+        actualizarBotonesEliminarSublineasProducto(lineaPrincipal);
         
         return divIntermedia;
     }
@@ -12127,6 +12329,12 @@ document.addEventListener('DOMContentLoaded', function() {
             elementoPadre.style.opacity = '1';
             if (elementoArrastradoProducto && tipoArrastradoProducto === tipo) {
                 actualizarJSONProducto();
+                if (tipo === 'intermedia') {
+                    const lineaPrincipal = elementoPadre.closest('.linea-principal-producto');
+                    if (lineaPrincipal) {
+                        actualizarBotonesEliminarSublineasProducto(lineaPrincipal);
+                    }
+                }
             }
             elementoArrastradoProducto = null;
             tipoArrastradoProducto = null;

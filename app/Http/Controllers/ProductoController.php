@@ -38,12 +38,23 @@ class ProductoController extends Controller
             ]);
 
         if ($busqueda) {
-            $query->where(function ($q) use ($busqueda) {
-                $q->where('nombre', 'like', '%' . $busqueda . '%')
-                    ->orWhere('marca', 'like', '%' . $busqueda . '%')
-                    ->orWhere('modelo', 'like', '%' . $busqueda . '%')
-                    ->orWhere('talla', 'like', '%' . $busqueda . '%');
-            });
+            $tokens = preg_split('/[\s\-_\/]+/u', trim($busqueda), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+            $tokens = array_values(array_unique(array_map(
+                fn (string $t) => mb_strtolower($t, 'UTF-8'),
+                $tokens
+            )));
+
+            $normalizarCampo = "LOWER(REPLACE(REPLACE(REPLACE(%s, '-', ' '), '/', ' '), '  ', ' '))";
+
+            foreach ($tokens as $token) {
+                $like = '%' . $token . '%';
+                $query->where(function ($q) use ($like, $normalizarCampo) {
+                    $q->whereRaw(sprintf($normalizarCampo, 'nombre') . ' LIKE ?', [$like])
+                        ->orWhereRaw(sprintf($normalizarCampo, 'marca') . ' LIKE ?', [$like])
+                        ->orWhereRaw(sprintf($normalizarCampo, 'modelo') . ' LIKE ?', [$like])
+                        ->orWhereRaw(sprintf($normalizarCampo, 'talla') . ' LIKE ?', [$like]);
+                });
+            }
         }
 
         // Filtro por mostrar

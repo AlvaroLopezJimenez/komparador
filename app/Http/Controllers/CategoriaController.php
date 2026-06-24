@@ -93,6 +93,7 @@ class CategoriaController extends Controller
             'mostrar' => 'required|in:si,no',
             'especificaciones_internas' => 'nullable|string',
             'info_adicional_chatgpt' => 'nullable|string',
+            'unidad_de_medida' => 'nullable|string|in:unidad,kilos,litros,unidadMilesima,unidadUnica,800gramos,100ml',
         ], [
             'slug.unique' => 'El slug ya existe. Por favor, elige otro.',
         ]);
@@ -119,6 +120,7 @@ class CategoriaController extends Controller
             'mostrar' => $request->mostrar,
             'especificaciones_internas' => $especificacionesInternas,
             'info_adicional_chatgpt' => $request->info_adicional_chatgpt,
+            'unidad_de_medida' => $request->filled('unidad_de_medida') ? $request->unidad_de_medida : null,
         ]);
 
         return redirect()->route('admin.categorias.index')->with('success', 'Categoría creada correctamente.');
@@ -141,6 +143,7 @@ class CategoriaController extends Controller
             'mostrar' => 'required|in:si,no',
             'especificaciones_internas' => 'nullable|string',
             'info_adicional_chatgpt' => 'nullable|string',
+            'unidad_de_medida' => 'nullable|string|in:unidad,kilos,litros,unidadMilesima,unidadUnica,800gramos,100ml',
         ]);
 
         // Si el slug es diferente al actual, verificar que no exista en otra categoría
@@ -167,6 +170,7 @@ class CategoriaController extends Controller
             'mostrar' => $request->mostrar,
             'especificaciones_internas' => $especificacionesInternas,
             'info_adicional_chatgpt' => $request->info_adicional_chatgpt,
+            'unidad_de_medida' => $request->filled('unidad_de_medida') ? $request->unidad_de_medida : null,
         ]);
 
         return redirect()->route('admin.categorias.index')->with('success', 'Categoría actualizada correctamente.');
@@ -205,13 +209,15 @@ class CategoriaController extends Controller
         while ($categoriaActual) {
             array_unshift($jerarquia, [
                 'id' => $categoriaActual->id,
-                'nombre' => $categoriaActual->nombre
+                'nombre' => $categoriaActual->nombre,
+                'unidad_de_medida' => $categoriaActual->unidad_de_medida,
             ]);
             $categoriaActual = $categoriaActual->parent;
         }
         
         return response()->json([
-            'jerarquia' => $jerarquia
+            'jerarquia' => $jerarquia,
+            'unidad_de_medida' => $categoria->unidad_de_medida,
         ]);
     }
     

@@ -422,14 +422,26 @@
         </style>
 
         <!-- Botones de acción -->
-        <div class="mb-6 flex justify-between items-center">
+        <div class="mb-6">
+        <div class="flex justify-between items-center">
             <div class="flex items-center space-x-3">
                 <span id="avisos-seleccionados" class="text-sm text-gray-300">0 avisos seleccionados</span>
-                <button id="btn-eliminar-seleccionados" onclick="eliminarAvisosSeleccionados()" 
-                    class="inline-flex items-center px-3 py-1 text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 disabled:bg-gray-500 disabled:cursor-not-allowed"
-                    disabled>
-                    Eliminar Seleccionados
-                </button>
+                <div id="eliminar-seleccionados-wrap" class="inline-flex rounded-md shadow-sm" role="group">
+                        <button id="btn-eliminar-seleccionados" type="button" onclick="eliminarAvisosSeleccionados()"
+                            class="inline-flex items-center px-3 py-1 text-sm font-medium rounded-l-md text-white bg-red-600 hover:bg-red-700 disabled:bg-gray-500 disabled:cursor-not-allowed border-r border-red-500"
+                            disabled>
+                            Eliminar Seleccionados
+                        </button>
+                        <button id="btn-eliminar-seleccionados-toggle" type="button" onclick="togglePanelEliminarPorTexto()"
+                            class="inline-flex items-center px-2 py-1 text-sm font-medium rounded-r-md text-white bg-red-600 hover:bg-red-700 disabled:bg-gray-500 disabled:cursor-not-allowed"
+                            aria-expanded="false"
+                            aria-controls="eliminar-seleccionados-panel"
+                            title="Eliminar por texto del mensaje">
+                            <svg id="eliminar-seleccionados-chevron" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                </div>
                 @if(auth()->id() === 1)
                     <div class="flex items-center space-x-2">
                         <label class="flex items-center space-x-2 cursor-pointer">
@@ -484,6 +496,22 @@
                     Crear Aviso Interno
                 </button>
             </div>
+        </div>
+        <div id="eliminar-seleccionados-panel" class="hidden mt-3 p-3 bg-gray-800 border border-gray-600 rounded-md">
+            <label for="eliminar-seleccionados-texto-filter" class="block text-xs font-medium text-gray-300 mb-1">
+                Solo eliminar seleccionados cuyo mensaje contenga exactamente este texto:
+            </label>
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-start">
+                <textarea id="eliminar-seleccionados-texto-filter" rows="2"
+                    class="flex-1 px-3 py-2 text-sm border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 dark:bg-gray-700 dark:text-gray-200 resize-y"
+                    placeholder="Escribe el texto exacto del aviso..."></textarea>
+                <button id="btn-eliminar-seleccionados-por-texto" type="button" onclick="eliminarAvisosSeleccionadosPorTexto()"
+                    class="inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md text-white bg-red-700 hover:bg-red-800 disabled:bg-gray-500 disabled:cursor-not-allowed whitespace-nowrap"
+                    disabled>
+                    Eliminar coincidentes
+                </button>
+            </div>
+        </div>
         </div>
 
         @php
@@ -559,7 +587,7 @@
         <!-- Contenido de pestañas -->
         <div id="content-vencidos" class="tab-content{{ $avisosTabActual !== 'vencidos' ? ' hidden' : '' }}">
             <div class="mb-4">
-                <div class="flex flex-wrap gap-2">
+                <div class="flex flex-wrap items-center gap-2">
                     @foreach($avisosSubTabsLabels as $clave => $label)
                         @php
                             $count = $conteosTiposVencidos[$clave] ?? 0;
@@ -575,6 +603,12 @@
                             @endif
                         </a>
                     @endforeach
+                    <label class="inline-flex items-center gap-2 ml-2 px-3 py-1.5 text-xs font-medium text-gray-300 cursor-pointer">
+                        <input type="checkbox"
+                               class="checkbox-abrir-automaticamente rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                               onchange="toggleAbrirAutomaticamenteAvisos(this.checked)">
+                        <span>Abrir automáticamente</span>
+                    </label>
                 </div>
             </div>
             <div class="bg-gray-800 dark:bg-gray-800 shadow rounded-lg overflow-x-auto">
@@ -972,7 +1006,7 @@
 
         <div id="content-pendientes" class="tab-content{{ $avisosTabActual !== 'pendientes' ? ' hidden' : '' }}">
             <div class="mb-4">
-                <div class="flex flex-wrap gap-2">
+                <div class="flex flex-wrap items-center gap-2">
                     @foreach($avisosSubTabsLabels as $clave => $label)
                         @php
                             $count = $conteosTiposPendientes[$clave] ?? 0;
@@ -988,6 +1022,12 @@
                             @endif
                         </a>
                     @endforeach
+                    <label class="inline-flex items-center gap-2 ml-2 px-3 py-1.5 text-xs font-medium text-gray-300 cursor-pointer">
+                        <input type="checkbox"
+                               class="checkbox-abrir-automaticamente rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                               onchange="toggleAbrirAutomaticamenteAvisos(this.checked)">
+                        <span>Abrir automáticamente</span>
+                    </label>
                 </div>
             </div>
             <div class="bg-gray-800 dark:bg-gray-800 shadow rounded-lg overflow-x-auto">
@@ -1311,7 +1351,7 @@
 
         <div id="content-ocultos" class="tab-content{{ $avisosTabActual !== 'ocultos' ? ' hidden' : '' }}">
             <div class="mb-4">
-                <div class="flex flex-wrap gap-2">
+                <div class="flex flex-wrap items-center gap-2">
                     @foreach($avisosSubTabsLabels as $clave => $label)
                         @php
                             $count = $conteosTiposOcultos[$clave] ?? 0;
@@ -1327,6 +1367,12 @@
                             @endif
                         </a>
                     @endforeach
+                    <label class="inline-flex items-center gap-2 ml-2 px-3 py-1.5 text-xs font-medium text-gray-300 cursor-pointer">
+                        <input type="checkbox"
+                               class="checkbox-abrir-automaticamente rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                               onchange="toggleAbrirAutomaticamenteAvisos(this.checked)">
+                        <span>Abrir automáticamente</span>
+                    </label>
                 </div>
             </div>
             <div class="bg-gray-800 dark:bg-gray-800 shadow rounded-lg overflow-x-auto">
@@ -1956,7 +2002,125 @@
             return primeraFila;
         }
 
+        function obtenerBotonAutoAbrirPrimeraFila(fila) {
+            if (!fila) {
+                return null;
+            }
+
+            const tipo = fila.dataset.tipo;
+            const botones = fila.querySelectorAll('.aviso-elemento-content button');
+
+            if (tipo === 'productos') {
+                return Array.from(botones).find((btn) => btn.textContent.trim() === '1ª Oferta') || null;
+            }
+
+            if (tipo === 'ofertas') {
+                return Array.from(botones).find((btn) => btn.textContent.trim() === 'Ver') || null;
+            }
+
+            return null;
+        }
+
+        const AVISOS_ABRIR_AUTOMATICAMENTE_KEY = 'avisos-abrir-automaticamente';
+
+        function abrirAutomaticamenteAvisosActivo() {
+            return sessionStorage.getItem(AVISOS_ABRIR_AUTOMATICAMENTE_KEY) === '1';
+        }
+
+        function sincronizarCheckboxAbrirAutomaticamente(checked) {
+            document.querySelectorAll('.checkbox-abrir-automaticamente').forEach((checkbox) => {
+                checkbox.checked = checked;
+            });
+        }
+
+        function abrirUrlAutomaticaPrimeraFila() {
+            const primeraFila = obtenerPrimeraFilaAvisoVisible();
+            const btnAbrir = obtenerBotonAutoAbrirPrimeraFila(primeraFila);
+            if (btnAbrir) {
+                btnAbrir.click();
+            }
+        }
+
+        function toggleAbrirAutomaticamenteAvisos(checked) {
+            sessionStorage.setItem(AVISOS_ABRIR_AUTOMATICAMENTE_KEY, checked ? '1' : '0');
+            sincronizarCheckboxAbrirAutomaticamente(checked);
+
+            if (checked) {
+                abrirUrlAutomaticaPrimeraFila();
+            }
+        }
+
+        function obtenerBloquePrecioEnvioPrimeraFila() {
+            const primeraFila = obtenerPrimeraFilaAvisoVisible();
+            if (!primeraFila) {
+                return null;
+            }
+
+            const bloque = primeraFila.querySelector('.avisos-oferta-block');
+            if (!bloque) {
+                return null;
+            }
+
+            const envio = bloque.querySelector('.envio-oferta-mas-barata, .envio-oferta-input');
+            const precio = bloque.querySelector('.precio-total-oferta-mas-barata, .precio-total-input');
+            const btnGuardar = bloque.querySelector('button[onclick*="guardarPrecioOfertaMasBarata"]');
+            const btnMostrar = primeraFila.querySelector('button[onclick*="mostrarOferta("]');
+            const btnAccion = btnGuardar || btnMostrar;
+
+            if (!envio || !precio || !btnAccion) {
+                return null;
+            }
+
+            return { envio, precio, btnAccion };
+        }
+
+        function manejarEnterPrecioEnvioPrimeraFila(e) {
+            if (e.key !== 'Enter' || e.ctrlKey || e.metaKey || e.altKey) {
+                return false;
+            }
+
+            if (algunModalAvisosBloqueaAtajos()) {
+                return false;
+            }
+
+            const bloque = obtenerBloquePrecioEnvioPrimeraFila();
+            if (!bloque) {
+                return false;
+            }
+
+            const activo = document.activeElement;
+            const enCampoPrecioEnvio = activo === bloque.envio || activo === bloque.precio;
+
+            if (enCampoPrecioEnvio) {
+                if (e.shiftKey) {
+                    return false;
+                }
+                e.preventDefault();
+                bloque.btnAccion.click();
+                return true;
+            }
+
+            if (usuarioEscribiendoEnCampo()) {
+                return false;
+            }
+
+            e.preventDefault();
+            if (e.shiftKey) {
+                bloque.envio.focus();
+                bloque.envio.select();
+            } else {
+                bloque.precio.focus();
+                bloque.precio.select();
+            }
+
+            return true;
+        }
+
         function manejarAtajosTecladoAvisos(e) {
+            if (manejarEnterPrecioEnvioPrimeraFila(e)) {
+                return;
+            }
+
             if (algunModalAvisosBloqueaAtajos()) {
                 return;
             }
@@ -1984,6 +2148,15 @@
                 if (btnEliminar) {
                     e.preventDefault();
                     btnEliminar.click();
+                }
+                return;
+            }
+
+            if (esTeclaSola(e, 'e')) {
+                const btnAplazar = primeraFila.querySelector('button[onclick^="aplazarAviso("]');
+                if (btnAplazar) {
+                    e.preventDefault();
+                    btnAplazar.click();
                 }
             }
         }
@@ -2067,6 +2240,13 @@
             } else {
                 activarPestañaPrincipal(tabDesdeServidor, false);
             }
+
+            const abrirAutomaticamente = abrirAutomaticamenteAvisosActivo();
+            sincronizarCheckboxAbrirAutomaticamente(abrirAutomaticamente);
+
+            if (abrirAutomaticamente) {
+                abrirUrlAutomaticaPrimeraFila();
+            }
         });
 
         // Funciones para editar avisos
@@ -2134,41 +2314,35 @@
 
         // Función helper para obtener el texto del aviso desde el DOM
         function obtenerTextoAvisoDesdeDOM(avisoId) {
-            // Buscar la fila que contiene el aviso
             const fila = document.querySelector(`tr[data-aviso-id="${avisoId}"]`);
             if (!fila) {
                 return null;
             }
-            
-            // Buscar la celda que contiene el texto del aviso (tercera columna)
-            const celdas = fila.querySelectorAll('td');
-            if (celdas.length < 3) {
+
+            const celdaTexto = fila.querySelector('td.avisos-tabla-texto-aviso');
+            if (!celdaTexto) {
                 return null;
             }
-            
-            // La celda del texto es la tercera (índice 2)
-            const celdaTexto = celdas[2];
+
+            const spanTexto = celdaTexto.querySelector('.text-base > span.block');
+            if (spanTexto) {
+                return spanTexto.textContent.trim();
+            }
+
             const divTexto = celdaTexto.querySelector('div.text-base');
             if (!divTexto) {
                 return null;
             }
-            
-            // Obtener solo el texto directo del div (antes de cualquier elemento hijo)
-            // El texto del aviso es el contenido de texto directo del div
+
             let textoAviso = '';
-            
-            // Recorrer los nodos hijos del div
             for (let node of divTexto.childNodes) {
                 if (node.nodeType === Node.TEXT_NODE) {
-                    // Es un nodo de texto, añadirlo
                     textoAviso += node.textContent;
                 } else if (node.nodeType === Node.ELEMENT_NODE) {
-                    // Si encontramos un elemento, el texto del aviso ya terminó
-                    // El texto del aviso está antes del primer elemento hijo
                     break;
                 }
             }
-            
+
             return textoAviso.trim();
         }
 
@@ -2307,7 +2481,7 @@
                     ajustarAlturaTextarea(this);
                 });
             }
-            
+
             const textareaNuevo = document.getElementById('texto-nuevo-aviso');
             if (textareaNuevo) {
                 textareaNuevo.addEventListener('input', function() {
@@ -2678,63 +2852,104 @@
             const checkboxes = document.querySelectorAll('.checkbox-aviso:checked');
             const contador = document.getElementById('avisos-seleccionados');
             const btnEliminar = document.getElementById('btn-eliminar-seleccionados');
+            const btnToggle = document.getElementById('btn-eliminar-seleccionados-toggle');
+            const btnEliminarPorTexto = document.getElementById('btn-eliminar-seleccionados-por-texto');
             
             const cantidad = checkboxes.length;
             contador.textContent = `${cantidad} avisos seleccionados`;
             
-            // Habilitar/deshabilitar botón
-            btnEliminar.disabled = cantidad === 0;
+            const haySeleccion = cantidad > 0;
+            btnEliminar.disabled = !haySeleccion;
+            if (btnToggle) {
+                btnToggle.disabled = false;
+            }
+            if (btnEliminarPorTexto) {
+                btnEliminarPorTexto.disabled = !haySeleccion;
+            }
         }
 
-        async function eliminarAvisosSeleccionados() {
+        function togglePanelEliminarPorTexto() {
+            const panel = document.getElementById('eliminar-seleccionados-panel');
+            const toggle = document.getElementById('btn-eliminar-seleccionados-toggle');
+            const chevron = document.getElementById('eliminar-seleccionados-chevron');
+
+            if (!panel) {
+                return;
+            }
+
+            const visible = !panel.classList.contains('hidden');
+            panel.classList.toggle('hidden', visible);
+            toggle.setAttribute('aria-expanded', visible ? 'false' : 'true');
+            if (chevron) {
+                chevron.classList.toggle('rotate-180', !visible);
+            }
+
+            if (!visible) {
+                const textarea = document.getElementById('eliminar-seleccionados-texto-filter');
+                if (textarea) {
+                    textarea.focus();
+                }
+            }
+        }
+
+        function obtenerAvisosSeleccionadosIds() {
             const checkboxes = document.querySelectorAll('.checkbox-aviso:checked');
-            const avisosIds = Array.from(checkboxes).map(checkbox => checkbox.dataset.avisoId);
-            
+            return Array.from(checkboxes).map(checkbox => checkbox.dataset.avisoId);
+        }
+
+        function filtrarAvisosSeleccionadosPorTexto(textoFiltro) {
+            const textoBuscado = textoFiltro.trim();
+            if (textoBuscado === '') {
+                return [];
+            }
+
+            const checkboxes = document.querySelectorAll('.checkbox-aviso:checked');
+
+            return Array.from(checkboxes)
+                .filter(checkbox => {
+                    const textoAviso = obtenerTextoAvisoDesdeDOM(checkbox.dataset.avisoId);
+                    return textoAviso !== null && textoAviso.includes(textoBuscado);
+                })
+                .map(checkbox => checkbox.dataset.avisoId);
+        }
+
+        async function ejecutarEliminacionAvisos(avisosIds, btnElement, mensajeConfirmacion) {
             if (avisosIds.length === 0) {
-                mostrarAlertaAvisos('No hay avisos seleccionados para eliminar.');
                 return;
             }
-            
-            if (!await mostrarConfirmacionAvisos(`¿Estás seguro de que quieres eliminar ${avisosIds.length} avisos?`)) {
+
+            if (!await mostrarConfirmacionAvisos(mensajeConfirmacion)) {
                 return;
             }
-            
-            // Deshabilitar botón durante la eliminación
-            const btnEliminar = document.getElementById('btn-eliminar-seleccionados');
-            const originalText = btnEliminar.textContent;
-            btnEliminar.disabled = true;
-            btnEliminar.textContent = 'Verificando...';
-            
-            // Verificar cada aviso antes de eliminar
-            let avisosParaEliminar = [];
-            
+
+            const originalText = btnElement.textContent;
+            btnElement.disabled = true;
+            btnElement.textContent = 'Verificando...';
+
+            const avisosParaEliminar = [];
+
             for (const id of avisosIds) {
                 const textoVista = obtenerTextoAvisoDesdeDOM(id);
-                
                 const puedeEliminar = await verificarTextoAvisoAntesDeEliminar(id, textoVista);
-                
+
                 if (!puedeEliminar) {
-                    // Si el texto cambió, se recargó la página, así que salimos
                     return;
                 }
-                
-                // Si llegamos aquí, el texto es igual, podemos eliminar
+
                 avisosParaEliminar.push(id);
             }
-            
-            // Si no quedan avisos para eliminar (todos tenían cambios), recargar
+
             if (avisosParaEliminar.length === 0) {
                 location.reload();
                 return;
             }
-            
-            btnEliminar.textContent = 'Eliminando...';
-            
-            // Eliminar avisos uno por uno
+
+            btnElement.textContent = 'Eliminando...';
+
             let eliminados = 0;
             let errores = 0;
-            
-            const eliminarAviso = (id) => {
+
+            const eliminarAvisoRequest = (id) => {
                 return fetch(`/panel-privado/avisos/${id}`, {
                     method: 'DELETE',
                     headers: {
@@ -2742,9 +2957,9 @@
                     }
                 });
             };
-            
-            const promesas = avisosParaEliminar.map(id => 
-                eliminarAviso(id)
+
+            const promesas = avisosParaEliminar.map(id =>
+                eliminarAvisoRequest(id)
                     .then(response => response.json())
                     .then(data => {
                         if (data.success) {
@@ -2757,7 +2972,7 @@
                         errores++;
                     })
             );
-            
+
             Promise.all(promesas).then(() => {
                 if (errores === 0) {
                     location.reload();
@@ -2766,10 +2981,59 @@
                     location.reload();
                 } else {
                     mostrarAlertaAvisos('Error al eliminar los avisos.');
-                    btnEliminar.disabled = false;
-                    btnEliminar.textContent = originalText;
+                    btnElement.disabled = false;
+                    btnElement.textContent = originalText;
+                    actualizarContadorSeleccionados();
                 }
             });
+        }
+
+        async function eliminarAvisosSeleccionados() {
+            const avisosIds = obtenerAvisosSeleccionadosIds();
+
+            if (avisosIds.length === 0) {
+                mostrarAlertaAvisos('No hay avisos seleccionados para eliminar.');
+                return;
+            }
+
+            const btnEliminar = document.getElementById('btn-eliminar-seleccionados');
+            await ejecutarEliminacionAvisos(
+                avisosIds,
+                btnEliminar,
+                `¿Estás seguro de que quieres eliminar ${avisosIds.length} avisos?`
+            );
+        }
+
+        async function eliminarAvisosSeleccionadosPorTexto() {
+            const textarea = document.getElementById('eliminar-seleccionados-texto-filter');
+            const textoFiltro = textarea ? textarea.value : '';
+            const seleccionados = obtenerAvisosSeleccionadosIds().length;
+
+            if (seleccionados === 0) {
+                mostrarAlertaAvisos('No hay avisos seleccionados para eliminar.');
+                return;
+            }
+
+            if (textoFiltro.trim() === '') {
+                mostrarAlertaAvisos('Escribe el texto que debe aparecer en el mensaje del aviso.');
+                return;
+            }
+
+            const avisosIds = filtrarAvisosSeleccionadosPorTexto(textoFiltro);
+
+            if (avisosIds.length === 0) {
+                mostrarAlertaAvisos('Ningún aviso seleccionado contiene ese texto en el mensaje.');
+                return;
+            }
+
+            const omitidos = seleccionados - avisosIds.length;
+            let mensaje = `¿Eliminar ${avisosIds.length} aviso${avisosIds.length === 1 ? '' : 's'} seleccionado${avisosIds.length === 1 ? '' : 's'} cuyo mensaje contiene ese texto?`;
+            if (omitidos > 0) {
+                mensaje += ` (${omitidos} seleccionado${omitidos === 1 ? '' : 's'} sin ese texto no se eliminará${omitidos === 1 ? '' : 'n'})`;
+            }
+
+            const btnEliminarPorTexto = document.getElementById('btn-eliminar-seleccionados-por-texto');
+            await ejecutarEliminacionAvisos(avisosIds, btnEliminarPorTexto, mensaje);
         }
 
         // Función para marcar envío como comprobado (guarda precio/envío de los inputs y actualiza la oferta)

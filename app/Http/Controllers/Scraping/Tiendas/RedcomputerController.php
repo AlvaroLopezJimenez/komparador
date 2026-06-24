@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\Scraping\Tiendas;
 
 use App\Http\Controllers\Scraping\Tiendas\PlantillaTiendaController;
+use App\Models\OfertaProducto;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 
 /**
  * RED Computer (PrestaShop): precio en <span class="product-price current-price-value" content="115.91">.
+ * Si detecta "Próximamente se añadirán más productos", pone la oferta en mostrar-no y crea aviso a 4 días.
  * Listado: enlaces <a class="thumbnail product-thumbnail" href="...-id.html">.
  * Paginación: ?page=2 (ej. /tarjetas-graficas-108?page=2).
  */
@@ -24,12 +27,39 @@ class RedcomputerController extends PlantillaTiendaController
 
         $html = html_entity_decode((string) $resultado['html'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
+        if ($this->esSinStock($html)) {
+            if ($oferta && $oferta instanceof OfertaProducto) {
+                $oferta->update(['mostrar' => 'no']);
+                DB::table('avisos')->insert([
+                    'texto_aviso'     => 'Sin stock 1a vez - Generado automaticamente',
+                    'fecha_aviso'     => now()->addDays(4),
+                    'user_id'         => 1,
+                    'avisoable_type'  => OfertaProducto::class,
+                    'avisoable_id'    => $oferta->id,
+                    'oculto'          => 0,
+                    'created_at'      => now(),
+                    'updated_at'      => now(),
+                ]);
+            }
+
+            return response()->json(['success' => false, 'error' => 'Producto sin stock en RED Computer.']);
+        }
+
         $precio = $this->extraerPrecioFicha($html);
         if ($precio === null) {
             return response()->json(['success' => false, 'error' => 'No se encontró el precio (current-price-value / content) en el HTML.']);
         }
 
         return response()->json(['success' => true, 'precio' => $precio]);
+    }
+
+    /**
+     * Detecta si la página indica que no hay productos disponibles.
+     * Ej.: <p>¡Estate atento! Próximamente se añadirán más productos.</p>
+     */
+    private function esSinStock(string $html): bool
+    {
+        return str_contains($html, 'Próximamente se añadirán más productos');
     }
 
     /** Ficha: solo <span class="... current-price-value ..." content="..."> */

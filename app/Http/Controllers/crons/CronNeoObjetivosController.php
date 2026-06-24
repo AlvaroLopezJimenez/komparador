@@ -1852,29 +1852,85 @@ class CronNeoObjetivosController extends Controller
     private function detectarTiendaPorUrl(string $url, $todasLasTiendas): ?Tienda
     {
         try {
-            $parsed = parse_url($url);
-            $hostUser = strtolower($parsed['host'] ?? '');
-            $hostUser = preg_replace('/^www\./', '', $hostUser);
-            if (empty($hostUser)) {
+            $urlParaParsear = trim($url);
+            if ($urlParaParsear === '') {
                 return null;
             }
+            if (!preg_match('#^https?://#i', $urlParaParsear)) {
+                $urlParaParsear = 'https://' . $urlParaParsear;
+            }
+            $parsed = parse_url($urlParaParsear);
+            $hostUser = strtolower($parsed['host'] ?? '');
+            $hostUser = preg_replace('/^www\./', '', $hostUser);
+            if ($hostUser === '') {
+                return null;
+            }
+
             foreach ($todasLasTiendas as $t) {
                 $tu = trim($t->url ?? '');
-                if (empty($tu)) {
+                if ($tu === '') {
                     continue;
                 }
                 $tu = preg_replace('#^https?://#i', '', $tu);
                 $tu = preg_replace('/^www\./i', '', strtolower($tu));
                 $tu = preg_replace('#/.*$#', '', $tu);
-                if ($tu && ($hostUser === $tu || str_ends_with($hostUser, '.' . $tu) || str_ends_with($tu, '.' . $hostUser))) {
+                $tu = rtrim($tu, '/');
+                if ($tu === '' || !str_contains($tu, '.')) {
+                    continue;
+                }
+                if ($hostUser === $tu || str_ends_with($hostUser, '.' . $tu) || str_ends_with($tu, '.' . $hostUser)) {
                     return $t;
                 }
             }
+
+            $mejor = null;
+            $mejorLongitud = 0;
+            foreach ($todasLasTiendas as $t) {
+                foreach ($this->clavesHostTiendaDetectarNeo($t) as $clave) {
+                    if (strlen($clave) < 4) {
+                        continue;
+                    }
+                    if (str_contains($hostUser, $clave) && strlen($clave) > $mejorLongitud) {
+                        $mejor = $t;
+                        $mejorLongitud = strlen($clave);
+                    }
+                }
+            }
+
+            return $mejor instanceof Tienda ? $mejor : null;
         } catch (\Throwable $e) {
             //
         }
 
         return null;
+    }
+
+    private function normalizarClaveTiendaDetectarNeo(string $texto): string
+    {
+        $s = \Illuminate\Support\Str::ascii(mb_strtolower(trim($texto)));
+
+        return preg_replace('/[^a-z0-9]/', '', $s) ?? '';
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function clavesHostTiendaDetectarNeo($tienda): array
+    {
+        $claves = [];
+        $nombre = $this->normalizarClaveTiendaDetectarNeo((string) ($tienda->nombre ?? ''));
+        if ($nombre !== '') {
+            $claves[] = $nombre;
+        }
+        $urlCampo = trim((string) ($tienda->url ?? ''));
+        if ($urlCampo !== '' && !str_contains($urlCampo, '.')) {
+            $slug = $this->normalizarClaveTiendaDetectarNeo($urlCampo);
+            if ($slug !== '') {
+                $claves[] = $slug;
+            }
+        }
+
+        return array_values(array_unique(array_filter($claves)));
     }
 
     /**

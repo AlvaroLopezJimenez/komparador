@@ -21,6 +21,7 @@ return new class extends Migration
             $table->text('info_adicional_chatgpt')->nullable();
             $table->foreignId('parent_id')->nullable()->constrained('categorias')->onDelete('set null');
             $table->enum('mostrar', ['si', 'no'])->default('si');
+            $table->string('unidad_de_medida')->nullable();
             $table->timestamps();
         });
     }

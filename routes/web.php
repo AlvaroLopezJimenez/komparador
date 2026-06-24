@@ -83,6 +83,10 @@ Route::middleware(['security.headers', 'block.public.deletes'])->group(function 
     //PARA REDIRIGIR AL USUARIO A LA TIENDA - AQUI CARGA LA PAGINA INTERMEDIA
     Route::get('/redirigir/{ofertaId}', [ClickController::class, 'redirigir'])->name('click.redirigir');
 
+    Route::post('/api/visitas', [App\Http\Controllers\VisitaUsuarioController::class, 'registrar'])
+        ->middleware('throttle:60,1')
+        ->name('visitas.registrar');
+
     Route::middleware('throttle:30,1')->group(function () {
         // BÚSQUEDA PÚBLICA
         Route::get('/buscar', [BuscadorController::class, 'buscar'])->name('buscar');
@@ -550,6 +554,8 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
     
     // DASHBOARD DE CLICKS
     Route::get('clicks/dashboard', [ClickController::class, 'dashboard'])->name('clicks.dashboard');
+    Route::get('clicks/dashboard/top', [ClickController::class, 'dashboardTop'])->name('clicks.dashboard.top');
+    Route::get('clicks/dashboard/grafica', [ClickController::class, 'dashboardGrafica'])->name('clicks.dashboard.grafica');
     Route::get('clicks/posiciones-tienda', [ClickController::class, 'posicionesTienda'])->name('clicks.posiciones-tienda');
     Route::get('clicks/verificar-posiciones/{productoId}', [ClickController::class, 'verificarPosiciones'])->name('clicks.verificar-posiciones');
     Route::delete('clicks/{id}', [ClickController::class, 'destroy'])->name('clicks.destroy');

@@ -203,6 +203,22 @@
                     </div>
                 </div>
 
+                <div>
+                    <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">Unidad de medida</label>
+                    <select name="unidad_de_medida" class="w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border @error('unidad_de_medida') border-red-500 @enderror">
+                        <option value="" {{ old('unidad_de_medida', $categoria?->unidad_de_medida ?? '') === '' ? 'selected' : '' }}>— Selecciona una opción —</option>
+                        <option value="unidad" {{ old('unidad_de_medida', $categoria?->unidad_de_medida ?? '') === 'unidad' ? 'selected' : '' }}>Unidad</option>
+                        <option value="kilos" {{ old('unidad_de_medida', $categoria?->unidad_de_medida ?? '') === 'kilos' ? 'selected' : '' }}>Kilos</option>
+                        <option value="litros" {{ old('unidad_de_medida', $categoria?->unidad_de_medida ?? '') === 'litros' ? 'selected' : '' }}>Litros</option>
+                        <option value="unidadMilesima" {{ old('unidad_de_medida', $categoria?->unidad_de_medida ?? '') === 'unidadMilesima' ? 'selected' : '' }}>Unidad Milésima</option>
+                        <option value="unidadUnica" {{ old('unidad_de_medida', $categoria?->unidad_de_medida ?? '') === 'unidadUnica' ? 'selected' : '' }}>Unidad Única</option>
+                        <option value="800gramos" {{ old('unidad_de_medida', $categoria?->unidad_de_medida ?? '') === '800gramos' ? 'selected' : '' }}>800 gramos</option>
+                        <option value="100ml" {{ old('unidad_de_medida', $categoria?->unidad_de_medida ?? '') === '100ml' ? 'selected' : '' }}>100 ml</option>
+                    </select>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Opcional. Se usará como valor por defecto al crear productos en esta categoría.</p>
+                    @error('unidad_de_medida') <p class="text-red-500 text-sm mt-1">{{ $message }}</p> @enderror
+                </div>
+
                 @if(!$categoria)
                 {{-- IMÁGENES (nueva categoría: después de datos básicos) --}}
                 <fieldset class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 space-y-4 border border-gray-200 dark:border-gray-700">

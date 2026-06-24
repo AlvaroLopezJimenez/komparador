@@ -412,6 +412,7 @@ class OfertasController extends Controller
             'success' => true,
             'especificaciones' => $especificaciones,
             'tiene_especificaciones' => $tieneEspecificaciones,
+            'unidad_de_medida' => $producto ? ($producto->unidadDeMedida ?? 'unidad') : null,
             'especificaciones_marcadas' => $especificacionesMarcadas,
             'url_producto' => $urlProducto,
             'imagenes_producto' => $imagenesProducto,
@@ -436,9 +437,11 @@ class OfertasController extends Controller
             'imagenes' => 'nullable|array',
             'imagenes.*' => 'string|max:500',
             'usar_imagenes_producto' => 'nullable|boolean',
+            'es_grupo_producto' => 'nullable|boolean',
         ]);
 
         $producto = Producto::findOrFail((int) $data['producto_id']);
+        $esGrupoProducto = $request->boolean('es_grupo_producto');
         if (!$producto->categoria_id_especificaciones_internas) {
             return response()->json([
                 'success' => false,
@@ -495,21 +498,30 @@ class OfertasController extends Controller
             $specInternasPre = [];
         }
         $filtrosCatPre = $specInternasPre['filtros'] ?? [];
-        $idxCat = null;
-        foreach ($filtrosCatPre as $i => $f) {
-            if ((string) ($f['id'] ?? '') === $principalId) {
-                $idxCat = $i;
-                break;
-            }
-        }
-
         $filtrosProdPre = $elegidasPre['_producto']['filtros'] ?? [];
+        $idxCat = null;
         $idxProd = null;
-        if ($idxCat === null) {
+
+        if ($esGrupoProducto) {
             foreach ($filtrosProdPre as $i => $f) {
                 if ((string) ($f['id'] ?? '') === $principalId) {
                     $idxProd = $i;
                     break;
+                }
+            }
+        } else {
+            foreach ($filtrosCatPre as $i => $f) {
+                if ((string) ($f['id'] ?? '') === $principalId) {
+                    $idxCat = $i;
+                    break;
+                }
+            }
+            if ($idxCat === null) {
+                foreach ($filtrosProdPre as $i => $f) {
+                    if ((string) ($f['id'] ?? '') === $principalId) {
+                        $idxProd = $i;
+                        break;
+                    }
                 }
             }
         }
@@ -858,6 +870,10 @@ class OfertasController extends Controller
                         $item['producto_asignado_desde_neo'] = true;
                         $item['hay_empate'] = false;
                         $item['candidatos_empatados'] = [];
+                        $especsDesdeUrl = $this->detectarEspecificacionesProductoDesdeUrl($productoUnico, $urlParaBuscar);
+                        if (! empty($especsDesdeUrl)) {
+                            $item['especificaciones_marcadas'] = $especsDesdeUrl;
+                        }
                     } else {
                         $item['error'] = ($item['error'] ?? '') . ' Producto neo no encontrado.';
                     }
@@ -1387,6 +1403,45 @@ Responde ÚNICAMENTE con el JSON.";
     }
 
     /**
+     * Precio centinela cuando no se puede consultar el precio real (tienda no scrapeable, Amazon API no elegible, etc.).
+     *
+     * @return array{0: float, 1: float} [precio_total, precio_unidad]
+     */
+    private function preciosCentinela9999Oferta(Producto $producto, float $unidades): array
+    {
+        $precioTotal = 9999.0;
+        $calcularPrecioUnidad = new CalcularPrecioUnidad();
+        $precioUnidad = $calcularPrecioUnidad->calcular(
+            $producto->unidadDeMedida ?? 'unidad',
+            $precioTotal,
+            $unidades
+        );
+        if ($precioUnidad === null) {
+            $precioUnidad = $precioTotal / max(0.01, $unidades);
+        }
+
+        return [$precioTotal, $precioUnidad];
+    }
+
+    /**
+     * Amazon Creators API: cuenta sin requisitos de elegibilidad (AssociateNotEligible / HTTP 403).
+     */
+    private function esErrorAmazonApiNoElegible(?string $error): bool
+    {
+        if ($error === null || $error === '') {
+            return false;
+        }
+        $normalized = mb_strtolower($error);
+
+        return str_contains($normalized, 'amazon')
+            && (
+                str_contains($normalized, 'associatenoteligible')
+                || str_contains($normalized, 'eligibility requirements')
+                || str_contains($normalized, 'accessdeniedexception')
+            );
+    }
+
+    /**
      * Crea una oferta desde el flujo masivo (obtiene precio, aplica envío/tienda, guarda)
      * POST /panel-privado/ofertas/crear-masivo/crear
      */
@@ -1399,37 +1454,58 @@ Responde ÚNICAMENTE con el JSON.";
             'tienda_id' => 'required|exists:tiendas,id',
             'especificaciones_internas' => 'nullable|string',
             'generar_sin_precio' => 'nullable|boolean',
+            'generar_segunda_mano' => 'nullable|boolean',
             'envio' => 'nullable|numeric',
+            'unidades' => 'nullable|numeric|min:0.01',
         ]);
 
         $url = trim($request->url);
+        $urlNorm = $this->normalizarUrl($url);
         $productoId = (int) $request->producto_id;
         $tiendaId = (int) $request->tienda_id;
         $generarSinPrecio = $request->boolean('generar_sin_precio');
+        $generarSegundaMano = $request->boolean('generar_segunda_mano');
+
+        if (UrlDescartada::where('url', $urlNorm)->exists()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Esta URL está descartada.',
+                'codigo' => 'url_ya_existe',
+            ], 409);
+        }
+        $urlLookup = app(ConsultarNeoCifrado::class)->hashLookup($urlNorm);
+        if ($urlLookup && OfertaProducto::where('url_lookup', $urlLookup)->exists()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Esta URL ya existe en ofertas.',
+                'codigo' => 'url_ya_existe',
+            ], 409);
+        }
 
         $producto = Producto::findOrFail($productoId);
         $tienda = Tienda::findOrFail($tiendaId);
 
-        $unidades = ($producto->unidadDeMedida === 'unidadUnica') ? 1.0 : 1.0;
+        if ($producto->unidadDeMedida === 'unidadUnica') {
+            $unidades = 1.0;
+        } elseif ($request->filled('unidades') && is_numeric($request->unidades) && (float) $request->unidades > 0) {
+            $unidades = (float) $request->unidades;
+        } else {
+            return response()->json([
+                'success' => false,
+                'error' => 'Debes indicar las unidades de la oferta (litros, kilos, etc.).',
+            ], 400);
+        }
 
         $tiendaNoVisibleNiScrapeable = ($tienda->mostrar_tienda === 'no' && $tienda->scrapear === 'no');
+        $amazonSinStockAutomatico = false;
 
-        if ($generarSinPrecio) {
-            // No intentar obtener precio: crear con precio 0, no mostrar y aviso sin stock
+        if ($generarSinPrecio || $generarSegundaMano) {
+            // No intentar obtener precio: crear con precio 0, no mostrar y aviso según el motivo elegido
             $precioTotal = 0.0;
             $precioUnidad = 0.0;
         } elseif ($tiendaNoVisibleNiScrapeable) {
             // Tienda marcada para no mostrar y no scrapear: no consultar precio y usar valor centinela.
-            $precioTotal = 9999.0;
-            $calcularPrecioUnidad = new CalcularPrecioUnidad();
-            $precioUnidad = $calcularPrecioUnidad->calcular(
-                $producto->unidadDeMedida ?? 'unidad',
-                $precioTotal,
-                $unidades
-            );
-            if ($precioUnidad === null) {
-                $precioUnidad = $precioTotal / max(0.01, $unidades);
-            }
+            [$precioTotal, $precioUnidad] = $this->preciosCentinela9999Oferta($producto, $unidades);
         } else {
             $scrapingController = new \App\Http\Controllers\Scraping\ScrapingController();
             $scrapingRequest = new Request([
@@ -1441,22 +1517,30 @@ Responde ÚNICAMENTE con el JSON.";
             $data = $response->getData(true);
 
             if (empty($data['success']) || !isset($data['precio']) || !is_numeric($data['precio'])) {
-                return response()->json([
-                    'success' => false,
-                    'error' => $data['error'] ?? 'No se pudo obtener el precio',
-                ], 400);
-            }
+                $errorScraping = $data['error'] ?? 'No se pudo obtener el precio';
+                if ($this->esErrorAmazonApiNoElegible($errorScraping)) {
+                    // Mismo tratamiento que «Sin stock» manual: precio 0, no mostrar, aviso a 4 días.
+                    $precioTotal = 0.0;
+                    $precioUnidad = 0.0;
+                    $amazonSinStockAutomatico = true;
+                } else {
+                    return response()->json([
+                        'success' => false,
+                        'error' => $errorScraping,
+                    ], 400);
+                }
+            } else {
+                $precioTotal = (float) str_replace(',', '.', (string) $data['precio']);
 
-            $precioTotal = (float) str_replace(',', '.', (string) $data['precio']);
-
-            $calcularPrecioUnidad = new CalcularPrecioUnidad();
-            $precioUnidad = $calcularPrecioUnidad->calcular(
-                $producto->unidadDeMedida ?? 'unidad',
-                $precioTotal,
-                $unidades
-            );
-            if ($precioUnidad === null) {
-                $precioUnidad = $precioTotal / max(0.01, $unidades);
+                $calcularPrecioUnidad = new CalcularPrecioUnidad();
+                $precioUnidad = $calcularPrecioUnidad->calcular(
+                    $producto->unidadDeMedida ?? 'unidad',
+                    $precioTotal,
+                    $unidades
+                );
+                if ($precioUnidad === null) {
+                    $precioUnidad = $precioTotal / max(0.01, $unidades);
+                }
             }
         }
 
@@ -1509,7 +1593,15 @@ Responde ÚNICAMENTE con el JSON.";
         $oferta = OfertaProducto::create($datos);
 
         if ($precioCero) {
-            $textoAviso = $generarSinPrecio ? 'Sin stock 1a vez' : 'Sin stock - 1a vez';
+            if ($generarSegundaMano) {
+                $textoAviso = 'Segunda mano - 1a vez';
+            } elseif ($generarSinPrecio) {
+                $textoAviso = 'Sin stock 1a vez';
+            } elseif ($amazonSinStockAutomatico) {
+                $textoAviso = 'Sin stock 1a vez - Generado automaticamente';
+            } else {
+                $textoAviso = 'Sin stock - 1a vez';
+            }
             \App\Models\Aviso::create([
                 'texto_aviso' => $textoAviso,
                 'fecha_aviso' => now()->addDays(4)->setTime(0, 1, 0),
@@ -1577,6 +1669,8 @@ Responde ÚNICAMENTE con el JSON.";
             'oferta_edit_url' => route('admin.ofertas.edit', $oferta),
             'envio' => $oferta->envio,
             'precio_unidad' => $oferta->precio_unidad,
+            'precio_cero' => $precioCero,
+            'sin_stock_automatico' => $amazonSinStockAutomatico,
             'mensaje' => 'Oferta creada correctamente',
         ]);
 
@@ -1827,26 +1921,85 @@ Responde ÚNICAMENTE con el JSON.";
     private function detectarTiendaPorUrl($url, $todasLasTiendas)
     {
         try {
-            $parsed = parse_url($url);
-            $hostUser = strtolower($parsed['host'] ?? '');
-            $hostUser = preg_replace('/^www\./', '', $hostUser);
-            if (empty($hostUser)) {
+            $urlParaParsear = trim($url);
+            if ($urlParaParsear === '') {
                 return null;
             }
+            if (!preg_match('#^https?://#i', $urlParaParsear)) {
+                $urlParaParsear = 'https://' . $urlParaParsear;
+            }
+            $parsed = parse_url($urlParaParsear);
+            $hostUser = strtolower($parsed['host'] ?? '');
+            $hostUser = preg_replace('/^www\./', '', $hostUser);
+            if ($hostUser === '') {
+                return null;
+            }
+
             foreach ($todasLasTiendas as $t) {
                 $tu = trim($t->url ?? '');
-                if (empty($tu)) continue;
+                if ($tu === '') {
+                    continue;
+                }
                 $tu = preg_replace('#^https?://#i', '', $tu);
                 $tu = preg_replace('/^www\./i', '', strtolower($tu));
                 $tu = preg_replace('#/.*$#', '', $tu);
-                if ($tu && ($hostUser === $tu || str_ends_with($hostUser, '.' . $tu) || str_ends_with($tu, '.' . $hostUser))) {
+                $tu = rtrim($tu, '/');
+                if ($tu === '' || !str_contains($tu, '.')) {
+                    continue;
+                }
+                if ($hostUser === $tu || str_ends_with($hostUser, '.' . $tu) || str_ends_with($tu, '.' . $hostUser)) {
                     return $t;
                 }
             }
+
+            $mejor = null;
+            $mejorLongitud = 0;
+            foreach ($todasLasTiendas as $t) {
+                foreach ($this->clavesHostTiendaDetectar($t) as $clave) {
+                    if (strlen($clave) < 4) {
+                        continue;
+                    }
+                    if (str_contains($hostUser, $clave) && strlen($clave) > $mejorLongitud) {
+                        $mejor = $t;
+                        $mejorLongitud = strlen($clave);
+                    }
+                }
+            }
+
+            return $mejor;
         } catch (\Throwable $e) {
             //
         }
+
         return null;
+    }
+
+    private function normalizarClaveTiendaDetectar(string $texto): string
+    {
+        $s = \Illuminate\Support\Str::ascii(mb_strtolower(trim($texto)));
+
+        return preg_replace('/[^a-z0-9]/', '', $s) ?? '';
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function clavesHostTiendaDetectar($tienda): array
+    {
+        $claves = [];
+        $nombre = $this->normalizarClaveTiendaDetectar((string) ($tienda->nombre ?? ''));
+        if ($nombre !== '') {
+            $claves[] = $nombre;
+        }
+        $urlCampo = trim((string) ($tienda->url ?? ''));
+        if ($urlCampo !== '' && !str_contains($urlCampo, '.')) {
+            $slug = $this->normalizarClaveTiendaDetectar($urlCampo);
+            if ($slug !== '') {
+                $claves[] = $slug;
+            }
+        }
+
+        return array_values(array_unique(array_filter($claves)));
     }
 
     /**
@@ -2240,7 +2393,7 @@ Responde ÚNICAMENTE con el JSON.";
         $productos = $query->with('categoria')
             ->orderBy('clicks', 'desc')
             ->limit(800)
-            ->get(['id', 'nombre', 'marca', 'modelo', 'talla', 'slug', 'categoria_id', 'imagen_grande', 'imagen_pequena', 'clicks', 'categoria_especificaciones_internas_elegidas']);
+            ->get(['id', 'nombre', 'marca', 'modelo', 'talla', 'slug', 'categoria_id', 'imagen_grande', 'imagen_pequena', 'clicks', 'categoria_especificaciones_internas_elegidas', 'unidadDeMedida']);
 
         // Incluir productos cuya marca coincida con alguna palabra del slug (asegura que Gigabyte esté si la URL dice gigabyte)
         $palabrasMarca = array_values(array_filter($palabrasNorm, fn ($p) => strlen($p) >= 3 && preg_match('/^\D+$/', $p)));
@@ -2253,7 +2406,7 @@ Responde ÚNICAMENTE con el JSON.";
                     }
                 })
                 ->with('categoria')
-                ->get(['id', 'nombre', 'marca', 'modelo', 'talla', 'slug', 'categoria_id', 'imagen_grande', 'imagen_pequena', 'clicks', 'categoria_especificaciones_internas_elegidas']);
+                ->get(['id', 'nombre', 'marca', 'modelo', 'talla', 'slug', 'categoria_id', 'imagen_grande', 'imagen_pequena', 'clicks', 'categoria_especificaciones_internas_elegidas', 'unidadDeMedida']);
             $productos = $productos->merge($extra)->unique('id')->values();
         }
 
@@ -2484,6 +2637,7 @@ Responde ÚNICAMENTE con el JSON.";
                 'imagen_grande' => $p->imagen_grande,
                 'imagen_pequena' => $p->imagen_pequena,
                 'imagenes_producto' => array_values(array_unique(array_filter($imgs))),
+                'unidad_de_medida' => $p->unidadDeMedida ?? 'unidad',
                 'puntuacion' => $item['puntuacion'],
             ];
         })->values()->toArray();
@@ -2521,20 +2675,88 @@ Responde ÚNICAMENTE con el JSON.";
             'texto_completo' => trim($p->nombre . ' - ' . ($p->marca ?? '') . ' - ' . ($p->modelo ?? '') . ' - ' . ($p->talla ?? '')),
             'url_producto' => $urlProducto,
             'imagenes_producto' => $imgs,
+            'unidad_de_medida' => $p->unidadDeMedida ?? 'unidad',
             'especificaciones' => $especs,
             'tiene_especificaciones' => $tieneEspecs,
         ];
     }
 
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function sublineasOfertaDesdeFiltroElegidas(array $f, array $especificacionesElegidas): array
+    {
+        $sublineasElegidas = $especificacionesElegidas[$f['id']] ?? [];
+        $subprincipales = $f['subprincipales'] ?? [];
+        $sublineasOferta = [];
+        foreach ($subprincipales as $sub) {
+            $subId = $sub['id'] ?? null;
+            if (!$subId) {
+                continue;
+            }
+            foreach ($sublineasElegidas as $item) {
+                $itemId = is_array($item) && isset($item['id']) ? $item['id'] : $item;
+                if ((string) $itemId !== (string) $subId) {
+                    continue;
+                }
+                $esOferta = is_array($item) && isset($item['o']) && (int) $item['o'] === 1;
+                if (!$esOferta) {
+                    continue;
+                }
+                $usarImagenesProducto = is_array($item) && !empty($item['usarImagenesProducto']);
+                $imagenes = [];
+                if (! $usarImagenesProducto) {
+                    foreach ([$sub['imagenes'] ?? [], $sub['imagen'] ?? []] as $v) {
+                        $imagenes = array_merge($imagenes, is_array($v) ? $v : ($v ? [$v] : []));
+                    }
+                    if (is_array($item) && isset($item['img'])) {
+                        $imgs = is_array($item['img']) ? $item['img'] : [$item['img']];
+                        $imagenes = array_merge($imagenes, $imgs);
+                    }
+                    if (is_array($item) && isset($item['imagenes'])) {
+                        $imgs = is_array($item['imagenes']) ? $item['imagenes'] : [$item['imagenes']];
+                        $imagenes = array_merge($imagenes, $imgs);
+                    }
+                    if (is_array($item) && isset($item['imagen'])) {
+                        $imagenes[] = $item['imagen'];
+                    }
+                }
+                $sublineasOferta[] = array_merge($sub, [
+                    'imagenes' => array_values(array_unique(array_filter($imagenes))),
+                    'usar_imagenes_producto' => $usarImagenesProducto,
+                ]);
+                break;
+            }
+        }
+
+        return $sublineasOferta;
+    }
+
     private function obtenerEspecificacionesProducto($productoId)
     {
         $producto = Producto::with('categoria')->find($productoId);
-        if (!$producto || !$producto->categoria_id_especificaciones_internas || !$producto->categoria_especificaciones_internas_elegidas) {
+        if (!$producto) {
             return null;
+        }
+
+        $unidadDeMedida = $producto->unidadDeMedida ?? 'unidad';
+
+        if (!$producto->categoria_id_especificaciones_internas || !$producto->categoria_especificaciones_internas_elegidas) {
+            return [
+                'unidad_de_medida' => $unidadDeMedida,
+                'columnas_ids' => [],
+                'formatos' => [],
+                'filtros' => [],
+            ];
         }
         $categoria = \App\Models\Categoria::find($producto->categoria_id_especificaciones_internas);
         if (!$categoria || !isset($categoria->especificaciones_internas['filtros'])) {
-            return null;
+            return [
+                'unidad_de_medida' => $unidadDeMedida,
+                'columnas_ids' => [],
+                'formatos' => [],
+                'filtros' => [],
+            ];
         }
         $especificacionesElegidas = $producto->categoria_especificaciones_internas_elegidas;
         $columnasIds = $especificacionesElegidas['_columnas'] ?? [];
@@ -2544,12 +2766,12 @@ Responde ÚNICAMENTE con el JSON.";
         if (isset($especificacionesElegidas['_producto']['filtros']) && is_array($especificacionesElegidas['_producto']['filtros'])) {
             $filtrosProducto = $especificacionesElegidas['_producto']['filtros'];
         }
-        $filtrosCombinados = array_merge($filtrosCategoria, $filtrosProducto);
-        $idsFiltrosProducto = [];
-        foreach ($filtrosProducto as $fp) {
-            if (!empty($fp['id'])) {
-                $idsFiltrosProducto[(string) $fp['id']] = true;
-            }
+        $filtrosConOrigen = [];
+        foreach ($filtrosCategoria as $f) {
+            $filtrosConOrigen[] = ['filtro' => $f, 'es_producto' => false];
+        }
+        foreach ($filtrosProducto as $f) {
+            $filtrosConOrigen[] = ['filtro' => $f, 'es_producto' => true];
         }
 
         $resultado = [
@@ -2559,50 +2781,15 @@ Responde ÚNICAMENTE con el JSON.";
             'filtros' => [],
         ];
 
-        foreach ($filtrosCombinados as $f) {
-            $sublineasElegidas = $especificacionesElegidas[$f['id']] ?? [];
-            $subprincipales = $f['subprincipales'] ?? [];
-            $sublineasOferta = [];
-            foreach ($subprincipales as $sub) {
-                $subId = $sub['id'] ?? null;
-                if (!$subId) continue;
-                foreach ($sublineasElegidas as $item) {
-                    $itemId = is_array($item) && isset($item['id']) ? $item['id'] : $item;
-                    if ((string) $itemId === (string) $subId) {
-                        $esOferta = is_array($item) && isset($item['o']) && (int) $item['o'] === 1;
-                        if ($esOferta) {
-                            $usarImagenesProducto = is_array($item) && !empty($item['usarImagenesProducto']);
-                            $imagenes = [];
-                            if (! $usarImagenesProducto) {
-                                foreach ([$sub['imagenes'] ?? [], $sub['imagen'] ?? []] as $v) {
-                                    $imagenes = array_merge($imagenes, is_array($v) ? $v : ($v ? [$v] : []));
-                                }
-                                if (is_array($item) && isset($item['img'])) {
-                                    $imgs = is_array($item['img']) ? $item['img'] : [$item['img']];
-                                    $imagenes = array_merge($imagenes, $imgs);
-                                }
-                                if (is_array($item) && isset($item['imagenes'])) {
-                                    $imgs = is_array($item['imagenes']) ? $item['imagenes'] : [$item['imagenes']];
-                                    $imagenes = array_merge($imagenes, $imgs);
-                                }
-                                if (is_array($item) && isset($item['imagen'])) {
-                                    $imagenes[] = $item['imagen'];
-                                }
-                            }
-                            $sublineasOferta[] = array_merge($sub, [
-                                'imagenes' => array_values(array_unique(array_filter($imagenes))),
-                                'usar_imagenes_producto' => $usarImagenesProducto,
-                            ]);
-                            break;
-                        }
-                    }
-                }
-            }
+        foreach ($filtrosConOrigen as $itemOrigen) {
+            $f = $itemOrigen['filtro'];
+            $esProducto = (bool) $itemOrigen['es_producto'];
+            $sublineasOferta = $this->sublineasOfertaDesdeFiltroElegidas($f, $especificacionesElegidas);
             if (!empty($sublineasOferta)) {
                 $resultado['filtros'][] = [
                     'id' => $f['id'],
                     'texto' => $f['texto'] ?? '',
-                    'es_producto' => isset($idsFiltrosProducto[(string) ($f['id'] ?? '')]),
+                    'es_producto' => $esProducto,
                     'subprincipales' => $sublineasOferta,
                 ];
             }

@@ -19,6 +19,8 @@ return new class extends Migration {
             $table->string('pais')->nullable();
             $table->decimal('latitud', 10, 7)->nullable(); // Precisión para coordenadas
             $table->decimal('longitud', 10, 7)->nullable();
+            $table->string('visitor_id', 80)->nullable();
+            $table->string('session_id', 80)->nullable();
             $table->timestamps();
         });
     }

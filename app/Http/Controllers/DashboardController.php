@@ -8,9 +8,11 @@ use App\Models\OfertaProducto;
 use App\Models\Tienda;
 use App\Models\Aviso;
 use App\Models\Click;
+use App\Models\VisitaUsuario;
 use App\Models\EjecucionGlobal;
 use App\Models\Chollo;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Database\QueryException;
 use Carbon\Carbon;
 
 class DashboardController extends Controller
@@ -55,8 +57,19 @@ class DashboardController extends Controller
     {
         $hoy = today()->format('Y-m-d');
         
-        // Clicks de hoy (reutilizando la lógica del ClickController)
+        // Clicks de hoy
         $clicksHoy = Click::whereDate('created_at', $hoy)->count();
+
+        $visitasHoy = 0;
+        $ctrHoy = 0;
+        try {
+            $visitasHoy = VisitaUsuario::whereDate('created_at', $hoy)->count();
+            $ctrHoy = $visitasHoy > 0
+                ? round(($clicksHoy / $visitasHoy) * 100, 1)
+                : 0;
+        } catch (QueryException $e) {
+            // visitas_usuario puede no existir aún en algunos entornos
+        }
         
         // Estadísticas del scraper del día actual (reutilizando la lógica del OfertaProductoController)
         $ejecucionesHoy = EjecucionGlobal::where('nombre', 'ejecuciones_scrapear_ofertas')
@@ -83,7 +96,9 @@ class DashboardController extends Controller
         $porcentajeErroresPrimeraOferta = $totalOfertasPrimeraOferta > 0 ? round(($totalErroresPrimeraOferta / $totalOfertasPrimeraOferta) * 100, 1) : 0;
 
         return [
+            'visitasHoy' => $visitasHoy,
             'clicksHoy' => $clicksHoy,
+            'ctrHoy' => $ctrHoy,
             'totalEjecuciones' => $totalEjecuciones,
             'totalOfertas' => $totalOfertas,
             'totalActualizadas' => $totalActualizadas,

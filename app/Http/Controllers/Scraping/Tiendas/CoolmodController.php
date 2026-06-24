@@ -254,6 +254,7 @@ class CoolmodController extends PlantillaTiendaController
     {
         return [
             '/cupon-eneba/iu',
+            '/asus[\s_-]*mejora[\s_-]*tu[\s_-]*juego/iu',
             '/super-oferta-rtx/iu',
             '/power\s*up\s+con\s+msi/iu',
             '/te\s+la\s+instalamos\s+gratis/iu',
