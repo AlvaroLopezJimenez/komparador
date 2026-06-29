@@ -175,7 +175,12 @@ class ScraperSegundoPlanoController extends ScraperBaseController
             if ($tiendaId) {
                 $ofertas = $this->obtenerOfertasTienda($tiendaId, $cantidad);
             } else {
-                $ofertas = $this->obtenerOfertasElegibles(50);
+                $ofertasNoCsv = $this->obtenerOfertasElegibles(50);
+                $ofertasCsv = $this->scraping()->obtenerOfertasElegiblesCsvAwin();
+                $ofertas = $ofertasNoCsv
+                    ->concat($ofertasCsv)
+                    ->unique('id')
+                    ->values();
             }
 
             $totalOfertas = $ofertas->count();

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Scraping;
 
 use App\Http\Controllers\Controller;
+use App\Services\TiendaScrapingConfigResolver;
 use Illuminate\Http\Request;
 use App\Models\OfertaProducto;
 use App\Models\Tienda;
@@ -59,6 +60,36 @@ class DiagnosticoController extends Controller
         
         // Calcular limitaciones de API
         $limitacionesAPI = $this->calcularLimitacionesAPI();
+
+        $resolverScraping = new TiendaScrapingConfigResolver();
+
+        $todasLasTiendas = Tienda::all();
+        $resumenesPorId = $resolverScraping->resumenIndexPorTiendas($todasLasTiendas);
+        $resumenScrapingPorTienda = [];
+        $tiendasScrapingSuperaMostrar = [];
+        foreach ($todasLasTiendas as $tienda) {
+            $resumen = $resumenesPorId[$tienda->id] ?? [
+                'cat_mos'      => ['si' => 0, 'total' => 0],
+                'cat_scraping' => ['si' => 0, 'total' => 0],
+                'cat_api'      => [],
+                'cat_sin_api'  => 0,
+            ];
+            $resumenScrapingPorTienda[$tienda->nombre] = $resumen;
+
+            if ($resumen['cat_scraping']['si'] > $resumen['cat_mos']['si']) {
+                $tiendasScrapingSuperaMostrar[] = [
+                    'tienda'       => $tienda,
+                    'cat_mos'      => $resumen['cat_mos'],
+                    'cat_scraping' => $resumen['cat_scraping'],
+                ];
+            }
+        }
+        
+        $tiendasPorNombre = $todasLasTiendas->keyBy('nombre');
+        $tiendasMostrandoSinScraping = $todasLasTiendas
+            ->filter(fn ($tienda) => $tienda->mostrar_tienda === 'si' && $tienda->scrapear === 'no')
+            ->sortBy('nombre')
+            ->values();
         
         return view('admin.scraping.diagnostico', compact(
             'totalOfertas',
@@ -69,7 +100,11 @@ class DiagnosticoController extends Controller
             'controladoresTiendas',
             'ejecucionesPorDia',
             'ofertasScrapeando',
-            'limitacionesAPI'
+            'limitacionesAPI',
+            'resumenScrapingPorTienda',
+            'tiendasScrapingSuperaMostrar',
+            'tiendasPorNombre',
+            'tiendasMostrandoSinScraping'
         ));
     }
     
@@ -391,8 +426,10 @@ class DiagnosticoController extends Controller
      */
     private function calcularLimitacionesAPI()
     {
+        $resolver = new TiendaScrapingConfigResolver();
+
         // Obtener todas las ofertas activas con su frecuencia de actualización
-        $ofertasActivas = OfertaProducto::with('tienda')
+        $ofertasActivas = OfertaProducto::with(['tienda', 'producto'])
             ->where('mostrar', 'si')
             ->where('frecuencia_actualizar_precio_minutos', '>', 0)
             ->get();
@@ -407,7 +444,7 @@ class DiagnosticoController extends Controller
         // Procesar ofertas activas
         foreach ($ofertasActivas as $oferta) {
             $tiendaNombre = $oferta->tienda->nombre;
-            $apiTienda = $oferta->tienda->api;
+            $apiTienda = $resolver->resolverApiParaOferta($oferta);
             $frecuenciaMinutos = $oferta->frecuencia_actualizar_precio_minutos;
             
             // Calcular peticiones por día (1440 minutos = 24 horas)

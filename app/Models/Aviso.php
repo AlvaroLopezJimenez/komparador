@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class Aviso extends Model
 {
@@ -69,6 +71,25 @@ class Aviso extends Model
     public function scopeVisiblesPorUsuario($query, $userId)
     {
         return $query->where('user_id', $userId);
+    }
+
+    /**
+     * Oculta avisos de oferta cuya tienda tiene mostrar_tienda = 'no'.
+     */
+    public function scopeExcluirOfertasDeTiendasNoVisibles(Builder $query): Builder
+    {
+        $ofertaType = OfertaProducto::class;
+
+        return $query->where(function (Builder $q) use ($ofertaType) {
+            $q->where('avisoable_type', '!=', $ofertaType)
+                ->orWhereNotExists(function ($sub) {
+                    $sub->select(DB::raw(1))
+                        ->from('ofertas_producto')
+                        ->join('tiendas', 'tiendas.id', '=', 'ofertas_producto.tienda_id')
+                        ->whereColumn('ofertas_producto.id', 'avisos.avisoable_id')
+                        ->where('tiendas.mostrar_tienda', 'no');
+                });
+        });
     }
 
     // Métodos helper

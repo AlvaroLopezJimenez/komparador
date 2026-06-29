@@ -676,15 +676,7 @@ public function todasCategorias()
      */
     private function generarSlug($texto)
     {
-        // DEBUG: Log para ver qué contiene $texto
-        error_log('DEBUG HomeController generarSlug - $texto tipo: ' . gettype($texto));
-        error_log('DEBUG HomeController generarSlug - $texto valor: ' . var_export($texto, true));
-        
-        $slug = \Illuminate\Support\Str::slug($texto);
-        
-        error_log('DEBUG HomeController generarSlug - slug generado: ' . $slug);
-        
-        return $slug;
+        return \App\Helpers\CategoriaHelper::slugFiltro((string) $texto);
     }
 
     /**
@@ -745,20 +737,8 @@ public function todasCategorias()
             if (!$lineaId) continue;
             
             foreach ($filtro['subprincipales'] ?? [] as $sub) {
-                // DEBUG: Log para ver qué contiene $sub
-                error_log('DEBUG HomeController parsearFiltrosUrl - $sub completo: ' . json_encode($sub));
-                error_log('DEBUG HomeController parsearFiltrosUrl - $sub[texto] tipo: ' . gettype($sub['texto'] ?? 'NO_EXISTE'));
-                error_log('DEBUG HomeController parsearFiltrosUrl - $sub[texto] valor: ' . var_export($sub['texto'] ?? 'NO_EXISTE', true));
-                
                 $sublineaId = $sub['id'] ?? null;
-                $slug = $sub['slug'] ?? null;
-                
-                // Si no tiene slug, generarlo desde el texto
-                if (!$slug && isset($sub['texto'])) {
-                    $slug = $this->generarSlug($sub['texto']);
-                }
-                
-                error_log('DEBUG HomeController parsearFiltrosUrl - slug final: ' . ($slug ?? 'NULL'));
+                $slug = isset($sub['texto']) ? $this->generarSlug($sub['texto']) : null;
                 
                 if ($slug && $sublineaId) {
                     $mapaSlugs[$slug] = [

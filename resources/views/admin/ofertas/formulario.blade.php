@@ -20,6 +20,25 @@
 
     <div class="max-w-5xl mx-auto py-10 px-4 space-y-8 bg-gray-50 dark:bg-gray-900 rounded-lg shadow-md form-container">
 
+        <div id="avisos-visibilidad-oferta-wrap" class="{{ empty($avisosVisibilidadOferta ?? []) ? 'hidden' : '' }}">
+            <div class="mb-6 p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-400 text-amber-900 dark:text-amber-100">
+                <p class="font-semibold">⚠️ Avisos de visibilidad y scraping</p>
+                <ul id="avisos-visibilidad-oferta-lista" class="mt-2 ml-5 list-disc text-sm space-y-1 text-amber-900 dark:text-amber-100">
+                    @foreach(($avisosVisibilidadOferta ?? []) as $aviso)
+                        <li>{{ $aviso }}</li>
+                    @endforeach
+                </ul>
+                @if(!empty($tiendaAvisoEdit ?? null))
+                    <p class="mt-3 text-sm js-aviso-visibilidad-enlace">
+                        <a href="{{ route('admin.tiendas.edit', $tiendaAvisoEdit) }}"
+                            class="font-medium underline hover:text-amber-700 dark:hover:text-amber-200">
+                            Editar configuración de {{ $tiendaAvisoEdit->nombre }}
+                        </a>
+                    </p>
+                @endif
+            </div>
+        </div>
+
         <form method="POST"
                             action="{{ $oferta ? route('admin.ofertas.update', $oferta) : route('admin.ofertas.store') }}">
             @csrf
@@ -1483,6 +1502,75 @@
              indiceSeleccionadoTienda = -1;
          }
 
+         async function actualizarAvisosVisibilidadOferta() {
+             const wrap = document.getElementById('avisos-visibilidad-oferta-wrap');
+             const lista = document.getElementById('avisos-visibilidad-oferta-lista');
+             const tiendaId = document.getElementById('tienda_id')?.value;
+             const productoId = document.getElementById('producto_id')?.value;
+
+             if (!wrap || !lista) {
+                 return;
+             }
+
+             if (!tiendaId) {
+                 wrap.classList.add('hidden');
+                 lista.innerHTML = '';
+                 return;
+             }
+
+             try {
+                 const params = new URLSearchParams({ tienda_id: tiendaId });
+                 if (productoId) {
+                     params.set('producto_id', productoId);
+                 }
+
+                 const response = await fetch('{{ route('admin.ofertas.avisos-visibilidad') }}?' + params.toString(), {
+                     headers: { 'Accept': 'application/json' },
+                 });
+
+                 if (!response.ok) {
+                     return;
+                 }
+
+                 const data = await response.json();
+                 const avisos = Array.isArray(data.avisos) ? data.avisos : [];
+
+                 if (avisos.length === 0) {
+                     wrap.classList.add('hidden');
+                     lista.innerHTML = '';
+                     return;
+                 }
+
+                 lista.innerHTML = avisos.map(function(texto) {
+                     return '<li>' + texto.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</li>';
+                 }).join('');
+
+                 let enlaceHtml = '';
+                 if (data.tienda_edit_url && data.tienda_nombre) {
+                     const nombre = String(data.tienda_nombre).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                     enlaceHtml = '<p class="mt-3 text-sm"><a href="' + data.tienda_edit_url + '" class="font-medium underline hover:text-amber-700 dark:hover:text-amber-200">Editar configuración de ' + nombre + '</a></p>';
+                 }
+
+                 const caja = wrap.querySelector('.rounded-lg');
+                 if (caja) {
+                     const enlaceExistente = caja.querySelector('.js-aviso-visibilidad-enlace');
+                     if (enlaceExistente) {
+                         enlaceExistente.remove();
+                     }
+                     if (enlaceHtml) {
+                         const div = document.createElement('div');
+                         div.className = 'js-aviso-visibilidad-enlace';
+                         div.innerHTML = enlaceHtml;
+                         caja.appendChild(div);
+                     }
+                 }
+
+                 wrap.classList.remove('hidden');
+             } catch (e) {
+                 console.log('No se pudieron cargar avisos de visibilidad', e);
+             }
+         }
+
          function actualizarBtnIrProductoPublicoDesdeApi(productoCompleto) {
              const btn = document.getElementById('btn_ir_producto_publico');
              if (!btn) return;
@@ -1551,6 +1639,14 @@
                  }
              }
              actualizarBtnIrProductoPublicoDesdeApi(productoCompleto);
+
+             ultimoProductoCategoriaId = productoCompleto?.categoria_id ?? null;
+             const tiendaIdTrasProducto = document.getElementById('tienda_id')?.value;
+             if (tiendaIdTrasProducto && ultimoProductoCategoriaId) {
+                 await aplicarFrecuenciaSugerida(tiendaIdTrasProducto, ultimoProductoCategoriaId, { soloSiCategoria: true });
+             }
+
+             actualizarAvisosVisibilidadOferta();
              
              // Cargar especificaciones internas del producto
              cargarEspecificacionesInternas(producto.id);
@@ -1587,8 +1683,11 @@
              // Actualizar desplegable de como_scrapear según la tienda
              actualizarComoScrapearSegunTienda(tienda.id);
 
-             // Auto-sugerir "Actualizar cada" según la frecuencia más común de la tienda
-             aplicarFrecuenciaMasComunDeTienda(tienda.id);
+             // Auto-sugerir "Actualizar cada": mín de tienda o de categoría si ya hay producto
+             const categoriaIdParaFrecuencia = ultimoProductoCategoriaId || null;
+             aplicarFrecuenciaSugerida(tienda.id, categoriaIdParaFrecuencia);
+
+             actualizarAvisosVisibilidadOferta();
              
              // Si el checkbox del chollo está marcado, verificar si existe otra oferta con chollo
              const cholloCheckbox = document.getElementById('es_chollo_checkbox');
@@ -1769,16 +1868,16 @@
          }
 
          // ===========================
-         // AUTO "ACTUALIZAR CADA" POR TIENDA (usa TiendaController@obtenerDesgloseTiempos)
+         // AUTO "ACTUALIZAR CADA" POR TIENDA / CATEGORÍA
          // ===========================
          let frecuenciaActualizarTouched = false;
+         let ultimoProductoCategoriaId = @json($producto?->categoria_id ?? null);
 
          function minutosAValorUnidad(minutos) {
              const m = Number(minutos);
              if (!Number.isFinite(m) || m <= 0) {
                  return { valor: 1, unidad: 'dias' };
              }
-             // Preferir días si es exacto, luego horas, si no minutos
              if (Number.isInteger(m) && m % 1440 === 0) {
                  return { valor: m / 1440, unidad: 'dias' };
              }
@@ -1788,60 +1887,49 @@
              return { valor: m, unidad: 'minutos' };
          }
 
-         async function aplicarFrecuenciaMasComunDeTienda(tiendaId, opciones = {}) {
+         function aplicarMinutosAFrecuenciaFormulario(minutos) {
              const inputValor = document.querySelector('[name="frecuencia_valor"]');
              const selectUnidad = document.querySelector('[name="frecuencia_unidad"]');
              if (!inputValor || !selectUnidad) return;
+             const convertido = minutosAValorUnidad(minutos);
+             inputValor.value = convertido.valor;
+             selectUnidad.value = convertido.unidad;
+         }
 
+         /**
+          * Tienda → frecuencia mínima por defecto de la tienda.
+          * Tienda + categoría con mín configurado → mín de esa categoría.
+          * opciones.soloSiCategoria: solo aplica si el origen es categoría (al elegir producto).
+          */
+         async function aplicarFrecuenciaSugerida(tiendaId, categoriaId = null, opciones = {}) {
              const ofertaId = {{ $oferta ? $oferta->id : 'null' }};
              const esNuevaOferta = ofertaId === 'null' || ofertaId === null;
              const force = !!opciones.force;
+             const soloSiCategoria = !!opciones.soloSiCategoria;
 
-             // En edición, no pisar si el usuario ya tocó el campo
              if (!force && !esNuevaOferta && frecuenciaActualizarTouched) {
                  return;
              }
-
              if (!tiendaId) return;
 
              try {
-                 const response = await fetch(`/panel-privado/tiendas/${tiendaId}/desglose-tiempos`);
+                 const params = categoriaId ? `?categoria_id=${encodeURIComponent(categoriaId)}` : '';
+                 const response = await fetch(`/panel-privado/tiendas/${tiendaId}/frecuencia-sugerida${params}`);
+                 if (!response.ok) return;
                  const data = await response.json();
-                 const desglose = Array.isArray(data?.desglose) ? data.desglose : [];
-
-                 if (desglose.length === 0) {
-                     // Sin datos: dejar como está
-                     return;
-                 }
-
-                 // Elegir la moda (mayor cantidad). En empate, menor minutos.
-                 let mejor = null;
-                 for (const item of desglose) {
-                     const cantidad = Number(item?.cantidad ?? 0);
-                     const minutos = Number(item?.minutos ?? 0);
-                     if (!Number.isFinite(minutos) || minutos <= 0) continue;
-
-                     if (!mejor) {
-                         mejor = { cantidad, minutos };
-                         continue;
-                     }
-                     if (cantidad > mejor.cantidad) {
-                         mejor = { cantidad, minutos };
-                         continue;
-                     }
-                     if (cantidad === mejor.cantidad && minutos < mejor.minutos) {
-                         mejor = { cantidad, minutos };
-                     }
-                 }
-
-                 if (!mejor) return;
-
-                 const convertido = minutosAValorUnidad(mejor.minutos);
-                 inputValor.value = convertido.valor;
-                 selectUnidad.value = convertido.unidad;
+                 const minutos = Number(data?.minutos ?? 0);
+                 if (!Number.isFinite(minutos) || minutos <= 0) return;
+                 if (soloSiCategoria && data?.origen !== 'categoria') return;
+                 aplicarMinutosAFrecuenciaFormulario(minutos);
              } catch (e) {
-                 console.error('Error al obtener desglose de tiempos de tienda:', e);
+                 console.error('Error al obtener frecuencia sugerida:', e);
              }
+         }
+
+         /** @deprecated Usar aplicarFrecuenciaSugerida */
+         async function aplicarFrecuenciaMasComunDeTienda(tiendaId, opciones = {}) {
+             const categoriaId = ultimoProductoCategoriaId || null;
+             await aplicarFrecuenciaSugerida(tiendaId, categoriaId, opciones);
          }
 
         // Función para navegar con teclado
@@ -2416,6 +2504,7 @@
             const tiendaIdAlCargar = document.getElementById('tienda_id')?.value;
             if (tiendaIdAlCargar) {
                 actualizarComoScrapearSegunTienda(tiendaIdAlCargar);
+                actualizarAvisosVisibilidadOferta();
             }
 
             // Marcar como "tocado" si el usuario cambia manualmente el campo de frecuencia
@@ -2433,7 +2522,8 @@
             const ofertaIdCarga = {{ $oferta ? $oferta->id : 'null' }};
             const esNuevaOfertaCarga = ofertaIdCarga === 'null' || ofertaIdCarga === null;
             if (esNuevaOfertaCarga && tiendaIdAlCargar) {
-                aplicarFrecuenciaMasComunDeTienda(tiendaIdAlCargar, { force: true });
+                const catIdCarga = ultimoProductoCategoriaId || null;
+                aplicarFrecuenciaSugerida(tiendaIdAlCargar, catIdCarga, { force: true });
             }
 
             const actualizarEstadoChollo = (activo) => {
@@ -2624,6 +2714,7 @@
                     ocultarSugerenciasTienda();
                     document.getElementById('tienda_id').value = '';
                     tiendaInput.classList.remove('border-green-500');
+                    actualizarAvisosVisibilidadOferta();
                     // Ocultar aviso de oferta existente si se limpia la tienda
                     ocultarAvisoOfertaExistente();
                     

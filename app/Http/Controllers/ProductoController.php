@@ -2496,6 +2496,7 @@ public function generarContenido(Request $request)
         return response()->json([
             'id' => $producto->id,
             'nombre' => $producto->nombre,
+            'categoria_id' => $producto->categoria_id,
             'unidadDeMedida' => $producto->unidadDeMedida,
             // Imágenes del producto (para "usarImagenesProducto" en especificaciones internas, etc.)
             'imagen_grande' => $producto->imagen_grande ?? [],

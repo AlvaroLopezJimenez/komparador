@@ -8,8 +8,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Neobyte: extrae el precio desde JSON-LD schema.org ("price": "199") o desde
- * datos con "affiliation":"NEOBYTE" y "price":199.
+ * Neobyte (PrestaShop / IQIT): precio en
+ * <span class="product-price current-price-value" content="1348.9"> (respaldo: JSON-LD / affiliation NEOBYTE).
  * Bloque #promociones / "Promociones incluidas" / .promociones_banners: +Juego si queda algún banner
  * que no sea solo Eneba, la promo "Actualiza", banners de "descuento" ni vales para próxima compra
  * (se filtran por enlace, título/alt e imagen del banner).
@@ -219,15 +219,68 @@ class NeobyteController extends PlantillaTiendaController
     }
 
     /**
-     * Extrae el precio: primero desde schema.org ("price": "199"), luego desde affiliation NEOBYTE ("price":199).
+     * Extrae el precio: primero desde span.current-price-value[content], luego JSON-LD / affiliation NEOBYTE.
      */
     private function extraerPrecio(string $html): ?float
     {
+        $precio = $this->extraerPrecioDesdeCurrentPriceValue($html);
+        if ($precio !== null) {
+            return $precio;
+        }
+
         $precio = $this->extraerPrecioSchemaOrg($html);
         if ($precio !== null) {
             return $precio;
         }
+
         return $this->extraerPrecioAffiliation($html);
+    }
+
+    /**
+     * <span class="current-price"><span class="product-price current-price-value" content="1348.9">
+     */
+    private function extraerPrecioDesdeCurrentPriceValue(string $html): ?float
+    {
+        if (
+            preg_match(
+                '~<span[^>]*\bclass=(["\'])[^"\']*\bproduct-price\b[^"\']*\bcurrent-price-value\b[^"\']*\1[^>]*\bcontent=(["\'])(?<p>[0-9]+(?:[.,][0-9]+)?)\2~i',
+                $html,
+                $m
+            )
+        ) {
+            $p = $m['p'] ?? null;
+            if ($p !== null) {
+                return $this->normalizarImporte($p);
+            }
+        }
+
+        if (
+            preg_match(
+                '~<span[^>]*\bclass=(["\'])[^"\']*\bcurrent-price-value\b[^"\']*\1[^>]*\bcontent=(["\'])(?<p>[0-9]+(?:[.,][0-9]+)?)\2~i',
+                $html,
+                $m2
+            )
+        ) {
+            $p = $m2['p'] ?? null;
+            if ($p !== null) {
+                return $this->normalizarImporte($p);
+            }
+        }
+
+        if (
+            preg_match(
+                '~<span[^>]*\bclass=(["\'])[^"\']*\bcurrent-price-value\b[^"\']*\1[^>]*>\s*(?<p>[0-9][0-9\.\,\s]*[0-9])~i',
+                $html,
+                $m3
+            )
+        ) {
+            $p = $m3['p'] ?? null;
+            if ($p !== null) {
+                return $this->normalizarImporte($p);
+            }
+        }
+
+        return null;
     }
 
     /**

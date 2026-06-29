@@ -341,6 +341,10 @@ Route::prefix('admin')->group(function () {
         return app(\App\Http\Controllers\Crons\CronNeoObjetivosController::class)($request);
     })->name('admin.cron-neo-objetivos');
 
+    // Descarga feeds CSV-Awin (.gz) de tiendas con url_csv configurada
+    Route::get('cron-descarga-csv-tiendas', [\App\Http\Controllers\Crons\CronDescargaCSVTiendasController::class, '__invoke'])
+        ->name('admin.cron-descarga-csv-tiendas');
+
     // Cron buscar productos: sesión web para redirigir al panel tras finalizar
     Route::middleware('web')->group(function () {
         Route::get('productos/buscar-amazon/cron', [\App\Http\Controllers\Crons\CronBuscarProductosAmazonController::class, 'ejecutarCronConResumen'])
@@ -507,6 +511,68 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
         ]);
     })->name('ejecuciones.avisos-sin-stock-scrapear');
 
+    // Ejecuciones: cron descarga CSV tiendas (Awin)
+    Route::get('ejecuciones/descarga-csv-tiendas', function (Request $request) {
+        $nombreEjecucion = \App\Http\Controllers\Crons\CronDescargaCSVTiendasController::NOMBRE_EJECUCION_GLOBAL;
+        $hoy = Carbon::today();
+        $mesSeleccionado = $hoy->copy()->startOfMonth();
+        $fechaSeleccionada = $hoy->copy()->startOfDay();
+        if ($request->filled('mes') && preg_match('/^\d{4}-\d{2}$/', (string) $request->input('mes'))) {
+            try {
+                $mesSeleccionado = Carbon::createFromFormat('Y-m', (string) $request->input('mes'))->startOfMonth();
+            } catch (\Throwable $e) {
+                //
+            }
+        }
+        if ($request->filled('fecha') && preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $request->input('fecha'))) {
+            try {
+                $fechaSeleccionada = Carbon::createFromFormat('Y-m-d', (string) $request->input('fecha'))->startOfDay();
+            } catch (\Throwable $e) {
+                //
+            }
+        }
+
+        $ejecucion = null;
+        if ($request->filled('ejecucion_id')) {
+            $ejecucion = \App\Models\EjecucionGlobal::where('nombre', $nombreEjecucion)->find($request->input('ejecucion_id'));
+            if (!$ejecucion) {
+                abort(404, 'Ejecución no encontrada');
+            }
+            if ($ejecucion->inicio) {
+                $fechaSeleccionada = $ejecucion->inicio->copy()->startOfDay();
+                $mesSeleccionado = $ejecucion->inicio->copy()->startOfMonth();
+            }
+        }
+
+        $inicioMes = $mesSeleccionado->copy()->startOfMonth();
+        $finMes = $mesSeleccionado->copy()->endOfMonth();
+
+        $fechasConEjecuciones = \App\Models\EjecucionGlobal::query()
+            ->where('nombre', $nombreEjecucion)
+            ->whereBetween('inicio', [$inicioMes, $finMes])
+            ->selectRaw('DATE(inicio) as fecha, COUNT(*) as total')
+            ->groupBy('fecha')
+            ->pluck('total', 'fecha')
+            ->toArray();
+
+        $ejecuciones = \App\Models\EjecucionGlobal::query()
+            ->where('nombre', $nombreEjecucion)
+            ->whereDate('inicio', $fechaSeleccionada->toDateString())
+            ->orderByDesc('id')
+            ->get(['id', 'inicio', 'fin', 'total', 'total_guardado', 'total_errores']);
+
+        return view('admin.crons.cron_descarga_csv_tiendas_resultado', [
+            'ejecucion_id' => $ejecucion?->id,
+            'ejecucion' => $ejecucion,
+            'ejecuciones' => $ejecuciones,
+            'fechaSeleccionada' => $fechaSeleccionada,
+            'mesSeleccionado' => $mesSeleccionado,
+            'inicioMes' => $inicioMes,
+            'finMes' => $finMes,
+            'fechasConEjecuciones' => $fechasConEjecuciones,
+        ]);
+    })->name('ejecuciones.descarga-csv-tiendas');
+
     // Ejecuciones: cron buscar productos Amazon
     Route::get('ejecuciones/buscar-amazon-productos', [\App\Http\Controllers\Crons\CronBuscarProductosAmazonController::class, 'vistaHistorialEjecucionesBuscarAmazon'])
         ->name('ejecuciones.buscar-amazon-productos');
@@ -567,6 +633,9 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
 
     // Ruta para ver todas las ofertas (sin producto asociado)
     Route::get('ofertas', [OfertaProductoController::class, 'todas'])->name('ofertas.todas');
+
+    // Filas importadas desde feeds CSV-Awin (tabla csv_ofertas)
+    Route::get('ofertas/todas-csv', [OfertaProductoController::class, 'csvOfertas'])->name('ofertas.todas_csv');
 
     // Ruta para crear una oferta sin producto
     Route::get('ofertas/create', [OfertaProductoController::class, 'createGeneral'])->name('ofertas.create.formularioGeneral');
@@ -637,6 +706,7 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
     Route::get('tiendas/urls-por-categoria', [TiendaController::class, 'urlsPorCategoria'])->name('tiendas.urls-por-categoria');
     Route::post('tiendas/urls-por-categoria/guardar', [TiendaController::class, 'guardarUrlPorCategoria'])->name('tiendas.urls-por-categoria.guardar');
     Route::get('tiendas/{tienda}/desglose-tiempos', [TiendaController::class, 'obtenerDesgloseTiempos'])->name('tiendas.desglose-tiempos');
+    Route::get('tiendas/{tienda}/frecuencia-sugerida', [TiendaController::class, 'frecuenciaSugerida'])->name('tiendas.frecuencia-sugerida');
     Route::post('tiendas/{tienda}/actualizar-tiempos', [TiendaController::class, 'actualizarTiempos'])->name('tiendas.actualizar-tiempos');
     
     // Obtener tienda por ID (JSON) - DEBE IR AL FINAL para que no capture rutas más específicas
@@ -835,6 +905,7 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
     
     // Obtener tiendas disponibles para el formulario de editar oferta
     Route::get('ofertas/tiendas-disponibles', [OfertaProductoController::class, 'obtenerTiendasDisponibles'])->name('ofertas.tiendas.disponibles');
+    Route::get('ofertas/avisos-visibilidad', [OfertaProductoController::class, 'avisosVisibilidadOferta'])->name('ofertas.avisos-visibilidad');
     
     // Buscar productos en tiempo real para el formulario
     Route::get('ofertas/buscar-productos', [OfertaProductoController::class, 'buscarProductos'])->name('ofertas.buscar.productos');

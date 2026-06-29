@@ -10,6 +10,16 @@
 
     <div class="max-w-7xl mx-auto py-10 px-4 space-y-8 bg-gray-50 dark:bg-gray-900 rounded-lg shadow-md">
         
+        @php
+            $hayRecomendaciones = $ofertasElegibles->count() === 0
+                || count($controladoresTiendas) === 0
+                || count($limitacionesAPI['tiendas_sin_api']) > 0
+                || !empty($tiendasScrapingSuperaMostrar)
+                || $tiendasMostrandoSinScraping->isNotEmpty()
+                || $ofertasMostrar === 0;
+        @endphp
+
+        @if($hayRecomendaciones)
         <!-- Recomendaciones -->
         <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 border border-gray-200 dark:border-gray-700">
             <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-4">💡 Recomendaciones</h3>
@@ -34,9 +44,49 @@
                     <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4">
                         <h4 class="font-semibold text-yellow-800 dark:text-yellow-200">⚠️ Tiendas sin API configurada</h4>
                         <p class="text-yellow-700 dark:text-yellow-300 text-sm mt-1">
-                            Las siguientes tiendas no tienen API configurada: {{ implode(', ', $limitacionesAPI['tiendas_sin_api']) }}. 
-                            Configura una API en el formulario de cada tienda.
+                            Las siguientes tiendas no tienen API por defecto configurada: {{ implode(', ', $limitacionesAPI['tiendas_sin_api']) }}.
                         </p>
+                    </div>
+                @endif
+
+                @if(!empty($tiendasScrapingSuperaMostrar))
+                    <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-4">
+                        <h4 class="font-semibold text-red-800 dark:text-red-200">❌ Categorías scrapeando por encima de las que se muestran</h4>
+                        <p class="text-red-700 dark:text-red-300 text-sm mt-1">
+                            Estas tiendas tienen más categorías con ofertas en scraping que en mostrar. Revisa la configuración por categoría en el formulario de cada tienda.
+                        </p>
+                        <ul class="mt-2 text-sm text-red-800 dark:text-red-200 space-y-1 max-h-40 overflow-y-auto">
+                            @foreach($tiendasScrapingSuperaMostrar as $aviso)
+                                <li>
+                                    <a href="{{ route('admin.tiendas.edit', $aviso['tienda']) }}"
+                                        class="font-medium underline hover:text-red-600 dark:hover:text-red-300">
+                                        {{ $aviso['tienda']->nombre }}
+                                    </a>
+                                    <span> — cat.mos {{ $aviso['cat_mos']['si'] }}/{{ $aviso['cat_mos']['total'] }}, cat.scraping {{ $aviso['cat_scraping']['si'] }}/{{ $aviso['cat_scraping']['total'] }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+
+                @if($tiendasMostrandoSinScraping->isNotEmpty())
+                    <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-4">
+                        <h4 class="font-semibold text-red-800 dark:text-red-200">❌ Tiendas visibles sin scraping activo</h4>
+                        <p class="text-red-700 dark:text-red-300 text-sm mt-1">
+                            Estas tiendas tienen mostrar activado pero scraping desactivado a nivel de tienda. Sus ofertas no se actualizarán automáticamente.
+                        </p>
+                        <ul class="mt-2 text-sm text-red-800 dark:text-red-200 space-y-1 max-h-40 overflow-y-auto">
+                            @foreach($tiendasMostrandoSinScraping as $tienda)
+                                <li>
+                                    <a href="{{ route('admin.tiendas.edit', $tienda) }}"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="font-medium underline hover:text-red-600 dark:hover:text-red-300">
+                                        {{ $tienda->nombre }}
+                                    </a>
+                                </li>
+                            @endforeach
+                        </ul>
                     </div>
                 @endif
 
@@ -48,17 +98,9 @@
                         </p>
                     </div>
                 @endif
-
-                @if($ofertasElegibles->count() > 0 && count($controladoresTiendas) > 0)
-                    <div class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-4">
-                        <h4 class="font-semibold text-green-800 dark:text-green-200">✅ Sistema listo</h4>
-                        <p class="text-green-700 dark:text-green-300 text-sm mt-1">
-                            El sistema de scraping está configurado correctamente y hay ofertas disponibles para procesar.
-                        </p>
-                    </div>
-                @endif
             </div>
         </div>
+        @endif
 
         <!-- Estadísticas Generales -->
         <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 border border-gray-200 dark:border-gray-700">
@@ -116,7 +158,7 @@
         <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 border border-gray-200 dark:border-gray-700">
             <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-4">🔒 Limitaciones de API</h3>
             <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                Control de peticiones a APIs externas configuradas por tienda.
+                Control de peticiones a APIs externas. Se usa la API de cada categoría si está configurada; si no, la API por defecto de la tienda.
             </p>
 
             @php
@@ -217,8 +259,101 @@
             @endif
             
             <!-- Desglose por tienda -->
-            <div class="mt-6">
-                <h5 class="text-md font-semibold text-gray-700 dark:text-gray-200 mb-3">📊 Desglose por Tienda ({{ $ejecucionesPorDia['total_ofertas_activas'] }} ofertas activas)</h5>
+            <div class="mt-6" id="desglosePorTienda">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+                    <h5 class="text-md font-semibold text-gray-700 dark:text-gray-200">
+                        📊 Desglose por Tienda ({{ $ejecucionesPorDia['total_ofertas_activas'] }} ofertas activas)
+                        <span id="desgloseTiendasVisibles" class="text-sm font-normal text-gray-500 dark:text-gray-400"></span>
+                    </h5>
+                    <div class="flex flex-row gap-2 items-center">
+                        <button type="button" id="toggleFiltrosDesglose"
+                            class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 inline-flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
+                            </svg>
+                            Filtros
+                        </button>
+                        <input type="search" id="buscadorTienda" placeholder="Buscar tienda..." class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-[180px]">
+                    </div>
+                </div>
+                <div id="panelFiltrosDesglose" class="hidden mb-4 p-4 bg-gray-50 dark:bg-gray-700/40 rounded-lg border border-gray-200 dark:border-gray-600">
+                    <div class="flex flex-wrap gap-x-6 gap-y-3 items-center">
+                        <div class="flex flex-col gap-1">
+                            <label for="filtroApiTienda" class="text-xs font-medium text-gray-600 dark:text-gray-300 uppercase">API</label>
+                            <select id="filtroApiTienda" class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-[180px]">
+                                <option value="">Todas las APIs</option>
+                                @foreach($porApiAgrupada as $apiBase => $datos)
+                                    <option value="{{ $apiBase }}">{{ $apiBase }}</option>
+                                @endforeach
+                                <option value="__sin_configurar__">Sin configurar</option>
+                            </select>
+                        </div>
+                        <div class="relative desglose-filtro-dropdown">
+                            <span class="text-xs font-medium text-gray-600 dark:text-gray-300 uppercase block mb-1" title="Controlador">Controlador</span>
+                            <button type="button" id="filtroControladorBtn" class="desglose-filtro-dropdown-btn px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-[120px] inline-flex items-center justify-between gap-2">
+                                <span id="filtroControladorTexto">Sí</span>
+                                <svg class="w-4 h-4 shrink-0 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                            </button>
+                            <div id="filtroControladorPanel" class="desglose-filtro-dropdown-panel hidden absolute z-20 mt-1 w-full min-w-[140px] rounded-md border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-lg p-2 space-y-1">
+                                <label class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer text-sm text-gray-700 dark:text-gray-200">
+                                    <input type="checkbox" id="filtroControladorSi" checked class="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500">
+                                    <span>Sí</span>
+                                </label>
+                                <label class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer text-sm text-gray-700 dark:text-gray-200">
+                                    <input type="checkbox" id="filtroControladorNo" class="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500">
+                                    <span>No</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="relative desglose-filtro-dropdown">
+                            <span class="text-xs font-medium text-gray-600 dark:text-gray-300 uppercase block mb-1">scraping</span>
+                            <button type="button" id="filtroScrapingBtn" class="desglose-filtro-dropdown-btn px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-[120px] inline-flex items-center justify-between gap-2">
+                                <span id="filtroScrapingTexto">Sí</span>
+                                <svg class="w-4 h-4 shrink-0 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                            </button>
+                            <div id="filtroScrapingPanel" class="desglose-filtro-dropdown-panel hidden absolute z-20 mt-1 w-full min-w-[140px] rounded-md border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-lg p-2 space-y-1">
+                                <label class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer text-sm text-gray-700 dark:text-gray-200">
+                                    <input type="checkbox" id="filtroScrapingSi" checked class="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500">
+                                    <span>Sí</span>
+                                </label>
+                                <label class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer text-sm text-gray-700 dark:text-gray-200">
+                                    <input type="checkbox" id="filtroScrapingNo" class="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500">
+                                    <span>No</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="relative desglose-filtro-dropdown">
+                            <span class="text-xs font-medium text-gray-600 dark:text-gray-300 uppercase block mb-1">mostrar</span>
+                            <button type="button" id="filtroMostrarBtn" class="desglose-filtro-dropdown-btn px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-[120px] inline-flex items-center justify-between gap-2">
+                                <span id="filtroMostrarTexto">Sí</span>
+                                <svg class="w-4 h-4 shrink-0 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                            </button>
+                            <div id="filtroMostrarPanel" class="desglose-filtro-dropdown-panel hidden absolute z-20 mt-1 w-full min-w-[140px] rounded-md border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-lg p-2 space-y-1">
+                                <label class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer text-sm text-gray-700 dark:text-gray-200">
+                                    <input type="checkbox" id="filtroMostrarSi" checked class="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500">
+                                    <span>Sí</span>
+                                </label>
+                                <label class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer text-sm text-gray-700 dark:text-gray-200">
+                                    <input type="checkbox" id="filtroMostrarNo" class="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500">
+                                    <span>No</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <label for="desglosePerPage" class="text-xs font-medium text-gray-600 dark:text-gray-300 uppercase">Por página</label>
+                            <select id="desglosePerPage" class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-[100px]">
+                                <option value="20" selected>20</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                                <option value="200">200</option>
+                            </select>
+                        </div>
+                        <button type="button" id="limpiarFiltrosDesglose"
+                            class="text-sm text-blue-600 dark:text-blue-400 hover:underline">
+                            Limpiar filtros
+                        </button>
+                    </div>
+                </div>
                 <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
                     Cálculo basado en la frecuencia de actualización de cada oferta activa. Total: {{ number_format($ejecucionesPorDia['total_ejecuciones_por_dia'], 1) }} ejecuciones por día.
                 </p>
@@ -226,30 +361,38 @@
                     <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                         <thead class="bg-gray-50 dark:bg-gray-700">
                             <tr>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Tienda</th>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Ofertas</th>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Peticiones/Día</th>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Peticiones/Mes</th>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">% del Total</th>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">API Configurada</th>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Controlador</th>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Scrapeando</th>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Mostrando</th>
+                                <th class="desglose-sort-header px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors" data-sort="tienda">Tienda<span class="desglose-sort-indicator ml-1"></span></th>
+                                <th class="desglose-sort-header px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors" data-sort="ofertas">Ofertas<span class="desglose-sort-indicator ml-1"></span></th>
+                                <th class="desglose-sort-header px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors" data-sort="pet-dia">pet./dia<span class="desglose-sort-indicator ml-1"></span></th>
+                                <th class="desglose-sort-header px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors" data-sort="pet-mes">pet/mes<span class="desglose-sort-indicator ml-1"></span></th>
+                                <th class="desglose-sort-header px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors" data-sort="porcentaje">% del Total<span class="desglose-sort-indicator ml-1"></span></th>
+                                <th class="desglose-sort-header px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors" data-sort="api">API<span class="desglose-sort-indicator ml-1"></span></th>
+                                <th class="desglose-sort-header px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors" data-sort="controlador" title="Controlador">Con.<span class="desglose-sort-indicator ml-1"></span></th>
+                                <th class="desglose-sort-header px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors" data-sort="scraping">scraping<span class="desglose-sort-indicator ml-1"></span></th>
+                                <th class="desglose-sort-header px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors" data-sort="mostrar">mostrar<span class="desglose-sort-indicator ml-1"></span></th>
+                                <th class="desglose-sort-header px-4 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors" data-sort="cat-mos" title="Categorías con ofertas mostrando">cat.mos<span class="desglose-sort-indicator ml-1"></span></th>
+                                <th class="desglose-sort-header px-4 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors" data-sort="cat-scraping" title="Categorías con ofertas scrapeando">cat.scraping<span class="desglose-sort-indicator ml-1"></span></th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider" title="APIs por categoría con ofertas">cat API</th>
                             </tr>
                         </thead>
-                        <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                        <tbody id="desgloseTiendasBody" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                             @foreach($limitacionesAPI['por_tienda'] as $tienda => $datos)
                                 @php
                                     $apiTienda = $datos['api'] ?? null;
                                     $apiBase = $apiTienda ? explode(';', $apiTienda, 2)[0] : null;
+                                    $resumen = $resumenScrapingPorTienda[$tienda] ?? [
+                                        'cat_mos' => ['si' => 0, 'total' => 0],
+                                        'cat_scraping' => ['si' => 0, 'total' => 0],
+                                        'cat_api' => [],
+                                        'cat_sin_api' => 0,
+                                    ];
 
                                     // Color según el grupo base
                                     if ($apiBase && isset($apiColorMap[$apiBase])) {
-                                        $claseTextoApi = $apiColorMap[$apiBase]['text_only'];
+                                        $colorApi = $apiColorMap[$apiBase];
                                     } else {
-                                        $claseTextoApi = $apiTienda ? 'text-gray-600 dark:text-gray-400' : 'text-red-600 dark:text-red-400';
+                                        $colorApi = $colorDefecto;
                                     }
-                                    
                                     // Controlador disponible
                                     $controladorExiste = false;
                                     if (isset($ejecucionesPorDia['por_tienda'][$tienda])) {
@@ -261,9 +404,33 @@
                                         ? ($datos['peticiones_por_dia'] / $ejecucionesPorDia['total_ejecuciones_por_dia']) * 100 
                                         : 0;
                                 @endphp
-                                <tr>
+                                <tr class="fila-desglose-tienda"
+                                    data-orden-original="{{ $loop->index }}"
+                                    data-api-base="{{ $apiBase ?? '' }}"
+                                    data-tienda-nombre="{{ strtolower($tienda) }}"
+                                    data-sort-tienda="{{ strtolower($tienda) }}"
+                                    data-sort-ofertas="{{ $datos['ofertas_activas'] ?? 0 }}"
+                                    data-sort-pet-dia="{{ $datos['peticiones_por_dia'] ?? 0 }}"
+                                    data-sort-pet-mes="{{ $datos['peticiones_por_mes'] ?? 0 }}"
+                                    data-sort-porcentaje="{{ $porcentaje }}"
+                                    data-sort-api="{{ strtolower($apiBase ?? '') }}"
+                                    data-sort-controlador="{{ $controladorExiste ? 1 : 0 }}"
+                                    data-sort-scraping="{{ (isset($datos['scrapear']) && $datos['scrapear'] === 'si') ? 1 : 0 }}"
+                                    data-sort-mostrar="{{ (isset($datos['mostrar_tienda']) && $datos['mostrar_tienda'] === 'si') ? 1 : 0 }}"
+                                    data-sort-cat-mos="{{ $resumen['cat_mos']['si'] }}"
+                                    data-sort-cat-scraping="{{ $resumen['cat_scraping']['si'] }}">
                                     <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
-                                        {{ $tienda }}
+                                        @php $tiendaModel = $tiendasPorNombre[$tienda] ?? null; @endphp
+                                        @if($tiendaModel)
+                                            <a href="{{ route('admin.tiendas.edit', $tiendaModel) }}"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                class="text-blue-600 dark:text-blue-400 hover:underline">
+                                                {{ $tienda }}
+                                            </a>
+                                        @else
+                                            {{ $tienda }}
+                                        @endif
                                     </td>
                                     <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                                         {{ $datos['ofertas_activas'] ?? 0 }}/{{ $datos['ofertas_totales'] ?? 0 }}
@@ -277,18 +444,20 @@
                                     <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                                         <span class="text-purple-600 dark:text-purple-400 font-semibold">{{ number_format($porcentaje, 1) }}%</span>
                                     </td>
-                                    <td class="px-4 py-2 whitespace-nowrap text-sm font-semibold {{ $claseTextoApi }}">
-                                        @if($apiTienda)
-                                            {{ $apiTienda }} {{-- Mostrar nombre completo como pides --}}
+                                    <td class="px-4 py-2 whitespace-nowrap text-sm">
+                                        @if($apiBase)
+                                            <div class="w-8 h-8 {{ $colorApi['icon_bg'] }} rounded-lg flex items-center justify-center" title="{{ $apiTienda }}">
+                                                <span class="text-white font-bold text-sm">{{ strtoupper(substr($apiBase, 0, 2)) }}</span>
+                                            </div>
                                         @else
-                                            ❌ Sin configurar
+                                            <span class="text-red-600 dark:text-red-400 font-semibold">❌</span>
                                         @endif
                                     </td>
                                     <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                                         @if($controladorExiste)
-                                            <span class="text-green-600 dark:text-green-400 font-semibold">✅ Disponible</span>
+                                            <span class="text-green-600 dark:text-green-400 font-semibold">✅</span>
                                         @else
-                                            <span class="text-red-600 dark:text-red-400 font-semibold">❌ Faltante</span>
+                                            <span class="text-red-600 dark:text-red-400 font-semibold">❌</span>
                                         @endif
                                     </td>
                                     <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
@@ -305,119 +474,54 @@
                                             <span class="text-red-600 dark:text-red-400 font-semibold">❌</span>
                                         @endif
                                     </td>
+                                    <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 text-center" title="Categorías con ofertas mostrando">
+                                        {{ $resumen['cat_mos']['si'] }}/{{ $resumen['cat_mos']['total'] }}
+                                    </td>
+                                    <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 text-center" title="Categorías con ofertas scrapeando">
+                                        {{ $resumen['cat_scraping']['si'] }}/{{ $resumen['cat_scraping']['total'] }}
+                                    </td>
+                                    <td class="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            @foreach($resumen['cat_api'] as $filaApi)
+                                                @php
+                                                    $icon = $filaApi['icon'];
+                                                    $iconBg = isset($apiColorMap[$filaApi['base']]) ? $apiColorMap[$filaApi['base']]['icon_bg'] : $icon['icon_bg'];
+                                                @endphp
+                                                <span class="inline-flex items-center gap-1" title="{{ $icon['title'] }}">
+                                                    <span class="w-6 h-6 text-xs {{ $iconBg }} rounded-lg flex items-center justify-center text-white font-bold shrink-0">
+                                                        {{ $icon['label'] }}
+                                                    </span>
+                                                    <span class="text-sm font-medium">{{ $filaApi['count'] }}</span>
+                                                </span>
+                                            @endforeach
+                                            @if($resumen['cat_sin_api'] > 0)
+                                                @php $iconSinApi = \App\Services\TiendaScrapingConfigResolver::metaIconoApi(null, true); @endphp
+                                                <span class="inline-flex items-center gap-1" title="{{ $iconSinApi['title'] }}">
+                                                    <span class="w-6 h-6 text-xs {{ $iconSinApi['icon_bg'] }} rounded-lg flex items-center justify-center text-white font-bold shrink-0">
+                                                        {{ $iconSinApi['label'] }}
+                                                    </span>
+                                                    <span class="text-sm font-medium">{{ $resumen['cat_sin_api'] }}</span>
+                                                </span>
+                                            @endif
+                                            @if(empty($resumen['cat_api']) && $resumen['cat_sin_api'] === 0)
+                                                <span class="text-sm text-gray-400">—</span>
+                                            @endif
+                                        </div>
+                                    </td>
                                 </tr>
                             @endforeach
                         </tbody>
                     </table>
+                    <div id="desgloseTiendasSinResultados" class="hidden text-center py-6 text-sm text-gray-500 dark:text-gray-400">
+                        No hay tiendas que coincidan con los filtros seleccionados.
+                    </div>
+                    <div id="desglosePaginacion" class="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <p id="desglosePaginacionInfo" class="text-sm text-gray-600 dark:text-gray-400"></p>
+                        <div id="desglosePaginacionBotones" class="flex flex-wrap items-center gap-1"></div>
+                    </div>
                 </div>
             </div>
         </div>
-
-
-        <!-- Ofertas con Errores y Éxitos -->
-        <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-             <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-4">
-                 📊 Ofertas con Errores y Éxitos de Scraping
-             </h3>
-             <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                 Estado de las ofertas procesadas por el scraper. Se muestra el último estado de cada oferta por día.
-             </p>
-             
-             <!-- Filtros -->
-             <div class="mb-6 space-y-4">
-                 <div class="flex flex-wrap gap-4 items-center">
-                     <!-- Selector de fecha -->
-                     <div class="flex items-center space-x-2">
-                         <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Fecha:</label>
-                         <input type="date" id="fechaSelector" class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                     </div>
-                     
-                     <!-- Checkboxes de filtro -->
-                     <div class="flex items-center space-x-4">
-                         <label class="flex items-center space-x-2">
-                             <input type="checkbox" id="mostrarExitos" checked class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
-                             <span class="text-sm font-medium text-gray-700 dark:text-gray-300">✅ Éxitos</span>
-                         </label>
-                         <label class="flex items-center space-x-2">
-                             <input type="checkbox" id="mostrarErrores" checked class="rounded border-gray-300 dark:border-gray-600 text-red-600 focus:ring-red-500">
-                             <span class="text-sm font-medium text-gray-700 dark:text-gray-300">❌ Errores</span>
-                         </label>
-                     </div>
-                    
-                     <!-- Elementos por página -->
-                     <div class="flex items-center space-x-2">
-                         <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Por página:</label>
-                         <select id="perPageSelector" class="px-7 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                             <option value="10">10</option>
-                             <option value="20" selected>20</option>
-                             <option value="50">50</option>
-                             <option value="100">100</option>
-                         </select>
-                     </div>
-                     
-                     <!-- Botón de actualizar -->
-                     <button id="actualizarOfertas" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors">
-                         🔄 Actualizar
-                     </button>
-                 </div>
-                 
-                 <!-- Estadísticas rápidas -->
-                 <div class="flex flex-wrap gap-4 text-sm">
-                     <div class="flex items-center space-x-2">
-                         <span class="w-3 h-3 bg-green-500 rounded-full"></span>
-                         <span class="text-gray-700 dark:text-gray-300">Éxitos: <span id="contadorExitos" class="font-semibold">0</span></span>
-                     </div>
-                     <div class="flex items-center space-x-2">
-                         <span class="w-3 h-3 bg-red-500 rounded-full"></span>
-                         <span class="text-gray-700 dark:text-gray-300">Errores: <span id="contadorErrores" class="font-semibold">0</span></span>
-                     </div>
-                     <div class="flex items-center space-x-2">
-                         <span class="w-3 h-3 bg-blue-500 rounded-full"></span>
-                         <span class="text-gray-700 dark:text-gray-300">Total: <span id="contadorTotal" class="font-semibold">0</span></span>
-                     </div>
-                 </div>
-             </div>
-             
-             <!-- Tabla de resultados -->
-             <div id="tablaOfertasContainer" class="overflow-x-auto">
-                 <div id="loadingOfertas" class="text-center py-8 hidden">
-                     <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                     <p class="mt-2 text-gray-600 dark:text-gray-400">Cargando ofertas...</p>
-                 </div>
-                 
-                 <div id="tablaOfertas" class="hidden">
-                     <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                         <thead class="bg-gray-50 dark:bg-gray-700">
-                             <tr>
-                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">ID</th>
-                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Tienda</th>
-                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Estado</th>
-                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Precio Anterior</th>
-                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Precio Nuevo</th>
-                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Hora</th>
-                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Error</th>
-                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Acciones</th>
-                             </tr>
-                         </thead>
-                         <tbody id="tablaOfertasBody" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                             <!-- Los datos se cargarán dinámicamente -->
-                         </tbody>
-                     </table>
-                     
-                     <!-- Paginación -->
-                     <div id="paginacionOfertas" class="mt-4 flex items-center justify-between">
-                         <!-- La paginación se generará dinámicamente -->
-                     </div>
-                 </div>
-                 
-                 <div id="noOfertas" class="text-center py-8 hidden">
-                     <div class="text-gray-500 dark:text-gray-400 text-lg">📝 No hay ofertas para mostrar</div>
-                     <p class="text-sm text-gray-400 dark:text-gray-500 mt-2">
-                         No se encontraron ofertas para la fecha y filtro seleccionados.
-                     </p>
-                 </div>
-             </div>
-         </div>
 
         <!-- Ofertas Elegibles para Scraping -->
         <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 border border-gray-200 dark:border-gray-700">
@@ -477,235 +581,380 @@
 
     </div>
      
-     <!-- JavaScript para el panel de ofertas con errores y éxitos -->
+     <!-- JavaScript para filtros del desglose por tienda -->
      <script>
          document.addEventListener('DOMContentLoaded', function() {
-              let currentPage = 1;
-              let currentMostrarExitos = true;
-              let currentMostrarErrores = true;
-              let currentPerPage = 20;
-              let currentFecha = new Date().toISOString().split('T')[0];
-              let fechasDisponibles = [];
-              
-              const fechaSelector = document.getElementById('fechaSelector');
-              const mostrarExitosCheckbox = document.getElementById('mostrarExitos');
-              const mostrarErroresCheckbox = document.getElementById('mostrarErrores');
-              const perPageSelector = document.getElementById('perPageSelector');
-              const actualizarBtn = document.getElementById('actualizarOfertas');
-              const loadingDiv = document.getElementById('loadingOfertas');
-              const tablaDiv = document.getElementById('tablaOfertas');
-              const noOfertasDiv = document.getElementById('noOfertas');
-              const tablaBody = document.getElementById('tablaOfertasBody');
-              const paginacionDiv = document.getElementById('paginacionOfertas');
-              
-              fechaSelector.value = currentFecha;
-              cargarOfertas();
-              
-              actualizarBtn.addEventListener('click', cargarOfertas);
-              fechaSelector.addEventListener('change', function() {
-                  const fechaSeleccionada = this.value;
-                  if (fechasDisponibles.includes(fechaSeleccionada)) {
-                      currentFecha = fechaSeleccionada;
-                      currentPage = 1;
-                      cargarOfertas();
-                  } else {
-                      alert('No hay ejecuciones disponibles para esta fecha. Selecciona otra fecha.');
-                      this.value = currentFecha;
-                  }
-              });
-              mostrarExitosCheckbox.addEventListener('change', function() {
-                  currentMostrarExitos = this.checked;
-                  currentPage = 1;
-                  cargarOfertas();
-              });
-              mostrarErroresCheckbox.addEventListener('change', function() {
-                  currentMostrarErrores = this.checked;
-                  currentPage = 1;
-                  cargarOfertas();
-              });
-              perPageSelector.addEventListener('change', function() {
-                 currentPerPage = parseInt(this.value);
-                 currentPage = 1;
-                 cargarOfertas();
-              });
-             
-              function cargarOfertas() {
-                 mostrarLoading();
-                 
-                 const params = new URLSearchParams({
-                      fecha: currentFecha,
-                      mostrar_exitos: currentMostrarExitos,
-                      mostrar_errores: currentMostrarErrores,
-                      perPage: currentPerPage,
-                      page: currentPage
-                  });
-                 
-                 fetch(`{{ route('admin.scraping.ofertas-errores-exitos') }}?${params}`)
-                     .then(response => response.json())
-                     .then(data => {
-                         ocultarLoading();
-                         
-                         if (data.ofertas.length === 0) {
-                             mostrarNoOfertas();
-                             return;
-                         }
-                         
-                         mostrarTabla();
-                         renderizarTabla(data.ofertas);
-                         renderizarPaginacion(data);
-                         actualizarContadores(data.estadisticas_dia);
-                         
-                         fechasDisponibles = data.fechas_disponibles;
-                         
-                         mostrarExitosCheckbox.checked = data.mostrar_exitos;
-                         mostrarErroresCheckbox.checked = data.mostrar_errores;
-                     })
-                     .catch(error => {
-                         console.error('Error al cargar ofertas:', error);
-                         ocultarLoading();
-                         mostrarError('Error al cargar las ofertas. Inténtalo de nuevo.');
-                     });
-              }
-             
-              function mostrarLoading() {
-                 loadingDiv.classList.remove('hidden');
-                 tablaDiv.classList.add('hidden');
-                 noOfertasDiv.classList.add('hidden');
-              }
-             
-              function ocultarLoading() {
-                 loadingDiv.classList.add('hidden');
-              }
-             
-              function mostrarTabla() {
-                 tablaDiv.classList.remove('hidden');
-                 noOfertasDiv.classList.add('hidden');
-              }
-             
-              function mostrarNoOfertas() {
-                 tablaDiv.classList.add('hidden');
-                 noOfertasDiv.classList.remove('hidden');
-              }
-             
-              function renderizarTabla(ofertas) {
-                 tablaBody.innerHTML = '';
-                 
-                 ofertas.forEach(oferta => {
-                     const row = document.createElement('tr');
-                     
-                     const estadoClass = oferta.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
-                     const estadoText = oferta.success ? '✅ Éxito' : '❌ Error';
-                     const precioNuevo = oferta.precio_nuevo !== null ? `${oferta.precio_nuevo}€` : '-';
-                     const precioAnterior = oferta.precio_anterior !== null ? `${oferta.precio_anterior}€` : '-';
-                     const hora = new Date(oferta.hora).toLocaleTimeString('es-ES', { 
-                         hour: '2-digit', 
-                         minute: '2-digit',
-                         second: '2-digit'
-                     });
-                     
-                     row.innerHTML = `
-                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
-                             ${oferta.oferta_id}
-                         </td>
-                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                             ${oferta.tienda_nombre}
-                         </td>
-                         <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold ${estadoClass}">
-                             ${estadoText}
-                         </td>
-                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                             ${precioAnterior}
-                         </td>
-                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                             ${precioNuevo}
-                         </td>
-                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                             ${hora}
-                         </td>
-                         <td class="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
-                             ${oferta.error ? `<span class="text-red-600 dark:text-red-400">${oferta.error}</span>` : '-'}
-                         </td>
-                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                             <div class="flex space-x-2">
-                                 <a href="${oferta.url_oferta}" target="_blank" class="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded text-blue-700 bg-blue-100 hover:bg-blue-200 dark:text-blue-300 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 transition-colors">
-                                     🔗 Ir
-                                 </a>
-                                 <a href="/panel-privado/ofertas/${oferta.oferta_id}/edit" class="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded text-green-700 bg-green-100 hover:bg-green-200 dark:text-green-300 dark:bg-green-900/20 dark:hover:bg-green-900/40 transition-colors">
-                                     ✏️ Editar
-                                 </a>
-                             </div>
-                         </td>
-                     `;
-                     
-                     tablaBody.appendChild(row);
+             const filtroApiTienda = document.getElementById('filtroApiTienda');
+             const buscadorTienda = document.getElementById('buscadorTienda');
+             const toggleFiltrosDesglose = document.getElementById('toggleFiltrosDesglose');
+             const panelFiltrosDesglose = document.getElementById('panelFiltrosDesglose');
+             const filtroControladorSi = document.getElementById('filtroControladorSi');
+             const filtroControladorNo = document.getElementById('filtroControladorNo');
+             const filtroControladorBtn = document.getElementById('filtroControladorBtn');
+             const filtroControladorPanel = document.getElementById('filtroControladorPanel');
+             const filtroControladorTexto = document.getElementById('filtroControladorTexto');
+             const filtroScrapingSi = document.getElementById('filtroScrapingSi');
+             const filtroScrapingNo = document.getElementById('filtroScrapingNo');
+             const filtroScrapingBtn = document.getElementById('filtroScrapingBtn');
+             const filtroScrapingPanel = document.getElementById('filtroScrapingPanel');
+             const filtroScrapingTexto = document.getElementById('filtroScrapingTexto');
+             const filtroMostrarSi = document.getElementById('filtroMostrarSi');
+             const filtroMostrarNo = document.getElementById('filtroMostrarNo');
+             const filtroMostrarBtn = document.getElementById('filtroMostrarBtn');
+             const filtroMostrarPanel = document.getElementById('filtroMostrarPanel');
+             const filtroMostrarTexto = document.getElementById('filtroMostrarTexto');
+             const limpiarFiltrosDesglose = document.getElementById('limpiarFiltrosDesglose');
+             const desglosePerPage = document.getElementById('desglosePerPage');
+             const desglosePaginacionInfo = document.getElementById('desglosePaginacionInfo');
+             const desglosePaginacionBotones = document.getElementById('desglosePaginacionBotones');
+             const desglosePaginacion = document.getElementById('desglosePaginacion');
+             const desgloseTiendasBody = document.getElementById('desgloseTiendasBody');
+             const desgloseTiendasVisibles = document.getElementById('desgloseTiendasVisibles');
+             const desgloseTiendasSinResultados = document.getElementById('desgloseTiendasSinResultados');
+             const desgloseTiendasTabla = document.querySelector('#desglosePorTienda table');
+             const sortHeaders = document.querySelectorAll('.desglose-sort-header');
+
+             const columnasNumericas = new Set(['ofertas', 'pet-dia', 'pet-mes', 'porcentaje', 'controlador', 'scraping', 'mostrar', 'cat-mos', 'cat-scraping']);
+             let sortColumna = null;
+             let sortDireccion = null;
+             let paginaActual = 1;
+
+             function obtenerPerPage() {
+                 const valor = desglosePerPage ? parseInt(desglosePerPage.value, 10) : 20;
+                 return Number.isFinite(valor) && valor > 0 ? valor : 20;
+             }
+
+             function esFiltroSiNoPorDefecto(checkSi, checkNo) {
+                 return checkSi && checkSi.checked && checkNo && !checkNo.checked;
+             }
+
+             function textoFiltroSiNo(checkSi, checkNo) {
+                 const si = checkSi && checkSi.checked;
+                 const no = checkNo && checkNo.checked;
+                 if (si && no) return 'Sí, No';
+                 if (si) return 'Sí';
+                 if (no) return 'No';
+                 return 'Ninguno';
+             }
+
+             function actualizarTextosFiltrosSiNo() {
+                 if (filtroControladorTexto) filtroControladorTexto.textContent = textoFiltroSiNo(filtroControladorSi, filtroControladorNo);
+                 if (filtroScrapingTexto) filtroScrapingTexto.textContent = textoFiltroSiNo(filtroScrapingSi, filtroScrapingNo);
+                 if (filtroMostrarTexto) filtroMostrarTexto.textContent = textoFiltroSiNo(filtroMostrarSi, filtroMostrarNo);
+             }
+
+             function coincideFiltroSiNo(valorFila, checkSi, checkNo) {
+                 const si = checkSi && checkSi.checked;
+                 const no = checkNo && checkNo.checked;
+                 if (si && no) return true;
+                 if (!si && !no) return false;
+                 if (si && valorFila === '1') return true;
+                 if (no && valorFila === '0') return true;
+                 return false;
+             }
+
+             function cerrarPanelesFiltroSiNo(exceptoPanel) {
+                 [filtroControladorPanel, filtroScrapingPanel, filtroMostrarPanel].forEach(panel => {
+                     if (panel && panel !== exceptoPanel) {
+                         panel.classList.add('hidden');
+                     }
                  });
-              }
-             
-              function renderizarPaginacion(data) {
-                 if (data.last_page <= 1) {
-                     paginacionDiv.innerHTML = '';
+             }
+
+             function configurarFiltroSiNo(btn, panel, checkSi, checkNo) {
+                 if (!btn || !panel || !checkSi || !checkNo) return;
+
+                 btn.addEventListener('click', function(e) {
+                     e.stopPropagation();
+                     const abrir = panel.classList.contains('hidden');
+                     cerrarPanelesFiltroSiNo(null);
+                     panel.classList.toggle('hidden', !abrir);
+                 });
+
+                 panel.addEventListener('click', function(e) {
+                     e.stopPropagation();
+                 });
+
+                 [checkSi, checkNo].forEach(input => {
+                     input.addEventListener('change', function() {
+                         actualizarTextosFiltrosSiNo();
+                         filtrarDesgloseTiendas();
+                     });
+                 });
+             }
+
+             function hayFiltrosActivos() {
+                 const apiSeleccionada = filtroApiTienda ? filtroApiTienda.value : '';
+                 const textoBusqueda = buscadorTienda ? buscadorTienda.value.trim() : '';
+                 return apiSeleccionada !== ''
+                     || textoBusqueda !== ''
+                     || !esFiltroSiNoPorDefecto(filtroControladorSi, filtroControladorNo)
+                     || !esFiltroSiNoPorDefecto(filtroScrapingSi, filtroScrapingNo)
+                     || !esFiltroSiNoPorDefecto(filtroMostrarSi, filtroMostrarNo);
+             }
+
+             function filaCoincideFiltros(fila) {
+                 const apiSeleccionada = filtroApiTienda ? filtroApiTienda.value : '';
+                 const textoBusqueda = buscadorTienda ? buscadorTienda.value.trim().toLowerCase() : '';
+
+                 const apiBase = fila.dataset.apiBase || '';
+                 const nombreTienda = fila.dataset.tiendaNombre || '';
+
+                 let coincideApi = true;
+                 if (apiSeleccionada === '__sin_configurar__') {
+                     coincideApi = apiBase === '';
+                 } else if (apiSeleccionada !== '') {
+                     coincideApi = apiBase === apiSeleccionada;
+                 }
+
+                 const coincideNombre = textoBusqueda === '' || nombreTienda.includes(textoBusqueda);
+                 const coincideControlador = coincideFiltroSiNo(fila.dataset.sortControlador, filtroControladorSi, filtroControladorNo);
+                 const coincideScraping = coincideFiltroSiNo(fila.dataset.sortScraping, filtroScrapingSi, filtroScrapingNo);
+                 const coincideMostrar = coincideFiltroSiNo(fila.dataset.sortMostrar, filtroMostrarSi, filtroMostrarNo);
+
+                 return coincideApi && coincideNombre && coincideControlador && coincideScraping && coincideMostrar;
+             }
+
+             function obtenerFilasFiltradas() {
+                 return obtenerFilasDesglose().filter(fila => filaCoincideFiltros(fila));
+             }
+
+             function actualizarEstiloBotonFiltros() {
+                 if (!toggleFiltrosDesglose) return;
+                 if (hayFiltrosActivos()) {
+                     toggleFiltrosDesglose.classList.add('ring-2', 'ring-blue-500', 'border-blue-500');
+                 } else {
+                     toggleFiltrosDesglose.classList.remove('ring-2', 'ring-blue-500', 'border-blue-500');
+                 }
+             }
+
+             function obtenerFilasDesglose() {
+                 return desgloseTiendasBody ? Array.from(desgloseTiendasBody.querySelectorAll('.fila-desglose-tienda')) : [];
+             }
+
+             function obtenerValorOrden(fila, columna) {
+                 const clave = 'sort' + columna.split('-').map(p => p.charAt(0).toUpperCase() + p.slice(1)).join('');
+                 return fila.dataset[clave] ?? '';
+             }
+
+             function compararValores(a, b, columna) {
+                 if (columnasNumericas.has(columna)) {
+                     return parseFloat(a) - parseFloat(b);
+                 }
+                 return String(a).localeCompare(String(b), 'es', { sensitivity: 'base' });
+             }
+
+             function actualizarIndicadoresOrden() {
+                 sortHeaders.forEach(header => {
+                     const indicador = header.querySelector('.desglose-sort-indicator');
+                     if (!indicador) return;
+
+                     if (header.dataset.sort === sortColumna && sortDireccion === 'desc') {
+                         indicador.textContent = '↓';
+                     } else if (header.dataset.sort === sortColumna && sortDireccion === 'asc') {
+                         indicador.textContent = '↑';
+                     } else {
+                         indicador.textContent = '';
+                     }
+                 });
+             }
+
+             function aplicarOrdenDesglose() {
+                 if (!desgloseTiendasBody) return;
+
+                 const filas = obtenerFilasDesglose();
+
+                 filas.sort((a, b) => {
+                     if (!sortColumna || sortDireccion === null) {
+                         return parseInt(a.dataset.ordenOriginal, 10) - parseInt(b.dataset.ordenOriginal, 10);
+                     }
+
+                     const cmp = compararValores(
+                         obtenerValorOrden(a, sortColumna),
+                         obtenerValorOrden(b, sortColumna),
+                         sortColumna
+                     );
+
+                     return sortDireccion === 'desc' ? -cmp : cmp;
+                 });
+
+                 filas.forEach(fila => desgloseTiendasBody.appendChild(fila));
+                 actualizarIndicadoresOrden();
+                 actualizarDesgloseTiendas();
+             }
+
+             function crearBotonPagina(texto, pagina, activa = false, deshabilitada = false) {
+                 const boton = document.createElement('button');
+                 boton.type = 'button';
+                 boton.textContent = texto;
+                 boton.className = activa
+                     ? 'px-3 py-1 rounded text-sm bg-blue-600 text-white'
+                     : 'px-3 py-1 rounded text-sm border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600';
+                 boton.disabled = deshabilitada;
+                 if (deshabilitada) {
+                     boton.classList.add('opacity-50', 'cursor-not-allowed');
+                 }
+                 if (!deshabilitada && !activa) {
+                     boton.addEventListener('click', function() {
+                         paginaActual = pagina;
+                         actualizarDesgloseTiendas();
+                     });
+                 }
+                 return boton;
+             }
+
+             function renderizarPaginacion(totalFiltradas, totalPaginas, inicio, fin) {
+                 if (!desglosePaginacionBotones || !desglosePaginacionInfo) return;
+
+                 desglosePaginacionBotones.innerHTML = '';
+
+                 if (totalFiltradas === 0) {
+                     desglosePaginacionInfo.textContent = '';
+                     if (desglosePaginacion) desglosePaginacion.classList.add('hidden');
                      return;
                  }
-                 
-                 let paginacionHTML = `
-                     <div class="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300">
-                         <span>Mostrando ${((data.current_page - 1) * data.per_page) + 1} a ${Math.min(data.current_page * data.per_page, data.total)} de ${data.total} resultados</span>
-                     </div>
-                     <div class="flex items-center space-x-2">
-                 `;
-                 
-                 if (data.current_page > 1) {
-                     paginacionHTML += `
-                         <button onclick="cambiarPagina(${data.current_page - 1})" class="px-3 py-1 text-sm bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-600">
-                             Anterior
-                         </button>
-                     `;
+
+                 if (desglosePaginacion) desglosePaginacion.classList.remove('hidden');
+
+                 const totalTodas = obtenerFilasDesglose().length;
+                 let textoInfo = `Mostrando ${inicio + 1}-${fin} de ${totalFiltradas} tienda${totalFiltradas === 1 ? '' : 's'}`;
+                 if (hayFiltrosActivos() && totalFiltradas !== totalTodas) {
+                     textoInfo += ` (filtradas de ${totalTodas})`;
                  }
-                 
-                 const startPage = Math.max(1, data.current_page - 2);
-                 const endPage = Math.min(data.last_page, data.current_page + 2);
-                 
-                 for (let i = startPage; i <= endPage; i++) {
-                     const activeClass = i === data.current_page ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600';
-                     paginacionHTML += `
-                         <button onclick="cambiarPagina(${i})" class="px-3 py-1 text-sm rounded ${activeClass}">
-                             ${i}
-                         </button>
-                     `;
+                 desglosePaginacionInfo.textContent = textoInfo;
+
+                 desglosePaginacionBotones.appendChild(crearBotonPagina('«', paginaActual - 1, false, paginaActual <= 1));
+
+                 const paginasVisibles = [];
+                 for (let p = 1; p <= totalPaginas; p++) {
+                     if (p === 1 || p === totalPaginas || Math.abs(p - paginaActual) <= 2) {
+                         paginasVisibles.push(p);
+                     }
                  }
-                 
-                 if (data.current_page < data.last_page) {
-                     paginacionHTML += `
-                         <button onclick="cambiarPagina(${data.current_page + 1})" class="px-3 py-1 text-sm bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-600">
-                             Siguiente
-                         </button>
-                     `;
+
+                 let ultimaPaginaMostrada = 0;
+                 paginasVisibles.forEach(p => {
+                     if (ultimaPaginaMostrada && p - ultimaPaginaMostrada > 1) {
+                         const puntos = document.createElement('span');
+                         puntos.textContent = '…';
+                         puntos.className = 'px-2 text-gray-500';
+                         desglosePaginacionBotones.appendChild(puntos);
+                     }
+                     desglosePaginacionBotones.appendChild(crearBotonPagina(String(p), p, p === paginaActual));
+                     ultimaPaginaMostrada = p;
+                 });
+
+                 desglosePaginacionBotones.appendChild(crearBotonPagina('»', paginaActual + 1, false, paginaActual >= totalPaginas));
+             }
+
+             function actualizarDesgloseTiendas(resetPagina = false) {
+                 if (resetPagina) {
+                     paginaActual = 1;
                  }
-                 
-                 paginacionHTML += '</div>';
-                 paginacionDiv.innerHTML = paginacionHTML;
-              }
-             
-              function cambiarPagina(page) {
-                 currentPage = page;
-                 cargarOfertas();
-              }
-             
-              function actualizarContadores(estadisticas) {
-                  document.getElementById('contadorExitos').textContent = estadisticas.exitos;
-                  document.getElementById('contadorErrores').textContent = estadisticas.errores;
-                  document.getElementById('contadorTotal').textContent = estadisticas.total;
-              }
-             
-              function mostrarError(mensaje) {
-                 const notification = document.createElement('div');
-                 notification.className = 'fixed top-4 right-4 bg-red-600 text-white px-6 py-3 rounded-lg shadow-lg z-50';
-                 notification.textContent = mensaje;
-                 document.body.appendChild(notification);
-                 setTimeout(() => { notification.remove(); }, 5000);
-              }
-             
-              window.cambiarPagina = cambiarPagina;
+
+                 const todasLasFilas = obtenerFilasDesglose();
+                 const filasFiltradas = obtenerFilasFiltradas();
+                 const perPage = obtenerPerPage();
+                 const totalFiltradas = filasFiltradas.length;
+                 const totalPaginas = Math.max(1, Math.ceil(totalFiltradas / perPage));
+
+                 if (paginaActual > totalPaginas) {
+                     paginaActual = totalPaginas;
+                 }
+                 if (paginaActual < 1) {
+                     paginaActual = 1;
+                 }
+
+                 const inicio = (paginaActual - 1) * perPage;
+                 const fin = Math.min(inicio + perPage, totalFiltradas);
+                 const filasPagina = new Set(filasFiltradas.slice(inicio, fin));
+
+                 todasLasFilas.forEach(fila => {
+                     fila.classList.toggle('hidden', !filasPagina.has(fila));
+                 });
+
+                 if (desgloseTiendasVisibles) {
+                     const totalTodas = todasLasFilas.length;
+                     if (hayFiltrosActivos()) {
+                         desgloseTiendasVisibles.textContent = ` — ${totalFiltradas} de ${totalTodas} tiendas`;
+                     } else {
+                         desgloseTiendasVisibles.textContent = '';
+                     }
+                 }
+
+                 if (desgloseTiendasSinResultados && desgloseTiendasTabla) {
+                     const sinResultados = totalFiltradas === 0 && todasLasFilas.length > 0;
+                     desgloseTiendasSinResultados.classList.toggle('hidden', !sinResultados);
+                     desgloseTiendasTabla.classList.toggle('hidden', sinResultados);
+                 }
+
+                 renderizarPaginacion(totalFiltradas, totalPaginas, inicio, fin);
+                 actualizarEstiloBotonFiltros();
+             }
+
+             sortHeaders.forEach(header => {
+                 header.addEventListener('click', function() {
+                     const columna = this.dataset.sort;
+
+                     if (sortColumna === columna) {
+                         if (sortDireccion === null) {
+                             sortDireccion = 'desc';
+                         } else if (sortDireccion === 'desc') {
+                             sortDireccion = 'asc';
+                         } else {
+                             sortDireccion = null;
+                             sortColumna = null;
+                         }
+                     } else {
+                         sortColumna = columna;
+                         sortDireccion = 'desc';
+                     }
+
+                     aplicarOrdenDesglose();
+                 });
+             });
+
+             function filtrarDesgloseTiendas() {
+                 actualizarDesgloseTiendas(true);
+             }
+
+             if (toggleFiltrosDesglose && panelFiltrosDesglose) {
+                 toggleFiltrosDesglose.addEventListener('click', function() {
+                     panelFiltrosDesglose.classList.toggle('hidden');
+                 });
+             }
+
+             if (limpiarFiltrosDesglose) {
+                 limpiarFiltrosDesglose.addEventListener('click', function() {
+                     if (filtroApiTienda) filtroApiTienda.value = '';
+                     if (filtroControladorSi) filtroControladorSi.checked = true;
+                     if (filtroControladorNo) filtroControladorNo.checked = false;
+                     if (filtroScrapingSi) filtroScrapingSi.checked = true;
+                     if (filtroScrapingNo) filtroScrapingNo.checked = false;
+                     if (filtroMostrarSi) filtroMostrarSi.checked = true;
+                     if (filtroMostrarNo) filtroMostrarNo.checked = false;
+                     actualizarTextosFiltrosSiNo();
+                     cerrarPanelesFiltroSiNo(null);
+                     filtrarDesgloseTiendas();
+                 });
+             }
+
+             configurarFiltroSiNo(filtroControladorBtn, filtroControladorPanel, filtroControladorSi, filtroControladorNo);
+             configurarFiltroSiNo(filtroScrapingBtn, filtroScrapingPanel, filtroScrapingSi, filtroScrapingNo);
+             configurarFiltroSiNo(filtroMostrarBtn, filtroMostrarPanel, filtroMostrarSi, filtroMostrarNo);
+
+             document.addEventListener('click', function() {
+                 cerrarPanelesFiltroSiNo(null);
+             });
+
+             if (filtroApiTienda) filtroApiTienda.addEventListener('change', filtrarDesgloseTiendas);
+             if (buscadorTienda) buscadorTienda.addEventListener('input', filtrarDesgloseTiendas);
+             if (desglosePerPage) desglosePerPage.addEventListener('change', function() {
+                 actualizarDesgloseTiendas(true);
+             });
+
+             actualizarTextosFiltrosSiNo();
+             actualizarDesgloseTiendas();
          });
      </script>
  </x-app-layout>

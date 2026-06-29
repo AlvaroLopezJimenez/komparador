@@ -277,7 +277,10 @@ class CasekingController extends PlantillaTiendaController
         return str_contains($h, 'product-not-available')
             || str_contains($h, 'no disponible')
             || preg_match('~availability[^>]*>\s*agotado~i', $html)
-            || preg_match('~data-available="false"~i', $html);
+            || preg_match('~data-available="false"~i', $html)
+            || preg_match('~data-available="preorder"~i', $html)
+            || str_contains($h, 'product-availability-message-preorder')
+            || preg_match('~data-qa="pdp-availability-status-value"[^>]*>\s*en\s+tr[aá]nsito~iu', $html);
     }
 
     /**

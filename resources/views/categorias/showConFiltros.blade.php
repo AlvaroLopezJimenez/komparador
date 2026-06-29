@@ -12,7 +12,7 @@
         $mapaIdsASlugs = [];
         foreach ($filtrosImportantes as $filtro) {
             foreach ($filtro['subprincipales'] ?? [] as $sub) {
-                $slug = $sub['slug'] ?? \Illuminate\Support\Str::slug($sub['texto'] ?? '');
+                $slug = \App\Helpers\CategoriaHelper::slugFiltro($sub['texto'] ?? '');
                 $mapaIdsASlugs[$sub['id']] = $slug;
             }
         }
@@ -113,7 +113,7 @@
             $mapaIdsASlugs = [];
             foreach ($filtrosImportantes as $filtro) {
                 foreach ($filtro['subprincipales'] ?? [] as $sub) {
-                    $slug = $sub['slug'] ?? \Illuminate\Support\Str::slug($sub['texto'] ?? '');
+                    $slug = \App\Helpers\CategoriaHelper::slugFiltro($sub['texto'] ?? '');
                     $mapaIdsASlugs[$sub['id']] = $slug;
                 }
             }
@@ -566,7 +566,7 @@
                                             $mostrarItem = $index < $mostrarPrimeras || !$tieneMasDe5;
                                             // Verificar si este filtro está aplicado
                                             // $filtrosAplicados -> $fa1
-                                            $slugSublinea = $sub['slug'] ?? \Illuminate\Support\Str::slug($sub['texto'] ?? '');
+                                            $slugSublinea = \App\Helpers\CategoriaHelper::slugFiltro($sub['texto'] ?? '');
                                             $estaSeleccionado = false;
                                             if (isset($fa1[$filtro['id']]) && is_array($fa1[$filtro['id']])) {
                                                 $estaSeleccionado = in_array($sub['id'], $fa1[$filtro['id']]);
@@ -912,7 +912,7 @@
                                         $estaDeshabilitado = $contador === 0;
                                         // Verificar si este filtro está aplicado
                                         // $filtrosAplicados -> $fa1
-                                        $slugSublinea = $sub['slug'] ?? \Illuminate\Support\Str::slug($sub['texto'] ?? '');
+                                        $slugSublinea = \App\Helpers\CategoriaHelper::slugFiltro($sub['texto'] ?? '');
                                         $estaSeleccionado = false;
                                         if (isset($fa1[$filtro['id']]) && is_array($fa1[$filtro['id']])) {
                                             $estaSeleccionado = in_array($sub['id'], $fa1[$filtro['id']]);
@@ -1380,7 +1380,7 @@
             
             estructuraFiltros.forEach(filtro => {
                 filtro.subprincipales.forEach(sub => {
-                    const slug = sub.slug || _gs1(sub.texto || '');
+                    const slug = _gs1(sub.texto || '');
                     mapaIdsASlugs[sub.id] = slug;
                 });
             });
@@ -1450,6 +1450,7 @@
                 .toString()
                 .toLowerCase()
                 .trim()
+                .replace(/\+/g, ' plus ')
                 .normalize('NFD')
                 .replace(/[\u0300-\u036f]/g, '')
                 .replace(/[^a-z0-9]+/g, '-')

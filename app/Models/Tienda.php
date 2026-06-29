@@ -19,6 +19,7 @@ class Tienda extends Model
         'aviso',
         'avisos_sin_stock_scrapear_automatico',
         'api',
+        'url_csv',
         'mostrar_tienda',
         'scrapear',
         'como_scrapear',
@@ -26,12 +27,21 @@ class Tienda extends Model
         'frecuencia_maxima_minutos',
     ];
 
+    protected $casts = [
+        'url_csv' => 'array',
+    ];
+
     public function ofertas()
     {
         return $this->hasMany(\App\Models\OfertaProducto::class);
     }
     public function comisiones()
-{
-    return $this->hasMany(\App\Models\ComisionCategoriaTienda::class);
-}
+    {
+        return $this->hasMany(\App\Models\ComisionCategoriaTienda::class);
+    }
+
+    public function scrapingPorCategoria()
+    {
+        return $this->hasMany(\App\Models\TiendaCategoriaApi::class);
+    }
 }

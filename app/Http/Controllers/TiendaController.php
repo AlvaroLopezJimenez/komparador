@@ -10,6 +10,8 @@ use App\Models\Tienda;
 use App\Models\Categoria;
 use App\Models\Neoobjetivo;
 use App\Models\OfertaProducto;
+use App\Models\TiendaCategoriaApi;
+use App\Services\TiendaScrapingConfigResolver;
 
 class TiendaController extends Controller
 {
@@ -40,12 +42,15 @@ class TiendaController extends Controller
         $tiendas = $query->paginate($perPage)->appends($request->query());
 
         $tiendasSinNeoobjetivoPorCategoria = $this->obtenerTiendasVisiblesConCategoriasSinNeoobjetivo();
+        $resumenScrapingPorTienda = app(TiendaScrapingConfigResolver::class)
+            ->resumenIndexPorTiendas($tiendas->getCollection());
 
         return view('admin.tiendas.index', compact(
             'tiendas',
             'perPage',
             'mostrarParaVista',
-            'tiendasSinNeoobjetivoPorCategoria'
+            'tiendasSinNeoobjetivoPorCategoria',
+            'resumenScrapingPorTienda'
         ));
     }
 
@@ -65,6 +70,9 @@ class TiendaController extends Controller
             'categoriasSinNeoobjetivo' => collect(),
             'categoriasAncestrosSinNeo' => collect(),
             'conteoTotalOfertas' => [],
+            'scrapingPorCategoria' => collect(),
+            'categoriasSinApiScraping' => collect(),
+            'categoriasAncestrosSinApi' => collect(),
         ]);
     }
 
@@ -84,7 +92,7 @@ class TiendaController extends Controller
             'url_opiniones' => 'nullable|string',
             'anotaciones_internas' => 'nullable|string',
             'aviso' => 'nullable|date',
-            'api' => 'required|string|in:miVpsHtml;1,miVpsHtml;2,miVpsHtml;3,miVpsHtml;4,miVpsHtml;5,scrapingAnt,brightData;false,brightData;true,aliexpressOpen,amazonApi,amazonProductInfo,amazonPricing,navegadorLocal',
+            'api' => 'required|string|' . TiendaScrapingConfigResolver::reglaValidacionApi(),
             'mostrar_tienda' => 'required|in:si,no',
             'scrapear' => 'required|in:si,no',
             'avisos_sin_stock_scrapear_automatico' => 'required|in:si,no',
@@ -94,28 +102,43 @@ class TiendaController extends Controller
             'frecuencia_maxima_valor' => 'required|numeric|min:0.1',
             'frecuencia_maxima_unidad' => 'required|in:minutos,horas,dias',
             'urls_categoria.*.*.visitada' => 'nullable|date',
+            'scraping_categoria.*.api' => 'nullable|string|' . TiendaScrapingConfigResolver::reglaValidacionApi(),
+            'scraping_categoria.*.frecuencia_minima_valor' => 'nullable|numeric|min:0.1',
+            'scraping_categoria.*.frecuencia_minima_unidad' => 'nullable|in:minutos,horas,dias',
+            'scraping_categoria.*.frecuencia_maxima_valor' => 'nullable|numeric|min:0.1',
+            'scraping_categoria.*.frecuencia_maxima_unidad' => 'nullable|in:minutos,horas,dias',
+            'scraping_categoria.*.scrapear' => 'nullable|in:si,no',
+            'scraping_categoria.*.mostrar' => 'nullable|in:si,no',
+            'url_csv' => 'nullable|string',
         ]);
-        
-        // Convertir frecuencia mínima a minutos
+
+        $errorUrlCsv = $this->validarUrlCsvSiAplica($request);
+        if ($errorUrlCsv !== null) {
+            $errores = ['url_csv' => $errorUrlCsv];
+            if ($request->input('api') === TiendaScrapingConfigResolver::API_CSV_AWIN) {
+                $errores['api'] = 'CSV-Awin requiere al menos un enlace de descarga.';
+            }
+
+            return redirect()->back()
+                ->withErrors($errores)
+                ->withInput();
+        }
+
         $frecuenciaMinimaMinutos = $this->convertirAMinutos(
             $request->input('frecuencia_minima_valor'),
             $request->input('frecuencia_minima_unidad')
         );
-        
-        // Convertir frecuencia máxima a minutos
         $frecuenciaMaximaMinutos = $this->convertirAMinutos(
             $request->input('frecuencia_maxima_valor'),
             $request->input('frecuencia_maxima_unidad')
         );
-        
-        // Validar que la frecuencia mínima sea menor o igual a la máxima
+
         if ($frecuenciaMinimaMinutos > $frecuenciaMaximaMinutos) {
             return redirect()->back()
                 ->withErrors(['frecuencia_minima_valor' => 'La frecuencia mínima no puede ser mayor que la frecuencia máxima'])
                 ->withInput();
         }
-        
-        // Validar que la frecuencia mínima sea al menos 15 minutos
+
         if ($frecuenciaMinimaMinutos < 15) {
             return redirect()->back()
                 ->withErrors(['frecuencia_minima_valor' => 'La frecuencia mínima debe ser al menos 15 minutos'])
@@ -129,9 +152,9 @@ class TiendaController extends Controller
             $avisoFecha = now()->add($request->input('aviso_unidad'), (int)$request->input('aviso_cantidad'))->setTime(0, 1);
         }
 
-
         $tienda = \App\Models\Tienda::create([
             ...$request->only(['nombre', 'envio_gratis', 'envio_normal', 'url', 'url_imagen', 'url_opiniones', 'api', 'mostrar_tienda', 'scrapear', 'avisos_sin_stock_scrapear_automatico', 'como_scrapear']),
+            'url_csv' => $this->resolverUrlCsvParaGuardar($request),
             'opiniones' => $request->filled('opiniones') ? $request->input('opiniones') : 0,
             'puntuacion' => $request->filled('puntuacion') ? $request->input('puntuacion') : 0,
             'anotaciones_internas' => $request->input('anotaciones_internas'),
@@ -141,6 +164,7 @@ class TiendaController extends Controller
         ]);
 
         $this->guardarUrlsCategoriaNeoobjetivo($request, $tienda);
+        $this->guardarScrapingCategoria($request, $tienda);
 
         return redirect()->route('admin.tiendas.index')->with('success', 'Tienda creada correctamente.');
     }
@@ -263,11 +287,33 @@ class TiendaController extends Controller
             $computeTotalOfertas($c);
         }
 
+        $scrapingPorCategoria = TiendaCategoriaApi::where('tienda_id', $tienda->id)
+            ->get()
+            ->keyBy('categoria_id');
+
+        $resolverScraping = new TiendaScrapingConfigResolver();
+        $categoriasSinApiScraping = $resolverScraping
+            ->categoriasConOfertasSinApiConfigurada($tienda)
+            ->pluck('id');
+
+        $categoriasAncestrosSinApi = collect();
+        foreach ($categoriasSinApiScraping as $catId) {
+            $categoria = Categoria::find($catId);
+            while ($categoria && $categoria->parent_id) {
+                $categoria = $categoria->parent;
+                if ($categoria) {
+                    $categoriasAncestrosSinApi->push($categoria->id);
+                }
+            }
+        }
+        $categoriasAncestrosSinApi = $categoriasAncestrosSinApi->unique()->values();
+
         return view('admin.tiendas.formulario', compact(
             'tienda', 'categorias', 'neoobjetivosPorCategoria',
             'tipoListadoCategoria', 'mensajeControlador', 'mensajeTipoListado',
             'categoriasSinNeoobjetivo', 'categoriasAncestrosSinNeo',
-            'conteoTotalOfertas'
+            'conteoTotalOfertas', 'scrapingPorCategoria',
+            'categoriasSinApiScraping', 'categoriasAncestrosSinApi'
         ));
     }
 
@@ -289,7 +335,7 @@ class TiendaController extends Controller
             'url_opiniones' => 'nullable|string',
             'anotaciones_internas' => 'nullable|string',
             'aviso' => 'nullable|date',
-            'api' => 'required|string|in:miVpsHtml;1,miVpsHtml;2,miVpsHtml;3,miVpsHtml;4,miVpsHtml;5,scrapingAnt,brightData;false,brightData;true,aliexpressOpen,amazonApi,amazonProductInfo,amazonPricing,navegadorLocal',
+            'api' => 'required|string|' . TiendaScrapingConfigResolver::reglaValidacionApi(),
             'mostrar_tienda' => 'required|in:si,no',
             'scrapear' => 'required|in:si,no',
             'avisos_sin_stock_scrapear_automatico' => 'required|in:si,no',
@@ -299,7 +345,27 @@ class TiendaController extends Controller
             'frecuencia_maxima_valor' => 'required|numeric|min:0.1',
             'frecuencia_maxima_unidad' => 'required|in:minutos,horas,dias',
             'urls_categoria.*.*.visitada' => 'nullable|date',
+            'scraping_categoria.*.api' => 'nullable|string|' . TiendaScrapingConfigResolver::reglaValidacionApi(),
+            'scraping_categoria.*.frecuencia_minima_valor' => 'nullable|numeric|min:0.1',
+            'scraping_categoria.*.frecuencia_minima_unidad' => 'nullable|in:minutos,horas,dias',
+            'scraping_categoria.*.frecuencia_maxima_valor' => 'nullable|numeric|min:0.1',
+            'scraping_categoria.*.frecuencia_maxima_unidad' => 'nullable|in:minutos,horas,dias',
+            'scraping_categoria.*.scrapear' => 'nullable|in:si,no',
+            'scraping_categoria.*.mostrar' => 'nullable|in:si,no',
+            'url_csv' => 'nullable|string',
         ]);
+
+        $errorUrlCsv = $this->validarUrlCsvSiAplica($request);
+        if ($errorUrlCsv !== null) {
+            $errores = ['url_csv' => $errorUrlCsv];
+            if ($request->input('api') === TiendaScrapingConfigResolver::API_CSV_AWIN) {
+                $errores['api'] = 'CSV-Awin requiere al menos un enlace de descarga.';
+            }
+
+            return redirect()->back()
+                ->withErrors($errores)
+                ->withInput();
+        }
         
         // Convertir frecuencia mínima a minutos
         $frecuenciaMinimaMinutos = $this->convertirAMinutos(
@@ -354,6 +420,7 @@ class TiendaController extends Controller
                 'avisos_sin_stock_scrapear_automatico',
                 'como_scrapear',
             ]),
+            'url_csv' => $this->resolverUrlCsvParaGuardar($request),
             'aviso' => $avisoFecha,
             'frecuencia_minima_minutos' => $frecuenciaMinimaMinutos,
             'frecuencia_maxima_minutos' => $frecuenciaMaximaMinutos,
@@ -381,6 +448,7 @@ class TiendaController extends Controller
         }
 
         $this->guardarUrlsCategoriaNeoobjetivo($request, $tienda);
+        $this->guardarScrapingCategoria($request, $tienda);
 
         return redirect()->route('admin.tiendas.index')->with('success', 'Tienda actualizada correctamente.');
     }
@@ -499,6 +567,102 @@ class TiendaController extends Controller
 
             $query->delete();
         }
+    }
+
+    /**
+     * Guarda la configuración de scraping (API y frecuencias) por categoría.
+     */
+    private function guardarScrapingCategoria(Request $request, Tienda $tienda): void
+    {
+        $scrapingPorCategoria = $request->input('scraping_categoria', []);
+        if (!is_array($scrapingPorCategoria)) {
+            return;
+        }
+
+        foreach ($scrapingPorCategoria as $categoriaId => $datos) {
+            if (!is_array($datos)) {
+                continue;
+            }
+
+            $categoriaId = (int) $categoriaId;
+            $api = is_string($datos['api'] ?? null) ? trim($datos['api']) : '';
+            $scrapearCategoria = in_array($datos['scrapear'] ?? 'si', ['si', 'no'], true)
+                ? $datos['scrapear']
+                : 'si';
+            $mostrarCategoria = in_array($datos['mostrar'] ?? 'si', ['si', 'no'], true)
+                ? $datos['mostrar']
+                : 'si';
+
+            if ($api === '' && $scrapearCategoria === 'si' && $mostrarCategoria === 'si') {
+                TiendaCategoriaApi::where('tienda_id', $tienda->id)
+                    ->where('categoria_id', $categoriaId)
+                    ->delete();
+                continue;
+            }
+
+            $frecuenciaMinima = null;
+            if (
+                isset($datos['frecuencia_minima_valor'], $datos['frecuencia_minima_unidad'])
+                && $datos['frecuencia_minima_valor'] !== ''
+                && $datos['frecuencia_minima_unidad'] !== ''
+            ) {
+                $frecuenciaMinima = $this->convertirAMinutos(
+                    $datos['frecuencia_minima_valor'],
+                    $datos['frecuencia_minima_unidad']
+                );
+            }
+
+            $frecuenciaMaxima = null;
+            if (
+                isset($datos['frecuencia_maxima_valor'], $datos['frecuencia_maxima_unidad'])
+                && $datos['frecuencia_maxima_valor'] !== ''
+                && $datos['frecuencia_maxima_unidad'] !== ''
+            ) {
+                $frecuenciaMaxima = $this->convertirAMinutos(
+                    $datos['frecuencia_maxima_valor'],
+                    $datos['frecuencia_maxima_unidad']
+                );
+            }
+
+            if ($frecuenciaMinima !== null && $frecuenciaMaxima !== null && $frecuenciaMinima > $frecuenciaMaxima) {
+                continue;
+            }
+
+            TiendaCategoriaApi::updateOrCreate(
+                [
+                    'tienda_id' => $tienda->id,
+                    'categoria_id' => $categoriaId,
+                ],
+                [
+                    'api' => $api !== '' ? $api : null,
+                    'scrapear' => $scrapearCategoria,
+                    'mostrar' => $mostrarCategoria,
+                    'frecuencia_minima_minutos' => $frecuenciaMinima,
+                    'frecuencia_maxima_minutos' => $frecuenciaMaxima,
+                ]
+            );
+        }
+    }
+
+    /**
+     * Convierte minutos almacenados a [valor, unidad] para el formulario.
+     *
+     * @return array{0: float|int, 1: string}
+     */
+    public static function minutosAValorUnidad(?int $minutos): array
+    {
+        if ($minutos === null) {
+            return ['', ''];
+        }
+
+        if ($minutos % 1440 === 0) {
+            return [$minutos / 1440, 'dias'];
+        }
+        if ($minutos % 60 === 0) {
+            return [$minutos / 60, 'horas'];
+        }
+
+        return [$minutos, 'minutos'];
     }
 
     private function parsearVisitadaCategoria(mixed $visitadaInput): Carbon
@@ -823,6 +987,28 @@ class TiendaController extends Controller
     }
 
     /**
+     * Frecuencia sugerida al crear oferta: mínimo de tienda o de categoría si está configurado.
+     */
+    public function frecuenciaSugerida(Request $request, Tienda $tienda)
+    {
+        $categoriaId = $request->filled('categoria_id') ? (int) $request->input('categoria_id') : null;
+        $resolver = new TiendaScrapingConfigResolver();
+        $minutos = $resolver->resolverFrecuenciaInicialOferta($tienda, $categoriaId);
+        $origen = 'tienda';
+        if ($categoriaId) {
+            $config = $resolver->obtenerConfig($tienda->id, $categoriaId);
+            if ($config?->frecuencia_minima_minutos !== null) {
+                $origen = 'categoria';
+            }
+        }
+
+        return response()->json([
+            'minutos' => $minutos,
+            'origen' => $origen,
+        ]);
+    }
+
+    /**
      * Actualizar tiempo de actualización de todas las ofertas de una tienda
      */
     public function actualizarTiempos(Request $request, Tienda $tienda)
@@ -958,6 +1144,82 @@ class TiendaController extends Controller
         return redirect()
             ->route('admin.tiendas.urls-por-categoria', ['categoria_id' => $validated['categoria_id']])
             ->with('success', 'URL guardada correctamente.');
+    }
+
+    /**
+     * Indica si la tienda usa CSV-Awin en la API por defecto o en alguna categoría.
+     */
+    private function usaCsvAwin(Request $request): bool
+    {
+        if ($request->input('api') === TiendaScrapingConfigResolver::API_CSV_AWIN) {
+            return true;
+        }
+
+        $scrapingPorCategoria = $request->input('scraping_categoria', []);
+        if (!is_array($scrapingPorCategoria)) {
+            return false;
+        }
+
+        foreach ($scrapingPorCategoria as $datos) {
+            if (!is_array($datos)) {
+                continue;
+            }
+            if (($datos['api'] ?? '') === TiendaScrapingConfigResolver::API_CSV_AWIN) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return list<string>|null
+     */
+    private function procesarUrlCsvDesdeRequest(Request $request): ?array
+    {
+        $raw = $request->input('url_csv');
+        if (!is_string($raw)) {
+            return null;
+        }
+
+        $lineas = preg_split('/\r\n|\r|\n/', $raw) ?: [];
+        $urls = [];
+        foreach ($lineas as $linea) {
+            $url = trim($linea);
+            if ($url !== '') {
+                $urls[] = $url;
+            }
+        }
+
+        return $urls === [] ? null : array_values($urls);
+    }
+
+    /**
+     * @return list<string>|null
+     */
+    private function resolverUrlCsvParaGuardar(Request $request): ?array
+    {
+        return $this->procesarUrlCsvDesdeRequest($request);
+    }
+
+    private function validarUrlCsvSiAplica(Request $request): ?string
+    {
+        if (!$this->usaCsvAwin($request)) {
+            return null;
+        }
+
+        $urls = $this->procesarUrlCsvDesdeRequest($request);
+        if ($urls === null) {
+            return 'Debes indicar al menos un enlace de descarga cuando uses CSV-Awin.';
+        }
+
+        foreach ($urls as $url) {
+            if (!filter_var($url, FILTER_VALIDATE_URL)) {
+                return 'Cada enlace de descarga debe ser una URL válida: ' . $url;
+            }
+        }
+
+        return null;
     }
 
     /**

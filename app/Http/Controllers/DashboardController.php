@@ -23,19 +23,18 @@ class DashboardController extends Controller
         try {
             $userId = auth()->id();
             
-            // Verificar si el usuario ID 1 quiere ver todos los avisos
             $mostrarTodos = false;
             if ($userId === 1 && session('avisos_mostrar_todos', false)) {
                 $mostrarTodos = true;
             }
             
-            // Contar avisos vencidos usando el nuevo sistema (solo visibles)
+            // Contar avisos vencidos (solo visibles, del usuario actual)
             $totalAvisosQuery = Aviso::vencidos()
-                ->visibles();
-            
-            // Aplicar filtro por usuario solo si no se está mostrando todos
-            if (!$mostrarTodos) {
-                $totalAvisosQuery->visiblesPorUsuario($userId);
+                ->visibles()
+                ->visiblesPorUsuario($userId);
+
+            if (! $mostrarTodos) {
+                $totalAvisosQuery->excluirOfertasDeTiendasNoVisibles();
             }
             
             $totalAvisos = $totalAvisosQuery->count();

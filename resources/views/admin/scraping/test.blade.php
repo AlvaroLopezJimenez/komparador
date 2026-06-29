@@ -60,6 +60,7 @@
                                         <option value="amazonProductInfo">Amazon Product Info API - RapidAPI</option>
                                         <option value="amazonPricing">Amazon Pricing And Product Info API - RapidAPI</option>
                                         <option value="navegadorLocal">Navegador local (programa externo)</option>
+                                        <option value="CSV-Awin">CSV-Awin (feed de productos)</option>
                                     </select>
                                 </div>
                             </div>

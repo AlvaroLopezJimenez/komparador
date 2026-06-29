@@ -21,6 +21,13 @@ git add .
 git commit -m "Describe el cambio que hiciste"
 git push
 
+//////////COLUMNAS NECESARIAS CSV DE AWIN
+
+search_price
+merchant_deep_link
+delivery_cost
+in_stock
+
 /////////ACTUALIZAR TAILWIND - HAY QUE METERLO EN AMBAS CARPETAS PUBLIC/BUILD
 
 npm run build
@@ -93,3 +100,15 @@ docker-compose exec app php artisan db:seed
 
 IMPORTANTE!!   //apagar docker sin eliminar modulos
    docker-compose down
+
+******* AWIN ***********
+
+   Hola,
+
+Sería un placer unirme a vuestro programa de afiliados y poder incluir !!!!!*/*/*/*/NOMBRE/*/*/*/*/!!!!!! a nuestro komparador.com
+
+Considero que vuestra tienda ofrece un gran servicio y un catálogo muy interesante, y por los precios con los que trabajáis entraríais en las primeras posiciones en una gran cantidad de productos, por lo que creo que sería una buena incorporación para nuestros usuarios.
+
+Si consideráis que encajamos con vuestro programa, nos encantaría colaborar en vuestro programa de afiliación.
+
+Muchas gracias por vuestro tiempo y un saludo!

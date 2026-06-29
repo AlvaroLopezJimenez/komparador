@@ -16,6 +16,7 @@ use App\Http\Controllers\Scraping\PeticionApiHTMLController;
 use App\Services\ConsultarNeoCifrado;
 use App\Services\LimpiarUrlDeTiendas;
 use App\Services\NeoProgramaExternoRamaNeoUrlNormalizer;
+use App\Services\TiendaScrapingConfigResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\DB;
@@ -403,13 +404,18 @@ class CronNeoObjetivosController extends Controller
                 'tipo_listado'     => $tipoListado,
             ];
 
+            $apiScrapingCategoria = app(TiendaScrapingConfigResolver::class)->resolverApi(
+                $tienda,
+                $neo->categoria_id ? (int) $neo->categoria_id : null
+            );
+
             // Ejecutar petición(es) y extracción de URLs según tipo listado; guardar en log como en la rama Neo (VPS)
             $peticionesRamaCategoriaTienda = [];
             $todasLasUrlsExtraidas = [];
             try {
                 if ($tipoListado === 'sitemap') {
                     $apiHTML = app(PeticionApiHTMLController::class);
-                    $resultado = $apiHTML->obtenerHTML($url, null, $tienda->api ?? null);
+                    $resultado = $apiHTML->obtenerHTML($url, null, $apiScrapingCategoria);
                     $ok = !empty($resultado['success']);
                     $body = $resultado['html'] ?? '';
                     $err = $resultado['error'] ?? null;
@@ -429,7 +435,7 @@ class CronNeoObjetivosController extends Controller
                     $currentUrl = $url;
                     $maxPaginas = 50;
                     while ($currentUrl !== null && $currentUrl !== '' && count($peticionesRamaCategoriaTienda) < $maxPaginas) {
-                        $resultado = $apiHTML->obtenerHTML($currentUrl, null, $tienda->api ?? null);
+                        $resultado = $apiHTML->obtenerHTML($currentUrl, null, $apiScrapingCategoria);
                         $ok = !empty($resultado['success']);
                         $html = $resultado['html'] ?? '';
                         $err = $resultado['error'] ?? null;
@@ -455,7 +461,7 @@ class CronNeoObjetivosController extends Controller
                     // mostrar_mas: una petición HTML (VPS puede usar cargar_mas_selector para pulsar "Cargar más")
                     $apiHTML = app(PeticionApiHTMLController::class);
                     $cargarMasSelector = $controladorTienda->selectorCargarMasParaVps();
-                    $resultado = $apiHTML->obtenerHTML($url, null, $tienda->api ?? null, $cargarMasSelector);
+                    $resultado = $apiHTML->obtenerHTML($url, null, $apiScrapingCategoria, $cargarMasSelector);
                     $ok = !empty($resultado['success']);
                     $html = $resultado['html'] ?? '';
                     $err = $resultado['error'] ?? null;
@@ -924,7 +930,7 @@ class CronNeoObjetivosController extends Controller
                             $pagIdx = 0;
                             while ($currentUrl !== null && $currentUrl !== '' && count($peticionesRamaCategoriaTienda) < $maxPaginas) {
                                 $pagIdx++;
-                                $resultado = $apiHTML->obtenerHTML($currentUrl, null, $tienda->api ?? null);
+                                $resultado = $apiHTML->obtenerHTML($currentUrl, null, $apiScrapingCategoria);
                                 $ok = !empty($resultado['success']);
                                 $html = $resultado['html'] ?? '';
                                 $extraccion = $controladorTienda->extraerProductosYSiguientePagina($html, $currentUrl);

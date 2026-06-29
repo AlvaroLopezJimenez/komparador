@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Scraping;
 
 use App\Http\Controllers\Controller;
+use App\Services\CsvAwinOfertaService;
+use App\Services\TiendaScrapingConfigResolver;
 use App\Support\UrlOfertaValidacion;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -37,6 +39,22 @@ class ScrapingController extends Controller
                 ]);
             }
 
+            $apiEfectiva = $tiendaModel->api;
+
+            // API efectiva: categoría del producto si está configurada, si no la de la tienda
+            if ($oferta !== null) {
+                $oferta->loadMissing('producto');
+                $categoriaId = $oferta->producto?->categoria_id;
+                $apiEfectiva = app(TiendaScrapingConfigResolver::class)->resolverApi(
+                    $tiendaModel,
+                    $categoriaId !== null ? (int) $categoriaId : null
+                ) ?? $apiEfectiva;
+            }
+
+            if ($apiEfectiva === TiendaScrapingConfigResolver::API_CSV_AWIN) {
+                return app(CsvAwinOfertaService::class)->obtenerPrecioJson($url, $tiendaModel, $oferta);
+            }
+
             // Normalizar nombre de tienda para buscar el controlador
             $nombreControlador = $this->normalizarNombreTienda($tienda);
             
@@ -53,6 +71,11 @@ class ScrapingController extends Controller
 
             // Instanciar el controlador de la tienda
             $controladorTienda = new $claseControlador();
+
+            if ($oferta !== null && $apiEfectiva !== null) {
+                $tiendaModel = clone $tiendaModel;
+                $tiendaModel->api = $apiEfectiva;
+            }
             
             // Llamar al método obtenerPrecio del controlador de la tienda
             $response = $controladorTienda->obtenerPrecio($url, $variante, $tiendaModel, $oferta);

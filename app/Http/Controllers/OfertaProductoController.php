@@ -23,8 +23,11 @@ use App\Services\SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos;
 use App\Models\ProductoOfertaMasBarataPorProducto;
 use App\Models\UrlDescartada;
 use App\Models\Neo;
+use App\Models\CsvOferta;
+use App\Models\Tienda;
 use App\Support\UrlOfertaValidacion;
 use App\Services\ConsultarNeoCifrado;
+use App\Services\TiendaScrapingConfigResolver;
 
 class OfertaProductoController extends Controller
 {
@@ -210,13 +213,81 @@ class OfertaProductoController extends Controller
         return view('admin.ofertas.todas', compact('ofertas', 'perPage', 'mostrarParaVista', 'urlsDescartadasCoincidentes'));
     }
 
+    /**
+     * Listado de filas importadas desde feeds CSV-Awin (tabla csv_ofertas).
+     */
+    public function csvOfertas(Request $request)
+    {
+        $perPage = (int) $request->input('perPage', 20);
+        if (!in_array($perPage, [20, 50, 100, 200], true)) {
+            $perPage = 20;
+        }
+
+        $busqueda = trim((string) $request->input('busqueda', ''));
+        $tiendaId = $request->filled('tienda_id') ? (int) $request->input('tienda_id') : null;
+        $stock = $request->input('stock');
+
+        $filas = $this->queryCsvOfertas($busqueda, $tiendaId, $stock)
+            ->paginate($perPage)
+            ->withQueryString();
+
+        $tiendasConCsv = Tienda::query()
+            ->whereNotNull('url_csv')
+            ->orderBy('nombre')
+            ->get(['id', 'nombre']);
+
+        return view('admin.ofertas.todas_csv', compact(
+            'filas',
+            'perPage',
+            'busqueda',
+            'tiendaId',
+            'stock',
+            'tiendasConCsv'
+        ));
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Builder<CsvOferta>
+     */
+    private function queryCsvOfertas(string $busqueda, ?int $tiendaId, $stock)
+    {
+        return CsvOferta::query()
+            ->with('tienda')
+            ->when($tiendaId, fn ($q) => $q->where('tienda_id', $tiendaId))
+            ->when($stock !== null && $stock !== '', function ($q) use ($stock) {
+                if ($stock === '1') {
+                    $q->where('stock', 1);
+                } elseif ($stock === '0') {
+                    $q->where('stock', 0);
+                }
+            })
+            ->when($busqueda !== '', function ($q) use ($busqueda) {
+                $termino = strtolower($busqueda);
+                $urlLookup = app(ConsultarNeoCifrado::class)->hashLookup($busqueda);
+
+                $q->where(function ($sub) use ($termino, $urlLookup) {
+                    $sub->whereRaw('LOWER(url) LIKE ?', ['%' . $termino . '%']);
+                    if ($urlLookup !== '') {
+                        $sub->orWhere('url_lookup', $urlLookup);
+                    }
+                });
+            })
+            ->orderByDesc('updated_at');
+    }
+
 
 
     public function edit(OfertaProducto $oferta)
     {
-        $oferta->load(['producto.categoria', 'chollo']);
-        $producto = $oferta->producto; // relación inversa
-        return view('admin.ofertas.formulario', compact('oferta', 'producto'));
+        $oferta->load(['producto.categoria', 'chollo', 'tienda']);
+        $producto = $oferta->producto;
+        $avisosVisibilidadOferta = $this->construirAvisosVisibilidadOferta(
+            (int) $oferta->tienda_id,
+            $producto?->categoria_id !== null ? (int) $producto->categoria_id : null
+        );
+        $tiendaAvisoEdit = $oferta->tienda;
+
+        return view('admin.ofertas.formulario', compact('oferta', 'producto', 'avisosVisibilidadOferta', 'tiendaAvisoEdit'));
     }
 
 
@@ -748,7 +819,12 @@ class OfertaProductoController extends Controller
     {
         $oferta = null;
         $producto->loadMissing('categoria');
-        return view('admin.ofertas.formulario', compact('producto', 'oferta'));
+        [$avisosVisibilidadOferta, $tiendaAvisoEdit] = $this->avisosVisibilidadDesdeOldOIds(
+            old('tienda_id') ? (int) old('tienda_id') : null,
+            (int) $producto->id
+        );
+
+        return view('admin.ofertas.formulario', compact('producto', 'oferta', 'avisosVisibilidadOferta', 'tiendaAvisoEdit'));
     }
 
     //Nueva oferta sin pasarle producto al formulario
@@ -757,7 +833,111 @@ class OfertaProductoController extends Controller
         $producto = null;
         $oferta = null;
         $url = $request->query('url', '');
-        return view('admin.ofertas.formulario', compact('producto', 'oferta', 'url'));
+        [$avisosVisibilidadOferta, $tiendaAvisoEdit] = $this->avisosVisibilidadDesdeOldOIds(
+            old('tienda_id') ? (int) old('tienda_id') : null,
+            old('producto_id') ? (int) old('producto_id') : null
+        );
+
+        return view('admin.ofertas.formulario', compact('producto', 'oferta', 'url', 'avisosVisibilidadOferta', 'tiendaAvisoEdit'));
+    }
+
+    /**
+     * Avisos AJAX al cambiar tienda o producto en el formulario de oferta.
+     */
+    public function avisosVisibilidadOferta(Request $request)
+    {
+        $validated = $request->validate([
+            'tienda_id' => 'required|integer|exists:tiendas,id',
+            'producto_id' => 'nullable|integer|exists:productos,id',
+        ]);
+
+        $categoriaId = null;
+        if (!empty($validated['producto_id'])) {
+            $categoriaId = Producto::query()
+                ->whereKey($validated['producto_id'])
+                ->value('categoria_id');
+            $categoriaId = $categoriaId !== null ? (int) $categoriaId : null;
+        }
+
+        $avisos = $this->construirAvisosVisibilidadOferta((int) $validated['tienda_id'], $categoriaId);
+        $tienda = Tienda::find((int) $validated['tienda_id']);
+
+        return response()->json([
+            'avisos' => $avisos,
+            'tienda_edit_url' => $tienda ? route('admin.tiendas.edit', $tienda) : null,
+            'tienda_nombre' => $tienda?->nombre,
+        ]);
+    }
+
+    /**
+     * @return array{0: list<string>, 1: ?Tienda}
+     */
+    private function avisosVisibilidadDesdeOldOIds(?int $tiendaId, ?int $productoId): array
+    {
+        if ($tiendaId === null) {
+            return [[], null];
+        }
+
+        $categoriaId = null;
+        if ($productoId !== null) {
+            $categoriaId = Producto::query()->whereKey($productoId)->value('categoria_id');
+            $categoriaId = $categoriaId !== null ? (int) $categoriaId : null;
+        }
+
+        $tienda = Tienda::find($tiendaId);
+
+        return [
+            $this->construirAvisosVisibilidadOferta($tiendaId, $categoriaId),
+            $tienda,
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function construirAvisosVisibilidadOferta(int $tiendaId, ?int $categoriaId): array
+    {
+        $tienda = Tienda::find($tiendaId);
+        if ($tienda === null) {
+            return [];
+        }
+
+        $resolver = app(TiendaScrapingConfigResolver::class);
+        $config = $categoriaId !== null
+            ? $resolver->obtenerConfig($tienda->id, $categoriaId)
+            : null;
+        $categoriaNombre = $categoriaId !== null
+            ? (Categoria::find($categoriaId)?->nombre ?? 'esta categoría')
+            : null;
+
+        $avisos = [];
+
+        if ($tienda->mostrar_tienda === 'no') {
+            $avisos[] = 'La tienda «' . $tienda->nombre . '» tiene Mostrar tienda en No: sus ofertas no aparecen en el comparador.';
+        }
+
+        if ($resolver->resolverScrapear($tienda, $categoriaId) === 'no') {
+            if ($config !== null && $config->scrapear === 'no' && $categoriaNombre !== null) {
+                $avisos[] = 'En la categoría «' . $categoriaNombre . '» de «' . $tienda->nombre . '» está Scrapear en No: no se actualizará el precio automáticamente.';
+            } elseif ($tienda->scrapear === 'no') {
+                $avisos[] = 'La tienda «' . $tienda->nombre . '» tiene Scrapear en No: no se actualizará el precio automáticamente.';
+            } else {
+                $avisos[] = 'Scrapear en No para esta tienda y categoría: no se actualizará el precio automáticamente.';
+            }
+        }
+
+        if (
+            $tienda->mostrar_tienda !== 'no'
+            && $resolver->resolverMostrar($tienda, $categoriaId) === 'no'
+        ) {
+            if ($config !== null && $config->mostrar === 'no' && $categoriaNombre !== null) {
+                $avisos[] = 'En la categoría «' . $categoriaNombre . '» de «' . $tienda->nombre . '» está Mostrar en No: esta oferta no aparecerá en el comparador.';
+            } else {
+                $avisos[] = 'Mostrar en No para esta tienda y categoría: esta oferta no aparecerá en el comparador.';
+            }
+        }
+
+        return $avisos;
     }
 
 

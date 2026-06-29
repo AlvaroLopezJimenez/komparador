@@ -2424,6 +2424,7 @@ if (!window.kpInternaGlobalRegistrar) {
                 .toString()
                 .toLowerCase()
                 .trim()
+                .replace(/\+/g, ' plus ')
                 .normalize('NFD')
                 .replace(/[\u0300-\u036f]/g, '') // Eliminar acentos
                 .replace(/[^a-z0-9]+/g, '-')     // Reemplazar espacios y caracteres especiales

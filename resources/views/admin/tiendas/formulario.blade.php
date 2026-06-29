@@ -23,6 +23,22 @@
             </ul>
         </div>
         @endif
+
+        @if($tienda->exists && isset($categoriasSinApiScraping) && $categoriasSinApiScraping->isNotEmpty())
+            @php
+                $nombresCategoriasSinApi = \App\Models\Categoria::whereIn('id', $categoriasSinApiScraping)->orderBy('nombre')->pluck('nombre');
+            @endphp
+            <div class="mb-4 p-4 bg-amber-100 dark:bg-amber-900/30 border border-amber-400 text-amber-900 dark:text-amber-100 rounded-lg">
+                <p class="font-semibold">⚠️ Categorías con ofertas sin API de scraping configurada</p>
+                <p class="text-sm mt-1">Esta tienda tiene ofertas en categorías que no tienen API asignada. Se usará la API por defecto de la tienda, pero conviene configurarla explícitamente por categoría:</p>
+                <ul class="list-disc pl-5 mt-2 text-sm">
+                    @foreach($nombresCategoriasSinApi as $nombreCat)
+                        <li>{{ $nombreCat }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
         <form method="POST" action="{{ $tienda->exists ? route('admin.tiendas.update', $tienda) : route('admin.tiendas.store') }}">
             @csrf
             @if($tienda->exists)
@@ -170,8 +186,36 @@
                             <option value="navegadorLocal" {{ old('api', $tienda->api) == 'navegadorLocal' ? 'selected' : '' }}>
                                 Navegador local (programa externo)
                             </option>
+                            <option value="CSV-Awin" class="js-opcion-csv-awin" {{ old('api', $tienda->api) == 'CSV-Awin' ? 'selected' : '' }}>
+                                CSV-Awin (feed de productos)
+                            </option>
                         </select>
                         @error('api')
+                        <p class="text-sm text-red-500 mt-1">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    @php
+                        $urlCsvOld = old('url_csv');
+                        if ($urlCsvOld === null) {
+                            $urlCsvLista = is_array($tienda->url_csv ?? null) ? $tienda->url_csv : [];
+                            $urlCsvTexto = implode("\n", $urlCsvLista);
+                        } else {
+                            $urlCsvTexto = is_string($urlCsvOld) ? $urlCsvOld : implode("\n", (array) $urlCsvOld);
+                        }
+                    @endphp
+                    <div class="md:col-span-2">
+                        <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">Enlace de descarga CSV</label>
+                        <textarea
+                            name="url_csv"
+                            id="url-csv-input"
+                            rows="4"
+                            placeholder="https://productdata.awin.com/...&#10;https://..."
+                            class="w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border font-mono text-sm"
+                        >{{ $urlCsvTexto }}</textarea>
+                        <p class="text-xs text-gray-500 mt-1">URL(s) del ZIP de Awin. Puedes indicar uno o varios enlaces (uno por línea). Obligatorio si usas la API CSV-Awin.</p>
+                        <p id="url-csv-csv-awin-aviso" class="hidden text-xs text-red-500 mt-1">Indica al menos un enlace de descarga para poder usar CSV-Awin.</p>
+                        @error('url_csv')
                         <p class="text-sm text-red-500 mt-1">{{ $message }}</p>
                         @enderror
                     </div>
@@ -318,7 +362,7 @@
             {{-- URL de listado por categoría (Neoobjetivo) --}}
             <script src="//unpkg.com/alpinejs" defer></script>
             <fieldset class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 space-y-6 border border-gray-200 dark:border-gray-700">
-                <legend class="text-lg font-semibold text-gray-700 dark:text-gray-200">URL de listado por categoría</legend>
+                <legend class="text-lg font-semibold text-gray-700 dark:text-gray-200">Scraping y URL de listado por categoría</legend>
 
                 @error('urls_categoria')
                     <div class="p-3 rounded-lg bg-red-100 dark:bg-red-900/30 border border-red-400 text-red-700 dark:text-red-300 text-sm">
@@ -349,16 +393,33 @@
                     </p>
                 @endif
 
-                <p class="text-sm text-gray-500 dark:text-gray-400">Puedes añadir varias URLs de listado por categoría con los botones + y −.</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">En cada categoría usa <strong>Editar API</strong> (API, scrapear, mostrar y tiempos mín/máx) o <strong>Editar URL</strong> (enlaces de listado y fecha visitada). Las categorías con ofertas deben tener API asignada.</p>
 
                 <style>
+                    [x-cloak] { display: none !important; }
+                    .categoria-api-grid {
+                        display: grid;
+                        width: 100%;
+                        align-items: end;
+                        column-gap: 0.5rem;
+                        row-gap: 0.35rem;
+                        grid-template-columns: minmax(0, 1.2fr) 4.5rem 4.5rem 5.5rem 5.5rem;
+                    }
                     .url-categoria-linea-grid {
                         display: grid;
                         width: 100%;
                         align-items: center;
                         column-gap: 0.5rem;
                         row-gap: 0.25rem;
-                        grid-template-columns: 1.75rem 14rem minmax(0, 1fr) 13rem 1.75rem 1.75rem;
+                        grid-template-columns: minmax(0, 1fr) 13rem 1.75rem 1.75rem;
+                    }
+                    @media (max-width: 768px) {
+                        .categoria-api-grid {
+                            grid-template-columns: 1fr;
+                        }
+                        .url-categoria-linea-grid {
+                            grid-template-columns: 1fr 1fr;
+                        }
                     }
                 </style>
 
@@ -368,7 +429,10 @@
                         $categoriasSinNeoobjetivo = $categoriasSinNeoobjetivo ?? collect();
                         $categoriasAncestrosSinNeo = $categoriasAncestrosSinNeo ?? collect();
                         $conteoTotalOfertas = $conteoTotalOfertas ?? [];
-                        $renderCategorias = function($categorias, $neoobjetivosPorCategoria, $categoriasSinNeoobjetivo, $categoriasAncestrosSinNeo, $conteoTotalOfertas, $nivel = 0) use (&$renderCategorias) {
+                        $scrapingPorCategoria = $scrapingPorCategoria ?? collect();
+                        $categoriasSinApiScraping = $categoriasSinApiScraping ?? collect();
+                        $categoriasAncestrosSinApi = $categoriasAncestrosSinApi ?? collect();
+                        $renderCategorias = function($categorias, $neoobjetivosPorCategoria, $categoriasSinNeoobjetivo, $categoriasAncestrosSinNeo, $conteoTotalOfertas, $scrapingPorCategoria, $categoriasSinApiScraping, $categoriasAncestrosSinApi, $nivel = 0) use (&$renderCategorias) {
                             foreach ($categorias as $categoria) {
                                 $oldLineas = old("urls_categoria.{$categoria->id}");
                                 if (is_array($oldLineas)) {
@@ -401,60 +465,187 @@
                                 $margin = $nivel * 4;
                                 $sinNeo = $categoriasSinNeoobjetivo->contains($categoria->id);
                                 $esAncestro = !$sinNeo && $categoriasAncestrosSinNeo->contains($categoria->id);
+                                $sinApi = $categoriasSinApiScraping->contains($categoria->id);
+                                $esAncestroSinApi = !$sinApi && $categoriasAncestrosSinApi->contains($categoria->id);
                                 $numOfertas = $conteoTotalOfertas[$categoria->id] ?? 0;
+
+                                $scrapingOld = old("scraping_categoria.{$categoria->id}");
+                                $configScraping = $scrapingPorCategoria->get($categoria->id);
+                                if (is_array($scrapingOld)) {
+                                    $apiCategoria = $scrapingOld['api'] ?? '';
+                                    $scrapearCategoria = $scrapingOld['scrapear'] ?? 'si';
+                                    $mostrarCategoria = $scrapingOld['mostrar'] ?? 'si';
+                                    $fminVal = $scrapingOld['frecuencia_minima_valor'] ?? '';
+                                    $fminUni = $scrapingOld['frecuencia_minima_unidad'] ?? 'dias';
+                                    $fmaxVal = $scrapingOld['frecuencia_maxima_valor'] ?? '';
+                                    $fmaxUni = $scrapingOld['frecuencia_maxima_unidad'] ?? 'dias';
+                                } elseif ($configScraping) {
+                                    $apiCategoria = $configScraping->api ?? '';
+                                    $scrapearCategoria = $configScraping->scrapear ?? 'si';
+                                    $mostrarCategoria = $configScraping->mostrar ?? 'si';
+                                    [$fminVal, $fminUni] = \App\Http\Controllers\TiendaController::minutosAValorUnidad($configScraping->frecuencia_minima_minutos);
+                                    [$fmaxVal, $fmaxUni] = \App\Http\Controllers\TiendaController::minutosAValorUnidad($configScraping->frecuencia_maxima_minutos);
+                                } else {
+                                    $apiCategoria = '';
+                                    $scrapearCategoria = 'si';
+                                    $mostrarCategoria = 'si';
+                                    $fminVal = $fmaxVal = '';
+                                    $fminUni = $fmaxUni = 'dias';
+                                }
+
+                                $rowClass = '';
+                                if ($sinNeo) {
+                                    $rowClass = 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded p-2';
+                                } elseif ($sinApi) {
+                                    $rowClass = 'bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded p-2';
+                                }
+
+                                $abrirPanelApi = is_array(old("scraping_categoria.{$categoria->id}"));
+                                $abrirPanelUrl = is_array(old("urls_categoria.{$categoria->id}"));
                     @endphp
 
                     <div
-                        class="js-categoria-row ml-{{ $margin }} {{ $sinNeo ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded p-2' : '' }}"
+                        class="js-categoria-row ml-{{ $margin }} {{ $rowClass }} space-y-2"
                         data-categoria-id="{{ $categoria->id }}"
                         data-sin-neo-inicial="{{ $sinNeo ? '1' : '0' }}"
-                        x-data="{ open{{ $categoria->id }}: false }"
+                        x-data="{ open{{ $categoria->id }}: false, showApi{{ $categoria->id }}: {{ $abrirPanelApi ? 'true' : 'false' }}, showUrl{{ $categoria->id }}: {{ $abrirPanelUrl ? 'true' : 'false' }} }"
                     >
-                        <div class="js-urls-categoria-lineas space-y-2 w-full" data-categoria-id="{{ $categoria->id }}" data-siguiente-indice="{{ $lineasUrl->count() }}">
-                            @php foreach ($lineasUrl as $idx => $linea): @endphp
-                            <div class="js-url-categoria-linea url-categoria-linea-grid">
-                                @if($idx === 0)
-                                    @if($hasChildren)
-                                        <button type="button"
-                                            @click="open{{ $categoria->id }} = !open{{ $categoria->id }}"
-                                            class="w-7 h-7 justify-self-center flex items-center justify-center text-white bg-pink-600 hover:bg-pink-700 rounded-full transition shrink-0"
-                                            :aria-label="open{{ $categoria->id }} ? 'Contraer' : 'Expandir'">
-                                            <span x-text="open{{ $categoria->id }} ? '-' : '+'"></span>
-                                        </button>
-                                    @else
-                                        <span class="w-7 h-7 block shrink-0" aria-hidden="true"></span>
-                                    @endif
-                                    <span class="js-categoria-nombre text-sm font-medium leading-tight break-words {{ $sinNeo ? 'text-red-700 dark:text-red-300' : ($esAncestro ? 'text-red-600 dark:text-red-400' : 'text-gray-800 dark:text-gray-200') }}">{{ $categoria->nombre }} <span class="text-gray-500 dark:text-gray-400 font-normal">({{ $numOfertas }})</span></span>
-                                @else
-                                    <span class="w-7 h-7 block shrink-0" aria-hidden="true"></span>
-                                    <span class="block" aria-hidden="true"></span>
-                                @endif
+                        <div class="js-categoria-header flex flex-wrap items-center gap-2 w-full">
+                            @if($hasChildren)
+                                <button type="button"
+                                    @click="open{{ $categoria->id }} = !open{{ $categoria->id }}"
+                                    class="w-7 h-7 flex items-center justify-center text-white bg-pink-600 hover:bg-pink-700 rounded-full transition shrink-0"
+                                    :aria-label="open{{ $categoria->id }} ? 'Contraer' : 'Expandir'">
+                                    <span x-text="open{{ $categoria->id }} ? '-' : '+'"></span>
+                                </button>
+                            @else
+                                <span class="w-7 h-7 block shrink-0" aria-hidden="true"></span>
+                            @endif
+                            <span class="js-categoria-nombre flex-1 min-w-[8rem] text-sm font-medium leading-tight break-words {{ $sinNeo ? 'text-red-700 dark:text-red-300' : ($sinApi ? 'text-amber-800 dark:text-amber-200' : ($esAncestro || $esAncestroSinApi ? 'text-red-600 dark:text-red-400' : 'text-gray-800 dark:text-gray-200')) }}">{{ $categoria->nombre }} <span class="text-gray-500 dark:text-gray-400 font-normal">({{ $numOfertas }})</span></span>
+                            <button type="button"
+                                @click="showApi{{ $categoria->id }} = !showApi{{ $categoria->id }}"
+                                class="px-2 py-1 text-xs font-medium rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 shrink-0"
+                                :class="showApi{{ $categoria->id }} ? 'ring-2 ring-pink-500 border-pink-500' : ''">
+                                <span x-text="showApi{{ $categoria->id }} ? 'Ocultar API' : 'Editar API'"></span>
+                            </button>
+                            <button type="button"
+                                @click="showUrl{{ $categoria->id }} = !showUrl{{ $categoria->id }}; if (showUrl{{ $categoria->id }}) { $nextTick(() => $refs.urlInput{{ $categoria->id }}?.focus()) }"
+                                class="px-2 py-1 text-xs font-medium rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 shrink-0"
+                                :class="showUrl{{ $categoria->id }} ? 'ring-2 ring-pink-500 border-pink-500' : ''">
+                                <span x-text="showUrl{{ $categoria->id }} ? 'Ocultar URL' : 'Editar URL'"></span>
+                            </button>
+                        </div>
+
+                        <div class="js-categoria-api-panel ml-9 space-y-1" x-show="showApi{{ $categoria->id }}" x-cloak>
+                            <div class="categoria-api-grid">
                                 <div class="min-w-0">
-                                    <input type="hidden" name="urls_categoria[{{ $categoria->id }}][{{ $idx }}][id]" value="{{ $linea['id'] }}">
-                                    <input
-                                        type="url"
-                                        name="urls_categoria[{{ $categoria->id }}][{{ $idx }}][url]"
-                                        data-id="{{ $categoria->id }}"
-                                        placeholder="https://..."
-                                        class="url-categoria-input js-url-categoria w-full px-2 py-1 bg-gray-100 dark:bg-gray-700 text-white border rounded {{ $sinNeo ? 'border-red-500' : '' }}"
-                                        value="{{ $linea['url'] }}"
+                                    <label class="block text-xs text-gray-500 dark:text-gray-400 mb-0.5">API</label>
+                                    <select
+                                        name="scraping_categoria[{{ $categoria->id }}][api]"
+                                        class="w-full px-2 py-1 rounded bg-gray-100 dark:bg-gray-700 text-white border text-sm js-api-scraping-select {{ $sinApi ? 'border-amber-500' : '' }}"
                                     >
+                                        <option value="">— Sin configurar —</option>
+                                        <option value="miVpsHtml;1" {{ $apiCategoria == 'miVpsHtml;1' ? 'selected' : '' }}>Mi VPS — Selenium (rápido)</option>
+                                        <option value="miVpsHtml;2" {{ $apiCategoria == 'miVpsHtml;2' ? 'selected' : '' }}>Mi VPS — Selenium (normal)</option>
+                                        <option value="miVpsHtml;3" {{ $apiCategoria == 'miVpsHtml;3' ? 'selected' : '' }}>Mi VPS — Selenium (WAF duro)</option>
+                                        <option value="miVpsHtml;4" {{ $apiCategoria == 'miVpsHtml;4' ? 'selected' : '' }}>Mi VPS — Requests</option>
+                                        <option value="miVpsHtml;5" {{ $apiCategoria == 'miVpsHtml;5' ? 'selected' : '' }}>Mi VPS — Proxies Residenciales</option>
+                                        <option value="scrapingAnt" {{ $apiCategoria == 'scrapingAnt' ? 'selected' : '' }}>ScrapingAnt</option>
+                                        <option value="brightData;false" {{ $apiCategoria == 'brightData;false' ? 'selected' : '' }}>Bright Data (sin JS)</option>
+                                        <option value="brightData;true" {{ $apiCategoria == 'brightData;true' ? 'selected' : '' }}>Bright Data (con JS)</option>
+                                        <option value="aliexpressOpen" {{ $apiCategoria == 'aliexpressOpen' ? 'selected' : '' }}>Api de Aliexpress</option>
+                                        <option value="amazonApi" {{ $apiCategoria == 'amazonApi' ? 'selected' : '' }}>Amazon API OFICIAL</option>
+                                        <option value="amazonProductInfo" {{ $apiCategoria == 'amazonProductInfo' ? 'selected' : '' }}>Amazon Product Info - RapidAPI</option>
+                                        <option value="amazonPricing" {{ $apiCategoria == 'amazonPricing' ? 'selected' : '' }}>Amazon Pricing - RapidAPI</option>
+                                        <option value="navegadorLocal" {{ $apiCategoria == 'navegadorLocal' ? 'selected' : '' }}>Navegador local</option>
+                                        <option value="CSV-Awin" class="js-opcion-csv-awin" {{ $apiCategoria == 'CSV-Awin' ? 'selected' : '' }}>CSV-Awin (feed)</option>
+                                    </select>
                                 </div>
-                                <input
-                                    type="datetime-local"
-                                    name="urls_categoria[{{ $categoria->id }}][{{ $idx }}][visitada]"
-                                    class="js-visitada-categoria w-full min-w-0 px-2 py-1 bg-gray-100 dark:bg-gray-700 text-white border rounded text-sm"
-                                    value="{{ $linea['visitada'] }}"
-                                >
-                                <button type="button" class="btn-eliminar-url-categoria w-7 h-7 flex items-center justify-center bg-red-500 hover:bg-red-600 text-white rounded text-sm shrink-0" title="Eliminar línea">−</button>
-                                <button type="button" class="btn-añadir-url-categoria w-7 h-7 flex items-center justify-center bg-green-500 hover:bg-green-600 text-white rounded text-sm shrink-0" title="Añadir línea debajo">+</button>
+                                <div class="min-w-0">
+                                    <label class="block text-xs text-gray-500 dark:text-gray-400 mb-0.5">Scrapear</label>
+                                    <select
+                                        name="scraping_categoria[{{ $categoria->id }}][scrapear]"
+                                        class="w-full px-1 py-1 rounded bg-gray-100 dark:bg-gray-700 text-white border text-xs"
+                                    >
+                                        <option value="si" {{ $scrapearCategoria === 'si' ? 'selected' : '' }}>Sí</option>
+                                        <option value="no" {{ $scrapearCategoria === 'no' ? 'selected' : '' }}>No</option>
+                                    </select>
+                                </div>
+                                <div class="min-w-0">
+                                    <label class="block text-xs text-gray-500 dark:text-gray-400 mb-0.5">Mostrar</label>
+                                    <select
+                                        name="scraping_categoria[{{ $categoria->id }}][mostrar]"
+                                        class="w-full px-1 py-1 rounded bg-gray-100 dark:bg-gray-700 text-white border text-xs"
+                                    >
+                                        <option value="si" {{ $mostrarCategoria === 'si' ? 'selected' : '' }}>Sí</option>
+                                        <option value="no" {{ $mostrarCategoria === 'no' ? 'selected' : '' }}>No</option>
+                                    </select>
+                                </div>
+                                <div class="min-w-0">
+                                    <label class="block text-xs text-gray-500 dark:text-gray-400 mb-0.5">Mín</label>
+                                    <div class="flex gap-0.5">
+                                        <input type="number" step="0.1" min="0.1" placeholder="Mín"
+                                            name="scraping_categoria[{{ $categoria->id }}][frecuencia_minima_valor]"
+                                            value="{{ $fminVal }}"
+                                            class="w-full min-w-0 px-1 py-1 rounded bg-gray-100 dark:bg-gray-700 text-white border text-xs text-center">
+                                        <select name="scraping_categoria[{{ $categoria->id }}][frecuencia_minima_unidad]"
+                                            class="min-w-0 px-0.5 py-1 rounded bg-gray-100 dark:bg-gray-700 text-white border text-xs">
+                                            <option value="minutos" {{ $fminUni === 'minutos' ? 'selected' : '' }}>m</option>
+                                            <option value="horas" {{ $fminUni === 'horas' ? 'selected' : '' }}>h</option>
+                                            <option value="dias" {{ $fminUni === 'dias' ? 'selected' : '' }}>d</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="min-w-0">
+                                    <label class="block text-xs text-gray-500 dark:text-gray-400 mb-0.5">Máx</label>
+                                    <div class="flex gap-0.5">
+                                        <input type="number" step="0.1" min="0.1" placeholder="Máx"
+                                            name="scraping_categoria[{{ $categoria->id }}][frecuencia_maxima_valor]"
+                                            value="{{ $fmaxVal }}"
+                                            class="w-full min-w-0 px-1 py-1 rounded bg-gray-100 dark:bg-gray-700 text-white border text-xs text-center">
+                                        <select name="scraping_categoria[{{ $categoria->id }}][frecuencia_maxima_unidad]"
+                                            class="min-w-0 px-0.5 py-1 rounded bg-gray-100 dark:bg-gray-700 text-white border text-xs">
+                                            <option value="minutos" {{ $fmaxUni === 'minutos' ? 'selected' : '' }}>m</option>
+                                            <option value="horas" {{ $fmaxUni === 'horas' ? 'selected' : '' }}>h</option>
+                                            <option value="dias" {{ $fmaxUni === 'dias' ? 'selected' : '' }}>d</option>
+                                        </select>
+                                    </div>
+                                </div>
                             </div>
-                            @php endforeach; @endphp
+                        </div>
+
+                        <div class="js-categoria-url-panel ml-9" x-show="showUrl{{ $categoria->id }}" x-cloak>
+                            <div class="js-urls-categoria-lineas space-y-2 w-full" data-categoria-id="{{ $categoria->id }}" data-siguiente-indice="{{ $lineasUrl->count() }}">
+                                @php foreach ($lineasUrl as $idx => $linea): @endphp
+                                <div class="js-url-categoria-linea url-categoria-linea-grid">
+                                    <div class="min-w-0">
+                                        <input type="hidden" name="urls_categoria[{{ $categoria->id }}][{{ $idx }}][id]" value="{{ $linea['id'] }}">
+                                        <input
+                                            type="url"
+                                            name="urls_categoria[{{ $categoria->id }}][{{ $idx }}][url]"
+                                            data-id="{{ $categoria->id }}"
+                                            placeholder="https://..."
+                                            @if($idx === 0) x-ref="urlInput{{ $categoria->id }}" @endif
+                                            class="url-categoria-input js-url-categoria w-full px-2 py-1 bg-gray-100 dark:bg-gray-700 text-white border rounded {{ $sinNeo ? 'border-red-500' : '' }}"
+                                            value="{{ $linea['url'] }}"
+                                        >
+                                    </div>
+                                    <input
+                                        type="datetime-local"
+                                        name="urls_categoria[{{ $categoria->id }}][{{ $idx }}][visitada]"
+                                        class="js-visitada-categoria w-full min-w-0 px-2 py-1 bg-gray-100 dark:bg-gray-700 text-white border rounded text-sm"
+                                        value="{{ $linea['visitada'] }}"
+                                    >
+                                    <button type="button" class="btn-eliminar-url-categoria w-7 h-7 flex items-center justify-center bg-red-500 hover:bg-red-600 text-white rounded text-sm shrink-0" title="Eliminar línea">−</button>
+                                    <button type="button" class="btn-añadir-url-categoria w-7 h-7 flex items-center justify-center bg-green-500 hover:bg-green-600 text-white rounded text-sm shrink-0" title="Añadir línea debajo">+</button>
+                                </div>
+                                @php endforeach; @endphp
+                            </div>
                         </div>
 
                         @if ($hasChildren)
                             <div class="space-y-2 mt-2 ml-4" x-show="open{{ $categoria->id }}" x-cloak>
-                                @php $renderCategorias($categoria->children, $neoobjetivosPorCategoria, $categoriasSinNeoobjetivo, $categoriasAncestrosSinNeo, $conteoTotalOfertas, $nivel + 1); @endphp
+                                @php $renderCategorias($categoria->children, $neoobjetivosPorCategoria, $categoriasSinNeoobjetivo, $categoriasAncestrosSinNeo, $conteoTotalOfertas, $scrapingPorCategoria, $categoriasSinApiScraping, $categoriasAncestrosSinApi, $nivel + 1); @endphp
                             </div>
                         @endif
                     </div>
@@ -462,7 +653,7 @@
                     @php
                             }
                         };
-                        $renderCategorias($categorias, $neoobjetivosPorCategoria, $categoriasSinNeoobjetivo, $categoriasAncestrosSinNeo, $conteoTotalOfertas);
+                        $renderCategorias($categorias, $neoobjetivosPorCategoria, $categoriasSinNeoobjetivo, $categoriasAncestrosSinNeo, $conteoTotalOfertas, $scrapingPorCategoria, $categoriasSinApiScraping, $categoriasAncestrosSinApi);
                     @endphp
                 </div>
 
@@ -486,8 +677,6 @@
                         const urlEsc = url.replace(/"/g, '&quot;');
 
                         div.innerHTML = `
-                            <span class="w-7 h-7 block shrink-0" aria-hidden="true"></span>
-                            <span class="block" aria-hidden="true"></span>
                             <div class="min-w-0">
                                 <input type="hidden" name="urls_categoria[${categoriaId}][${idx}][id]" value="${neoId}">
                                 <input type="url" name="urls_categoria[${categoriaId}][${idx}][url]" data-id="${categoriaId}" placeholder="https://..."
@@ -693,7 +882,8 @@
 
                     function actualizarBoton() {
                         var hayRojas = quedanRojas();
-                        if (!hayRojas || checkbox.checked) {
+                        var csvInvalido = typeof window.komparadorCsvAwinValido === 'function' && !window.komparadorCsvAwinValido();
+                        if ((!hayRojas || checkbox.checked) && !csvInvalido) {
                             btn.disabled = false;
                             btn.classList.remove('bg-gray-400', 'dark:bg-gray-500', 'text-gray-200', 'cursor-not-allowed');
                             btn.classList.add('bg-pink-600', 'hover:bg-pink-700', 'text-white');
@@ -734,6 +924,7 @@
                     }
 
                     checkbox.addEventListener('change', actualizarBoton);
+                    document.addEventListener('csv-awin-estado-cambiado', actualizarBoton);
                     actualizarBoton();
                 });
             </script>
@@ -1120,6 +1311,146 @@
             
     </div>
     <script>
+        (function() {
+            const CSV_AWIN = 'CSV-Awin';
+
+            function urlCsvInput() {
+                return document.getElementById('url-csv-input');
+            }
+
+            function avisoUrlCsv() {
+                return document.getElementById('url-csv-csv-awin-aviso');
+            }
+
+            function obtenerUrlsCsv() {
+                const input = urlCsvInput();
+                if (!input) {
+                    return [];
+                }
+                return input.value
+                    .split(/\r\n|\r|\n/)
+                    .map(function(linea) { return linea.trim(); })
+                    .filter(function(linea) { return linea !== ''; });
+            }
+
+            function tieneUrlsCsv() {
+                return obtenerUrlsCsv().length > 0;
+            }
+
+            function obtenerSelectsApi() {
+                const selects = [];
+                const principal = document.getElementById('api-select');
+                if (principal) {
+                    selects.push(principal);
+                }
+                document.querySelectorAll('.js-api-scraping-select').forEach(function(select) {
+                    selects.push(select);
+                });
+                return selects;
+            }
+
+            function algunaApiEsCsvAwin() {
+                return obtenerSelectsApi().some(function(select) {
+                    return select.value === CSV_AWIN;
+                });
+            }
+
+            function marcarSelectCsvAwin(select) {
+                if (select.value === CSV_AWIN && !tieneUrlsCsv()) {
+                    select.classList.add('border-red-500');
+                } else {
+                    select.classList.remove('border-red-500');
+                }
+            }
+
+            function actualizarEstadoCsvAwin() {
+                const permitido = tieneUrlsCsv();
+                const input = urlCsvInput();
+                const aviso = avisoUrlCsv();
+                const csvAwinActivo = algunaApiEsCsvAwin();
+
+                document.querySelectorAll('.js-opcion-csv-awin').forEach(function(opt) {
+                    opt.disabled = !permitido;
+                });
+
+                obtenerSelectsApi().forEach(function(select) {
+                    marcarSelectCsvAwin(select);
+                });
+
+                if (input) {
+                    if (csvAwinActivo && !permitido) {
+                        input.classList.add('border-red-500');
+                    } else if (permitido || !csvAwinActivo) {
+                        input.classList.remove('border-red-500');
+                    }
+                }
+
+                if (aviso) {
+                    if (!permitido && csvAwinActivo) {
+                        aviso.classList.remove('hidden');
+                    } else if (permitido) {
+                        aviso.classList.add('hidden');
+                    }
+                }
+
+                actualizarBotonGuardarCsvAwin();
+                document.dispatchEvent(new CustomEvent('csv-awin-estado-cambiado'));
+            }
+
+            function actualizarBotonGuardarCsvAwin() {
+                const btnGuardar = document.getElementById('btn_guardar_tienda');
+                const checkboxCategorias = document.getElementById('sin_listado_categoria_checkbox');
+                if (!btnGuardar || checkboxCategorias) {
+                    return;
+                }
+
+                const csvInvalido = algunaApiEsCsvAwin() && !tieneUrlsCsv();
+                if (csvInvalido) {
+                    btnGuardar.disabled = true;
+                    btnGuardar.classList.remove('bg-pink-600', 'hover:bg-pink-700', 'text-white');
+                    btnGuardar.classList.add('bg-gray-400', 'dark:bg-gray-500', 'text-gray-200', 'cursor-not-allowed');
+                } else {
+                    btnGuardar.disabled = false;
+                    btnGuardar.classList.remove('bg-gray-400', 'dark:bg-gray-500', 'text-gray-200', 'cursor-not-allowed');
+                    btnGuardar.classList.add('bg-pink-600', 'hover:bg-pink-700', 'text-white');
+                }
+            }
+
+            window.komparadorCsvAwinValido = function() {
+                return !algunaApiEsCsvAwin() || tieneUrlsCsv();
+            };
+
+            document.addEventListener('DOMContentLoaded', function() {
+                const input = urlCsvInput();
+                if (input) {
+                    input.addEventListener('input', actualizarEstadoCsvAwin);
+                    input.addEventListener('change', actualizarEstadoCsvAwin);
+                    input.addEventListener('focus', actualizarEstadoCsvAwin);
+                }
+
+                obtenerSelectsApi().forEach(function(select) {
+                    select.addEventListener('change', function() {
+                        if (select.value === CSV_AWIN && !tieneUrlsCsv()) {
+                            select.value = '';
+                            select.classList.add('border-red-500');
+                            if (input) {
+                                input.classList.add('border-red-500');
+                                input.focus();
+                            }
+                            if (avisoUrlCsv()) {
+                                avisoUrlCsv().classList.remove('hidden');
+                            }
+                            alert('Debes indicar al menos un enlace de descarga antes de seleccionar CSV-Awin.');
+                            return;
+                        }
+                        actualizarEstadoCsvAwin();
+                    });
+                });
+
+                actualizarEstadoCsvAwin();
+            });
+        })();
+
         document.querySelector('form').addEventListener('submit', function(e) {
             const inputs = this.querySelectorAll('[required]');
             let valido = true;
@@ -1136,6 +1467,26 @@
             if (!valido) {
                 e.preventDefault();
                 alert('Por favor, completa todos los campos obligatorios.');
+                return;
+            }
+
+            if (typeof window.komparadorCsvAwinValido === 'function' && !window.komparadorCsvAwinValido()) {
+                e.preventDefault();
+                const input = document.getElementById('url-csv-input');
+                if (input) {
+                    input.classList.add('border-red-500');
+                    input.focus();
+                }
+                document.querySelectorAll('.js-api-scraping-select, #api-select').forEach(function(select) {
+                    if (select.value === 'CSV-Awin') {
+                        select.classList.add('border-red-500');
+                    }
+                });
+                const aviso = document.getElementById('url-csv-csv-awin-aviso');
+                if (aviso) {
+                    aviso.classList.remove('hidden');
+                }
+                alert('Debes indicar al menos un enlace de descarga para usar CSV-Awin.');
             }
         });
 

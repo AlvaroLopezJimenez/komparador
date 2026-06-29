@@ -4,9 +4,24 @@ namespace App\Helpers;
 
 use App\Models\Categoria;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 class CategoriaHelper
 {
+    /**
+     * Genera un slug para opciones de filtro (ej. "Talla 3+" → "talla-3-plus").
+     */
+    public static function slugFiltro(?string $texto): string
+    {
+        if ($texto === null || $texto === '') {
+            return '';
+        }
+
+        $normalizado = preg_replace('/\+/', ' plus ', $texto);
+
+        return Str::slug($normalizado);
+    }
+
     /**
      * Obtiene toda la jerarquía de categorías desde una categoría específica hacia arriba
      */

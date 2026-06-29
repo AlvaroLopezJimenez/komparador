@@ -8,7 +8,7 @@
         </div>
     </x-slot>
 
-    <div class="py-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="py-10 max-w-[96rem] mx-auto px-4 sm:px-6 lg:px-8">
 
         {{-- Añadir tienda --}}
         <div class="mb-4 text-right">
@@ -103,20 +103,34 @@
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nombre</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Envío gratis</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ofertas</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mostrar</th>
-                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nombre</th>
+                        <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Envío gratis</th>
+                        <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ofertas</th>
+                        <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase" title="Mostrar tienda">Mostrar</th>
+                        <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase" title="Scrapear tienda">Scrapeando</th>
+                        <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase" title="Categorías con ofertas mostrando">cat.mos</th>
+                        <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase" title="Categorías con ofertas scrapeando">cat.scraping</th>
+                        <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase" title="API general de la tienda">API</th>
+                        <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase" title="APIs por categoría con ofertas">cat API</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200">
                     @forelse ($tiendas as $tienda)
+                    @php
+                        $resumen = $resumenScrapingPorTienda[$tienda->id] ?? [
+                            'cat_mos' => ['si' => 0, 'total' => 0],
+                            'cat_scraping' => ['si' => 0, 'total' => 0],
+                            'api_icon' => \App\Services\TiendaScrapingConfigResolver::metaIconoApi($tienda->api),
+                            'cat_api' => [],
+                            'cat_sin_api' => 0,
+                        ];
+                    @endphp
                     <tr class="hover:bg-gray-100 dark:hover:bg-gray-300 transition-colors {{ $tienda->mostrar_tienda === 'no' ? 'opacity-60 bg-gray-50' : '' }}">
-                        <td class="px-6 py-4">{{ $tienda->nombre }}</td>
-                        <td class="px-6 py-4">{{ $tienda->envio_gratis }}</td>
-                        <td class="px-6 py-4">{{ $tienda->ofertas_mostrar_si_count }}/{{ $tienda->ofertas_count }}</td>
-                        <td class="px-6 py-4 text-center">
+                        <td class="px-4 py-4 whitespace-nowrap">{{ $tienda->nombre }}</td>
+                        <td class="px-3 py-4">{{ $tienda->envio_gratis }}</td>
+                        <td class="px-3 py-4 whitespace-nowrap">{{ $tienda->ofertas_mostrar_si_count }}/{{ $tienda->ofertas_count }}</td>
+                        <td class="px-3 py-4 text-center">
                             @if($tienda->mostrar_tienda === 'si')
                                 <span title="Visible">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-green-600 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -131,7 +145,61 @@
                                 </span>
                             @endif
                         </td>
-                        <td class="px-6 py-4 text-right">
+                        <td class="px-3 py-4 text-center">
+                            @if($tienda->scrapear === 'si')
+                                <span title="Scrapeando">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-green-600 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </span>
+                            @else
+                                <span title="No scrapeando">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-red-500 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </span>
+                            @endif
+                        </td>
+                        <td class="px-3 py-4 text-center text-sm whitespace-nowrap" title="Categorías con ofertas mostrando">
+                            {{ $resumen['cat_mos']['si'] }}/{{ $resumen['cat_mos']['total'] }}
+                        </td>
+                        <td class="px-3 py-4 text-center text-sm whitespace-nowrap" title="Categorías con ofertas scrapeando">
+                            {{ $resumen['cat_scraping']['si'] }}/{{ $resumen['cat_scraping']['total'] }}
+                        </td>
+                        <td class="px-3 py-4 text-center">
+                            @php $apiIcon = $resumen['api_icon']; @endphp
+                            <span class="inline-flex items-center gap-1 justify-center" title="{{ $apiIcon['title'] }}">
+                                <span class="w-6 h-6 text-xs {{ $apiIcon['icon_bg'] }} rounded flex items-center justify-center text-white font-bold shrink-0">
+                                    {{ $apiIcon['label'] }}
+                                </span>
+                            </span>
+                        </td>
+                        <td class="px-3 py-4">
+                            <div class="flex flex-wrap items-center gap-2">
+                                @foreach($resumen['cat_api'] as $filaApi)
+                                    @php $icon = $filaApi['icon']; @endphp
+                                    <span class="inline-flex items-center gap-1" title="{{ $icon['title'] }}">
+                                        <span class="w-6 h-6 text-xs {{ $icon['icon_bg'] }} rounded flex items-center justify-center text-white font-bold shrink-0">
+                                            {{ $icon['label'] }}
+                                        </span>
+                                        <span class="text-sm text-gray-700 dark:text-gray-300 font-medium">{{ $filaApi['count'] }}</span>
+                                    </span>
+                                @endforeach
+                                @if($resumen['cat_sin_api'] > 0)
+                                    @php $iconSinApi = \App\Services\TiendaScrapingConfigResolver::metaIconoApi(null, true); @endphp
+                                    <span class="inline-flex items-center gap-1" title="{{ $iconSinApi['title'] }}">
+                                        <span class="w-6 h-6 text-xs {{ $iconSinApi['icon_bg'] }} rounded flex items-center justify-center text-white font-bold shrink-0">
+                                            {{ $iconSinApi['label'] }}
+                                        </span>
+                                        <span class="text-sm text-gray-700 dark:text-gray-300 font-medium">{{ $resumen['cat_sin_api'] }}</span>
+                                    </span>
+                                @endif
+                                @if(empty($resumen['cat_api']) && $resumen['cat_sin_api'] === 0)
+                                    <span class="text-sm text-gray-400">—</span>
+                                @endif
+                            </div>
+                        </td>
+                        <td class="px-4 py-4 text-right whitespace-nowrap">
                             <a href="{{ $tienda->url }}" target="_blank" rel="noopener noreferrer"
                                 class="text-green-500 hover:underline mr-4">Ir</a>
                             <a href="{{ route('admin.tiendas.ofertas', $tienda) }}"
@@ -142,7 +210,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="5" class="px-6 py-4 text-center text-gray-500">
+                        <td colspan="10" class="px-6 py-4 text-center text-gray-500">
                             No hay tiendas registradas.
                         </td>
                     </tr>

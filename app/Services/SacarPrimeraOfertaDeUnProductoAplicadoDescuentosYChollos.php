@@ -28,9 +28,7 @@ class SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos
         // - (fecha_final >= fecha_actual OR fecha_final IS NULL) (aún no ha terminado o no tiene fecha final)
         $ofertasOriginales = $producto->ofertas()->with('tienda')
             ->where('mostrar', 'si')
-            ->whereHas('tienda', function($query) {
-                $query->where('mostrar_tienda', 'si');
-            })
+            ->whereRaw(TiendaScrapingConfigResolver::sqlMostrarEfectivo() . " = 'si'")
             ->where(function($query) {
                 // Ofertas sin chollo_id se incluyen normalmente
                 $query->whereNull('chollo_id')
@@ -164,9 +162,7 @@ class SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos
         // - (fecha_final >= fecha_actual OR fecha_final IS NULL) (aún no ha terminado o no tiene fecha final)
         $ofertasOriginales = $producto->ofertas()->with('tienda')
             ->where('mostrar', 'si')
-            ->whereHas('tienda', function($query) {
-                $query->where('mostrar_tienda', 'si');
-            })
+            ->whereRaw(TiendaScrapingConfigResolver::sqlMostrarEfectivo() . " = 'si'")
             ->where(function($query) {
                 // Ofertas sin chollo_id se incluyen normalmente (solo verificando fecha_inicio si existe)
                 $query->whereNull('chollo_id')

@@ -53,7 +53,7 @@ class AvisoController extends Controller
             $avisosTab = 'vencidos';
         }
         
-        // Verificar si el usuario ID 1 quiere ver todos los avisos
+        // Usuario ID 1: incluir avisos de oferta de tiendas con mostrar_tienda = 'no'
         $mostrarTodos = false;
         if ($userId === 1 && session('avisos_mostrar_todos', false)) {
             $mostrarTodos = true;
@@ -62,13 +62,13 @@ class AvisoController extends Controller
         $appendQuery = $this->avisosIndexQueryAppends($perPage, $vencidosTipo, $pendientesTipo, $ocultosTipo, $avisosTab);
 
         $conteosTiposVencidos = $this->conteosPorTipoAvisosEnQuery(
-            Aviso::query()->vencidos()->visibles()->when(! $mostrarTodos, fn (Builder $q) => $q->visiblesPorUsuario($userId))
+            $this->queryAvisosIndexBase(Aviso::query()->vencidos()->visibles(), $userId, $mostrarTodos)
         );
         $conteosTiposPendientes = $this->conteosPorTipoAvisosEnQuery(
-            Aviso::query()->pendientes()->visibles()->when(! $mostrarTodos, fn (Builder $q) => $q->visiblesPorUsuario($userId))
+            $this->queryAvisosIndexBase(Aviso::query()->pendientes()->visibles(), $userId, $mostrarTodos)
         );
         $conteosTiposOcultos = $this->conteosPorTipoAvisosEnQuery(
-            Aviso::query()->ocultos()->when(! $mostrarTodos, fn (Builder $q) => $q->visiblesPorUsuario($userId))
+            $this->queryAvisosIndexBase(Aviso::query()->ocultos(), $userId, $mostrarTodos)
         );
 
         $totalVencidos = $conteosTiposVencidos['todos'];
@@ -76,14 +76,11 @@ class AvisoController extends Controller
         $totalOcultos = $conteosTiposOcultos['todos'];
         
         // Obtener avisos vencidos (solo visibles) con paginación
-        $avisosVencidosQuery = Aviso::with(['user'])
-            ->vencidos()
-            ->visibles();
-        
-        // Aplicar filtro por usuario solo si no se está mostrando todos
-        if (!$mostrarTodos) {
-            $avisosVencidosQuery->visiblesPorUsuario($userId);
-        }
+        $avisosVencidosQuery = $this->queryAvisosIndexBase(
+            Aviso::with(['user'])->vencidos()->visibles(),
+            $userId,
+            $mostrarTodos
+        );
 
         $this->aplicarFiltroTipoAvisos($avisosVencidosQuery, $vencidosTipo);
         
@@ -94,14 +91,11 @@ class AvisoController extends Controller
         $avisosVencidos->appends($appendQuery);
 
         // Obtener avisos pendientes (solo visibles) con paginación
-        $avisosPendientesQuery = Aviso::with(['user'])
-            ->pendientes()
-            ->visibles();
-        
-        // Aplicar filtro por usuario solo si no se está mostrando todos
-        if (!$mostrarTodos) {
-            $avisosPendientesQuery->visiblesPorUsuario($userId);
-        }
+        $avisosPendientesQuery = $this->queryAvisosIndexBase(
+            Aviso::with(['user'])->pendientes()->visibles(),
+            $userId,
+            $mostrarTodos
+        );
 
         $this->aplicarFiltroTipoAvisos($avisosPendientesQuery, $pendientesTipo);
         
@@ -112,13 +106,11 @@ class AvisoController extends Controller
         $avisosPendientes->appends($appendQuery);
 
         // Obtener avisos ocultos con paginación
-        $avisosOcultosQuery = Aviso::with(['user'])
-            ->ocultos();
-        
-        // Aplicar filtro por usuario solo si no se está mostrando todos
-        if (!$mostrarTodos) {
-            $avisosOcultosQuery->visiblesPorUsuario($userId);
-        }
+        $avisosOcultosQuery = $this->queryAvisosIndexBase(
+            Aviso::with(['user'])->ocultos(),
+            $userId,
+            $mostrarTodos
+        );
 
         $this->aplicarFiltroTipoAvisos($avisosOcultosQuery, $ocultosTipo);
         
@@ -183,6 +175,21 @@ class AvisoController extends Controller
         $v = strtolower(trim((string) $valor));
 
         return in_array($v, self::AVISOS_FILTRO_TIPOS, true) ? $v : 'todos';
+    }
+
+    /**
+     * Filtros base del listado de avisos: usuario actual y, salvo «mostrar todos»,
+     * ocultar avisos de oferta de tiendas con mostrar_tienda = 'no'.
+     */
+    private function queryAvisosIndexBase(Builder $query, int $userId, bool $mostrarTodos): Builder
+    {
+        $query->visiblesPorUsuario($userId);
+
+        if (! $mostrarTodos) {
+            $query->excluirOfertasDeTiendasNoVisibles();
+        }
+
+        return $query;
     }
 
     /**
@@ -440,10 +447,10 @@ class AvisoController extends Controller
             'oculto' => $request->oculto ?? false
         ]);
 
-        // Eliminar avisos duplicados vencidos después de gestionar este aviso
+        // Eliminar avisos duplicados después de gestionar este aviso
         // Solo para avisos de tipo Producto u OfertaProducto
         if (in_array($aviso->avisoable_type, ['App\Models\Producto', 'App\Models\OfertaProducto'])) {
-            $this->eliminarAvisosDuplicadosVencidos($aviso);
+            $this->eliminarAvisosDuplicados($aviso);
         }
 
         return response()->json([
@@ -478,10 +485,11 @@ class AvisoController extends Controller
         $avisoableId = $aviso->avisoable_id;
         $textoAviso = $aviso->texto_aviso;
         $avisoId = $aviso->id;
+        $userId = $aviso->user_id;
 
         $aviso->delete();
 
-        // Eliminar avisos duplicados vencidos después de gestionar este aviso
+        // Eliminar avisos duplicados después de gestionar este aviso
         // Solo para avisos de tipo Producto u OfertaProducto
         if (in_array($avisoableType, ['App\Models\Producto', 'App\Models\OfertaProducto'])) {
             // Crear un objeto temporal para pasar a la función
@@ -490,7 +498,8 @@ class AvisoController extends Controller
             $avisoTemporal->avisoable_type = $avisoableType;
             $avisoTemporal->avisoable_id = $avisoableId;
             $avisoTemporal->texto_aviso = $textoAviso;
-            $this->eliminarAvisosDuplicadosVencidos($avisoTemporal);
+            $avisoTemporal->user_id = $userId;
+            $this->eliminarAvisosDuplicados($avisoTemporal);
         }
 
         return response()->json([
@@ -892,6 +901,13 @@ class AvisoController extends Controller
             '404' => '404 1a vez',
         ];
 
+        $etiquetasPorMotivo = [
+            'sin_stock' => 'Sin stock',
+            'segunda_mano' => 'Segunda mano',
+            'reacondicionado' => 'Reacondicionado',
+            '404' => '404',
+        ];
+
         $ofertaId = null;
 
         if ($aviso->avisoable_type === OfertaProducto::class) {
@@ -914,12 +930,22 @@ class AvisoController extends Controller
         }
 
         try {
-            DB::transaction(function () use ($aviso, $validated, $textosPorMotivo, $ofertaId) {
+            $etiquetaBoton = $etiquetasPorMotivo[$validated['motivo']];
+            $avisoExistenteMotivo = $this->buscarAvisoOfertaConEtiquetaBoton($ofertaId, $etiquetaBoton);
+
+            DB::transaction(function () use ($aviso, $validated, $textosPorMotivo, $ofertaId, $avisoExistenteMotivo) {
                 $oferta = OfertaProducto::findOrFail($ofertaId);
 
                 // Ocultar oferta para que deje de mostrarse
                 $oferta->mostrar = 'no';
                 $oferta->save();
+
+                // Ya hay un aviso de esta oferta con el mismo motivo (otro registro)
+                if ($avisoExistenteMotivo && $avisoExistenteMotivo->id !== $aviso->id) {
+                    $aviso->delete();
+
+                    return;
+                }
 
                 // Reprogramar aviso con nuevo texto y +4 días
                 $aviso->texto_aviso = $textosPorMotivo[$validated['motivo']];
@@ -935,10 +961,17 @@ class AvisoController extends Controller
                 $aviso->save();
             });
 
+            if (! Aviso::whereKey($aviso->id)->exists()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Oferta ocultada. Ya existía un aviso con ese motivo para la oferta.',
+                ]);
+            }
+
             $aviso->refresh();
 
             if (in_array($aviso->avisoable_type, [Producto::class, OfertaProducto::class], true)) {
-                $this->eliminarAvisosDuplicadosVencidos($aviso);
+                $this->eliminarAvisosDuplicados($aviso);
             }
 
             return response()->json([
@@ -1027,10 +1060,10 @@ class AvisoController extends Controller
                 'fecha_aviso' => $nuevaFecha
             ]);
 
-            // Eliminar avisos duplicados vencidos después de gestionar este aviso
+            // Eliminar avisos duplicados después de gestionar este aviso
             // Solo para avisos de tipo Producto u OfertaProducto
             if (in_array($aviso->avisoable_type, ['App\Models\Producto', 'App\Models\OfertaProducto'])) {
-                $this->eliminarAvisosDuplicadosVencidos($aviso);
+                $this->eliminarAvisosDuplicados($aviso);
             }
 
             return response()->json([
@@ -1105,59 +1138,86 @@ class AvisoController extends Controller
     }
 
     /**
-     * Elimina avisos vencidos duplicados basándose en las 3 primeras palabras del texto
-     * Solo para avisos de tipo Producto u OfertaProducto
-     * 
+     * Busca un aviso de la oferta cuyo texto coincide con la etiqueta del botón
+     * (sin distinguir mayúsculas, acentos ni números).
+     */
+    private function buscarAvisoOfertaConEtiquetaBoton(int $ofertaId, string $etiquetaBoton): ?Aviso
+    {
+        $avisos = Aviso::where('avisoable_type', OfertaProducto::class)
+            ->where('avisoable_id', $ofertaId)
+            ->get(['id', 'texto_aviso']);
+
+        foreach ($avisos as $aviso) {
+            if ($this->textoAvisoCoincideConEtiquetaBoton($aviso->texto_aviso, $etiquetaBoton)) {
+                return $aviso;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Compara el texto de un aviso con la etiqueta del botón (p. ej. «Sin stock»),
+     * ignorando mayúsculas, acentos y números.
+     */
+    private function textoAvisoCoincideConEtiquetaBoton(string $textoAviso, string $etiquetaBoton): bool
+    {
+        if (mb_strtolower(trim($etiquetaBoton)) === '404') {
+            return preg_match('/404/u', $textoAviso) === 1;
+        }
+
+        $normAviso = $this->normalizarTextoComparacionAvisoMotivo($textoAviso);
+        $normEtiqueta = $this->normalizarTextoComparacionAvisoMotivo($etiquetaBoton);
+
+        if ($normEtiqueta === '') {
+            return false;
+        }
+
+        return str_contains($normAviso, $normEtiqueta);
+    }
+
+    private function normalizarTextoComparacionAvisoMotivo(string $texto): string
+    {
+        $texto = mb_strtolower(trim($texto));
+        $texto = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $texto) ?: $texto;
+
+        return preg_replace('/[^a-z]/', '', $texto) ?? '';
+    }
+
+    /**
+     * Elimina avisos duplicados con el mismo texto exacto en el mismo producto u oferta.
+     *
      * @param Aviso $avisoGestionado El aviso que se acaba de gestionar
      */
-    private function eliminarAvisosDuplicadosVencidos(Aviso $avisoGestionado)
+    private function eliminarAvisosDuplicados(Aviso $avisoGestionado)
     {
         try {
-            // Solo procesar avisos de tipo Producto u OfertaProducto
             if (!in_array($avisoGestionado->avisoable_type, ['App\Models\Producto', 'App\Models\OfertaProducto'])) {
                 return;
             }
 
-            // Obtener las 3 primeras palabras del texto del aviso gestionado
             $textoAviso = trim($avisoGestionado->texto_aviso);
-            $palabras = preg_split('/\s+/', $textoAviso);
-            
-            // Si no hay al menos 3 palabras, no hacer nada
-            if (count($palabras) < 3) {
+            if ($textoAviso === '') {
                 return;
             }
 
-            // Obtener las 3 primeras palabras
-            $primerasTresPalabras = array_slice($palabras, 0, 3);
-            $prefijo = implode(' ', $primerasTresPalabras);
-            
-            // Escapar caracteres especiales para LIKE
-            $prefijoEscapado = str_replace(['%', '_'], ['\%', '\_'], $prefijo);
-
-            // Buscar avisos vencidos duplicados:
-            // - Mismo tipo (Producto u OfertaProducto)
-            // - Mismo avisoable_id
-            // - Que empiecen con las mismas 3 palabras
-            // - Que estén vencidos
-            // - Mismo usuario (solo eliminar duplicados del mismo usuario)
-            // - Excluyendo el aviso gestionado
-            $avisosDuplicados = Aviso::where('avisoable_type', $avisoGestionado->avisoable_type)
+            $query = Aviso::where('avisoable_type', $avisoGestionado->avisoable_type)
                 ->where('avisoable_id', $avisoGestionado->avisoable_id)
-                ->where('texto_aviso', 'like', $prefijoEscapado . '%')
-                ->where('user_id', $avisoGestionado->user_id)
-                ->vencidos()
-                ->where('id', '!=', $avisoGestionado->id)
-                ->get();
+                ->where('texto_aviso', $textoAviso)
+                ->where('id', '!=', $avisoGestionado->id);
 
-            // Eliminar los avisos duplicados encontrados
-            if ($avisosDuplicados->count() > 0) {
-                $avisosDuplicados->each->delete();
-                \Log::info('Eliminados ' . $avisosDuplicados->count() . ' avisos duplicados vencidos para ' . $avisoGestionado->avisoable_type . ' ID: ' . $avisoGestionado->avisoable_id);
+            if ($avisoGestionado->user_id !== null) {
+                $query->where('user_id', $avisoGestionado->user_id);
             }
 
+            $avisosDuplicados = $query->get();
+
+            if ($avisosDuplicados->count() > 0) {
+                $avisosDuplicados->each->delete();
+                \Log::info('Eliminados ' . $avisosDuplicados->count() . ' avisos duplicados para ' . $avisoGestionado->avisoable_type . ' ID: ' . $avisoGestionado->avisoable_id);
+            }
         } catch (\Exception $e) {
-            \Log::error('Error al eliminar avisos duplicados vencidos: ' . $e->getMessage());
-            // No lanzar excepción para no interrumpir el flujo principal
+            \Log::error('Error al eliminar avisos duplicados: ' . $e->getMessage());
         }
     }
 
@@ -1462,8 +1522,8 @@ class AvisoController extends Controller
     }
 
     /**
-     * Guardar el estado de "mostrar todos los avisos" en la sesión
-     * Solo disponible para el usuario ID 1
+     * Guardar el estado de «mostrar todos» en la sesión: incluir avisos de oferta
+     * de tiendas con mostrar_tienda = 'no'. Solo disponible para el usuario ID 1.
      */
     public function toggleMostrarTodos(Request $request)
     {
@@ -1484,7 +1544,9 @@ class AvisoController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => $request->mostrar_todos ? 'Mostrando avisos de todos los usuarios' : 'Mostrando solo tus avisos',
+            'message' => $request->mostrar_todos
+                ? 'Mostrando avisos de oferta de todas las tiendas'
+                : 'Ocultando avisos de oferta de tiendas no visibles',
             'mostrar_todos' => $request->mostrar_todos
         ]);
     }

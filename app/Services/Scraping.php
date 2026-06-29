@@ -26,6 +26,9 @@ class Scraping
 
     private const UMBRAL_CAMBIO_ANOMALO = 0.40;
 
+    /** Precio centinela de oferta sin stock / no disponible. */
+    private const PRECIO_CENTINELA_SIN_STOCK = 9999.0;
+
     /** Bajada mínima respecto al precio más bajo del último año (p. ej. 0,10 = al menos un 10 % por debajo). */
     private const UMBRAL_BAJADA_BAJO_PRECIO_MINIMO_HISTORICO = 0.10;
 
@@ -153,6 +156,20 @@ class Scraping
                             ->orWhere('api', '!=', self::API_NAVEGADOR_LOCAL);
                     });
             })
+            ->tap(fn (Builder $query) => $this->aplicarFiltroApiEfectivaCsvAwin($query, false))
+            ->get();
+    }
+
+    /**
+     * Ofertas elegibles cuya API efectiva es CSV-Awin (no cuentan para el límite del cron principal).
+     */
+    public function obtenerOfertasElegiblesCsvAwin(): Collection
+    {
+        return $this->queryOfertasElegiblesBase(null)
+            ->whereHas('tienda', function ($query) {
+                $query->where('scrapear', 'si');
+            })
+            ->tap(fn (Builder $query) => $this->aplicarFiltroApiEfectivaCsvAwin($query, true))
             ->get();
     }
 
@@ -166,15 +183,47 @@ class Scraping
             ->get();
     }
 
-    protected function queryOfertasElegiblesBase(int $limit): Builder
+    protected function queryOfertasElegiblesBase(?int $limit = null): Builder
     {
-        return OfertaProducto::with(['producto', 'tienda'])
+        $query = OfertaProducto::with(['producto', 'tienda'])
             ->where('mostrar', 'si')
             ->where('como_scrapear', 'automatico')
             ->whereNull('chollo_id')
             ->whereRaw('TIMESTAMPDIFF(MINUTE, updated_at, NOW()) >= frecuencia_actualizar_precio_minutos')
-            ->orderByRaw('TIMESTAMPDIFF(MINUTE, updated_at, NOW()) DESC')
-            ->limit($limit);
+            ->whereRaw(TiendaScrapingConfigResolver::sqlScrapearEfectivo() . " = 'si'")
+            ->orderByRaw('TIMESTAMPDIFF(MINUTE, updated_at, NOW()) DESC');
+
+        if ($limit !== null) {
+            $query->limit($limit);
+        }
+
+        return $query;
+    }
+
+    /**
+     * Filtra por API efectiva (categoría si está configurada, si no la de tienda).
+     *
+     * @param  bool  $soloCsvAwin  true = solo CSV-Awin; false = excluir CSV-Awin
+     */
+    private function aplicarFiltroApiEfectivaCsvAwin(Builder $query, bool $soloCsvAwin): void
+    {
+        $csvApi = TiendaScrapingConfigResolver::API_CSV_AWIN;
+        $subquery = "(
+            SELECT COALESCE(NULLIF(tca.api, ''), t.api)
+            FROM productos p
+            INNER JOIN tiendas t ON t.id = ofertas_producto.tienda_id
+            LEFT JOIN tienda_categoria_api tca
+                ON tca.tienda_id = ofertas_producto.tienda_id
+                AND tca.categoria_id = p.categoria_id
+            WHERE p.id = ofertas_producto.producto_id
+            LIMIT 1
+        )";
+
+        if ($soloCsvAwin) {
+            $query->whereRaw("{$subquery} = ?", [$csvApi]);
+        } else {
+            $query->whereRaw("COALESCE({$subquery}, '') != ?", [$csvApi]);
+        }
     }
 
     /**
@@ -228,27 +277,52 @@ class Scraping
         $precioAnterior,
         float $precioNuevo
     ): ?array {
-        if (!is_numeric($precioAnterior) || $precioAnterior <= 0) {
+        if (!is_numeric($precioAnterior)) {
             return null;
         }
 
-        $bajadaRelativa = ($precioAnterior - $precioNuevo) / $precioAnterior;
-        if ($bajadaRelativa >= self::UMBRAL_CAMBIO_ANOMALO) {
-            $this->insertarAvisoAnomalo($oferta, $precioAnterior, $precioNuevo, $bajadaRelativa, true);
-            $oferta->touch();
+        $precioAnterior = (float) $precioAnterior;
 
-            return $this->resultadoAnomalo($oferta, $precioAnterior, $precioNuevo);
+        if ($this->esPrecioCentinelaSinStock($precioAnterior) || $this->esPrecioCentinelaSinStock($precioNuevo)) {
+            return null;
         }
 
-        $subidaRelativa = ($precioNuevo - $precioAnterior) / $precioAnterior;
-        if ($subidaRelativa >= self::UMBRAL_CAMBIO_ANOMALO) {
-            $this->insertarAvisoAnomalo($oferta, $precioAnterior, $precioNuevo, $subidaRelativa, false);
-            $oferta->touch();
+        if (!$this->esPrecioCeroExacto($precioAnterior) && $precioAnterior > 0) {
+            $bajadaRelativa = ($precioAnterior - $precioNuevo) / $precioAnterior;
+            if ($bajadaRelativa >= self::UMBRAL_CAMBIO_ANOMALO) {
+                $this->insertarAvisoAnomalo($oferta, $precioAnterior, $precioNuevo, $bajadaRelativa, true);
+                $oferta->touch();
 
-            return $this->resultadoAnomalo($oferta, $precioAnterior, $precioNuevo);
+                return $this->resultadoAnomalo($oferta, $precioAnterior, $precioNuevo);
+            }
+        }
+
+        if (!$this->esPrecioCeroExacto($precioAnterior)
+            && !$this->esPrecioCeroExacto($precioNuevo)
+            && $precioAnterior > 0) {
+            $subidaRelativa = ($precioNuevo - $precioAnterior) / $precioAnterior;
+            if ($subidaRelativa >= self::UMBRAL_CAMBIO_ANOMALO) {
+                $this->insertarAvisoAnomalo($oferta, $precioAnterior, $precioNuevo, $subidaRelativa, false);
+                $oferta->touch();
+
+                return $this->resultadoAnomalo($oferta, $precioAnterior, $precioNuevo);
+            }
         }
 
         return null;
+    }
+
+    /**
+     * Cero estricto (0,000), no valores pequeños como 0,002.
+     */
+    private function esPrecioCeroExacto($precio): bool
+    {
+        return is_numeric($precio) && round((float) $precio, 3) === 0.0;
+    }
+
+    private function esPrecioCentinelaSinStock($precio): bool
+    {
+        return is_numeric($precio) && round((float) $precio, 2) === self::PRECIO_CENTINELA_SIN_STOCK;
     }
 
     /**
@@ -339,12 +413,57 @@ class Scraping
             );
         }
 
+        $this->actualizarTextoAvisoExistenteOInsertar(
+            OfertaProducto::class,
+            $oferta->id,
+            $textoAviso,
+            function ($query) {
+                $query->where(function ($q) {
+                    $q->where('texto_aviso', 'like', 'Bajada anómala (>40%')
+                        ->orWhere('texto_aviso', 'like', 'Subida anómala (>40%');
+                });
+            }
+        );
+    }
+
+    /**
+     * Si ya existe un aviso del mismo tipo en la entidad, actualiza solo el texto.
+     *
+     * @param  callable(Builder): void|null  $filtroExistente
+     */
+    private function actualizarTextoAvisoExistenteOInsertar(
+        string $avisoableType,
+        int $avisoableId,
+        string $textoAviso,
+        ?callable $filtroExistente = null
+    ): void {
+        $query = DB::table('avisos')
+            ->where('avisoable_type', $avisoableType)
+            ->where('avisoable_id', $avisoableId);
+
+        if ($filtroExistente !== null) {
+            $filtroExistente($query);
+        }
+
+        $existente = $query->orderByDesc('created_at')->first();
+
+        if ($existente) {
+            DB::table('avisos')
+                ->where('id', $existente->id)
+                ->update([
+                    'texto_aviso' => $textoAviso,
+                    'updated_at'  => now(),
+                ]);
+
+            return;
+        }
+
         DB::table('avisos')->insert([
             'texto_aviso'    => $textoAviso,
             'fecha_aviso'    => now(),
             'user_id'        => 1,
-            'avisoable_type' => OfertaProducto::class,
-            'avisoable_id'   => $oferta->id,
+            'avisoable_type' => $avisoableType,
+            'avisoable_id'   => $avisoableId,
             'oculto'         => 0,
             'created_at'     => now(),
             'updated_at'     => now(),
@@ -380,16 +499,6 @@ class Scraping
         $producto->update(['precio' => $precioMasBajo]);
 
         $textoAviso = 'Precio actualizado producto ' . $producto->nombre . ' precio antiguo: ' . $precioAntiguoProducto . ', precio Nuevo: ' . $precioMasBajo;
-        DB::table('avisos')->insert([
-            'texto_aviso'    => $textoAviso,
-            'fecha_aviso'    => now(),
-            'user_id'        => 1,
-            'avisoable_type' => Producto::class,
-            'avisoable_id'   => $producto->id,
-            'oculto'         => 0,
-            'created_at'     => now(),
-            'updated_at'     => now(),
-        ]);
 
         $alertasPendientes = CorreoAvisoPrecio::where('producto_id', $producto->id)
             ->where('precio_limite', '>=', $precioMasBajo)
@@ -397,13 +506,16 @@ class Scraping
 
         if ($alertasPendientes > 0) {
             $textoAviso .= ' | Alertas pendientes: ' . $alertasPendientes . ' correos';
-            DB::table('avisos')->where('avisoable_type', Producto::class)
-                ->where('avisoable_id', $producto->id)
-                ->where('texto_aviso', 'LIKE', '%Precio actualizado producto%')
-                ->orderBy('created_at', 'desc')
-                ->limit(1)
-                ->update(['texto_aviso' => $textoAviso]);
         }
+
+        $this->actualizarTextoAvisoExistenteOInsertar(
+            Producto::class,
+            $producto->id,
+            $textoAviso,
+            function ($query) {
+                $query->where('texto_aviso', 'like', '%Precio actualizado producto%');
+            }
+        );
 
         return true;
     }

@@ -61,7 +61,7 @@ class TiemposActualizacionOfertasDinamicos
      */
     public function calcularFrecuencia($ofertaId)
     {
-        $oferta = OfertaProducto::with('tienda')->findOrFail($ofertaId);
+        $oferta = OfertaProducto::with(['tienda', 'producto'])->findOrFail($ofertaId);
         $frecuenciaActual = $oferta->frecuencia_actualizar_precio_minutos ?? 1440;
         
         // Obtener historial de los últimos 7 días (en minutos)
@@ -96,10 +96,13 @@ class TiemposActualizacionOfertasDinamicos
             $intervaloSuavizado = self::FRECUENCIA_MINIMA_ABSOLUTA_MINUTOS;
         }
         
-        // Aplicar límites de tienda
+        // Aplicar límites de tienda o categoría (categoría tiene prioridad si está configurada)
         $tienda = $oferta->tienda;
-        $frecuenciaMinimaTienda = $tienda->frecuencia_minima_minutos ?? self::FRECUENCIA_MINIMA_ABSOLUTA_MINUTOS;
-        $frecuenciaMaximaTienda = $tienda->frecuencia_maxima_minutos ?? 10080; // 7 días por defecto
+        $resolver = new TiendaScrapingConfigResolver();
+        $categoriaId = $oferta->producto?->categoria_id;
+        $categoriaIdInt = $categoriaId !== null ? (int) $categoriaId : null;
+        $frecuenciaMinimaTienda = $resolver->resolverFrecuenciaMinima($tienda, $categoriaIdInt);
+        $frecuenciaMaximaTienda = $resolver->resolverFrecuenciaMaxima($tienda, $categoriaIdInt);
         
         // Aplicar límite mínimo de tienda
         if ($intervaloSuavizado < $frecuenciaMinimaTienda) {

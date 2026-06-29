@@ -9382,24 +9382,31 @@ if (document.readyState === 'loading') {
 <script>
 window.addEventListener('load', function () {
   @guest
+  var VISITA_DELAY_MS = 3000;
   var csrfMeta = document.querySelector('meta[name="csrf-token"]');
   if (!csrfMeta) return;
 
-  fetch(@json(route('visitas.registrar')), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-CSRF-TOKEN': csrfMeta.content,
-      'Accept': 'application/json',
-    },
-    credentials: 'same-origin',
-    keepalive: true,
-    body: JSON.stringify({
-      producto_id: {{ $producto->id }},
-      categoria_id: {{ $producto->categoria_id }},
-      origen: document.referrer || null,
-    }),
-  }).catch(function () {});
+  var visitaTimer = setTimeout(function () {
+    fetch(@json(route('visitas.registrar')), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': csrfMeta.content,
+        'Accept': 'application/json',
+      },
+      credentials: 'same-origin',
+      keepalive: true,
+      body: JSON.stringify({
+        producto_id: {{ $producto->id }},
+        categoria_id: {{ $producto->categoria_id }},
+        origen: document.referrer || null,
+      }),
+    }).catch(function () {});
+  }, VISITA_DELAY_MS);
+
+  window.addEventListener('pagehide', function () {
+    clearTimeout(visitaTimer);
+  }, { once: true });
   @endguest
 });
 </script>

@@ -11,15 +11,19 @@ use App\Models\Tienda;
 use App\Models\ProductoOfertaMasBarataPorProducto;
 use App\Models\UrlDescartada;
 use App\Models\Neo;
+use App\Models\CsvOferta;
 use App\Services\SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos;
 use App\Services\SignedUrlService;
 use App\Services\CalcularPrecioUnidad;
 use App\Services\LimpiarUrlDeTiendas;
 use App\Services\ConsultarNeoCifrado;
+use App\Services\TiendaScrapingConfigResolver;
 use App\Support\UrlOfertaValidacion;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Http\JsonResponse;
 
 class OfertasController extends Controller
 {
@@ -1559,7 +1563,11 @@ Responde ÚNICAMENTE con el JSON.";
             $envioFinal = $envioPlaceholderGratis ? null : (is_numeric($envio) ? round((float) $envio, 2) : null);
         }
         $comoScrapear = $this->obtenerComoScrapearTienda($tienda);
-        $frecuenciaMinutos = $this->obtenerFrecuenciaMasComunTienda($tiendaId);
+        $resolverScraping = new TiendaScrapingConfigResolver();
+        $frecuenciaMinutos = $resolverScraping->resolverFrecuenciaInicialOferta(
+            $tienda,
+            $producto->categoria_id ? (int) $producto->categoria_id : null
+        );
 
         $especificacionesInternas = null;
         if ($request->filled('especificaciones_internas')) {
@@ -2860,17 +2868,6 @@ Responde ÚNICAMENTE con el JSON.";
     {
         $cs = strtolower(trim($tienda->como_scrapear ?? 'manual'));
         return in_array($cs, ['automatico', 'manual', 'ambos']) ? ($cs === 'ambos' ? 'automatico' : $cs) : 'manual';
-    }
-
-    private function obtenerFrecuenciaMasComunTienda($tiendaId)
-    {
-        $row = OfertaProducto::where('tienda_id', $tiendaId)
-            ->whereNull('chollo_id')
-            ->selectRaw('frecuencia_actualizar_precio_minutos, COUNT(*) as cnt')
-            ->groupBy('frecuencia_actualizar_precio_minutos')
-            ->orderByDesc('cnt')
-            ->first();
-        return $row ? (int) $row->frecuencia_actualizar_precio_minutos : 1440;
     }
 }
 
