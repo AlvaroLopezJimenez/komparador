@@ -8,7 +8,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 
 /**
- * App Informática (VTEX): precio en div.ticnova-commons-components-0-x-price.
+ * App Informática: precio en span.font-bold.text-4xl (p. ej. 209,56 €).
+ * Reserva VTEX: div.ticnova-commons-components-0-x-price.
  * Listado de categoría: ?page=N y JSON-LD ItemList → Product @id (misma pauta que Pcbox).
  * Si en la ficha hay highlight VTEX data-highlight-name="JUEGO REGALO" (ticnova-product-highlights),
  * se marca la oferta con descuentos +Juego y aviso, igual que CoolmodController.
@@ -123,13 +124,20 @@ class AppinformaticaController extends PlantillaTiendaController
     }
 
     /**
-     * Precio en <div class="ticnova-commons-components-0-x-price">365,04&nbsp;€</div>
-     * La clase también aparece en CSS (.ticnova-...-price{...}); solo coincidimos con div/span y clase en atributo.
-     * Reserva: mismo patrón VTEX que Pcbox (crosselling PDP).
+     * Precio principal: <span class="font-bold text-4xl">209,56&nbsp;€</span>
+     * Reserva VTEX: <div class="ticnova-commons-components-0-x-price">…</div> o crosselling PDP (Pcbox).
      */
     private function extraerPrecioDesdeHtml(string $html): ?float
     {
         $htmlLimpio = preg_replace('~<style\b[^>]*>[\s\S]*?</style>~i', '', $html);
+
+        $patronTailwind = '~<span\b(?=[^>]*\bclass="[^"]*\bfont-bold\b)(?=[^>]*\btext-4xl\b)[^>]*>([^<]+)~i';
+        if (preg_match($patronTailwind, $htmlLimpio, $m) && isset($m[1])) {
+            $precio = $this->normalizarImporte(trim($m[1]));
+            if ($precio !== null && $precio > 0) {
+                return $precio;
+            }
+        }
 
         $patronPrincipal = '~<(?:div|span)\b[^>]*\bclass="[^"]*\bticnova-commons-components-0-x-price\b[^"]*"[^>]*>([^<]+)~i';
         if (preg_match_all($patronPrincipal, $htmlLimpio, $bloques, PREG_SET_ORDER)) {

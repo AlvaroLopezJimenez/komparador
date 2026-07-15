@@ -40,6 +40,7 @@ class EjecucionTiempoRealController extends ScraperBaseController
                 'message' => 'No hay ofertas para actualizar',
                 'progreso' => [
                     'actualizadas' => 0,
+                    'ocultadas' => 0,
                     'errores' => 0,
                     'procesadas' => 0
                 ]
@@ -59,6 +60,7 @@ class EjecucionTiempoRealController extends ScraperBaseController
                 'total_ofertas' => $ofertasElegibles->count(),
                 'ofertas' => $ofertasElegibles->pluck('id')->toArray(),
                 'actualizadas' => 0,
+                'ocultadas' => 0,
                 'errores' => 0,
                 'procesadas' => 0,
                 'resultados' => []
@@ -95,6 +97,7 @@ class EjecucionTiempoRealController extends ScraperBaseController
         if ($indiceActual >= count($ofertasIds)) {
             // Ejecución completada
             $log['estado'] = 'completada';
+            $log = $this->mergeMetricasPeticionesApiEnLog($log);
             
             $ejecucion->update([
                 'fin' => now(),
@@ -110,6 +113,7 @@ class EjecucionTiempoRealController extends ScraperBaseController
                 'total_errores' => $log['errores'] ?? 0,
                 'progreso' => [
                     'actualizadas' => $log['actualizadas'] ?? 0,
+                    'ocultadas' => $log['ocultadas'] ?? 0,
                     'errores' => $log['errores'] ?? 0,
                     'procesadas' => $log['procesadas'] ?? 0
                 ]
@@ -122,18 +126,22 @@ class EjecucionTiempoRealController extends ScraperBaseController
         if (!$oferta) {
             $log['errores']++;
             $log['procesadas']++;
-            $log['resultados'][] = [
-                'oferta_id' => $ofertaId,
-                'tienda_nombre' => 'Desconocida',
-                'url' => '',
-                'variante' => '',
-                'precio_anterior' => null,
-                'precio_nuevo' => null,
-                'success' => false,
-                'error' => 'Oferta no encontrada',
-                'cambios_detectados' => false,
-                'url_notificacion_llamada' => false
-            ];
+            $log['resultados'][] = $this->enriquecerResultadoScraperLog(
+                new OfertaProducto(['id' => $ofertaId]),
+                [
+                    'oferta_id' => $ofertaId,
+                    'tienda_nombre' => 'Desconocida',
+                    'url' => '',
+                    'variante' => '',
+                    'precio_anterior' => null,
+                    'precio_nuevo' => null,
+                    'success' => false,
+                    'error' => 'Oferta no encontrada',
+                    'cambios_detectados' => false,
+                    'url_notificacion_llamada' => false,
+                ]
+            );
+            $log = $this->mergeMetricasPeticionesApiEnLog($log);
             
             $ejecucion->update(['log' => $log]);
             
@@ -147,6 +155,7 @@ class EjecucionTiempoRealController extends ScraperBaseController
                 ],
                 'progreso' => [
                     'actualizadas' => $log['actualizadas'] ?? 0,
+                    'ocultadas' => $log['ocultadas'] ?? 0,
                     'errores' => $log['errores'] ?? 0,
                     'procesadas' => $log['procesadas'] ?? 0
                 ]
@@ -158,12 +167,16 @@ class EjecucionTiempoRealController extends ScraperBaseController
 
         // Actualizar log
         $log['procesadas']++;
-        if ($resultado['success']) {
-            $log['actualizadas']++;
+        $clasificacion = $this->clasificarResultadoScraping($resultado);
+        if ($clasificacion === 'actualizada') {
+            $log['actualizadas'] = ($log['actualizadas'] ?? 0) + 1;
+        } elseif ($clasificacion === 'ocultada') {
+            $log['ocultadas'] = ($log['ocultadas'] ?? 0) + 1;
         } else {
-            $log['errores']++;
+            $log['errores'] = ($log['errores'] ?? 0) + 1;
         }
-        $log['resultados'][] = $resultado;
+        $log['resultados'][] = $this->enriquecerResultadoScraperLog($oferta, $resultado);
+        $log = $this->mergeMetricasPeticionesApiEnLog($log);
         
         $ejecucion->update(['log' => $log]);
 
@@ -177,6 +190,7 @@ class EjecucionTiempoRealController extends ScraperBaseController
             ],
             'progreso' => [
                 'actualizadas' => $log['actualizadas'] ?? 0,
+                'ocultadas' => $log['ocultadas'] ?? 0,
                 'errores' => $log['errores'] ?? 0,
                 'procesadas' => $log['procesadas'] ?? 0
             ]
@@ -206,6 +220,7 @@ class EjecucionTiempoRealController extends ScraperBaseController
                 'id' => $ejecucion->id,
                 'total_ofertas' => $log['total_ofertas'] ?? 0,
                 'actualizadas' => $log['actualizadas'] ?? 0,
+                'ocultadas' => $log['ocultadas'] ?? 0,
                 'errores' => $log['errores'] ?? 0,
                 'procesadas' => $log['procesadas'] ?? 0,
                 'completada' => $ejecucion->fin !== null

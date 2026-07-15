@@ -64,3 +64,9 @@ Route::middleware(['neo.programa.externo', 'throttle:120,1'])->prefix('scraping-
     Route::post('/procesar-html-oferta', [App\Http\Controllers\Api\ApiProgramaExternoController::class, 'procesarHtmlOferta']);
     Route::post('/registrar-ejecucion-fin', [App\Http\Controllers\Api\ApiProgramaExternoController::class, 'registrarEjecucionFin']);
 });
+
+// Integración temporal chollopañales.com (token validado en CholloPanalesApiController)
+Route::middleware(['throttle:120,1'])->prefix('chollopanales')->group(function () {
+    Route::get('/probar-conexion', [App\Http\Controllers\Api\CholloPanalesApiController::class, 'probarConexion']);
+    Route::post('/actualizar-por-url', [App\Http\Controllers\Api\CholloPanalesApiController::class, 'actualizarPorUrl']);
+});

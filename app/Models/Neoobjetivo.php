@@ -8,8 +8,28 @@ use Throwable;
 
 class Neoobjetivo extends Model
 {
+    /** Días sin revisar visitada para considerar un neoobjetivo pendiente (cron + API programa externo). */
+    public const DIAS_SIN_REVISAR = 30;
+
     private const URL_ENCRYPTION_PREFIX = 'encv1:';
     private const URL_CIPHER = 'AES-256-CBC';
+
+    public static function fechaLimiteVisitadaPendiente(): \Illuminate\Support\Carbon
+    {
+        return now()->subDays(self::DIAS_SIN_REVISAR);
+    }
+
+    /** Valor por defecto al crear neoobjetivo (queda pendiente en el siguiente ciclo). */
+    public static function fechaVisitadaPorDefectoAlCrear(): \Illuminate\Support\Carbon
+    {
+        return self::fechaLimiteVisitadaPendiente();
+    }
+
+    /** Para pruebas manuales: un día más allá del umbral de revisión. */
+    public static function fechaVisitadaPruebaManual(): \Illuminate\Support\Carbon
+    {
+        return now()->subDays(self::DIAS_SIN_REVISAR + 1);
+    }
 
     protected $table = 'neoobjetivo';
 

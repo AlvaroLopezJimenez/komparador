@@ -17,6 +17,7 @@ return new class extends Migration
             $table->foreignId('tienda_id')->constrained()->onDelete('cascade');
             $table->foreignId('chollo_id')->nullable()->constrained()->onDelete('cascade');
             $table->decimal('unidades', 8, 2);
+            $table->string('texto_cantidad_alternativo')->nullable();
             $table->decimal('precio_total', 8, 2);
             $table->decimal('envio', 4, 2)->nullable();
             $table->dateTime('fecha_actualizacion_envio')->nullable();

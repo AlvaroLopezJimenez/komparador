@@ -8,6 +8,8 @@ use App\Models\CorreoAvisoPrecio;
 use App\Models\HistoricoPrecioProducto;
 use App\Models\OfertaProducto;
 use App\Models\Producto;
+use App\Services\CsvAwinOfertaService;
+use App\Services\TiendaScrapingConfigResolver;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -43,6 +45,8 @@ class Scraping
     {
         $oferta->loadMissing(['tienda', 'producto']);
 
+        $mostrarAntes = $oferta->mostrar;
+
         $serviceTiempos = new TiemposActualizacionOfertasDinamicos();
         $serviceTiempos->calcularFrecuencia($oferta->id);
 
@@ -65,6 +69,15 @@ class Scraping
         $precioAnterior = $oferta->precio_total;
 
         if (!$responseData['success']) {
+            $oferta->refresh();
+            if ($this->ofertaFueOcultadaTrasScraping($oferta, $mostrarAntes)) {
+                return $this->resultadoOfertaOculta(
+                    $oferta,
+                    $precioAnterior,
+                    $responseData['error'] ?? 'Oferta ocultada tras scraping'
+                );
+            }
+
             return $this->resultadoBase($oferta, $precioAnterior, null, false, 'Error en el scraping: ' . ($responseData['error'] ?? 'Error desconocido'));
         }
 
@@ -130,12 +143,34 @@ class Scraping
             'precio_anterior'          => $precioAnterior,
             'precio_nuevo'             => $precioNuevo,
             'success'                  => true,
+            'precio_guardado'          => true,
             'error'                    => null,
             'cambios_detectados'       => $cambiosDetectados,
             'url_notificacion_llamada' => false,
             'ofertas_antes'            => $cambiosDetectados ? $ofertasAntes->toArray() : null,
             'ofertas_despues'          => $cambiosDetectados ? $ofertasDespues->toArray() : null,
         ];
+    }
+
+    /**
+     * Segunda pasada silenciosa: tienda con API CSV-Awin pero categoría con otra API.
+     * Tras un scraping normal exitoso, sustituye el precio por el de csv_ofertas si difiere.
+     */
+    public function aplicarPrecioCsvPostScrapingSiCorresponde(OfertaProducto $oferta): bool
+    {
+        $oferta->loadMissing(['tienda', 'producto']);
+        $tienda = $oferta->tienda;
+        if ($tienda === null || $tienda->api !== TiendaScrapingConfigResolver::API_CSV_AWIN) {
+            return false;
+        }
+
+        $resolver = app(TiendaScrapingConfigResolver::class);
+        $apiEfectiva = $resolver->resolverApi($tienda, $oferta->producto->categoria_id ?? null);
+        if ($apiEfectiva === TiendaScrapingConfigResolver::API_CSV_AWIN) {
+            return false;
+        }
+
+        return app(CsvAwinOfertaService::class)->actualizarPrecioOfertaDesdeCsvSilencioso($oferta);
     }
 
     public function calcularPrecioRealPorUnidad($oferta): ?float
@@ -518,6 +553,27 @@ class Scraping
         );
 
         return true;
+    }
+
+    /**
+     * Oferta ocultada (mostrar=no) por sin stock, 404, CSV, segunda mano, etc.
+     *
+     * @return array<string, mixed>
+     */
+    private function resultadoOfertaOculta(OfertaProducto $oferta, $precioAnterior, ?string $motivo): array
+    {
+        return array_merge(
+            $this->resultadoBase($oferta, $precioAnterior, null, true, null),
+            [
+                'oferta_oculta'     => true,
+                'motivo_ocultacion' => $motivo,
+            ]
+        );
+    }
+
+    private function ofertaFueOcultadaTrasScraping(OfertaProducto $oferta, ?string $mostrarAntes): bool
+    {
+        return $mostrarAntes === 'si' && $oferta->mostrar === 'no';
     }
 
     /**

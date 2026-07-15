@@ -8,7 +8,7 @@ GET /admin/cron-neo-objetivos?token=XXX
 
 ## Filtro inicial (neoobjetivo)
 
-- `visitada` &lt; hace 7 días  
+- `visitada` &lt; hace 30 días (`Neoobjetivo::DIAS_SIN_REVISAR`)  
 - `url` no null  
 
 Se dividen en dos ramas según la URL:

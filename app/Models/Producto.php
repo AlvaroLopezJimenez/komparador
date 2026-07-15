@@ -44,6 +44,7 @@ class Producto extends Model
         'grupos_de_ofertas',
         'especificaciones_busqueda',
         'especificaciones_busqueda_texto',
+        'ean_isbn_etc',
     ];
 
     protected $casts = [
@@ -57,6 +58,7 @@ class Producto extends Model
         'especificaciones_busqueda' => 'array',
         'imagen_grande' => 'array',
         'imagen_pequena' => 'array',
+        'ean_isbn_etc' => 'array',
         'aviso' => 'datetime',
     ];
 

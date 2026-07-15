@@ -24,7 +24,7 @@ use Illuminate\Support\Str;
 class NeoApiProgramaExternoController extends Controller
 {
     /**
-     * GET neoobjetivos de rama Neo con visitada &gt; 7 días (URLs en claro).
+     * GET neoobjetivos de rama Neo con visitada &gt; {@see Neoobjetivo::DIAS_SIN_REVISAR} días (URLs en claro).
      *
      * Query: limite (1–500, default 200)
      */
@@ -33,7 +33,7 @@ class NeoApiProgramaExternoController extends Controller
         $limite = min(500, max(1, (int) $request->query('limite', 200)));
 
         $candidatas = Neoobjetivo::query()
-            ->where('visitada', '<', now()->subDays(7))
+            ->where('visitada', '<', Neoobjetivo::fechaLimiteVisitadaPendiente())
             ->whereNotNull('url_cipher')
             ->where('url_cipher', '!=', '')
             ->orderBy('visitada')
@@ -71,7 +71,7 @@ class NeoApiProgramaExternoController extends Controller
     }
 
     /**
-     * GET neoobjetivos de categoría en tienda: tienda_id rellenado, visitada &gt; 7 días, no rama Neo (Idealo).
+     * GET neoobjetivos de categoría en tienda: tienda_id rellenado, visitada &gt; {@see Neoobjetivo::DIAS_SIN_REVISAR} días, no rama Neo (Idealo).
      *
      * Query: limite (1–500, default 200)
      */
@@ -81,7 +81,7 @@ class NeoApiProgramaExternoController extends Controller
 
         $candidatas = Neoobjetivo::query()
             ->with('tienda')
-            ->where('visitada', '<', now()->subDays(7))
+            ->where('visitada', '<', Neoobjetivo::fechaLimiteVisitadaPendiente())
             ->whereNotNull('tienda_id')
             ->whereNotNull('url_cipher')
             ->where('url_cipher', '!=', '')

@@ -25,9 +25,10 @@ use App\Models\UrlDescartada;
 use App\Models\Neo;
 use App\Models\CsvOferta;
 use App\Models\Tienda;
-use App\Support\UrlOfertaValidacion;
+use App\Services\CsvAwinOfertaService;
 use App\Services\ConsultarNeoCifrado;
 use App\Services\TiendaScrapingConfigResolver;
+use App\Support\UrlOfertaValidacion;
 
 class OfertaProductoController extends Controller
 {
@@ -53,6 +54,25 @@ class OfertaProductoController extends Controller
     {
         $v = $this->parsePrecioToFloat($value);
         return $v !== null && abs($v) < 0.0000001;
+    }
+
+    private function normalizarDescuentosGuardado(?string $descuentos): ?string
+    {
+        $descuentos = trim($descuentos ?? '');
+        if ($descuentos === '') {
+            return null;
+        }
+
+        if ($descuentos === '2a al 50% - cheque - Solo Carrefour') {
+            $descuentos = '2a al 50 - cheque - SoloCarrefour';
+        }
+
+        return DescuentosController::joinDescuentos(
+            array_map(
+                fn (string $d) => DescuentosController::normalizarDescuento($d),
+                DescuentosController::parseDescuentos($descuentos)
+            )
+        );
     }
 
     private function crearAvisoSinStockSiNoExiste(OfertaProducto $oferta): void
@@ -98,6 +118,9 @@ class OfertaProductoController extends Controller
         $filtroEspecActivo = $this->parseFiltroEspecificacionesInternasRequest($request);
 
         $columnasEspecListado = $this->columnasEspecificacionesInternasParaListadoOfertas($producto);
+        $esUnidadUnicaListado = $producto->unidadDeMedida === 'unidadUnica';
+        $columnasEspecTabla = $esUnidadUnicaListado ? $columnasEspecListado : [];
+        $columnaFusionadaUnidades = (!$esUnidadUnicaListado && $columnasEspecListado !== []) ? $columnasEspecListado[0] : null;
         $conteosOpcionesEspec = $this->conteosOpcionesEspecificacionesInternasFiltro(
             $producto->id,
             $busqueda,
@@ -139,19 +162,32 @@ class OfertaProductoController extends Controller
         $celdasEspecPorOfertaId = [];
         foreach ($ofertas as $oferta) {
             $celdas = [];
-            foreach ($columnasEspecListado as $col) {
+            foreach ($columnasEspecTabla as $col) {
                 $celdas[] = $this->etiquetasEspecificacionesInternasSeleccionadasOferta($oferta->especificaciones_internas, $col);
             }
             $celdasEspecPorOfertaId[$oferta->id] = $celdas;
         }
 
-        return view('admin.ofertas.index', compact(
+        $textoColumnaUnidadesPorOfertaId = [];
+        if ($columnaFusionadaUnidades !== null) {
+            foreach ($ofertas as $oferta) {
+                $textoColumnaUnidadesPorOfertaId[$oferta->id] = $this->etiquetasEspecificacionesInternasSeleccionadasOferta(
+                    $oferta->especificaciones_internas,
+                    $columnaFusionadaUnidades
+                );
+            }
+        }
+
+        return view('admin.ofertas.ofertas_producto', compact(
             'producto',
             'ofertas',
             'perPage',
             'tiendasInfo',
             'mostrarParaVista',
             'columnasEspecListado',
+            'columnasEspecTabla',
+            'columnaFusionadaUnidades',
+            'textoColumnaUnidadesPorOfertaId',
             'celdasEspecPorOfertaId',
             'filtroEspecActivo',
             'conteosOpcionesEspec'
@@ -224,10 +260,11 @@ class OfertaProductoController extends Controller
         }
 
         $busqueda = trim((string) $request->input('busqueda', ''));
+        $busquedaCodigo = trim((string) $request->input('busqueda_codigo', ''));
         $tiendaId = $request->filled('tienda_id') ? (int) $request->input('tienda_id') : null;
         $stock = $request->input('stock');
 
-        $filas = $this->queryCsvOfertas($busqueda, $tiendaId, $stock)
+        $filas = $this->queryCsvOfertas($busqueda, $busquedaCodigo, $tiendaId, $stock)
             ->paginate($perPage)
             ->withQueryString();
 
@@ -240,6 +277,7 @@ class OfertaProductoController extends Controller
             'filas',
             'perPage',
             'busqueda',
+            'busquedaCodigo',
             'tiendaId',
             'stock',
             'tiendasConCsv'
@@ -247,9 +285,67 @@ class OfertaProductoController extends Controller
     }
 
     /**
+     * Búsqueda JSON de csv_ofertas para el modal CSV en crear-masivo neo.
+     */
+    public function buscarCsvOfertasCrearMasivo(Request $request)
+    {
+        $perPage = (int) $request->input('perPage', 50);
+        if (!in_array($perPage, [20, 50, 100, 200], true)) {
+            $perPage = 50;
+        }
+
+        $busqueda = trim((string) $request->input('busqueda', ''));
+        $busquedaCodigo = trim((string) $request->input('busqueda_codigo', ''));
+        $tiendaId = $request->filled('tienda_id') ? (int) $request->input('tienda_id') : null;
+        $stock = $request->input('stock');
+
+        $baseQuery = $this->queryCsvOfertas($busqueda, $busquedaCodigo, $tiendaId, $stock);
+        $total = (clone $baseQuery)->count();
+
+        $limiteUrls = 10000;
+        $urls = (clone $baseQuery)
+            ->limit($limiteUrls)
+            ->pluck('url')
+            ->filter()
+            ->values()
+            ->all();
+        $truncado = $total > $limiteUrls;
+
+        $filas = (clone $baseQuery)->paginate($perPage);
+
+        return response()->json([
+            'total' => $total,
+            'urls' => $urls,
+            'truncado' => $truncado,
+            'limite_urls' => $limiteUrls,
+            'filas' => $filas->map(function ($fila) {
+                return [
+                    'tienda' => $fila->tienda->nombre ?? '—',
+                    'nombre' => $fila->nombre,
+                    'url' => $fila->url,
+                    'precio' => $fila->precio,
+                    'envio' => $fila->envio,
+                    'stock' => $fila->stock,
+                    'updated_at' => $fila->updated_at?->format('d/m/Y H:i'),
+                    'ean' => $fila->ean,
+                    'isbn' => $fila->isbn,
+                    'upc' => $fila->upc,
+                    'mpn' => $fila->mpn,
+                    'gtin' => $fila->gtin,
+                ];
+            })->values(),
+            'pagination' => [
+                'current_page' => $filas->currentPage(),
+                'last_page' => $filas->lastPage(),
+                'per_page' => $filas->perPage(),
+            ],
+        ]);
+    }
+
+    /**
      * @return \Illuminate\Database\Eloquent\Builder<CsvOferta>
      */
-    private function queryCsvOfertas(string $busqueda, ?int $tiendaId, $stock)
+    private function queryCsvOfertas(string $busqueda, string $busquedaCodigo, ?int $tiendaId, $stock)
     {
         return CsvOferta::query()
             ->with('tienda')
@@ -272,6 +368,14 @@ class OfertaProductoController extends Controller
                     }
                 });
             })
+            ->when($busquedaCodigo !== '', function ($q) use ($busquedaCodigo) {
+                $termino = '%' . strtolower($busquedaCodigo) . '%';
+                $q->where(function ($sub) use ($termino) {
+                    foreach (['ean', 'isbn', 'upc', 'mpn', 'gtin'] as $columna) {
+                        $sub->orWhereRaw('LOWER(' . $columna . ') LIKE ?', [$termino]);
+                    }
+                });
+            })
             ->orderByDesc('updated_at');
     }
 
@@ -286,8 +390,12 @@ class OfertaProductoController extends Controller
             $producto?->categoria_id !== null ? (int) $producto->categoria_id : null
         );
         $tiendaAvisoEdit = $oferta->tienda;
+        $apiScrapingOferta = $this->resolverInfoApisScrapingOferta(
+            (int) $oferta->tienda_id,
+            (int) $oferta->producto_id
+        );
 
-        return view('admin.ofertas.formulario', compact('oferta', 'producto', 'avisosVisibilidadOferta', 'tiendaAvisoEdit'));
+        return view('admin.ofertas.formulario', compact('oferta', 'producto', 'avisosVisibilidadOferta', 'tiendaAvisoEdit', 'apiScrapingOferta'));
     }
 
 
@@ -300,7 +408,7 @@ class OfertaProductoController extends Controller
             'envio' => $request->filled('envio') ? str_replace(',', '.', $request->envio) : null,
         ]);
 
-        $validated = $request->validate([
+        $validated = $request->validate(array_merge([
             'producto_id' => 'required|exists:productos,id',
             'tienda_id' => 'required|exists:tiendas,id',
             'unidades' => 'required|numeric|min:0.01',
@@ -324,7 +432,7 @@ class OfertaProductoController extends Controller
             'comprobada' => 'nullable|date',
             'frecuencia_chollo_valor' => 'nullable|numeric|min:0.1',
             'frecuencia_chollo_unidad' => 'nullable|in:minutos,horas,dias',
-        ]);
+        ], $this->reglasValidacionTextoCantidadAlternativo((int) $request->input('producto_id'))));
 
         if (UrlDescartada::where('url', $validated['url'])->exists()) {
             throw ValidationException::withMessages([
@@ -465,33 +573,13 @@ class OfertaProductoController extends Controller
             $avisoFecha = now()->add($request->input('aviso_unidad'), (int)$request->input('aviso_cantidad'))->setTime(0, 1);
         }
 
-        // Procesar descuentos para cupones
-        $descuentos = isset($validated['descuentos']) ? trim($validated['descuentos']) : '';
-
-        if ($descuentos === '2a al 50% - cheque - Solo Carrefour') {
-            $descuentos = '2a al 50 - cheque - SoloCarrefour';
-        }
-        
-        // Si el campo descuentos ya viene con formato construido (cupon;codigo;cantidad o cupon;cantidad), no modificarlo
-        // Solo construir el formato si viene como 'cupon' sin formato (fallback por si el JavaScript no funciona)
-        if ($descuentos === 'cupon') {
-            $codigoCupon = $request->input('cupon_codigo');
-            $cantidadCupon = $request->input('cupon_cantidad');
-            
-            if ($codigoCupon && $cantidadCupon) {
-                // Formato nuevo: cupon;codigo;cantidad
-                $descuentos = 'cupon;' . trim($codigoCupon) . ';' . $cantidadCupon;
-            } elseif ($cantidadCupon) {
-                // Formato antiguo: cupon;cantidad (solo cantidad, sin código)
-                $descuentos = 'cupon;' . $cantidadCupon;
-            }
-        }
-        // Si ya viene con formato cupon;codigo;cantidad o cupon;cantidad, no modificarlo
+        $descuentos = $this->normalizarDescuentosGuardado($validated['descuentos'] ?? null);
 
         $datosBase = Arr::except($validated, [
             'es_chollo',
             'frecuencia_chollo_valor',
             'frecuencia_chollo_unidad',
+            'texto_cantidad_alternativo',
         ]);
 
         $precioCero = $this->esPrecioCero($request->input('precio_total')) || $this->esPrecioCero($request->input('precio_unidad'));
@@ -537,6 +625,7 @@ class OfertaProductoController extends Controller
             'aviso' => $avisoFecha,
             'descuentos' => $descuentos,
             'especificaciones_internas' => $especificacionesInternas,
+            'texto_cantidad_alternativo' => $this->normalizarTextoCantidadAlternativoGuardado($request, (int) $validated['producto_id']),
         ];
         
         // Si el campo envio ha cambiado, actualizar fecha_actualizacion_envio
@@ -823,8 +912,12 @@ class OfertaProductoController extends Controller
             old('tienda_id') ? (int) old('tienda_id') : null,
             (int) $producto->id
         );
+        $apiScrapingOferta = $this->resolverInfoApisScrapingOferta(
+            old('tienda_id') ? (int) old('tienda_id') : null,
+            (int) $producto->id
+        );
 
-        return view('admin.ofertas.formulario', compact('producto', 'oferta', 'avisosVisibilidadOferta', 'tiendaAvisoEdit'));
+        return view('admin.ofertas.formulario', compact('producto', 'oferta', 'avisosVisibilidadOferta', 'tiendaAvisoEdit', 'apiScrapingOferta'));
     }
 
     //Nueva oferta sin pasarle producto al formulario
@@ -837,8 +930,12 @@ class OfertaProductoController extends Controller
             old('tienda_id') ? (int) old('tienda_id') : null,
             old('producto_id') ? (int) old('producto_id') : null
         );
+        $apiScrapingOferta = $this->resolverInfoApisScrapingOferta(
+            old('tienda_id') ? (int) old('tienda_id') : null,
+            old('producto_id') ? (int) old('producto_id') : null
+        );
 
-        return view('admin.ofertas.formulario', compact('producto', 'oferta', 'url', 'avisosVisibilidadOferta', 'tiendaAvisoEdit'));
+        return view('admin.ofertas.formulario', compact('producto', 'oferta', 'url', 'avisosVisibilidadOferta', 'tiendaAvisoEdit', 'apiScrapingOferta'));
     }
 
     /**
@@ -861,12 +958,85 @@ class OfertaProductoController extends Controller
 
         $avisos = $this->construirAvisosVisibilidadOferta((int) $validated['tienda_id'], $categoriaId);
         $tienda = Tienda::find((int) $validated['tienda_id']);
+        $apiScraping = ! empty($validated['producto_id'])
+            ? $this->resolverInfoApisScrapingOferta((int) $validated['tienda_id'], (int) $validated['producto_id'])
+            : null;
 
         return response()->json([
             'avisos' => $avisos,
             'tienda_edit_url' => $tienda ? route('admin.tiendas.edit', $tienda) : null,
             'tienda_nombre' => $tienda?->nombre,
+            'apis_scraping' => $apiScraping,
         ]);
+    }
+
+    /**
+     * @return array{
+     *     api_tienda: string,
+     *     api_tienda_nombre: string,
+     *     api_categoria: ?string,
+     *     api_categoria_nombre: ?string,
+     *     tiene_dos_apis: bool
+     * }|null
+     */
+    private function resolverInfoApisScrapingOferta(?int $tiendaId, ?int $productoId): ?array
+    {
+        if ($tiendaId === null || $productoId === null) {
+            return null;
+        }
+
+        $tienda = Tienda::find($tiendaId);
+        if ($tienda === null) {
+            return null;
+        }
+
+        $resolver = app(TiendaScrapingConfigResolver::class);
+        $categoriaId = Producto::query()->whereKey($productoId)->value('categoria_id');
+        $categoriaId = $categoriaId !== null ? (int) $categoriaId : null;
+
+        $apiTienda = (string) ($tienda->api ?? '');
+        if ($apiTienda === '') {
+            return null;
+        }
+
+        $metaTienda = TiendaScrapingConfigResolver::metaIconoApi($apiTienda);
+        $apiCategoria = $resolver->resolverApiSoloCategoria($tienda, $categoriaId);
+
+        $info = [
+            'api_tienda' => $apiTienda,
+            'api_tienda_nombre' => $metaTienda['nombre'] ?? $apiTienda,
+            'api_categoria' => null,
+            'api_categoria_nombre' => null,
+            'tiene_dos_apis' => false,
+        ];
+
+        if ($apiCategoria !== null && $apiCategoria !== '' && $apiCategoria !== $apiTienda) {
+            $metaCategoria = TiendaScrapingConfigResolver::metaIconoApi($apiCategoria);
+            $info['api_categoria'] = $apiCategoria;
+            $info['api_categoria_nombre'] = $metaCategoria['nombre'] ?? $apiCategoria;
+            $info['tiene_dos_apis'] = true;
+        }
+
+        return $info;
+    }
+
+    private function resolverApiScrapingOferta(?int $tiendaId, ?int $productoId): ?string
+    {
+        if ($tiendaId === null || $productoId === null) {
+            return null;
+        }
+
+        $tienda = Tienda::find($tiendaId);
+        if ($tienda === null) {
+            return null;
+        }
+
+        $categoriaId = Producto::query()->whereKey($productoId)->value('categoria_id');
+
+        return app(TiendaScrapingConfigResolver::class)->resolverApi(
+            $tienda,
+            $categoriaId !== null ? (int) $categoriaId : null
+        );
     }
 
     /**
@@ -954,7 +1124,8 @@ class OfertaProductoController extends Controller
         ]);
 
         try {
-            $validated = $request->validate([
+            $productoIdValidacion = (int) $request->input('producto_id');
+            $validated = $request->validate(array_merge([
                 'producto_id' => 'required|exists:productos,id',
                 'tienda_id' => 'required|exists:tiendas,id',
                 'unidades' => 'required|numeric|min:0.01',
@@ -979,7 +1150,7 @@ class OfertaProductoController extends Controller
                 'comprobada' => 'nullable|date',
                 'frecuencia_chollo_valor' => 'nullable|numeric|min:0.1',
                 'frecuencia_chollo_unidad' => 'nullable|in:minutos,horas,dias',
-            ]);
+            ], $this->reglasValidacionTextoCantidadAlternativo($productoIdValidacion)));
         } catch (\Illuminate\Validation\ValidationException $e) {
             \Log::error('Error de validación:', $e->errors());
             throw $e;
@@ -1049,34 +1220,14 @@ class OfertaProductoController extends Controller
             }
         }
 
-        // Procesar descuentos para cupones
-        $descuentos = isset($validated['descuentos']) ? trim($validated['descuentos']) : '';
-
-        if ($descuentos === '2a al 50% - cheque - Solo Carrefour') {
-            $descuentos = '2a al 50 - cheque - SoloCarrefour';
-        }
-        
-        // Si el campo descuentos ya viene con formato construido (cupon;codigo;cantidad o cupon;cantidad), no modificarlo
-        // Solo construir el formato si viene como 'cupon' sin formato (fallback por si el JavaScript no funciona)
-        if ($descuentos === 'cupon') {
-            $codigoCupon = $request->input('cupon_codigo');
-            $cantidadCupon = $request->input('cupon_cantidad');
-            
-            if ($codigoCupon && $cantidadCupon) {
-                // Formato nuevo: cupon;codigo;cantidad
-                $descuentos = 'cupon;' . trim($codigoCupon) . ';' . $cantidadCupon;
-            } elseif ($cantidadCupon) {
-                // Formato antiguo: cupon;cantidad (solo cantidad, sin código)
-                $descuentos = 'cupon;' . $cantidadCupon;
-            }
-        }
-        // Si ya viene con formato cupon;codigo;cantidad o cupon;cantidad, no modificarlo
+        $descuentos = $this->normalizarDescuentosGuardado($validated['descuentos'] ?? null);
 
         // Crear la oferta
         $datosBase = Arr::except($validated, [
             'es_chollo',
             'frecuencia_chollo_valor',
             'frecuencia_chollo_unidad',
+            'texto_cantidad_alternativo',
         ]);
 
         // Si el precio final es 0, forzar no mostrar (antes de crear)
@@ -1103,6 +1254,7 @@ class OfertaProductoController extends Controller
             'descuentos' => $descuentos,
             'aviso' => $avisoFecha,
             'especificaciones_internas' => $especificacionesInternas,
+            'texto_cantidad_alternativo' => $this->normalizarTextoCantidadAlternativoGuardado($request, (int) $validated['producto_id']),
         ];
         
         // Al crear una oferta nueva, siempre establecer fecha_actualizacion_envio
@@ -1219,6 +1371,42 @@ class OfertaProductoController extends Controller
         
         return response()->json([
             'ofertas' => $ofertas
+        ]);
+    }
+
+    /**
+     * Textos de cantidad alternativa usados en otras ofertas del mismo producto.
+     */
+    public function textosCantidadAlternativoProducto(Request $request, $productoId)
+    {
+        $excluirOfertaId = $request->query('excluir_oferta_id');
+
+        $textos = OfertaProducto::query()
+            ->where('producto_id', $productoId)
+            ->whereNotNull('texto_cantidad_alternativo')
+            ->where('texto_cantidad_alternativo', '!=', '')
+            ->when($excluirOfertaId, fn ($q) => $q->where('id', '!=', (int) $excluirOfertaId))
+            ->pluck('texto_cantidad_alternativo')
+            ->map(fn ($t) => trim((string) $t))
+            ->filter()
+            ->unique()
+            ->values();
+
+        $palabras = [];
+        $vistas = [];
+        foreach ($textos as $texto) {
+            foreach (preg_split('/\s+/u', (string) $texto, -1, PREG_SPLIT_NO_EMPTY) as $palabra) {
+                $clave = mb_strtolower($palabra);
+                if (!isset($vistas[$clave])) {
+                    $vistas[$clave] = true;
+                    $palabras[] = $palabra;
+                }
+            }
+        }
+
+        return response()->json([
+            'textos' => $textos,
+            'palabras' => array_values($palabras),
         ]);
     }
 
@@ -1765,6 +1953,11 @@ class OfertaProductoController extends Controller
             });
         }
 
+        $tipoEjecucion = $request->input('tipo_ejecucion', 'todas');
+        if (! in_array($tipoEjecucion, ['todas', 'normal', 'primera_oferta'], true)) {
+            $tipoEjecucion = 'todas';
+        }
+
         // Calcular estadísticas generales y datos para gráficos (sin paginación)
         $estadisticasQuery = clone $query;
         $totalEjecuciones = $estadisticasQuery->count();
@@ -1772,22 +1965,58 @@ class OfertaProductoController extends Controller
         $totalActualizadas = $estadisticasQuery->sum('total_guardado');
         $totalErrores = $estadisticasQuery->sum('total_errores');
 
+        // Media de peticiones/min reales y recuento global por API (desde totales guardados en cada ejecución)
+        $valoresPeticionesPorMinuto = [];
+        $conteoGlobalPorApi = [];
+        foreach ($estadisticasQuery->get() as $ejecucionMetrica) {
+            $logMetrica = is_array($ejecucionMetrica->log ?? null) ? $ejecucionMetrica->log : [];
+            $ppm = $logMetrica['metricas_peticiones_api']['peticiones_por_minuto'] ?? null;
+            if ($ppm !== null && is_numeric($ppm)) {
+                $valoresPeticionesPorMinuto[] = (int) $ppm;
+            }
+
+            $conteoEjecucion = $logMetrica['conteo_por_api'] ?? [];
+            if (is_array($conteoEjecucion)) {
+                foreach ($conteoEjecucion as $apiBase => $total) {
+                    $conteoGlobalPorApi[$apiBase] = ($conteoGlobalPorApi[$apiBase] ?? 0) + (int) $total;
+                }
+            }
+        }
+        arsort($conteoGlobalPorApi);
+        $mediaPeticionesPorMinuto = count($valoresPeticionesPorMinuto) > 0
+            ? round(array_sum($valoresPeticionesPorMinuto) / count($valoresPeticionesPorMinuto), 1)
+            : null;
+        $ejecucionesConMetricasPpm = count($valoresPeticionesPorMinuto);
+
         // Calcular errores por tienda (sin verificar URLs resueltas para optimizar)
         $erroresPorTienda = [];
+        $erroresPorTiendaDetalle = [];
+        $totalOcultadas = 0;
         $estadisticas = $estadisticasQuery->get();
-        
+        $tiendasApiCache = \App\Models\Tienda::pluck('api', 'nombre')->toArray();
+
         foreach ($estadisticas as $ejecucion) {
             $log = $ejecucion->log ?? [];
+            $totalOcultadas += (int) ($log['ocultadas'] ?? 0);
             $resultados = $log['resultados'] ?? [];
-            
+
             foreach ($resultados as $resultado) {
                 if (isset($resultado['success']) && !$resultado['success']) {
                     $tiendaNombre = $resultado['tienda_nombre'] ?? 'Tienda Desconocida';
-                    
+
                     if (!isset($erroresPorTienda[$tiendaNombre])) {
                         $erroresPorTienda[$tiendaNombre] = 0;
                     }
                     $erroresPorTienda[$tiendaNombre]++;
+
+                    $api = $resultado['api_usada'] ?? ($tiendasApiCache[$tiendaNombre] ?? null);
+                    if ($api) {
+                        $apiBase = explode(';', $api, 2)[0];
+                        if (!isset($erroresPorTiendaDetalle[$tiendaNombre][$apiBase])) {
+                            $erroresPorTiendaDetalle[$tiendaNombre][$apiBase] = 0;
+                        }
+                        $erroresPorTiendaDetalle[$tiendaNombre][$apiBase]++;
+                    }
                 }
             }
         }
@@ -1899,7 +2128,13 @@ class OfertaProductoController extends Controller
         }
 
         // Obtener ejecuciones paginadas para la lista
-        $ejecuciones = $query->orderByDesc('inicio')->paginate(15)->withQueryString();
+        $queryListado = clone $query;
+        if ($tipoEjecucion === 'normal') {
+            $queryListado->where('nombre', 'ejecuciones_scrapear_ofertas');
+        } elseif ($tipoEjecucion === 'primera_oferta') {
+            $queryListado->where('nombre', 'actualizar_primera_oferta');
+        }
+        $ejecuciones = $queryListado->orderByDesc('inicio')->paginate(15)->withQueryString();
 
         // Ordenar datos por hora (0-23) y convertir a arrays para JSON
         ksort($datosPorHora);
@@ -2063,14 +2298,21 @@ class OfertaProductoController extends Controller
             'fechaHasta',
             'horaDesde',
             'horaHasta',
+            'tipoEjecucion',
             'totalOfertas',
             'totalActualizadas',
+            'totalOcultadas',
             'totalErrores',
             'erroresPorTienda',
             'tiendasEnDatos',
             'datosPorHoraPorTienda',
             'tiendasConApi',
-            'estadisticasPorTienda'
+            'estadisticasPorTienda',
+            'mediaPeticionesPorMinuto',
+            'ejecucionesConMetricasPpm',
+            'conteoGlobalPorApi',
+            'erroresPorTiendaDetalle',
+            'tiendasApiCache'
         ))->with([
             'datosPorHora' => $datosPorHoraArray,
             'datosPorDia' => $datosPorDiaArray
@@ -2529,20 +2771,35 @@ class OfertaProductoController extends Controller
               ->orWhere('nombre', 'actualizar_primera_oferta');
         })->findOrFail($id);
         
-        $log = $ejecucion->log;
+        $log = is_array($ejecucion->log) ? $ejecucion->log : [];
+        $preparador = app(\App\Http\Controllers\Scraping\ScraperSegundoPlanoController::class);
         
-        // Si el log tiene el formato nuevo (con 'resultados'), devolver solo el array de resultados
+        // Si el log tiene el formato nuevo (con 'resultados'), devolver resultados y métricas
         if (isset($log['resultados']) && is_array($log['resultados'])) {
-            return response()->json($log['resultados']);
+            $log = $preparador->prepararLogEjecucionScraperParaVista($log);
+
+            return response()->json([
+                'resultados' => $log['resultados'],
+                'metricas_peticiones_api' => $log['metricas_peticiones_api'] ?? null,
+                'conteo_por_api' => $log['conteo_por_api'] ?? [],
+            ]);
         }
         
         // Si es el formato antiguo (array directo), devolverlo tal como está
         if (is_array($log) && !isset($log['token'])) {
-            return response()->json($log);
+            return response()->json([
+                'resultados' => $log,
+                'metricas_peticiones_api' => null,
+                'conteo_por_api' => [],
+            ]);
         }
         
         // Si es el formato nuevo pero sin 'resultados', devolver array vacío
-        return response()->json([]);
+        return response()->json([
+            'resultados' => [],
+            'metricas_peticiones_api' => null,
+            'conteo_por_api' => [],
+        ]);
     }
 
 
@@ -2930,38 +3187,71 @@ class OfertaProductoController extends Controller
         $request->validate([
             'url' => UrlOfertaValidacion::rules(),
             'tienda' => 'required|string',
-            'variante' => 'nullable|string'
+            'variante' => 'nullable|string',
+            'producto_id' => 'nullable|integer|exists:productos,id',
+            'oferta_id' => 'nullable|integer|exists:ofertas_producto,id',
+            'api_forzada' => 'nullable|string',
         ]);
 
         try {
-            // Usar el nuevo sistema de scraping interno
-            $scrapingController = new \App\Http\Controllers\Scraping\ScrapingController();
-            $response = $scrapingController->obtenerPrecio($request);
-            $responseData = $response->getData(true);
-            
-            // Verificar si la respuesta contiene un error
-            if (!$responseData['success']) {
+            $tiendaModel = Tienda::where('nombre', $request->input('tienda'))->first();
+            if (!$tiendaModel) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Error en el scraping: ' . ($responseData['error'] ?? 'Error desconocido')
-                ]);
-            }
-            
-            // Verificar si la respuesta contiene un precio válido
-            if (!isset($responseData['precio']) || !is_numeric($responseData['precio'])) {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Respuesta inválida del scraping: ' . json_encode($responseData)
+                    'error' => 'Tienda no encontrada en la base de datos',
                 ]);
             }
 
-            // Convertir precio a formato decimal (cambiar coma por punto si es necesario)
-            $precio = (float) str_replace(',', '.', $responseData['precio']);
+            $oferta = $this->resolverOfertaParaScraperFormulario($request);
+            $categoriaId = $this->resolverCategoriaIdParaScraperFormulario($request);
+            $resolver = app(TiendaScrapingConfigResolver::class);
 
-            return response()->json([
-                'success' => true,
-                'precio' => $precio
-            ]);
+            if ($request->filled('api_forzada')) {
+                return $this->respuestaPrecioScraperFormulario(
+                    $this->ejecutarScrapingFormulario($request, $oferta, $request->input('api_forzada'))
+                );
+            }
+
+            if ($tiendaModel->api === TiendaScrapingConfigResolver::API_CSV_AWIN) {
+                $csvResponse = app(CsvAwinOfertaService::class)->obtenerPrecioJson(
+                    $request->input('url'),
+                    $tiendaModel,
+                    $oferta
+                );
+                $csvData = $csvResponse->getData(true);
+
+                if (!empty($csvData['success']) && isset($csvData['precio']) && is_numeric($csvData['precio'])) {
+                    return $this->respuestaPrecioScraperFormulario($csvData);
+                }
+
+                $apiCategoria = $resolver->resolverApiSoloCategoria($tiendaModel, $categoriaId);
+                if ($this->tieneApiAlternativaCategoriaTrasCsv($apiCategoria)) {
+                    if (TiendaScrapingConfigResolver::esApiVps($apiCategoria)) {
+                        return $this->respuestaPrecioScraperFormulario(
+                            $this->ejecutarScrapingFormulario($request, $oferta, $apiCategoria)
+                        );
+                    }
+
+                    $metaApi = TiendaScrapingConfigResolver::metaIconoApi($apiCategoria);
+
+                    return response()->json([
+                        'success' => false,
+                        'error' => $csvData['error'] ?? 'Producto no encontrado en CSV-Awin.',
+                        'ofrecer_api_alternativa' => true,
+                        'api_alternativa' => $apiCategoria,
+                        'api_alternativa_nombre' => $metaApi['nombre'] ?? $apiCategoria,
+                    ]);
+                }
+
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Error en el scraping: ' . ($csvData['error'] ?? 'Producto no encontrado en CSV-Awin.'),
+                ]);
+            }
+
+            return $this->respuestaPrecioScraperFormulario(
+                $this->ejecutarScrapingFormulario($request, $oferta)
+            );
 
         } catch (\Exception $e) {
             return response()->json([
@@ -2971,14 +3261,109 @@ class OfertaProductoController extends Controller
         }
     }
 
+    private function resolverOfertaParaScraperFormulario(Request $request): ?OfertaProducto
+    {
+        if (!$request->filled('oferta_id')) {
+            return null;
+        }
+
+        return OfertaProducto::find($request->input('oferta_id'));
+    }
+
+    private function resolverCategoriaIdParaScraperFormulario(Request $request): ?int
+    {
+        if ($request->filled('producto_id')) {
+            $categoriaId = Producto::whereKey($request->input('producto_id'))->value('categoria_id');
+
+            return $categoriaId !== null ? (int) $categoriaId : null;
+        }
+
+        if ($request->filled('oferta_id')) {
+            $oferta = OfertaProducto::with('producto')->find($request->input('oferta_id'));
+
+            return $oferta?->producto?->categoria_id !== null
+                ? (int) $oferta->producto->categoria_id
+                : null;
+        }
+
+        return null;
+    }
+
+    private function tieneApiAlternativaCategoriaTrasCsv(?string $apiCategoria): bool
+    {
+        if ($apiCategoria === null || $apiCategoria === '') {
+            return false;
+        }
+
+        return $apiCategoria !== TiendaScrapingConfigResolver::API_CSV_AWIN;
+    }
+
     /**
-     * Verificar si una URL ya existe en la tabla ofertas_producto
+     * @return array<string, mixed>
+     */
+    private function ejecutarScrapingFormulario(Request $request, ?OfertaProducto $oferta, ?string $apiForzada = null): array
+    {
+        if ($apiForzada !== null && $apiForzada !== '') {
+            $request->merge(['api_forzada' => $apiForzada]);
+        }
+
+        $scrapingController = new \App\Http\Controllers\Scraping\ScrapingController();
+        $response = $scrapingController->obtenerPrecio($request, $oferta);
+
+        return $response->getData(true);
+    }
+
+    /**
+     * @param  array<string, mixed>  $responseData
+     */
+    private function respuestaPrecioScraperFormulario(array $responseData)
+    {
+        if (!$responseData['success']) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Error en el scraping: ' . ($responseData['error'] ?? 'Error desconocido'),
+            ]);
+        }
+
+        if (!isset($responseData['precio']) || !is_numeric($responseData['precio'])) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Respuesta inválida del scraping: ' . json_encode($responseData),
+            ]);
+        }
+
+        $precio = (float) str_replace(',', '.', (string) $responseData['precio']);
+
+        $respuesta = [
+            'success' => true,
+            'precio' => $precio,
+        ];
+
+        if (!empty($responseData['descuentos_sincronizados'])) {
+            $respuesta['descuentos_sincronizados'] = true;
+            $respuesta['descuentos'] = is_string($responseData['descuentos'] ?? null)
+                ? $responseData['descuentos']
+                : '';
+            $respuesta['descuentos_detectados'] = is_array($responseData['descuentos_detectados'] ?? null)
+                ? $responseData['descuentos_detectados']
+                : [];
+        }
+
+        return response()->json($respuesta);
+    }
+
+    /**
+     * Verificar si una URL ya existe en la tabla ofertas_producto.
+     * Solo se consideran ofertas de la misma tienda y que estén en mostrar=si,
+     * o en mostrar=no con aviso (columna aviso o avisos relacionados).
+     * Las de mostrar=no sin aviso no cuentan como duplicado.
      */
     public function verificarUrlExistente(Request $request)
     {
         $url = $request->input('url');
         $ofertaId = $request->input('oferta_id'); // Para excluir la oferta actual en caso de edición
         $productoId = $request->input('producto_id'); // ID del producto actual
+        $tiendaId = $request->input('tienda_id');
         
         if (empty($url)) {
             return response()->json([
@@ -3002,6 +3387,25 @@ class OfertaProductoController extends Controller
         if ($ofertaId) {
             $query->where('id', '!=', $ofertaId);
         }
+
+        // Solo misma tienda (sin tienda aún, no hay duplicados relevantes que comprobar)
+        if ($tiendaId) {
+            $query->where('tienda_id', $tiendaId);
+        } else {
+            $query->whereRaw('1 = 0');
+        }
+
+        // mostrar=si, o mostrar=no con aviso (legacy o tabla avisos)
+        $query->where(function ($q) {
+            $q->where('mostrar', 'si')
+                ->orWhere(function ($q2) {
+                    $q2->where('mostrar', 'no')
+                        ->where(function ($q3) {
+                            $q3->whereNotNull('aviso')
+                                ->orWhereHas('avisos');
+                        });
+                });
+        });
         
         $ofertasExistentes = $query->get();
         
@@ -4083,10 +4487,6 @@ class OfertaProductoController extends Controller
      */
     private function columnasEspecificacionesInternasParaListadoOfertas(Producto $producto): array
     {
-        if ($producto->unidadDeMedida !== 'unidadUnica') {
-            return [];
-        }
-
         if (!$producto->categoria_id_especificaciones_internas) {
             return [];
         }
@@ -4099,6 +4499,10 @@ class OfertaProductoController extends Controller
         $columnasIds = $this->normalizarIdsEspecificacionesInternasListado($elegidas['_columnas'] ?? null);
         if ($columnasIds === []) {
             return [];
+        }
+
+        if ($producto->unidadDeMedida !== 'unidadUnica') {
+            $columnasIds = array_slice($columnasIds, 0, 1);
         }
 
         $categoria = Categoria::find($producto->categoria_id_especificaciones_internas);
@@ -4476,5 +4880,37 @@ class OfertaProductoController extends Controller
         }
 
         return $out;
+    }
+
+    private function categoriaRequiereTextoCantidadAlternativo(int $productoId): bool
+    {
+        $producto = Producto::with('categoria')->find($productoId);
+
+        return $producto
+            && $producto->categoria
+            && ($producto->categoria->permitir_texto_cantidad_alternativo ?? 'no') === 'si';
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function reglasValidacionTextoCantidadAlternativo(int $productoId): array
+    {
+        if ($this->categoriaRequiereTextoCantidadAlternativo($productoId)) {
+            return ['texto_cantidad_alternativo' => 'required|string|max:255'];
+        }
+
+        return ['texto_cantidad_alternativo' => 'nullable|string|max:255'];
+    }
+
+    private function normalizarTextoCantidadAlternativoGuardado(Request $request, int $productoId): ?string
+    {
+        if (!$this->categoriaRequiereTextoCantidadAlternativo($productoId)) {
+            return null;
+        }
+
+        $texto = trim((string) $request->input('texto_cantidad_alternativo', ''));
+
+        return $texto !== '' ? $texto : null;
     }
 }

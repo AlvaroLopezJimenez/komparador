@@ -19,6 +19,7 @@ class Tienda extends Model
         'aviso',
         'avisos_sin_stock_scrapear_automatico',
         'api',
+        'api_productos',
         'url_csv',
         'mostrar_tienda',
         'scrapear',

@@ -379,18 +379,44 @@
         }
         const segs = String(path || '').replace(/\/+$/, '').split('/').filter(Boolean);
         if (!segs.length) return [];
-        let slug = segs[segs.length - 1];
-        if (segs.length >= 2 && /^(p|html?)$/i.test(slug)) {
-            slug = segs[segs.length - 2];
+        const partes = [];
+        const visto = new Set();
+        function pushParte(t) {
+            const s = String(t || '').trim();
+            if (!s) return;
+            const clave = s.toLowerCase();
+            if (visto.has(clave)) return;
+            visto.add(clave);
+            partes.push(s);
+        }
+        function partirSegmentoSlug(seg) {
+            if (!seg) return;
+            if (/^R-/i.test(seg)) {
+                pushParte(seg);
+                return;
+            }
+            seg.split('|').forEach(bloque => {
+                bloque.split('-').forEach(p => pushParte(p));
+            });
+        }
+        const n = segs.length;
+        const ultimo = segs[n - 1];
+        if (/^R-/i.test(ultimo)) {
+            if (n >= 2) partirSegmentoSlug(segs[n - 2]);
+            pushParte(ultimo);
+            return partes;
+        }
+        let slug = ultimo;
+        if (n >= 2 && /^(p|html?)$/i.test(ultimo)) {
+            slug = segs[n - 2];
+            if (/^R-/i.test(slug)) {
+                if (n >= 3) partirSegmentoSlug(segs[n - 3]);
+                pushParte(slug);
+                return partes;
+            }
         }
         if (!slug) return [];
-        const partes = [];
-        slug.split('|').forEach(bloque => {
-            bloque.split('-').forEach(p => {
-                const t = String(p || '').trim();
-                if (t) partes.push(t);
-            });
-        });
+        partirSegmentoSlug(slug);
         return partes;
     }
 
@@ -1761,7 +1787,7 @@
         if (cont.dataset.esUnidadUnica === '1' && Array.isArray(columnasIds) && columnasIds.length) {
             out._columnas = {};
             columnasIds.forEach(pid => {
-                if (out[pid] && out[pid][0]) out._columnas[pid] = out[pid][0];
+                if (out[pid] && out[pid].length) out._columnas[pid] = out[pid].slice();
             });
             if (!Object.keys(out._columnas).length) delete out._columnas;
         }
@@ -1787,7 +1813,7 @@
 
     function esErrorPrecioIa(data) {
         const txt = String((data && (data.error || data.message)) || '').toLowerCase();
-        return txt.includes('precio') || txt.includes('sin stock') || txt.includes('agotado') || txt.includes('no se pudo obtener') || txt.includes('out of stock');
+        return txt.includes('precio') || txt.includes('sin stock') || txt.includes('agotado') || txt.includes('no se pudo obtener') || txt.includes('out of stock') || txt.includes('csv-awin') || txt.includes('csv awin');
     }
 
     function formatearEurosIa(valor, sufijo, fallback) {

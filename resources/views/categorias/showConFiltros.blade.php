@@ -632,7 +632,8 @@
             {{-- MAIN CON PRODUCTOS --}}
             <main class="flex-1 lg:w-3/4">
                 {{-- BOTONES DE ORDENACIÓN (solo desktop) --}}
-                <div class="hidden lg:flex justify-end gap-2 mb-4">
+                <div class="hidden lg:flex items-center justify-end gap-2 mb-4">
+                    <span class="text-sm font-medium text-gray-700">Ordenar por:</span>
                     @php
                         // $urlRelevancia -> $ur1
                         // $urlPrecio -> $up1

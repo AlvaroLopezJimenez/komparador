@@ -73,6 +73,10 @@ class TiendaController extends Controller
             'scrapingPorCategoria' => collect(),
             'categoriasSinApiScraping' => collect(),
             'categoriasAncestrosSinApi' => collect(),
+            'resumenScrapingCategorias' => null,
+            'conteoDirectoOfertas' => [],
+            'categoriasConOfertas' => collect(),
+            'filtroPorCategoria' => [],
         ]);
     }
 
@@ -86,13 +90,14 @@ class TiendaController extends Controller
             'envio_gratis' => 'nullable|string',
             'envio_normal' => 'nullable|string',
             'url' => 'nullable|string',
-            'url_imagen' => 'nullable|string',
+            'url_imagen' => 'nullable|string|max:255',
             'opiniones' => 'nullable|integer',
             'puntuacion' => 'nullable|numeric|min:0|max:5',
             'url_opiniones' => 'nullable|string',
             'anotaciones_internas' => 'nullable|string',
             'aviso' => 'nullable|date',
             'api' => 'required|string|' . TiendaScrapingConfigResolver::reglaValidacionApi(),
+            'api_productos' => 'required|string|' . TiendaScrapingConfigResolver::reglaValidacionApi(),
             'mostrar_tienda' => 'required|in:si,no',
             'scrapear' => 'required|in:si,no',
             'avisos_sin_stock_scrapear_automatico' => 'required|in:si,no',
@@ -153,7 +158,7 @@ class TiendaController extends Controller
         }
 
         $tienda = \App\Models\Tienda::create([
-            ...$request->only(['nombre', 'envio_gratis', 'envio_normal', 'url', 'url_imagen', 'url_opiniones', 'api', 'mostrar_tienda', 'scrapear', 'avisos_sin_stock_scrapear_automatico', 'como_scrapear']),
+            ...$request->only(['nombre', 'envio_gratis', 'envio_normal', 'url', 'url_imagen', 'url_opiniones', 'api', 'api_productos', 'mostrar_tienda', 'scrapear', 'avisos_sin_stock_scrapear_automatico', 'como_scrapear']),
             'url_csv' => $this->resolverUrlCsvParaGuardar($request),
             'opiniones' => $request->filled('opiniones') ? $request->input('opiniones') : 0,
             'puntuacion' => $request->filled('puntuacion') ? $request->input('puntuacion') : 0,
@@ -308,12 +313,37 @@ class TiendaController extends Controller
         }
         $categoriasAncestrosSinApi = $categoriasAncestrosSinApi->unique()->values();
 
+        $resumenScrapingCategorias = app(TiendaScrapingConfigResolver::class)
+            ->resumenIndexPorTiendas(collect([$tienda]))[$tienda->id];
+
+        $resolverFiltroCategorias = app(TiendaScrapingConfigResolver::class);
+        $filtroPorCategoria = [];
+        foreach ($categoriasConOfertas as $catId) {
+            $catId = (int) $catId;
+            $apiEfectiva = $resolverFiltroCategorias->resolverApi($tienda, $catId);
+            $filtroPorCategoria[$catId] = [
+                'api_base' => TiendaScrapingConfigResolver::apiBase($apiEfectiva) ?? '',
+                'scrapear' => $resolverFiltroCategorias->resolverScrapear($tienda, $catId),
+                'mostrar' => $resolverFiltroCategorias->resolverMostrar($tienda, $catId),
+            ];
+        }
+
+        $flujoScrapingTienda = $resolverFiltroCategorias->construirFlujoParaTienda(
+            $tienda,
+            $categoriasConOfertas,
+            $scrapingPorCategoria,
+            $conteoDirectoOfertas->all(),
+            $conteoTotalOfertas
+        );
+
         return view('admin.tiendas.formulario', compact(
             'tienda', 'categorias', 'neoobjetivosPorCategoria',
             'tipoListadoCategoria', 'mensajeControlador', 'mensajeTipoListado',
             'categoriasSinNeoobjetivo', 'categoriasAncestrosSinNeo',
-            'conteoTotalOfertas', 'scrapingPorCategoria',
-            'categoriasSinApiScraping', 'categoriasAncestrosSinApi'
+            'conteoTotalOfertas', 'conteoDirectoOfertas', 'scrapingPorCategoria',
+            'categoriasSinApiScraping', 'categoriasAncestrosSinApi',
+            'resumenScrapingCategorias', 'categoriasConOfertas', 'filtroPorCategoria',
+            'flujoScrapingTienda'
         ));
     }
 
@@ -329,13 +359,14 @@ class TiendaController extends Controller
             'envio_gratis' => 'nullable|string',
             'envio_normal' => 'nullable|string',
             'url' => 'nullable|string',
-            'url_imagen' => 'nullable|string',
+            'url_imagen' => 'nullable|string|max:255',
             'opiniones' => 'nullable|integer',
             'puntuacion' => 'nullable|numeric|min:0|max:5',
             'url_opiniones' => 'nullable|string',
             'anotaciones_internas' => 'nullable|string',
             'aviso' => 'nullable|date',
             'api' => 'required|string|' . TiendaScrapingConfigResolver::reglaValidacionApi(),
+            'api_productos' => 'required|string|' . TiendaScrapingConfigResolver::reglaValidacionApi(),
             'mostrar_tienda' => 'required|in:si,no',
             'scrapear' => 'required|in:si,no',
             'avisos_sin_stock_scrapear_automatico' => 'required|in:si,no',
@@ -415,6 +446,7 @@ class TiendaController extends Controller
                 'url_opiniones',
                 'anotaciones_internas',
                 'api',
+                'api_productos',
                 'mostrar_tienda',
                 'scrapear',
                 'avisos_sin_stock_scrapear_automatico',
@@ -570,6 +602,179 @@ class TiendaController extends Controller
     }
 
     /**
+     * Actualiza scrapear o mostrar de una categoría vía AJAX (pestañas Scraping/Mostrar).
+     */
+    public function actualizarCampoScrapingCategoria(Request $request, Tienda $tienda)
+    {
+        $validated = $request->validate([
+            'categoria_id' => 'required|integer|exists:categorias,id',
+            'campo' => 'required|in:scrapear,mostrar',
+            'valor' => 'required|in:si,no',
+        ]);
+
+        $categoriaId = (int) $validated['categoria_id'];
+        $campo = $validated['campo'];
+        $valor = $validated['valor'];
+
+        $config = TiendaCategoriaApi::where('tienda_id', $tienda->id)
+            ->where('categoria_id', $categoriaId)
+            ->first();
+
+        $api = ($config && $config->api) ? trim((string) $config->api) : '';
+        $scrapear = $config->scrapear ?? null;
+        $mostrar = $config->mostrar ?? null;
+        $frecuenciaMinima = $config->frecuencia_minima_minutos ?? null;
+        $frecuenciaMaxima = $config->frecuencia_maxima_minutos ?? null;
+
+        if ($campo === 'scrapear') {
+            $scrapear = $valor;
+        } else {
+            $mostrar = $valor;
+        }
+
+        $scrapearGuardar = in_array($scrapear, ['si', 'no'], true) ? $scrapear : 'si';
+        $mostrarGuardar = in_array($mostrar, ['si', 'no'], true) ? $mostrar : 'si';
+        $defaultScrapear = $tienda->scrapear ?? 'si';
+        $defaultMostrar = $tienda->mostrar_tienda ?? 'si';
+
+        if ($api === '' && $scrapearGuardar === $defaultScrapear && $mostrarGuardar === $defaultMostrar) {
+            if ($config) {
+                $config->delete();
+            }
+        } else {
+            TiendaCategoriaApi::updateOrCreate(
+                [
+                    'tienda_id' => $tienda->id,
+                    'categoria_id' => $categoriaId,
+                ],
+                [
+                    'api' => $api !== '' ? $api : null,
+                    'scrapear' => $scrapearGuardar,
+                    'mostrar' => $mostrarGuardar,
+                    'frecuencia_minima_minutos' => $frecuenciaMinima,
+                    'frecuencia_maxima_minutos' => $frecuenciaMaxima,
+                ]
+            );
+        }
+
+        $configFresh = TiendaCategoriaApi::where('tienda_id', $tienda->id)
+            ->where('categoria_id', $categoriaId)
+            ->first();
+
+        $resolver = app(TiendaScrapingConfigResolver::class);
+
+        return response()->json([
+            'ok' => true,
+            'scrapear' => $resolver->resolverScrapear($tienda, $categoriaId),
+            'mostrar' => $resolver->resolverMostrar($tienda, $categoriaId),
+            'scrapear_explicito' => $configFresh !== null
+                && $configFresh->scrapear !== null
+                && $configFresh->scrapear !== '',
+            'mostrar_explicito' => $configFresh !== null
+                && $configFresh->mostrar !== null
+                && $configFresh->mostrar !== '',
+        ]);
+    }
+
+    /**
+     * Guarda api_productos de la tienda vía AJAX (formulario edición).
+     */
+    public function actualizarApiProductos(Request $request, Tienda $tienda)
+    {
+        $validated = $request->validate([
+            'api_productos' => 'required|string|' . TiendaScrapingConfigResolver::reglaValidacionApi(),
+        ]);
+
+        $tienda->update([
+            'api_productos' => $validated['api_productos'],
+        ]);
+
+        return response()->json([
+            'ok' => true,
+            'api_productos' => $tienda->api_productos,
+            'message' => 'API de búsqueda de productos guardada.',
+        ]);
+    }
+
+    /**
+     * Guarda o elimina una línea de URL de categoría (Neoobjetivo) vía AJAX.
+     */
+    public function actualizarUrlCategoriaTienda(Request $request, Tienda $tienda)
+    {
+        $validated = $request->validate([
+            'categoria_id' => 'required|integer|exists:categorias,id',
+            'neo_id' => 'nullable|integer',
+            'url' => 'nullable|string|max:2048',
+            'visitada' => 'nullable|date',
+        ]);
+
+        $categoriaId = (int) $validated['categoria_id'];
+        $neoId = !empty($validated['neo_id']) ? (int) $validated['neo_id'] : null;
+        $url = trim((string) ($validated['url'] ?? ''));
+
+        if ($url === '') {
+            if ($neoId) {
+                Neoobjetivo::where('id', $neoId)
+                    ->where('tienda_id', $tienda->id)
+                    ->where('categoria_id', $categoriaId)
+                    ->whereNull('oferta_id')
+                    ->whereNull('producto_id')
+                    ->delete();
+            }
+
+            return response()->json([
+                'ok' => true,
+                'neo_id' => null,
+                'deleted' => true,
+                'message' => 'URL eliminada.',
+            ]);
+        }
+
+        $visitada = $this->parsearVisitadaCategoria($validated['visitada'] ?? null);
+
+        if ($neoId) {
+            $neo = Neoobjetivo::where('id', $neoId)
+                ->where('tienda_id', $tienda->id)
+                ->where('categoria_id', $categoriaId)
+                ->whereNull('oferta_id')
+                ->whereNull('producto_id')
+                ->first();
+
+            if ($neo) {
+                $neo->update([
+                    'url' => $url,
+                    'visitada' => $visitada,
+                    'oferta_id' => null,
+                    'producto_id' => null,
+                ]);
+
+                return response()->json([
+                    'ok' => true,
+                    'neo_id' => $neo->id,
+                    'visitada' => $neo->visitada?->format('Y-m-d\TH:i'),
+                    'message' => 'URL guardada.',
+                ]);
+            }
+        }
+
+        $neo = Neoobjetivo::create([
+            'tienda_id' => $tienda->id,
+            'categoria_id' => $categoriaId,
+            'oferta_id' => null,
+            'producto_id' => null,
+            'url' => $url,
+            'visitada' => $visitada,
+        ]);
+
+        return response()->json([
+            'ok' => true,
+            'neo_id' => $neo->id,
+            'visitada' => $neo->visitada?->format('Y-m-d\TH:i'),
+            'message' => 'URL guardada.',
+        ]);
+    }
+
+    /**
      * Guarda la configuración de scraping (API y frecuencias) por categoría.
      */
     private function guardarScrapingCategoria(Request $request, Tienda $tienda): void
@@ -675,7 +880,7 @@ class TiendaController extends Controller
             }
         }
 
-        return now()->subDays(7);
+        return Neoobjetivo::fechaVisitadaPorDefectoAlCrear();
     }
 
     /**
@@ -1117,12 +1322,12 @@ class TiendaController extends Controller
                 ->with('success', 'URL eliminada para esta tienda en la categoría seleccionada.');
         }
 
-        $visitada = now()->subDays(7);
+        $visitada = Neoobjetivo::fechaVisitadaPorDefectoAlCrear();
         if (is_string($visitadaCategoria) && trim($visitadaCategoria) !== '') {
             try {
                 $visitada = Carbon::parse($visitadaCategoria);
             } catch (\Throwable $e) {
-                $visitada = now()->subDays(7);
+                $visitada = Neoobjetivo::fechaVisitadaPorDefectoAlCrear();
             }
         }
 

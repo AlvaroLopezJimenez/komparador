@@ -190,6 +190,11 @@
                             <div><dt class="text-gray-500 inline">Omitidas (oferta):</dt> <dd class="inline font-medium">{{ $contadores['urls_omitida_oferta'] ?? 0 }}</dd></div>
                             <div><dt class="text-gray-500 inline">Omitidas (descartada):</dt> <dd class="inline font-medium">{{ $contadores['urls_omitida_descartada'] ?? 0 }}</dd></div>
                             <div><dt class="text-gray-500 inline">Omitidas (neo):</dt> <dd class="inline font-medium">{{ $contadores['urls_omitida_neo'] ?? 0 }}</dd></div>
+                            <div><dt class="text-gray-500 inline">CSV coincidentes:</dt> <dd class="inline font-medium">{{ $contadores['csv_filas_coincidentes'] ?? 0 }}</dd></div>
+                            <div><dt class="text-gray-500 inline">CSV insertadas neo:</dt> <dd class="inline font-medium text-green-600">{{ $contadores['csv_insertadas_neo'] ?? 0 }}</dd></div>
+                            <div><dt class="text-gray-500 inline">CSV ya en neo:</dt> <dd class="inline font-medium">{{ $contadores['csv_ya_en_neo'] ?? 0 }}</dd></div>
+                            <div><dt class="text-gray-500 inline">CSV omitidas (oferta):</dt> <dd class="inline font-medium">{{ $contadores['csv_omitida_oferta'] ?? 0 }}</dd></div>
+                            <div><dt class="text-gray-500 inline">CSV aniadida_neo=si:</dt> <dd class="inline font-medium">{{ $contadores['csv_aniadida_neo_si'] ?? 0 }}</dd></div>
                         </dl>
                     </div>
                 @endif
@@ -217,8 +222,33 @@
                 @endif
 
                 @if (!empty($resultados))
+                    @php
+                        $urlsInsertadasEjecucion = [];
+                        foreach ($resultados as $r) {
+                            foreach ($r['detalle_urls'] ?? [] as $det) {
+                                if (!is_array($det) || ($det['accion'] ?? '') !== 'insertada') {
+                                    continue;
+                                }
+                                $urlDetalle = trim((string) ($det['url'] ?? ''));
+                                if ($urlDetalle !== '') {
+                                    $urlsInsertadasEjecucion[] = $urlDetalle;
+                                }
+                            }
+                        }
+                        $urlsInsertadasEjecucion = array_values(array_unique($urlsInsertadasEjecucion));
+                    @endphp
                     <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 space-y-4">
-                        <h3 class="font-semibold text-base">Productos ({{ count($resultados) }})</h3>
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <h3 class="font-semibold text-base">Productos ({{ count($resultados) }})</h3>
+                            @if ($urlsInsertadasEjecucion !== [])
+                                <button type="button"
+                                    class="px-3 py-1.5 text-sm rounded bg-green-600 text-white hover:bg-green-700 shrink-0"
+                                    onclick="copiarTextoCronAmazon('urls-insertadas-ejecucion')">
+                                    Copiar todas las URLs insertadas en Neo ({{ count($urlsInsertadasEjecucion) }})
+                                </button>
+                                <textarea id="urls-insertadas-ejecucion" readonly class="sr-only">{{ implode("\n", $urlsInsertadasEjecucion) }}</textarea>
+                            @endif
+                        </div>
                         @foreach ($resultados as $idx => $r)
                             <div class="rounded-lg border border-gray-200 dark:border-gray-600 p-3 text-sm space-y-2">
                                 <p>
@@ -243,33 +273,76 @@
                                 @if (!empty($r['error']) && empty($r['error_amazon']) && empty($r['error_aliexpress']))
                                     <p class="text-red-600 dark:text-red-400"><strong>Error:</strong> {{ $r['error'] }}</p>
                                 @endif
+                                @if (!empty($r['codigos_ofertas_consultadas']))
+                                    <p class="text-gray-600 dark:text-gray-400 text-xs">
+                                        Códigos CSV: ofertas consultadas <strong>{{ $r['codigos_ofertas_consultadas'] }}</strong>
+                                        @if (!empty($r['codigos_sincronizados']))
+                                            — <span class="text-green-600 dark:text-green-400">producto actualizado</span>
+                                        @endif
+                                    </p>
+                                @endif
                                 <p>
                                     Páginas Amazon: <strong>{{ $r['paginas_amazon'] ?? 0 }}</strong> —
                                     URLs Amazon: <strong>{{ $r['urls_amazon'] ?? 0 }}</strong> —
                                     URLs AliExpress: <strong>{{ $r['urls_aliexpress'] ?? 0 }}</strong> —
                                     Insertadas: <strong class="text-green-600">{{ $r['urls_insertadas'] ?? 0 }}</strong> —
                                     Omitidas: <strong>{{ $r['urls_omitidas'] ?? 0 }}</strong>
+                                    @if (($r['csv_coincidentes_codigo'] ?? 0) > 0)
+                                        — CSV por código: <strong>{{ $r['csv_coincidentes_codigo'] }}</strong> coincidencias,
+                                        <strong class="text-green-600">{{ $r['csv_insertadas_codigo'] ?? 0 }}</strong> en Neo
+                                    @endif
                                 </p>
 
                                 @if (!empty($r['detalle_urls']) && is_array($r['detalle_urls']))
-                                    <details class="mt-1">
-                                        <summary class="cursor-pointer text-xs text-blue-600 dark:text-blue-400">Detalle URLs ({{ count($r['detalle_urls']) }})</summary>
-                                        <ul class="mt-2 space-y-1 text-xs">
-                                            @foreach ($r['detalle_urls'] as $det)
-                                                <li class="flex flex-wrap items-center gap-2">
-                                                    @if (!empty($det['tienda']))
-                                                        <span class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-[10px] font-medium uppercase">{{ $det['tienda'] }}</span>
-                                                    @endif
-                                                    @if (($det['accion'] ?? '') === 'insertada')
-                                                        <span class="px-1.5 py-0.5 rounded bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-200 font-medium">Insertada</span>
-                                                    @else
-                                                        <span class="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium">Omitida ({{ $det['motivo'] ?? '?' }})</span>
-                                                    @endif
-                                                    <a href="{{ $det['url'] ?? '#' }}" target="_blank" rel="noopener" class="text-blue-600 dark:text-blue-400 hover:underline break-all">{{ \Illuminate\Support\Str::limit($det['url'] ?? '', 80) }}</a>
-                                                </li>
-                                            @endforeach
-                                        </ul>
-                                    </details>
+                                    @php
+                                        $urlsProducto = [];
+                                        foreach ($r['detalle_urls'] as $det) {
+                                            if (!is_array($det)) {
+                                                continue;
+                                            }
+                                            if (($det['accion'] ?? '') !== 'insertada') {
+                                                continue;
+                                            }
+                                            $urlDetalle = trim((string) ($det['url'] ?? ''));
+                                            if ($urlDetalle !== '') {
+                                                $urlsProducto[] = $urlDetalle;
+                                            }
+                                        }
+                                        $urlsProducto = array_values(array_unique($urlsProducto));
+                                    @endphp
+                                    <div class="flex flex-wrap items-center gap-2 mt-1">
+                                        <details class="min-w-0">
+                                            <summary class="cursor-pointer text-xs text-blue-600 dark:text-blue-400">Detalle URLs ({{ count($r['detalle_urls']) }})</summary>
+                                            <ul class="mt-2 space-y-1 text-xs">
+                                                @foreach ($r['detalle_urls'] as $det)
+                                                    <li class="flex flex-wrap items-start gap-2">
+                                                        @if (!empty($det['tienda']))
+                                                            <span class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-[10px] font-medium uppercase shrink-0">{{ $det['tienda'] }}</span>
+                                                        @elseif (!empty($det['origen']))
+                                                            <span class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-[10px] font-medium uppercase shrink-0">{{ $det['origen'] }}</span>
+                                                        @endif
+                                                        @if (!empty($det['origen_busqueda']))
+                                                            <span class="px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-200 text-[10px] font-medium shrink-0">{{ $det['origen_busqueda'] }}</span>
+                                                        @endif
+                                                        @if (($det['accion'] ?? '') === 'insertada')
+                                                            <span class="px-1.5 py-0.5 rounded bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-200 font-medium shrink-0">Insertada</span>
+                                                        @else
+                                                            <span class="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium shrink-0">Omitida ({{ $det['motivo'] ?? '?' }})</span>
+                                                        @endif
+                                                        <a href="{{ $det['url'] ?? '#' }}" target="_blank" rel="noopener" class="text-blue-600 dark:text-blue-400 hover:underline break-all">{{ $det['url'] ?? '' }}</a>
+                                                    </li>
+                                                @endforeach
+                                            </ul>
+                                        </details>
+                                        @if ($urlsProducto !== [])
+                                            <button type="button"
+                                                class="px-2 py-1 text-xs rounded bg-green-600 text-white hover:bg-green-700 shrink-0"
+                                                onclick="copiarTextoCronAmazon('urls-producto-{{ $idx }}')">
+                                                Copiar URLs
+                                            </button>
+                                            <textarea id="urls-producto-{{ $idx }}" readonly class="sr-only">{{ implode("\n", $urlsProducto) }}</textarea>
+                                        @endif
+                                    </div>
                                 @endif
                             </div>
                         @endforeach
@@ -287,4 +360,28 @@
 
         </div>
     </div>
+
+    @if (isset($ejecucion))
+        <script>
+            function copiarTextoCronAmazon(idTextarea) {
+                const el = document.getElementById(idTextarea);
+                if (!el) {
+                    return;
+                }
+                el.focus();
+                el.select();
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(el.value).then(function () {
+                        alert('URLs copiadas al portapapeles.');
+                    }).catch(function () {
+                        document.execCommand('copy');
+                        alert('URLs copiadas al portapapeles.');
+                    });
+                    return;
+                }
+                document.execCommand('copy');
+                alert('URLs copiadas al portapapeles.');
+            }
+        </script>
+    @endif
 </x-app-layout>

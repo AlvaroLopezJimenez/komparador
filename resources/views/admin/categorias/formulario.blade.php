@@ -14,7 +14,8 @@
         </div>
     </x-slot>
 
-    <div class="max-w-5xl mx-auto py-10 px-4 space-y-8 bg-gray-50 dark:bg-gray-900 rounded-lg shadow-md"
+    <div id="categoria-form-alpine" class="max-w-5xl mx-auto py-10 px-4 space-y-8 bg-gray-50 dark:bg-gray-900 rounded-lg shadow-md"
+        @verificar-slug-categoria="verificarSlugExistente()"
         x-data="{
             slugModificadoManualmente: false,
             slugExiste: false,
@@ -185,21 +186,48 @@
                     </div>
                 </div>
 
-                <div>
-                    <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">¿Mostrar? *</label>
-                    <div class="flex gap-6">
-                        <label class="inline-flex items-center">
-                            <input type="radio" name="mostrar" value="si"
-                                {{ old('mostrar', $categoria->mostrar ?? 'si') === 'si' ? 'checked' : '' }}
-                                class="form-radio text-pink-600">
-                            <span class="ml-2 text-gray-700 dark:text-gray-200">Sí</span>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">¿Mostrar? *</label>
+                        <div class="flex gap-6">
+                            <label class="inline-flex items-center">
+                                <input type="radio" name="mostrar" value="si"
+                                    {{ old('mostrar', $categoria->mostrar ?? 'si') === 'si' ? 'checked' : '' }}
+                                    class="form-radio text-pink-600">
+                                <span class="ml-2 text-gray-700 dark:text-gray-200">Sí</span>
+                            </label>
+                            <label class="inline-flex items-center">
+                                <input type="radio" name="mostrar" value="no"
+                                    {{ old('mostrar', $categoria->mostrar ?? 'si') === 'no' ? 'checked' : '' }}
+                                    class="form-radio text-pink-600">
+                                <span class="ml-2 text-gray-700 dark:text-gray-200">No</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="flex items-center gap-1.5 mb-1 font-medium text-gray-700 dark:text-gray-200">
+                            <span>¿Texto cantidad alternativo en ofertas? *</span>
+                            <button type="button"
+                                class="tooltip-btn inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-gray-100 text-xs font-bold hover:bg-gray-400 dark:hover:bg-gray-500 focus:outline-none"
+                                aria-label="Ayuda sobre texto cantidad alternativo"
+                                data-tooltip="Si marcas Sí, al crear o editar ofertas de productos de esta categoría será obligatorio escribir un texto alternativo de cantidad (por ejemplo «6 botellines» en lugar de «1,5 Litros»). El campo de litros/kilos/unidades sigue usándose para calcular el precio por unidad; el texto alternativo solo cambia lo que ve el usuario en el comparador.">?</button>
                         </label>
-                        <label class="inline-flex items-center">
-                            <input type="radio" name="mostrar" value="no"
-                                {{ old('mostrar', $categoria->mostrar ?? 'si') === 'no' ? 'checked' : '' }}
-                                class="form-radio text-pink-600">
-                            <span class="ml-2 text-gray-700 dark:text-gray-200">No</span>
-                        </label>
+                        <div class="flex gap-6">
+                            <label class="inline-flex items-center">
+                                <input type="radio" name="permitir_texto_cantidad_alternativo" value="si"
+                                    {{ old('permitir_texto_cantidad_alternativo', $categoria->permitir_texto_cantidad_alternativo ?? 'no') === 'si' ? 'checked' : '' }}
+                                    class="form-radio text-pink-600">
+                                <span class="ml-2 text-gray-700 dark:text-gray-200">Sí</span>
+                            </label>
+                            <label class="inline-flex items-center">
+                                <input type="radio" name="permitir_texto_cantidad_alternativo" value="no"
+                                    {{ old('permitir_texto_cantidad_alternativo', $categoria->permitir_texto_cantidad_alternativo ?? 'no') === 'no' ? 'checked' : '' }}
+                                    class="form-radio text-pink-600">
+                                <span class="ml-2 text-gray-700 dark:text-gray-200">No</span>
+                            </label>
+                        </div>
+                        @error('permitir_texto_cantidad_alternativo') <p class="text-red-500 text-sm mt-1">{{ $message }}</p> @enderror
                     </div>
                 </div>
 
@@ -256,6 +284,84 @@
                     <!-- Campo oculto para guardar el JSON -->
                     <input type="hidden" name="especificaciones_internas" id="especificaciones-internas-input" value="{{ old('especificaciones_internas', $categoria && $categoria->especificaciones_internas ? json_encode($categoria->especificaciones_internas, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : '') }}">
                 </fieldset>
+
+                @if($categoria)
+                {{-- BUSCAR URL NUEVAS (cron Amazon + AliExpress + CSV) --}}
+                <fieldset id="buscar-urls-nuevas-categoria" class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 space-y-4 border border-gray-200 dark:border-gray-700">
+                    <legend class="text-lg font-semibold text-gray-700 dark:text-gray-200">Buscar URL nuevas</legend>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">
+                        Ejecuta la misma búsqueda que el cron de Amazon/AliExpress/CSV para todos los productos elegibles de esta categoría
+                        (y subcategorías): <strong class="font-medium text-gray-700 dark:text-gray-200">mostrar=si</strong>,
+                        <strong class="font-medium text-gray-700 dark:text-gray-200">obsoleto=no</strong>, con nombre y palabras exigidas.
+                        Deja «1» para empezar desde el primero, o indica la posición en la lista (ej. 44 para continuar en el producto 44 de {{ (int) ($totalProductosBuscarUrls ?? 0) }}).
+                    </p>
+
+                    <div class="flex flex-wrap items-center gap-3">
+                        @php
+                            $totalBuscarUrls = (int) ($totalProductosBuscarUrls ?? 0);
+                        @endphp
+                        <label for="input-desde-producto-buscar-urls-cat"
+                            class="inline-flex flex-wrap items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                            <span>Empezar desde</span>
+                            <input type="number"
+                                id="input-desde-producto-buscar-urls-cat"
+                                min="1"
+                                max="{{ max(1, $totalBuscarUrls) }}"
+                                value="1"
+                                step="1"
+                                @if($totalBuscarUrls === 0) disabled @endif
+                                class="w-20 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-2 py-1.5 text-sm text-center disabled:opacity-50">
+                            <span class="whitespace-nowrap">/ <strong id="total-productos-buscar-urls-cat">{{ $totalBuscarUrls }}</strong></span>
+                            <span id="hint-desde-producto-buscar-urls-cat" class="text-xs text-gray-500 dark:text-gray-400"></span>
+                        </label>
+                        <button type="button" id="btn-ejecutar-cron-buscar-urls-cat"
+                            @if($totalBuscarUrls === 0) disabled @endif
+                            class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed">
+                            Ejecutar cron
+                        </button>
+                        <button type="button" id="btn-pausar-cron-buscar-urls-cat"
+                            class="bg-amber-600 hover:bg-amber-700 text-white font-semibold px-4 py-2 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled title="Pausar">
+                            ⏸ Pausar
+                        </button>
+                        <button type="button" id="btn-detener-cron-buscar-urls-cat"
+                            class="bg-orange-700 hover:bg-orange-800 text-white font-semibold px-4 py-2 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled title="Detener">
+                            ⏹ Detener
+                        </button>
+                        <button type="button" id="btn-log-buscar-urls-cat"
+                            class="bg-slate-600 hover:bg-slate-700 text-white font-semibold px-4 py-2 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled>
+                            Log
+                        </button>
+                    </div>
+
+                    <div id="progreso-buscar-urls-cat" class="hidden rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900/40 p-4 space-y-2 text-sm">
+                        <p id="texto-progreso-buscar-urls-cat" class="font-medium text-gray-800 dark:text-gray-100">
+                            Preparando…
+                        </p>
+                        <p class="text-gray-600 dark:text-gray-300">
+                            URL encontradas: <strong id="urls-todas-buscar-cat">0</strong> ·
+                            Existentes: <strong id="urls-existentes-buscar-cat" class="text-amber-600 dark:text-amber-400">0</strong> ·
+                            Añadidas a Neo: <strong id="urls-neo-buscar-cat" class="text-emerald-600 dark:text-emerald-400">0</strong>
+                        </p>
+                        <p id="producto-actual-buscar-urls-cat" class="text-gray-500 dark:text-gray-400 text-xs"></p>
+                    </div>
+                </fieldset>
+
+                <div id="modal-log-buscar-urls-cat" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" aria-modal="true" role="dialog">
+                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col border border-gray-200 dark:border-gray-700">
+                        <div class="flex items-center justify-between gap-3 px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Log — Buscar URL nuevas</h3>
+                            <button type="button" id="btn-cerrar-modal-log-buscar-urls-cat" class="text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 text-2xl leading-none" aria-label="Cerrar">&times;</button>
+                        </div>
+                        <div id="modal-log-buscar-urls-cat-contenido" class="px-5 py-4 overflow-y-auto flex-1 space-y-4 text-sm"></div>
+                        <div class="px-5 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end">
+                            <button type="button" id="btn-cerrar-modal-log-buscar-urls-cat-footer" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded">Cerrar</button>
+                        </div>
+                    </div>
+                </div>
+                @endif
 
                 {{-- INFORMACIÓN ADICIONAL PARA CHATGPT --}}
                 <fieldset class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 space-y-4 border border-gray-200 dark:border-gray-700">
@@ -535,10 +641,29 @@
         let categoriaActual = null;
         let parentIdActual = null;
 
+        function obtenerAlpineCategoriaForm() {
+            const el = document.getElementById('categoria-form-alpine');
+            if (!el) {
+                return null;
+            }
+            if (typeof Alpine !== 'undefined' && typeof Alpine.$data === 'function') {
+                return Alpine.$data(el);
+            }
+            return el._x_dataStack?.[0] ?? null;
+        }
+
+        function verificarSlugInicialSiEdicion() {
+            if (!categoriaActual) {
+                return;
+            }
+            const el = document.getElementById('categoria-form-alpine');
+            if (el) {
+                el.dispatchEvent(new CustomEvent('verificar-slug-categoria'));
+            }
+        }
+
         // Inicialización cuando se carga la página
         document.addEventListener('DOMContentLoaded', () => {
-            console.log('DOM cargado, inicializando sistema de categorías...');
-            
             const datos = document.getElementById('datos-categorias');
             if (datos) {
                 const categoriasData = datos.dataset.categoriasRaiz;
@@ -549,10 +674,6 @@
                     categoriasRaiz = JSON.parse(categoriasData || '[]');
                     categoriaActual = categoriaData && categoriaData !== 'null' ? JSON.parse(categoriaData) : null;
                     parentIdActual = parentIdData || null;
-                    
-                    console.log('Categorías raíz parseadas:', categoriasRaiz);
-                    console.log('Categoría actual:', categoriaActual);
-                    console.log('Parent ID actual:', parentIdActual);
                     
                     if (categoriaActual && parentIdActual) {
                         // Modo edición: cargar jerarquía completa
@@ -568,17 +689,15 @@
                     console.error('Error parseando datos:', error);
                 }
             }
-            
-            // Verificar slug inicial si estamos editando
-            if (categoriaActual) {
-                const scope = document.querySelector('[x-data]')?._x_dataStack?.[0];
-                if (scope) {
-                    setTimeout(() => {
-                        scope.verificarSlugExistente();
-                    }, 500);
-                }
-            }
         });
+
+        document.addEventListener('alpine:initialized', () => {
+            verificarSlugInicialSiEdicion();
+        });
+
+        if (typeof window.Alpine !== 'undefined') {
+            queueMicrotask(verificarSlugInicialSiEdicion);
+        }
 
         async function cargarJerarquiaCategoria(parentId) {
             // Obtener la jerarquía completa desde la raíz hasta el padre
@@ -592,8 +711,6 @@
                 
                 const data = await response.json();
                 const jerarquia = data.jerarquia || [];
-                
-                console.log('Jerarquía recibida:', jerarquia);
                 
                 // Construir selectores nivel por nivel
                 for (let i = 0; i < jerarquia.length; i++) {
@@ -648,8 +765,6 @@
         }
 
         function crearSelectorCategoria(nivel, opciones, valorSeleccionado, modoEdicion = false) {
-            console.log(`Creando selector nivel ${nivel} con ${opciones.length} opciones, modoEdicion: ${modoEdicion}`);
-            
             const container = document.getElementById('categorias-container');
             if (!container) {
                 console.error('No se encontró el contenedor de categorías');
@@ -659,7 +774,6 @@
             // Verificar si ya existe un selector en este nivel (para evitar duplicados)
             const selectorExistente = container.querySelector(`.selector-categoria[data-nivel="${nivel}"]`);
             if (selectorExistente) {
-                console.log(`Selector nivel ${nivel} ya existe, actualizando...`);
                 // Actualizar el selector existente
                 const selectExistente = selectorExistente.querySelector('select');
                 if (selectExistente) {
@@ -740,7 +854,6 @@
             if (!modoEdicion) {
                 select.addEventListener('change', () => {
                     const categoriaId = select.value;
-                    console.log(`Cambio en selector nivel ${nivel}, categoría seleccionada:`, categoriaId);
                     
                     if (categoriaId) {
                         cargarSubcategorias(nivel + 1, categoriaId);
@@ -754,7 +867,6 @@
                 // En modo edición, también agregar el evento pero sin crear selectores automáticamente
                 select.addEventListener('change', () => {
                     const categoriaId = select.value;
-                    console.log(`Cambio en selector nivel ${nivel}, categoría seleccionada:`, categoriaId);
                     
                     if (categoriaId) {
                         cargarSubcategorias(nivel + 1, categoriaId);
@@ -768,12 +880,9 @@
         }
 
         function cargarSubcategorias(nivel, categoriaId) {
-            console.log(`Iniciando carga de subcategorías para nivel ${nivel}, categoría ${categoriaId}`);
-            
             limpiarSelectoresSuperiores(nivel);
             
             const url = `/panel-privado/categorias/${categoriaId}/subcategorias`;
-            console.log(`Haciendo fetch a: ${url}`);
             
             fetch(url, {
                 headers: {
@@ -782,17 +891,10 @@
                     'Content-Type': 'application/json'
                 }
             })
-            .then(res => {
-                console.log('Respuesta del servidor:', res.status, res.statusText);
-                return res.json();
-            })
+            .then(res => res.json())
             .then(subcategorias => {
-                console.log('Subcategorías recibidas:', subcategorias);
                 if (subcategorias && subcategorias.length > 0) {
-                    console.log(`Creando selector para nivel ${nivel} con ${subcategorias.length} subcategorías`);
                     crearSelectorCategoria(nivel, subcategorias, null);
-                } else {
-                    console.log('No hay subcategorías disponibles para este nivel');
                 }
             })
             .catch(error => {
@@ -802,7 +904,6 @@
 
         function limpiarSelectoresSuperiores(nivel) {
             const selectores = document.querySelectorAll(`.selector-categoria[data-nivel="${nivel}"]`);
-            console.log(`Limpiando ${selectores.length} selectores del nivel ${nivel}`);
             selectores.forEach(selector => selector.remove());
         }
 
@@ -824,7 +925,6 @@
             }
             
             document.getElementById('categoria-final').value = categoriaFinal || '';
-            console.log('Categoría final actualizada:', categoriaFinal);
         }
 
 
@@ -836,7 +936,7 @@
             if (nombreInput && btnGuardar) {
                 nombreInput.addEventListener('input', function() {
                     const tieneNombre = this.value.trim().length > 0;
-                    const scope = document.querySelector('[x-data]')?._x_dataStack?.[0];
+                    const scope = obtenerAlpineCategoriaForm();
                     const slugExiste = scope ? scope.slugExiste : false;
                     btnGuardar.disabled = !tieneNombre || slugExiste;
                 });
@@ -1310,6 +1410,29 @@ if (!window.kpInternaGlobalRegistrar) {
 
     <script>
     document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.tooltip-btn[data-tooltip]').forEach(function(btn) {
+            btn.addEventListener('mouseenter', function() {
+                const texto = btn.getAttribute('data-tooltip');
+                if (!texto) return;
+                let tip = document.getElementById('kp-tooltip-global-cat');
+                if (!tip) {
+                    tip = document.createElement('div');
+                    tip.id = 'kp-tooltip-global-cat';
+                    tip.className = 'fixed z-[9999] max-w-xs px-3 py-2 text-xs text-white bg-gray-900 rounded shadow-lg pointer-events-none';
+                    document.body.appendChild(tip);
+                }
+                tip.textContent = texto;
+                tip.classList.remove('hidden');
+                const rect = btn.getBoundingClientRect();
+                tip.style.left = Math.min(rect.left, window.innerWidth - 280) + 'px';
+                tip.style.top = (rect.bottom + 6) + 'px';
+            });
+            btn.addEventListener('mouseleave', function() {
+                const tip = document.getElementById('kp-tooltip-global-cat');
+                if (tip) tip.classList.add('hidden');
+            });
+        });
+
         const formCatImg = document.getElementById('form-categoria');
         if (!formCatImg) return;
 
@@ -2504,6 +2627,656 @@ if (!window.kpInternaGlobalRegistrar) {
         }
     });
     </script>
+
+    @if($categoria)
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const KP_CSRF_BUSCAR_URLS = document.querySelector('meta[name="csrf-token"]')?.content || '{{ csrf_token() }}';
+        const URL_CRON_BUSCAR_URLS = @json(route('admin.productos.buscar-amazon.cron.panel'));
+        const CATEGORIA_ID_BUSCAR_URLS = {{ (int) $categoria->id }};
+
+        const btnEjecutar = document.getElementById('btn-ejecutar-cron-buscar-urls-cat');
+        const btnPausar = document.getElementById('btn-pausar-cron-buscar-urls-cat');
+        const btnDetener = document.getElementById('btn-detener-cron-buscar-urls-cat');
+        const btnLog = document.getElementById('btn-log-buscar-urls-cat');
+        const inputDesdeProducto = document.getElementById('input-desde-producto-buscar-urls-cat');
+        const elTotalProductos = document.getElementById('total-productos-buscar-urls-cat');
+        const elHintDesdeProducto = document.getElementById('hint-desde-producto-buscar-urls-cat');
+        const panelProgreso = document.getElementById('progreso-buscar-urls-cat');
+        const textoProgreso = document.getElementById('texto-progreso-buscar-urls-cat');
+        const elUrlsTodas = document.getElementById('urls-todas-buscar-cat');
+        const elUrlsExistentes = document.getElementById('urls-existentes-buscar-cat');
+        const elUrlsNeo = document.getElementById('urls-neo-buscar-cat');
+        const elProductoActual = document.getElementById('producto-actual-buscar-urls-cat');
+        const modalLog = document.getElementById('modal-log-buscar-urls-cat');
+        const modalLogContenido = document.getElementById('modal-log-buscar-urls-cat-contenido');
+
+        if (!btnEjecutar) return;
+
+        let sesionBuscarUrls = null;
+
+        function obtenerTotalProductosElegiblesBuscarUrls() {
+            return parseInt(elTotalProductos?.textContent || '0', 10) || 0;
+        }
+
+        function normalizarIndiceInicioBuscarUrls(valor) {
+            const total = obtenerTotalProductosElegiblesBuscarUrls();
+            if (total <= 0) {
+                return 1;
+            }
+
+            let indice = parseInt(String(valor ?? '1'), 10);
+            if (!Number.isFinite(indice) || indice < 1) {
+                indice = 1;
+            }
+            if (indice > total) {
+                indice = total;
+            }
+
+            if (inputDesdeProducto) {
+                inputDesdeProducto.value = String(indice);
+                inputDesdeProducto.max = String(total);
+            }
+
+            return indice;
+        }
+
+        function actualizarHintDesdeProducto(productoIds, indiceLista) {
+            if (!elHintDesdeProducto) {
+                return;
+            }
+
+            const total = Array.isArray(productoIds) ? productoIds.length : 0;
+            if (total <= 0 || indiceLista < 1) {
+                elHintDesdeProducto.textContent = '';
+                return;
+            }
+
+            const productoId = productoIds[indiceLista - 1];
+            if (productoId) {
+                elHintDesdeProducto.textContent = '(producto ID #' + productoId + ')';
+            } else {
+                elHintDesdeProducto.textContent = '';
+            }
+        }
+
+        if (inputDesdeProducto) {
+            inputDesdeProducto.addEventListener('change', function() {
+                normalizarIndiceInicioBuscarUrls(inputDesdeProducto.value);
+            });
+            inputDesdeProducto.addEventListener('blur', function() {
+                normalizarIndiceInicioBuscarUrls(inputDesdeProducto.value);
+            });
+        }
+
+        function escHtmlBuscarUrls(texto) {
+            return String(texto ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function clasificarUrlsProducto(detalleUrls) {
+            const todas = [];
+            const existentes = [];
+            const insertadasNeo = [];
+
+            (detalleUrls || []).forEach(function(det) {
+                if (!det || !det.url) return;
+                const url = String(det.url).trim();
+                if (!url) return;
+                todas.push(url);
+                if (det.accion === 'insertada') {
+                    insertadasNeo.push(url);
+                } else {
+                    existentes.push(url);
+                }
+            });
+
+            return { todas, existentes, insertadasNeo };
+        }
+
+        function actualizarPanelProgreso(data) {
+            if (!panelProgreso) return;
+            panelProgreso.classList.remove('hidden');
+
+            const indice = data.indice || 0;
+            const total = data.total || 0;
+            const resumen = data.resumen_urls || {};
+            const productoActual = data.producto_actual || {};
+            const mensajeEstado = data.mensaje_estado || '';
+
+            if (textoProgreso) {
+                if (mensajeEstado) {
+                    textoProgreso.textContent = mensajeEstado;
+                } else if (data.terminado) {
+                    textoProgreso.textContent = 'Finalizado: ' + indice + '/' + total + ' productos procesados';
+                } else {
+                    textoProgreso.textContent = indice + '/' + total + ' buscando productos…';
+                }
+            }
+            if (elUrlsTodas) elUrlsTodas.textContent = String(resumen.todas ?? 0);
+            if (elUrlsExistentes) elUrlsExistentes.textContent = String(resumen.existentes ?? 0);
+            if (elUrlsNeo) elUrlsNeo.textContent = String(resumen.insertadas_neo ?? 0);
+            if (elProductoActual) {
+                if (productoActual.nombre) {
+                    elProductoActual.textContent = 'Último producto: #' + (productoActual.producto_id || '—') + ' — ' + productoActual.nombre;
+                } else {
+                    elProductoActual.textContent = '';
+                }
+            }
+        }
+
+        function renderModalLogBuscarUrls(resultados) {
+            if (!modalLogContenido) return;
+
+            const lista = Array.isArray(resultados) ? resultados : [];
+            if (!lista.length) {
+                modalLogContenido.innerHTML = '<p class="text-gray-500 dark:text-gray-400">Aún no hay resultados.</p>';
+                return;
+            }
+
+            if (!sesionBuscarUrls) {
+                sesionBuscarUrls = { clasificaciones: [] };
+            }
+            sesionBuscarUrls.clasificaciones = lista.map(function(r) {
+                return clasificarUrlsProducto(r.detalle_urls);
+            });
+
+            const bloques = lista.map(function(r, idx) {
+                const clasif = sesionBuscarUrls.clasificaciones[idx];
+                const textareaId = 'textarea-urls-cat-' + idx;
+                const urlsTodasTexto = clasif.todas.join('\n');
+
+                const resumenProducto = [
+                    'Amazon: ' + (r.urls_amazon || 0),
+                    'AliExpress: ' + (r.urls_aliexpress || 0),
+                    'Insertadas: ' + (r.urls_insertadas || 0),
+                    'Omitidas: ' + (r.urls_omitidas || 0),
+                ].join(' · ');
+
+                let erroresHtml = '';
+                if (r.error_amazon) {
+                    erroresHtml += '<p class="text-red-600 dark:text-red-400 text-xs mt-1">Error Amazon: ' + escHtmlBuscarUrls(r.error_amazon) + '</p>';
+                }
+                if (r.error_aliexpress) {
+                    erroresHtml += '<p class="text-red-600 dark:text-red-400 text-xs mt-1">Error AliExpress: ' + escHtmlBuscarUrls(r.error_aliexpress) + '</p>';
+                }
+
+                return `
+                    <details class="rounded-lg border border-gray-200 dark:border-gray-600 p-3 bg-gray-50 dark:bg-gray-900/30" open>
+                        <summary class="cursor-pointer font-medium text-gray-900 dark:text-white">
+                            #${idx + 1} — Producto #${escHtmlBuscarUrls(r.producto_id)} — ${escHtmlBuscarUrls(r.nombre || 'Sin nombre')}
+                        </summary>
+                        <p class="text-xs text-gray-600 dark:text-gray-400 mt-2">${escHtmlBuscarUrls(resumenProducto)}</p>
+                        ${erroresHtml}
+                        <div class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2" data-filtro-grupo="${idx}">
+                            <button type="button" data-filtro="todas" data-idx="${idx}"
+                                class="filtro-urls-cat-btn rounded-lg border-2 border-blue-500 bg-blue-50 dark:bg-blue-900/30 p-3 text-left hover:opacity-90 transition">
+                                <span class="block text-xs text-gray-500 dark:text-gray-400">Todas las URL</span>
+                                <span class="text-xl font-bold text-blue-700 dark:text-blue-300">${clasif.todas.length}</span>
+                            </button>
+                            <button type="button" data-filtro="existentes" data-idx="${idx}"
+                                class="filtro-urls-cat-btn rounded-lg border-2 border-transparent bg-amber-50 dark:bg-amber-900/20 p-3 text-left hover:opacity-90 transition">
+                                <span class="block text-xs text-gray-500 dark:text-gray-400">Ya existían</span>
+                                <span class="text-xl font-bold text-amber-700 dark:text-amber-300">${clasif.existentes.length}</span>
+                            </button>
+                            <button type="button" data-filtro="insertadas_neo" data-idx="${idx}"
+                                class="filtro-urls-cat-btn rounded-lg border-2 border-transparent bg-emerald-50 dark:bg-emerald-900/20 p-3 text-left hover:opacity-90 transition">
+                                <span class="block text-xs text-gray-500 dark:text-gray-400">Añadidas a Neo</span>
+                                <span class="text-xl font-bold text-emerald-700 dark:text-emerald-300">${clasif.insertadasNeo.length}</span>
+                            </button>
+                        </div>
+                        <div class="mt-3 flex flex-wrap items-center gap-2">
+                            <button type="button" class="btn-copiar-urls-cat px-3 py-1.5 text-xs rounded bg-slate-700 hover:bg-slate-800 text-white" data-textarea="${textareaId}">
+                                Copiar todas
+                            </button>
+                        </div>
+                        <textarea id="${textareaId}" readonly rows="6"
+                            class="mt-2 w-full text-xs font-mono rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 p-2 resize-y">${escHtmlBuscarUrls(urlsTodasTexto)}</textarea>
+                    </details>
+                `;
+            }).join('');
+
+            modalLogContenido.innerHTML = bloques;
+
+            modalLogContenido.querySelectorAll('.filtro-urls-cat-btn').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    const idx = parseInt(btn.getAttribute('data-idx') || '0', 10);
+                    const filtro = btn.getAttribute('data-filtro') || 'todas';
+                    const textarea = document.getElementById('textarea-urls-cat-' + idx);
+                    const grupo = btn.closest('[data-filtro-grupo]');
+                    const clasif = sesionBuscarUrls?.clasificaciones?.[idx];
+                    if (!textarea || !grupo || !clasif) return;
+
+                    grupo.querySelectorAll('.filtro-urls-cat-btn').forEach(function(b) {
+                        b.classList.remove('border-blue-500', 'border-amber-500', 'border-emerald-500');
+                        b.classList.add('border-transparent');
+                    });
+
+                    const colorMap = {
+                        todas: 'border-blue-500',
+                        existentes: 'border-amber-500',
+                        insertadas_neo: 'border-emerald-500',
+                    };
+                    btn.classList.remove('border-transparent');
+                    btn.classList.add(colorMap[filtro] || 'border-blue-500');
+
+                    const mapaUrls = {
+                        todas: clasif.todas,
+                        existentes: clasif.existentes,
+                        insertadas_neo: clasif.insertadasNeo,
+                    };
+                    textarea.value = (mapaUrls[filtro] || []).join('\n');
+                });
+            });
+
+            modalLogContenido.querySelectorAll('.btn-copiar-urls-cat').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    const textarea = document.getElementById(btn.getAttribute('data-textarea'));
+                    if (!textarea) return;
+                    const texto = textarea.value;
+                    if (navigator.clipboard && window.isSecureContext) {
+                        navigator.clipboard.writeText(texto).then(function() {
+                            alert('URLs copiadas al portapapeles.');
+                        }).catch(function() {
+                            textarea.select();
+                            document.execCommand('copy');
+                            alert('URLs copiadas al portapapeles.');
+                        });
+                    } else {
+                        textarea.select();
+                        document.execCommand('copy');
+                        alert('URLs copiadas al portapapeles.');
+                    }
+                });
+            });
+        }
+
+        function abrirModalLog() {
+            if (!modalLog || !sesionBuscarUrls) return;
+            renderModalLogBuscarUrls(sesionBuscarUrls.resultados || []);
+            modalLog.classList.remove('hidden');
+        }
+
+        function cerrarModalLog() {
+            modalLog?.classList.add('hidden');
+        }
+
+        document.getElementById('btn-cerrar-modal-log-buscar-urls-cat')?.addEventListener('click', cerrarModalLog);
+        document.getElementById('btn-cerrar-modal-log-buscar-urls-cat-footer')?.addEventListener('click', cerrarModalLog);
+        modalLog?.addEventListener('click', function(e) {
+            if (e.target === modalLog) cerrarModalLog();
+        });
+        btnLog?.addEventListener('click', abrirModalLog);
+
+        async function esperarSiPausadoBuscarUrls(session) {
+            while (session.paused && !session.abort) {
+                await new Promise(function(resolve) {
+                    session.pauseResolve = resolve;
+                });
+            }
+        }
+
+        function reanudarDesdePausaBuscarUrls(session) {
+            session.paused = false;
+            if (typeof session.pauseResolve === 'function') {
+                session.pauseResolve();
+                session.pauseResolve = null;
+            }
+        }
+
+        function setControlesBuscarUrls(modo) {
+            const enCurso = modo === 'running' || modo === 'paused';
+            if (btnEjecutar) btnEjecutar.disabled = enCurso || obtenerTotalProductosElegiblesBuscarUrls() <= 0;
+            if (inputDesdeProducto) inputDesdeProducto.disabled = enCurso || obtenerTotalProductosElegiblesBuscarUrls() <= 0;
+            if (btnPausar) {
+                btnPausar.disabled = !enCurso;
+                btnPausar.textContent = modo === 'paused' ? '▶ Reanudar' : '⏸ Pausar';
+            }
+            if (btnDetener) btnDetener.disabled = !enCurso;
+            if (btnLog) {
+                const tieneResultados = sesionBuscarUrls && (sesionBuscarUrls.resultados || []).length > 0;
+                btnLog.disabled = !tieneResultados;
+            }
+        }
+
+        async function postJsonBuscarUrls(url, body) {
+            const contexto = {
+                accion: body && body.accion ? body.accion : null,
+                producto_id: body && body.producto_id ? body.producto_id : null,
+                indice: body && body.indice ? body.indice : null,
+                ejecucion_id: body && body.ejecucion_id ? body.ejecucion_id : null,
+                categoria_id: body && body.categoria_id ? body.categoria_id : null,
+            };
+
+            let resp;
+            let rawText = '';
+
+            try {
+                resp = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': KP_CSRF_BUSCAR_URLS,
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    body: JSON.stringify(body),
+                });
+                rawText = await resp.text();
+            } catch (networkError) {
+                console.error('[Buscar URLs categoría] Error de red', {
+                    contexto: contexto,
+                    url: url,
+                    error: networkError,
+                });
+                throw networkError;
+            }
+
+            let data = {};
+            if (rawText) {
+                try {
+                    data = JSON.parse(rawText);
+                } catch (parseError) {
+                    console.error('[Buscar URLs categoría] Respuesta no JSON (posible error PHP)', {
+                        contexto: contexto,
+                        status: resp.status,
+                        statusText: resp.statusText,
+                        contentType: resp.headers.get('content-type'),
+                        rawText: rawText.length > 4000 ? rawText.slice(0, 4000) + '…' : rawText,
+                    });
+                    throw new Error(
+                        'Error HTTP ' + resp.status + ' — respuesta no JSON. Revisa la consola (F12) para el detalle.'
+                    );
+                }
+            }
+
+            if (!resp.ok || data.ok === false) {
+                if (!rawText && resp.status >= 500) {
+                    console.error('[Buscar URLs categoría] HTTP 500 sin cuerpo — PHP murió antes de responder (memoria, timeout o error fatal). Revisa storage/logs/laravel.log buscando producto_id o panelCronProcesarProducto.', {
+                        contexto: contexto,
+                        status: resp.status,
+                        statusText: resp.statusText,
+                        contentType: resp.headers.get('content-type'),
+                    });
+                }
+                console.error(
+                    '[Buscar URLs categoría] Error API',
+                    data.error || data.message || ('HTTP ' + resp.status),
+                    data.exception ? '(' + data.exception + ')' : '',
+                    data.fase ? '[fase: ' + data.fase + ']' : '',
+                    contexto,
+                    data
+                );
+                const partes = [
+                    data.error || data.message || ('Error HTTP ' + resp.status + (rawText ? '' : ' (sin cuerpo — revisa laravel.log)')),
+                ];
+                if (data.exception) {
+                    partes.push('(' + data.exception + ')');
+                }
+                if (data.fase) {
+                    partes.push('[fase: ' + data.fase + ']');
+                }
+                if (contexto.producto_id) {
+                    partes.push('— producto #' + contexto.producto_id);
+                }
+                if (contexto.indice) {
+                    partes.push('(' + contexto.indice + '/' + (sesionBuscarUrls ? sesionBuscarUrls.total : '?') + ')');
+                }
+                throw new Error(partes.join(' '));
+            }
+
+            return data;
+        }
+
+        async function ejecutarBusquedaUrlsCategoria() {
+            if (sesionBuscarUrls && (sesionBuscarUrls.running || sesionBuscarUrls.paused)) return;
+
+            const indiceInicio = normalizarIndiceInicioBuscarUrls(inputDesdeProducto?.value || 1);
+            const indiceInicioCero = indiceInicio - 1;
+
+            sesionBuscarUrls = {
+                running: true,
+                paused: false,
+                abort: false,
+                pauseResolve: null,
+                ejecucion_id: null,
+                producto_ids: [],
+                resultados: [],
+                total: 0,
+                indiceInicio: indiceInicioCero,
+                indiceActual: indiceInicioCero,
+            };
+
+            setControlesBuscarUrls('running');
+            if (btnLog) btnLog.disabled = true;
+
+            let finalizado = false;
+            let detenido = false;
+
+            try {
+                const inicio = await postJsonBuscarUrls(URL_CRON_BUSCAR_URLS, {
+                    accion: 'iniciar',
+                    categoria_id: CATEGORIA_ID_BUSCAR_URLS,
+                });
+                if (inicio.sin_productos) {
+                    alert('No hay productos elegibles en esta categoría para buscar URLs.');
+                    return;
+                }
+
+                sesionBuscarUrls.ejecucion_id = inicio.ejecucion_id;
+                sesionBuscarUrls.producto_ids = inicio.producto_ids || [];
+                sesionBuscarUrls.total = inicio.total || 0;
+
+                if (elTotalProductos && sesionBuscarUrls.total > 0) {
+                    elTotalProductos.textContent = String(sesionBuscarUrls.total);
+                    if (inputDesdeProducto) {
+                        inputDesdeProducto.max = String(sesionBuscarUrls.total);
+                    }
+                }
+
+                const indiceInicioFinal = normalizarIndiceInicioBuscarUrls(indiceInicio);
+                const indiceInicioCeroFinal = indiceInicioFinal - 1;
+
+                if (indiceInicioCeroFinal >= sesionBuscarUrls.producto_ids.length) {
+                    alert('La posición ' + indiceInicioFinal + ' es mayor que el total (' + sesionBuscarUrls.total + ').');
+                    return;
+                }
+
+                sesionBuscarUrls.indiceInicio = indiceInicioCeroFinal;
+                sesionBuscarUrls.indiceActual = indiceInicioCeroFinal;
+                actualizarHintDesdeProducto(sesionBuscarUrls.producto_ids, indiceInicioFinal);
+
+                const productoIdInicio = sesionBuscarUrls.producto_ids[indiceInicioCeroFinal];
+                actualizarPanelProgreso({
+                    indice: indiceInicioCeroFinal,
+                    total: sesionBuscarUrls.total,
+                    resumen_urls: { todas: 0, existentes: 0, insertadas_neo: 0 },
+                    terminado: false,
+                    mensaje_estado: indiceInicioFinal > 1
+                        ? ('Empezando en posición ' + indiceInicioFinal + '/' + sesionBuscarUrls.total + ' (producto #' + productoIdInicio + ')…')
+                        : ('Cargados ' + sesionBuscarUrls.total + ' productos. Procesando desde el primero…'),
+                });
+
+                for (let i = indiceInicioCeroFinal; i < sesionBuscarUrls.producto_ids.length; i++) {
+                    await esperarSiPausadoBuscarUrls(sesionBuscarUrls);
+                    if (sesionBuscarUrls.abort) {
+                        detenido = true;
+                        actualizarPanelProgreso({
+                            indice: i,
+                            total: sesionBuscarUrls.total,
+                            resumen_urls: resumirUrlsDesdeResultados(sesionBuscarUrls.resultados),
+                            mensaje_estado: 'Detenido por el usuario (' + i + '/' + sesionBuscarUrls.total + ').',
+                        });
+                        break;
+                    }
+
+                    const productoId = sesionBuscarUrls.producto_ids[i];
+                    sesionBuscarUrls.indiceActual = i;
+
+                    const data = await postJsonBuscarUrls(URL_CRON_BUSCAR_URLS, {
+                        accion: 'procesar',
+                        categoria_id: CATEGORIA_ID_BUSCAR_URLS,
+                        ejecucion_id: sesionBuscarUrls.ejecucion_id,
+                        producto_id: productoId,
+                        indice: i + 1,
+                    });
+
+                    if (sesionBuscarUrls.abort) {
+                        detenido = true;
+                        actualizarPanelProgreso({
+                            indice: i + 1,
+                            total: sesionBuscarUrls.total,
+                            resumen_urls: resumirUrlsDesdeResultados(sesionBuscarUrls.resultados),
+                            mensaje_estado: 'Detenido por el usuario (' + (i + 1) + '/' + sesionBuscarUrls.total + ').',
+                        });
+                        break;
+                    }
+
+                    sesionBuscarUrls.resultados = acumularResultadoProductoBuscarUrls(
+                        sesionBuscarUrls.resultados,
+                        data.resultado_producto
+                    );
+                    actualizarPanelProgreso(data);
+                    setControlesBuscarUrls(sesionBuscarUrls.paused ? 'paused' : 'running');
+
+                    if (modalLog && !modalLog.classList.contains('hidden')) {
+                        renderModalLogBuscarUrls(sesionBuscarUrls.resultados);
+                    }
+                }
+
+                if (!detenido && !sesionBuscarUrls.abort) {
+                    finalizado = true;
+                    alert('Búsqueda finalizada.');
+                }
+            } catch (error) {
+                console.error('[Buscar URLs categoría] Fallo en la ejecución', {
+                    ejecucion_id: sesionBuscarUrls ? sesionBuscarUrls.ejecucion_id : null,
+                    producto_id: sesionBuscarUrls && sesionBuscarUrls.producto_ids
+                        ? sesionBuscarUrls.producto_ids[sesionBuscarUrls.indiceActual]
+                        : null,
+                    indice: sesionBuscarUrls ? (sesionBuscarUrls.indiceActual + 1) : null,
+                    total: sesionBuscarUrls ? sesionBuscarUrls.total : null,
+                    resultados_parciales: sesionBuscarUrls ? (sesionBuscarUrls.resultados || []).length : 0,
+                    error: error,
+                });
+                alert('Error: ' + (error.message || 'No se pudo completar la búsqueda') + '\n\nAbre la consola del navegador (F12) para más detalle.');
+            } finally {
+                if (sesionBuscarUrls) {
+                    sesionBuscarUrls.running = false;
+                    sesionBuscarUrls.paused = false;
+                    reanudarDesdePausaBuscarUrls(sesionBuscarUrls);
+                }
+                setControlesBuscarUrls('idle');
+                if (sesionBuscarUrls && (sesionBuscarUrls.resultados || []).length > 0) {
+                    if (btnLog) btnLog.disabled = false;
+                }
+            }
+        }
+
+        function acumularResultadoProductoBuscarUrls(resultadosActuales, resultadoProducto) {
+            const lista = Array.isArray(resultadosActuales) ? resultadosActuales.slice() : [];
+            if (!resultadoProducto || !resultadoProducto.producto_id) {
+                return lista;
+            }
+
+            const idx = lista.findIndex(function(r) {
+                return r && r.producto_id === resultadoProducto.producto_id;
+            });
+
+            if (idx >= 0) {
+                lista[idx] = resultadoProducto;
+            } else {
+                lista.push(resultadoProducto);
+            }
+
+            return lista;
+        }
+
+        function resumirUrlsDesdeResultados(resultados) {
+            let todas = 0;
+            let existentes = 0;
+            let insertadasNeo = 0;
+            (resultados || []).forEach(function(r) {
+                (r.detalle_urls || []).forEach(function(det) {
+                    if (!det) return;
+                    todas++;
+                    if (det.accion === 'insertada') {
+                        insertadasNeo++;
+                    } else {
+                        existentes++;
+                    }
+                });
+            });
+            return { todas: todas, existentes: existentes, insertadas_neo: insertadasNeo };
+        }
+
+        btnEjecutar.addEventListener('click', function() {
+            if (sesionBuscarUrls && (sesionBuscarUrls.running || sesionBuscarUrls.paused)) return;
+            if (sesionBuscarUrls && (sesionBuscarUrls.resultados || []).length > 0) {
+                if (!confirm('¿Volver a ejecutar la búsqueda? Se creará una nueva ejecución.')) {
+                    return;
+                }
+            }
+            ejecutarBusquedaUrlsCategoria();
+        });
+
+        btnPausar?.addEventListener('click', function() {
+            if (!sesionBuscarUrls || (!sesionBuscarUrls.running && !sesionBuscarUrls.paused)) return;
+
+            if (sesionBuscarUrls.paused) {
+                reanudarDesdePausaBuscarUrls(sesionBuscarUrls);
+                setControlesBuscarUrls('running');
+                actualizarPanelProgreso({
+                    indice: sesionBuscarUrls.indiceActual,
+                    total: sesionBuscarUrls.total,
+                    resumen_urls: resumirUrlsDesdeResultados(sesionBuscarUrls.resultados),
+                    mensaje_estado: 'Reanudando…',
+                });
+            } else {
+                sesionBuscarUrls.paused = true;
+                setControlesBuscarUrls('paused');
+                actualizarPanelProgreso({
+                    indice: sesionBuscarUrls.indiceActual,
+                    total: sesionBuscarUrls.total,
+                    resumen_urls: resumirUrlsDesdeResultados(sesionBuscarUrls.resultados),
+                    mensaje_estado: 'Pausado (' + sesionBuscarUrls.indiceActual + '/' + sesionBuscarUrls.total + ').',
+                });
+            }
+        });
+
+        btnDetener?.addEventListener('click', async function() {
+            if (!sesionBuscarUrls) return;
+            sesionBuscarUrls.abort = true;
+            reanudarDesdePausaBuscarUrls(sesionBuscarUrls);
+            actualizarPanelProgreso({
+                indice: sesionBuscarUrls.indiceActual,
+                total: sesionBuscarUrls.total,
+                resumen_urls: resumirUrlsDesdeResultados(sesionBuscarUrls.resultados),
+                mensaje_estado: 'Deteniendo…',
+            });
+
+            if (sesionBuscarUrls.ejecucion_id) {
+                try {
+                    const data = await postJsonBuscarUrls(URL_CRON_BUSCAR_URLS, {
+                        accion: 'detener',
+                        categoria_id: CATEGORIA_ID_BUSCAR_URLS,
+                        ejecucion_id: sesionBuscarUrls.ejecucion_id,
+                    });
+                    sesionBuscarUrls.resultados = data.resultados || sesionBuscarUrls.resultados;
+                    actualizarPanelProgreso(Object.assign({}, data, {
+                        mensaje_estado: 'Detenido por el usuario (' + (data.indice || sesionBuscarUrls.indiceActual) + '/' + (data.total || sesionBuscarUrls.total) + ').',
+                    }));
+                } catch (error) {
+                    console.error('No se pudo registrar la detención en EjecucionGlobal:', error);
+                }
+            }
+        });
+    });
+    </script>
+    @endif
 </x-app-layout>
 
 

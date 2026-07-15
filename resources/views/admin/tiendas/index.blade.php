@@ -108,6 +108,7 @@
                         <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ofertas</th>
                         <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase" title="Mostrar tienda">Mostrar</th>
                         <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase" title="Scrapear tienda">Scrapeando</th>
+                        <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase" title="cron avisos vencidos de sin stock">cron avisos</th>
                         <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase" title="Categorías con ofertas mostrando">cat.mos</th>
                         <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase" title="Categorías con ofertas scrapeando">cat.scraping</th>
                         <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase" title="API general de la tienda">API</th>
@@ -160,6 +161,21 @@
                                 </span>
                             @endif
                         </td>
+                        <td class="px-3 py-4 text-center">
+                            @if(($tienda->avisos_sin_stock_scrapear_automatico ?? 'si') === 'si')
+                                <span title="Cron avisos vencidos de sin stock: sí">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-green-600 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </span>
+                            @else
+                                <span title="Cron avisos vencidos de sin stock: no">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-red-500 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </span>
+                            @endif
+                        </td>
                         <td class="px-3 py-4 text-center text-sm whitespace-nowrap" title="Categorías con ofertas mostrando">
                             {{ $resumen['cat_mos']['si'] }}/{{ $resumen['cat_mos']['total'] }}
                         </td>
@@ -185,16 +201,7 @@
                                         <span class="text-sm text-gray-700 dark:text-gray-300 font-medium">{{ $filaApi['count'] }}</span>
                                     </span>
                                 @endforeach
-                                @if($resumen['cat_sin_api'] > 0)
-                                    @php $iconSinApi = \App\Services\TiendaScrapingConfigResolver::metaIconoApi(null, true); @endphp
-                                    <span class="inline-flex items-center gap-1" title="{{ $iconSinApi['title'] }}">
-                                        <span class="w-6 h-6 text-xs {{ $iconSinApi['icon_bg'] }} rounded flex items-center justify-center text-white font-bold shrink-0">
-                                            {{ $iconSinApi['label'] }}
-                                        </span>
-                                        <span class="text-sm text-gray-700 dark:text-gray-300 font-medium">{{ $resumen['cat_sin_api'] }}</span>
-                                    </span>
-                                @endif
-                                @if(empty($resumen['cat_api']) && $resumen['cat_sin_api'] === 0)
+                                @if(empty($resumen['cat_api']))
                                     <span class="text-sm text-gray-400">—</span>
                                 @endif
                             </div>
@@ -210,7 +217,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="10" class="px-6 py-4 text-center text-gray-500">
+                        <td colspan="11" class="px-6 py-4 text-center text-gray-500">
                             No hay tiendas registradas.
                         </td>
                     </tr>

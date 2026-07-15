@@ -18,6 +18,7 @@ use App\Services\CalcularPrecioUnidad;
 use App\Services\LimpiarUrlDeTiendas;
 use App\Services\ConsultarNeoCifrado;
 use App\Services\TiendaScrapingConfigResolver;
+use App\Services\CsvAwinOfertaService;
 use App\Support\UrlOfertaValidacion;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\DB;
@@ -59,7 +60,7 @@ class OfertasController extends Controller
             $columnasData = null;
             $esUnidadUnica = ($producto->unidadDeMedida === 'unidadUnica');
             
-            if ($esUnidadUnica && $producto->categoria_id_especificaciones_internas && $producto->categoria_especificaciones_internas_elegidas) {
+            if ($producto->categoria_id_especificaciones_internas && $producto->categoria_especificaciones_internas_elegidas) {
                 $categoriaEspecificaciones = \App\Models\Categoria::find($producto->categoria_id_especificaciones_internas);
                 $especificacionesElegidas = $producto->categoria_especificaciones_internas_elegidas;
                 
@@ -80,12 +81,19 @@ class OfertasController extends Controller
                 
                 if (count($filtrosCombinados) > 0 && isset($especificacionesElegidas['_columnas'])) {
                     $columnasIds = $especificacionesElegidas['_columnas'] ?? [];
+                    if (is_array($columnasIds) && $columnasIds !== [] && !array_is_list($columnasIds)) {
+                        $columnasIds = array_keys($columnasIds);
+                    }
+                    $columnasIds = array_map('strval', (array) $columnasIds);
+                    if (!$esUnidadUnica) {
+                        $columnasIds = array_slice($columnasIds, 0, 1);
+                    }
                     $filtros = $filtrosCombinados;
                     
                     // Crear mapa de líneas principales con sus datos
                     $columnasData = [];
                     foreach ($filtros as $filtro) {
-                        if (in_array($filtro['id'], $columnasIds)) {
+                        if (in_array((string) ($filtro['id'] ?? ''), $columnasIds, true)) {
                             // Procesar sublíneas para añadir texto alternativo si existe
                             $subprincipales = [];
                             foreach ($filtro['subprincipales'] ?? [] as $sub) {
@@ -309,6 +317,7 @@ class OfertasController extends Controller
                     "envio" => $envioOferta,
                     "unidades" => $unidadesFormateadas,
                     "unidades_originales" => $unidadesFormateadas,
+                    "texto_cantidad_alternativo" => $item->texto_cantidad_alternativo ?? null,
                     "precio_total" => number_format($item->precio_total ?? 0, 2, ',', ''),
                     "precio_unidad" => number_format($item->precio_unidad ?? 0, $decimalesPrecioUnidad, ',', ''),
                     "descuentos" => $item->descuentos ?? '',
@@ -417,6 +426,7 @@ class OfertasController extends Controller
             'especificaciones' => $especificaciones,
             'tiene_especificaciones' => $tieneEspecificaciones,
             'unidad_de_medida' => $producto ? ($producto->unidadDeMedida ?? 'unidad') : null,
+            'permitir_texto_cantidad_alternativo' => $producto ? ($producto->categoria?->permitir_texto_cantidad_alternativo ?? 'no') : 'no',
             'especificaciones_marcadas' => $especificacionesMarcadas,
             'url_producto' => $urlProducto,
             'imagenes_producto' => $imagenesProducto,
@@ -698,7 +708,9 @@ class OfertasController extends Controller
         foreach ($lineas as $url) {
             if (empty($url)) continue;
             $urlParaValidar = preg_match('/^https?:\/\//', $url) ? $url : 'https://' . $url;
-            if (!filter_var($urlParaValidar, FILTER_VALIDATE_URL)) {
+            // Usamos el mismo validador que al crear la oferta (UrlOfertaValidacion): admite
+            // acentos y otros caracteres en el path que filter_var(FILTER_VALIDATE_URL) rechaza.
+            if (!UrlOfertaValidacion::pasa($urlParaValidar)) {
                 $urlsParaProcesar[] = ['url' => $url, 'normalizada' => null, 'error' => 'URL no válida'];
                 continue;
             }
@@ -763,10 +775,7 @@ class OfertasController extends Controller
                 'error' => null,
             ];
 
-            $urlLookups = array_values(array_unique(array_filter([
-                app(ConsultarNeoCifrado::class)->hashLookup($urlParaMostrar),
-                app(ConsultarNeoCifrado::class)->hashLookup($urlParaBuscar),
-            ])));
+            $urlLookups = $this->lookupsUrlParaMarcarNeo($urlParaMostrar, $data['url'] ?? '', $urlParaBuscar);
             $categoriaUrlId = $categoriaCatalogoId;
             $neoProductoId = null;
             if (!empty($urlLookups)) {
@@ -814,6 +823,27 @@ class OfertasController extends Controller
                     $item['existe'] = true;
                     $item['existe_otros_productos'] = true;
                     $item['ofertas_existentes'] = $verificacion['ofertas'];
+                }
+
+                if (!empty($item['ofertas_existentes'])) {
+                    try {
+                        $neoActualizadas = $this->marcarNeoAniadidaSiPorUrl(
+                            $urlParaMostrar,
+                            isset($item['neo_id']) ? (int) $item['neo_id'] : null,
+                            $item['ofertas_existentes'],
+                            $data['url'] ?? null,
+                            $neoProductoId
+                        );
+                        if ($neoActualizadas > 0) {
+                            $item['neo_marcada_aniadida_si'] = true;
+                            $item['neo_filas_actualizadas'] = $neoActualizadas;
+                        }
+                    } catch (\Throwable $e) {
+                        \Log::warning('No se pudo marcar neo como aniadida=si al analizar URL', [
+                            'url' => $urlParaMostrar,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
                 }
             }
 
@@ -1446,13 +1476,49 @@ Responde ÚNICAMENTE con el JSON.";
     }
 
     /**
+     * Texto de aviso al crear oferta cuando el scraping no devuelve precio: precio 0 y mostrar=no.
+     */
+    private function textoAvisoSinStockAutomaticoDesdeErrorScraping(?string $error): string
+    {
+        if ($error !== null && $error !== '') {
+            $normalized = mb_strtolower($error);
+            if (str_contains($normalized, 'csv-awin') || str_contains($normalized, 'csv awin')) {
+                if (str_contains($normalized, 'no encontrado') || str_contains($normalized, 'not found')) {
+                    return CsvAwinOfertaService::TEXTO_AVISO_URL_CSV_NO_ENCONTRADA;
+                }
+            }
+        }
+
+        return CsvAwinOfertaService::TEXTO_AVISO_SIN_STOCK;
+    }
+
+    /**
+     * Si el precio viene de CSV-Awin y la URL está en el feed, copia ean/isbn/upc/mpn/gtin al producto.
+     */
+    private function sincronizarCodigosProductoDesdeCsvSiAplica(Producto $producto, Tienda $tienda, string $url): void
+    {
+        $categoriaId = $producto->categoria_id !== null ? (int) $producto->categoria_id : null;
+        $apiEfectiva = app(TiendaScrapingConfigResolver::class)->resolverApi($tienda, $categoriaId) ?? $tienda->api;
+        if ($apiEfectiva !== TiendaScrapingConfigResolver::API_CSV_AWIN) {
+            return;
+        }
+
+        $filaCsv = app(CsvAwinOfertaService::class)->buscarFila($tienda, $url);
+        if ($filaCsv === null) {
+            return;
+        }
+
+        app(CsvAwinOfertaService::class)->fusionarCodigosCsvEnProducto($producto, $filaCsv);
+    }
+
+    /**
      * Crea una oferta desde el flujo masivo (obtiene precio, aplica envío/tienda, guarda)
      * POST /panel-privado/ofertas/crear-masivo/crear
      */
     public function crearOfertaBulk(Request $request)
     {
         try {
-        $request->validate([
+        $request->validate(array_merge([
             'url' => UrlOfertaValidacion::rules(),
             'producto_id' => 'required|exists:productos,id',
             'tienda_id' => 'required|exists:tiendas,id',
@@ -1461,7 +1527,7 @@ Responde ÚNICAMENTE con el JSON.";
             'generar_segunda_mano' => 'nullable|boolean',
             'envio' => 'nullable|numeric',
             'unidades' => 'nullable|numeric|min:0.01',
-        ]);
+        ], $this->reglasValidacionTextoCantidadAlternativoCrearMasivo((int) $request->input('producto_id'))));
 
         $url = trim($request->url);
         $urlNorm = $this->normalizarUrl($url);
@@ -1479,6 +1545,8 @@ Responde ÚNICAMENTE con el JSON.";
         }
         $urlLookup = app(ConsultarNeoCifrado::class)->hashLookup($urlNorm);
         if ($urlLookup && OfertaProducto::where('url_lookup', $urlLookup)->exists()) {
+            $this->marcarNeoAniadidaSiPorUrl($url);
+
             return response()->json([
                 'success' => false,
                 'error' => 'Esta URL ya existe en ofertas.',
@@ -1501,7 +1569,7 @@ Responde ÚNICAMENTE con el JSON.";
         }
 
         $tiendaNoVisibleNiScrapeable = ($tienda->mostrar_tienda === 'no' && $tienda->scrapear === 'no');
-        $amazonSinStockAutomatico = false;
+        $textoAvisoSinStockAutomatico = '';
 
         if ($generarSinPrecio || $generarSegundaMano) {
             // No intentar obtener precio: crear con precio 0, no mostrar y aviso según el motivo elegido
@@ -1511,28 +1579,27 @@ Responde ÚNICAMENTE con el JSON.";
             // Tienda marcada para no mostrar y no scrapear: no consultar precio y usar valor centinela.
             [$precioTotal, $precioUnidad] = $this->preciosCentinela9999Oferta($producto, $unidades);
         } else {
-            $scrapingController = new \App\Http\Controllers\Scraping\ScrapingController();
-            $scrapingRequest = new Request([
-                'url' => $url,
-                'tienda' => $tienda->nombre,
-                'variante' => null,
-            ]);
-            $response = $scrapingController->obtenerPrecio($scrapingRequest);
-            $data = $response->getData(true);
+            try {
+                $scrapingController = new \App\Http\Controllers\Scraping\ScrapingController();
+                $scrapingRequest = new Request([
+                    'url' => $url,
+                    'tienda' => $tienda->nombre,
+                    'variante' => null,
+                    'producto_id' => $productoId,
+                ]);
+                $response = $scrapingController->obtenerPrecio($scrapingRequest);
+                $data = (is_object($response) && method_exists($response, 'getData'))
+                    ? $response->getData(true)
+                    : ['success' => false, 'error' => 'Respuesta inválida del scraping'];
+            } catch (\Throwable $e) {
+                $data = ['success' => false, 'error' => $e->getMessage()];
+            }
 
             if (empty($data['success']) || !isset($data['precio']) || !is_numeric($data['precio'])) {
                 $errorScraping = $data['error'] ?? 'No se pudo obtener el precio';
-                if ($this->esErrorAmazonApiNoElegible($errorScraping)) {
-                    // Mismo tratamiento que «Sin stock» manual: precio 0, no mostrar, aviso a 4 días.
-                    $precioTotal = 0.0;
-                    $precioUnidad = 0.0;
-                    $amazonSinStockAutomatico = true;
-                } else {
-                    return response()->json([
-                        'success' => false,
-                        'error' => $errorScraping,
-                    ], 400);
-                }
+                $textoAvisoSinStockAutomatico = $this->textoAvisoSinStockAutomaticoDesdeErrorScraping($errorScraping);
+                $precioTotal = 0.0;
+                $precioUnidad = 0.0;
             } else {
                 $precioTotal = (float) str_replace(',', '.', (string) $data['precio']);
 
@@ -1545,6 +1612,7 @@ Responde ÚNICAMENTE con el JSON.";
                 if ($precioUnidad === null) {
                     $precioUnidad = $precioTotal / max(0.01, $unidades);
                 }
+                $this->sincronizarCodigosProductoDesdeCsvSiAplica($producto, $tienda, $url);
             }
         }
 
@@ -1596,6 +1664,7 @@ Responde ÚNICAMENTE con el JSON.";
             'especificaciones_internas' => $especificacionesInternas,
             'frecuencia_actualizar_precio_minutos' => $frecuenciaMinutos,
             'fecha_actualizacion_envio' => now(),
+            'texto_cantidad_alternativo' => $this->normalizarTextoCantidadAlternativoGuardadoCrearMasivo($request, $productoId),
         ];
 
         $oferta = OfertaProducto::create($datos);
@@ -1605,8 +1674,8 @@ Responde ÚNICAMENTE con el JSON.";
                 $textoAviso = 'Segunda mano - 1a vez';
             } elseif ($generarSinPrecio) {
                 $textoAviso = 'Sin stock 1a vez';
-            } elseif ($amazonSinStockAutomatico) {
-                $textoAviso = 'Sin stock 1a vez - Generado automaticamente';
+            } elseif ($textoAvisoSinStockAutomatico !== '') {
+                $textoAviso = $textoAvisoSinStockAutomatico;
             } else {
                 $textoAviso = 'Sin stock - 1a vez';
             }
@@ -1657,19 +1726,7 @@ Responde ÚNICAMENTE con el JSON.";
         }
 
         // Si la URL viene de neo (crear-masivo), marcar aniadida = si
-        $urlNorm = $this->normalizarUrl($url);
-        $urlSinBarra = rtrim($urlNorm, '/');
-        $urlConBarra = $urlSinBarra . '/';
-        $variantes = array_unique([$url, trim($url), $urlNorm, $urlSinBarra, $urlConBarra]);
-        $lookups = array_values(array_unique(array_filter(array_map(
-            fn ($u) => app(ConsultarNeoCifrado::class)->hashLookup((string) $u),
-            $variantes
-        ))));
-        if (!empty($lookups)) {
-            Neo::where('aniadida', 'no')
-                ->whereIn('url_lookup', $lookups)
-                ->update(['aniadida' => 'si']);
-        }
+        $this->marcarNeoAniadidaSiPorUrl($url);
 
         return response()->json([
             'success' => true,
@@ -1678,7 +1735,7 @@ Responde ÚNICAMENTE con el JSON.";
             'envio' => $oferta->envio,
             'precio_unidad' => $oferta->precio_unidad,
             'precio_cero' => $precioCero,
-            'sin_stock_automatico' => $amazonSinStockAutomatico,
+            'sin_stock_automatico' => $textoAvisoSinStockAutomatico !== '',
             'mensaje' => 'Oferta creada correctamente',
         ]);
 
@@ -1758,6 +1815,7 @@ Responde ÚNICAMENTE con el JSON.";
                 'url' => $o->url,
                 'precio_total' => $o->precio_total,
                 'precio_unidad' => $o->precio_unidad,
+                'unidades' => $o->unidades,
                 'envio' => $o->envio,
                 'producto' => $o->producto ? $o->producto->nombre : null,
                 'tienda' => $o->tienda ? $o->tienda->nombre : null,
@@ -1892,6 +1950,303 @@ Responde ÚNICAMENTE con el JSON.";
     private function normalizarUrl($url)
     {
         return app(LimpiarUrlDeTiendas::class)->limpiar((string) $url);
+    }
+
+    /**
+     * Variantes de URL (original, limpia, con/sin barra, sin /p, decodificada) para lookup en neo.
+     *
+     * @return list<string>
+     */
+    private function variantesUrlParaMarcarNeo(string ...$urls): array
+    {
+        $variantes = [];
+        $limpiar = app(LimpiarUrlDeTiendas::class);
+
+        foreach ($urls as $url) {
+            $url = trim((string) $url);
+            if ($url === '') {
+                continue;
+            }
+
+            $variantes[] = $url;
+            $limpia = $limpiar->limpiar($url);
+            if ($limpia !== '') {
+                $variantes[] = $limpia;
+                $sinBarra = rtrim($limpia, '/');
+                $variantes[] = $sinBarra;
+                $variantes[] = $sinBarra . '/';
+                if (strlen($sinBarra) > 2 && str_ends_with($sinBarra, '/p')) {
+                    $variantes[] = substr($sinBarra, 0, -2);
+                }
+            }
+
+            $decoded = rawurldecode($url);
+            if ($decoded !== $url) {
+                $variantes[] = $decoded;
+                $limpiaDecoded = $limpiar->limpiar($decoded);
+                if ($limpiaDecoded !== '' && !in_array($limpiaDecoded, $variantes, true)) {
+                    $variantes[] = $limpiaDecoded;
+                    $sinBarraDecoded = rtrim($limpiaDecoded, '/');
+                    $variantes[] = $sinBarraDecoded;
+                    $variantes[] = $sinBarraDecoded . '/';
+                }
+            }
+            if ($limpia !== '' && $limpia !== $url) {
+                $decodedLimpia = rawurldecode($limpia);
+                if ($decodedLimpia !== $limpia) {
+                    $variantes[] = $decodedLimpia;
+                }
+            }
+
+            foreach ($this->variantesUrlConPathCodificado($url) as $encoded) {
+                $variantes[] = $encoded;
+            }
+            if ($limpia !== '' && $limpia !== $url) {
+                foreach ($this->variantesUrlConPathCodificado($limpia) as $encoded) {
+                    $variantes[] = $encoded;
+                }
+            }
+        }
+
+        return array_values(array_unique(array_filter($variantes, static fn ($v) => $v !== '')));
+    }
+
+    /**
+     * Genera variantes con caracteres no ASCII del path codificados (%C3%A1, etc.).
+     *
+     * @return list<string>
+     */
+    private function variantesUrlConPathCodificado(string $url): array
+    {
+        $url = trim($url);
+        if ($url === '' || !preg_match('#^https?://#i', $url)) {
+            return [];
+        }
+
+        $partes = parse_url($url);
+        if (!is_array($partes) || empty($partes['host'])) {
+            return [];
+        }
+
+        $path = (string) ($partes['path'] ?? '');
+        if ($path === '') {
+            return [];
+        }
+
+        $segmentos = explode('/', $path);
+        $codificados = array_map(static function (string $segmento): string {
+            if ($segmento === '') {
+                return '';
+            }
+            $decoded = rawurldecode($segmento);
+            $chars = preg_split('//u', $decoded, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+            $out = '';
+            foreach ($chars as $char) {
+                $out .= preg_match('/[^\x20-\x7E]/', $char) ? rawurlencode($char) : $char;
+            }
+
+            return $out;
+        }, $segmentos);
+
+        $pathCodificado = implode('/', $codificados);
+        $scheme = $partes['scheme'] ?? 'https';
+
+        return [
+            $scheme . '://' . $partes['host'] . $pathCodificado,
+            $scheme . '://' . $partes['host'] . rtrim($pathCodificado, '/'),
+            $scheme . '://' . $partes['host'] . rtrim($pathCodificado, '/') . '/',
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function clavesComparacionUrlNeo(string $url): array
+    {
+        $claves = [];
+        foreach ($this->variantesUrlParaMarcarNeo($url) as $variante) {
+            $clave = mb_strtolower(rtrim(rawurldecode($variante), '/'), 'UTF-8');
+            if (is_string($clave) && $clave !== '') {
+                $claves[] = $clave;
+            }
+        }
+
+        return array_values(array_unique($claves));
+    }
+
+    /**
+     * ID numérico al final del slug (p. ej. MediaMarkt ...-1363067.html).
+     */
+    private function extraerIdFinalUrlProducto(string $url): ?string
+    {
+        $decoded = rawurldecode(trim($url));
+        if (preg_match('/-(\d{5,})\.html$/i', $decoded, $matches)) {
+            return $matches[1];
+        }
+
+        return null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function lookupsUrlParaMarcarNeo(string ...$urls): array
+    {
+        $cifrado = app(ConsultarNeoCifrado::class);
+        $lookups = [];
+
+        foreach ($this->variantesUrlParaMarcarNeo(...$urls) as $variante) {
+            $hash = $cifrado->hashLookup($variante);
+            if ($hash !== '') {
+                $lookups[] = $hash;
+            }
+        }
+
+        return array_values(array_unique($lookups));
+    }
+
+    private function urlsSonEquivalentesParaNeo(string $urlA, string $urlB): bool
+    {
+        $clavesA = $this->clavesComparacionUrlNeo($urlA);
+        $clavesB = $this->clavesComparacionUrlNeo($urlB);
+
+        foreach ($clavesA as $ka) {
+            foreach ($clavesB as $kb) {
+                if ($ka === $kb) {
+                    return true;
+                }
+            }
+        }
+
+        $idA = $this->extraerIdFinalUrlProducto($urlA);
+        $idB = $this->extraerIdFinalUrlProducto($urlB);
+
+        return $idA !== null && $idB !== null && $idA === $idB;
+    }
+
+    /**
+     * Marca en neo las filas con esta URL (aniadida=no) como aniadida=si.
+     */
+    private function marcarNeoAniadidaSiPorUrl(
+        string $url,
+        ?int $neoId = null,
+        array $ofertasExistentes = [],
+        ?string $urlOriginal = null,
+        ?int $productoIdNeo = null
+    ): int {
+        $urlsFuente = array_values(array_unique(array_filter([
+            $url,
+            $urlOriginal,
+            ...array_map(static fn ($oferta) => (string) ($oferta['url'] ?? ''), $ofertasExistentes),
+        ])));
+
+        $lookups = $urlsFuente !== []
+            ? $this->lookupsUrlParaMarcarNeo(...$urlsFuente)
+            : [];
+
+        $offerIds = array_values(array_filter(array_map(
+            static fn ($oferta) => (int) ($oferta['id'] ?? 0),
+            $ofertasExistentes
+        )));
+        if ($offerIds !== []) {
+            $lookups = array_merge(
+                $lookups,
+                OfertaProducto::query()
+                    ->whereIn('id', $offerIds)
+                    ->pluck('url_lookup')
+                    ->filter()
+                    ->all()
+            );
+        }
+
+        $lookups = array_values(array_unique(array_filter($lookups)));
+
+        $ids = collect();
+        if ($neoId) {
+            $ids = $ids->merge(
+                Neo::where('id', $neoId)->where('aniadida', 'no')->pluck('id')
+            );
+        }
+        if ($lookups !== []) {
+            $ids = $ids->merge(
+                Neo::where('aniadida', 'no')->whereIn('url_lookup', $lookups)->pluck('id')
+            );
+        }
+
+        if ($ids->isEmpty() && $urlsFuente !== []) {
+            $idsReferencia = array_values(array_unique(array_filter(array_map(
+                fn (string $fuente) => $this->extraerIdFinalUrlProducto($fuente),
+                $urlsFuente
+            ))));
+
+            if ($idsReferencia !== []) {
+                $productoIdBusqueda = $productoIdNeo;
+                if (!$productoIdBusqueda && $offerIds !== []) {
+                    foreach ($offerIds as $offerId) {
+                        $productoIdOferta = OfertaProducto::query()
+                            ->where('id', $offerId)
+                            ->value('producto_id');
+                        if ($productoIdOferta) {
+                            $productoIdBusqueda = (int) $productoIdOferta;
+                            break;
+                        }
+                    }
+                }
+
+                if ($neoId || $productoIdBusqueda) {
+                    $query = Neo::query()
+                        ->where('aniadida', 'no')
+                        ->whereNotNull('url_cipher')
+                        ->where('url_cipher', '!=', '');
+
+                    if ($neoId) {
+                        $query->where('id', $neoId);
+                    } else {
+                        $query->where('producto_id', $productoIdBusqueda);
+                    }
+
+                    foreach ($query->get(['id', 'url_cipher']) as $neo) {
+                        $idNeo = $this->extraerIdFinalUrlProducto(trim((string) $neo->url));
+                        if ($idNeo !== null && in_array($idNeo, $idsReferencia, true)) {
+                            $ids->push($neo->id);
+                        }
+                    }
+                }
+            }
+        }
+
+        if ($ids->isEmpty() && $urlsFuente !== [] && ($neoId || $productoIdNeo)) {
+            $query = Neo::query()
+                ->where('aniadida', 'no')
+                ->whereNotNull('url_cipher')
+                ->where('url_cipher', '!=', '');
+
+            if ($neoId) {
+                $query->where('id', $neoId);
+            } else {
+                $query->where('producto_id', $productoIdNeo);
+            }
+
+            foreach ($query->get(['id', 'url_cipher']) as $neo) {
+                $neoUrl = trim((string) $neo->url);
+                if ($neoUrl === '') {
+                    continue;
+                }
+                foreach ($urlsFuente as $fuente) {
+                    if ($this->urlsSonEquivalentesParaNeo($neoUrl, $fuente)) {
+                        $ids->push($neo->id);
+                        break;
+                    }
+                }
+            }
+        }
+
+        $ids = $ids->unique()->values();
+        if ($ids->isEmpty()) {
+            return 0;
+        }
+
+        return Neo::whereIn('id', $ids)->where('aniadida', 'no')->update(['aniadida' => 'si']);
     }
 
     private function verificarUrlExistente($urlNormalizada)
@@ -2258,6 +2613,90 @@ Responde ÚNICAMENTE con el JSON.";
     }
 
     /**
+     * Palabras útiles del path de una URL (slug descriptivo + ID de producto si aplica).
+     * Carrefour: …/slug-descriptivo/R-fprod123(/p) — conserva R-fprod… entero y parte el slug descriptivo.
+     *
+     * @return list<string>
+     */
+    private function extraerPalabrasSlugDesdeUrlPath(string $urlOrPath): array
+    {
+        $path = $urlOrPath;
+        if (str_contains($urlOrPath, '://') || str_starts_with($urlOrPath, '//')) {
+            $path = parse_url($urlOrPath, PHP_URL_PATH) ?? '';
+        }
+        $segmentos = array_values(array_filter(explode('/', rtrim((string) $path, '/'))));
+        if ($segmentos === []) {
+            return [];
+        }
+
+        $partes = [];
+        $visto = [];
+
+        $push = function (string $p) use (&$partes, &$visto): void {
+            $p = trim($p);
+            if ($p === '') {
+                return;
+            }
+            $clave = strtolower($p);
+            if (isset($visto[$clave])) {
+                return;
+            }
+            $visto[$clave] = true;
+            $partes[] = $p;
+        };
+
+        $partirSegmento = function (string $seg) use ($push): void {
+            if ($seg === '') {
+                return;
+            }
+            if (preg_match('/^R-/i', $seg)) {
+                $push($seg);
+
+                return;
+            }
+            foreach (explode('|', $seg) as $bloque) {
+                foreach (explode('-', $bloque) as $p) {
+                    $push((string) $p);
+                }
+            }
+        };
+
+        $n = count($segmentos);
+        $ultimo = $segmentos[$n - 1];
+
+        // Carrefour sin /p final: …/slug-descriptivo/R-fprod123
+        if (preg_match('/^R-/i', $ultimo)) {
+            if ($n >= 2) {
+                $partirSegmento($segmentos[$n - 2]);
+            }
+            $push($ultimo);
+
+            return $partes;
+        }
+
+        // VTEX / Appinformatica / Carrefour con /p: …/slug-real/p o …/slug/R-fprod123/p
+        $slug = $ultimo;
+        if ($n >= 2 && preg_match('/^(p|html?)$/i', $ultimo)) {
+            $slug = $segmentos[$n - 2];
+            if (preg_match('/^R-/i', $slug)) {
+                if ($n >= 3) {
+                    $partirSegmento($segmentos[$n - 3]);
+                }
+                $push($slug);
+
+                return $partes;
+            }
+        }
+
+        if ($slug === '') {
+            return [];
+        }
+        $partirSegmento($slug);
+
+        return $partes;
+    }
+
+    /**
      * Marca especificaciones del producto cuando una opción aparece explícitamente en el slug.
      * - Evita marcar por prefijos ambiguos (ej: "windforce" no marca "windforce oc").
      * - Si hay empate de opciones en un grupo, no marca ninguna.
@@ -2272,14 +2711,8 @@ Responde ÚNICAMENTE con el JSON.";
             return [];
         }
 
-        $path = parse_url($url, PHP_URL_PATH) ?? '';
-        $segmentos = array_values(array_filter(explode('/', $path)));
-        $slug = end($segmentos);
-        if (!is_string($slug) || $slug === '') {
-            return [];
-        }
         $tokensBase = array_values(array_filter(
-            array_map(fn ($p) => $this->normalizarTokenParaVocabulario((string) $p), explode('-', $slug)),
+            array_map(fn ($p) => $this->normalizarTokenParaVocabulario((string) $p), $this->extraerPalabrasSlugDesdeUrlPath($url)),
             fn ($p) => $p !== ''
         ));
         $tokens = $this->expandirTokensMixtos($tokensBase);
@@ -2335,13 +2768,13 @@ Responde ÚNICAMENTE con el JSON.";
      */
     private function buscarProductoPorUrl(string $url, ?int $categoriaCatalogoId = null, array $vocabularioTokens = []): array
     {
-        $path = parse_url($url, PHP_URL_PATH) ?? '';
-        $segmentos = array_filter(explode('/', $path));
-        $slug = end($segmentos);
-        if (empty($slug) || strlen($slug) < 3) {
+        $todasLasPalabras = array_values(array_filter(
+            $this->extraerPalabrasSlugDesdeUrlPath($url),
+            fn ($p) => strlen($p) >= 2
+        ));
+        if ($todasLasPalabras === []) {
             return [];
         }
-        $todasLasPalabras = array_values(array_filter(explode('-', $slug), fn ($p) => strlen($p) >= 2));
         $palabras = array_slice($todasLasPalabras, 0, 12);
         if (empty($palabras)) {
             return [];
@@ -2646,6 +3079,7 @@ Responde ÚNICAMENTE con el JSON.";
                 'imagen_pequena' => $p->imagen_pequena,
                 'imagenes_producto' => array_values(array_unique(array_filter($imgs))),
                 'unidad_de_medida' => $p->unidadDeMedida ?? 'unidad',
+                'permitir_texto_cantidad_alternativo' => ($p->categoria?->permitir_texto_cantidad_alternativo ?? 'no'),
                 'puntuacion' => $item['puntuacion'],
             ];
         })->values()->toArray();
@@ -2684,6 +3118,7 @@ Responde ÚNICAMENTE con el JSON.";
             'url_producto' => $urlProducto,
             'imagenes_producto' => $imgs,
             'unidad_de_medida' => $p->unidadDeMedida ?? 'unidad',
+            'permitir_texto_cantidad_alternativo' => ($p->categoria?->permitir_texto_cantidad_alternativo ?? 'no'),
             'especificaciones' => $especs,
             'tiene_especificaciones' => $tieneEspecs,
         ];
@@ -2767,7 +3202,10 @@ Responde ÚNICAMENTE con el JSON.";
             ];
         }
         $especificacionesElegidas = $producto->categoria_especificaciones_internas_elegidas;
-        $columnasIds = $especificacionesElegidas['_columnas'] ?? [];
+        $columnasIds = $this->normalizarColumnasIdsEspecificaciones(
+            $especificacionesElegidas['_columnas'] ?? [],
+            $unidadDeMedida
+        );
 
         $filtrosCategoria = $categoria->especificaciones_internas['filtros'] ?? [];
         $filtrosProducto = [];
@@ -2868,6 +3306,74 @@ Responde ÚNICAMENTE con el JSON.";
     {
         $cs = strtolower(trim($tienda->como_scrapear ?? 'manual'));
         return in_array($cs, ['automatico', 'manual', 'ambos']) ? ($cs === 'ambos' ? 'automatico' : $cs) : 'manual';
+    }
+
+    /**
+     * @param  mixed  $raw
+     * @return list<string>
+     */
+    private function normalizarColumnasIdsEspecificaciones($raw, string $unidadDeMedida = 'unidad'): array
+    {
+        $out = [];
+        if (is_array($raw)) {
+            if ($raw !== [] && !array_is_list($raw)) {
+                foreach (array_keys($raw) as $k) {
+                    $key = (string) $k;
+                    if ($key !== '' && !str_starts_with($key, '_')) {
+                        $out[] = $key;
+                    }
+                }
+            } else {
+                foreach ($raw as $v) {
+                    if (is_array($v) && isset($v['id'])) {
+                        $v = $v['id'];
+                    }
+                    if (is_string($v) || is_numeric($v)) {
+                        $out[] = (string) $v;
+                    }
+                }
+            }
+        }
+
+        $out = array_values(array_unique($out));
+
+        if ($unidadDeMedida !== 'unidadUnica' && count($out) > 1) {
+            $out = array_slice($out, 0, 1);
+        }
+
+        return $out;
+    }
+
+    private function categoriaRequiereTextoCantidadAlternativoCrearMasivo(int $productoId): bool
+    {
+        $producto = Producto::with('categoria')->find($productoId);
+
+        return $producto
+            && $producto->categoria
+            && ($producto->categoria->permitir_texto_cantidad_alternativo ?? 'no') === 'si';
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function reglasValidacionTextoCantidadAlternativoCrearMasivo(int $productoId): array
+    {
+        if ($this->categoriaRequiereTextoCantidadAlternativoCrearMasivo($productoId)) {
+            return ['texto_cantidad_alternativo' => 'required|string|max:255'];
+        }
+
+        return ['texto_cantidad_alternativo' => 'nullable|string|max:255'];
+    }
+
+    private function normalizarTextoCantidadAlternativoGuardadoCrearMasivo(Request $request, int $productoId): ?string
+    {
+        if (!$this->categoriaRequiereTextoCantidadAlternativoCrearMasivo($productoId)) {
+            return null;
+        }
+
+        $texto = trim((string) $request->input('texto_cantidad_alternativo', ''));
+
+        return $texto !== '' ? $texto : null;
     }
 }
 

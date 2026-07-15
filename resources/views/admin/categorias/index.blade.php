@@ -44,20 +44,131 @@
         </details>
         @endif
 
-    <div class="max-w-5xl mx-auto py-10 px-4 space-y-8 bg-gray-50 dark:bg-gray-900 rounded-lg shadow-md"
-        x-data="{
-            openCategorias: [],
-            toggle(id) {
-                if (this.openCategorias.includes(id)) {
-                    this.openCategorias = this.openCategorias.filter(i => i !== id);
-                } else {
-                    this.openCategorias.push(id);
+    <script>
+        function categoriasIndexArbol() {
+            return {
+                openCategorias: [],
+                busquedaCategorias: '',
+                visibleIdsCache: null,
+                ramaIdsCache: null,
+                categoriasFlat: @json($todasCategorias->map(fn ($c) => ['id' => $c->id, 'nombre' => $c->nombre, 'parent_id' => $c->parent_id])->values()),
+                toggle(id) {
+                    if (this.openCategorias.includes(id)) {
+                        this.openCategorias = this.openCategorias.filter(function(i) { return i !== id; });
+                    } else {
+                        this.openCategorias.push(id);
+                    }
+                },
+                isOpen(id) {
+                    return this.openCategorias.includes(id);
+                },
+                normalizarTextoCategoria(texto) {
+                    return String(texto ?? '')
+                        .toLowerCase()
+                        .trim()
+                        .normalize('NFD')
+                        .replace(/[\u0300-\u036f]/g, '');
+                },
+                construirMapaHijosCategorias() {
+                    const mapa = {};
+                    this.categoriasFlat.forEach(function(c) {
+                        const clave = c.parent_id ?? 'root';
+                        if (!mapa[clave]) mapa[clave] = [];
+                        mapa[clave].push(c.id);
+                    });
+                    return mapa;
+                },
+                obtenerDescendientesCategoria(id, mapaHijos) {
+                    const descendientes = [];
+                    const self = this;
+                    (mapaHijos[id] || []).forEach(function(hijoId) {
+                        descendientes.push(hijoId);
+                        descendientes.push.apply(descendientes, self.obtenerDescendientesCategoria(hijoId, mapaHijos));
+                    });
+                    return descendientes;
+                },
+                obtenerAncestrosCategoria(id) {
+                    const ancestros = [];
+                    let actual = this.categoriasFlat.find(function(c) { return c.id === id; });
+                    while (actual && actual.parent_id) {
+                        ancestros.push(actual.parent_id);
+                        actual = this.categoriasFlat.find(function(c) { return c.id === actual.parent_id; });
+                    }
+                    return ancestros;
+                },
+                aplicarFiltroCategorias() {
+                    const consulta = this.normalizarTextoCategoria(this.busquedaCategorias);
+                    if (!consulta) {
+                        this.visibleIdsCache = null;
+                        this.ramaIdsCache = null;
+                        return;
+                    }
+
+                    const mapaHijos = this.construirMapaHijosCategorias();
+                    const visibles = new Set();
+                    const self = this;
+
+                    this.categoriasFlat.forEach(function(c) {
+                        if (!self.normalizarTextoCategoria(c.nombre).includes(consulta)) {
+                            return;
+                        }
+
+                        visibles.add(c.id);
+
+                        if ((mapaHijos[c.id] || []).length > 0) {
+                            self.obtenerDescendientesCategoria(c.id, mapaHijos).forEach(function(descId) {
+                                visibles.add(descId);
+                            });
+                        }
+                    });
+
+                    const ramaIds = new Set(visibles);
+                    visibles.forEach(function(id) {
+                        self.obtenerAncestrosCategoria(id).forEach(function(ancestorId) {
+                            ramaIds.add(ancestorId);
+                        });
+                    });
+
+                    this.visibleIdsCache = visibles;
+                    this.ramaIdsCache = ramaIds;
+
+                    const abrir = [];
+                    ramaIds.forEach(function(id) {
+                        if ((mapaHijos[id] || []).length > 0) {
+                            abrir.push(id);
+                        }
+                    });
+                    this.openCategorias = Array.from(new Set(this.openCategorias.concat(abrir)));
+                },
+                categoriaVisible(id) {
+                    if (!this.busquedaCategorias.trim()) {
+                        return true;
+                    }
+                    if (!this.visibleIdsCache) {
+                        return true;
+                    }
+                    return this.visibleIdsCache.has(id);
+                },
+                categoriaEnRamaVisible(id) {
+                    if (!this.busquedaCategorias.trim()) {
+                        return true;
+                    }
+                    if (!this.ramaIdsCache) {
+                        return true;
+                    }
+                    return this.ramaIdsCache.has(id);
+                },
+                limpiarBusquedaCategorias() {
+                    this.busquedaCategorias = '';
+                    this.visibleIdsCache = null;
+                    this.ramaIdsCache = null;
                 }
-            },
-            isOpen(id) {
-                return this.openCategorias.includes(id);
-            }
-        }">
+            };
+        }
+    </script>
+
+    <div class="max-w-5xl mx-auto py-10 px-4 space-y-8 bg-gray-50 dark:bg-gray-900 rounded-lg shadow-md"
+        x-data="categoriasIndexArbol()">
         
         
 
@@ -76,6 +187,37 @@
         {{-- CATEGORÍAS EXISTENTES --}}
         <fieldset class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 space-y-4 border border-gray-200 dark:border-gray-700">
             <legend class="text-lg font-semibold text-gray-700 dark:text-gray-200">Categorías existentes</legend>
+
+            <div class="mb-2">
+                <label for="buscador-categorias-index" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                    Buscar categoría
+                </label>
+                <div class="flex flex-wrap items-center gap-2">
+                    <input type="search"
+                        id="buscador-categorias-index"
+                        x-model="busquedaCategorias"
+                        @input="aplicarFiltroCategorias()"
+                        placeholder="Escribe para filtrar la ramificación…"
+                        autocomplete="off"
+                        class="flex-1 min-w-[12rem] w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-pink-500 focus:border-pink-500">
+                    <button type="button"
+                        x-show="busquedaCategorias.trim() !== ''"
+                        @click="limpiarBusquedaCategorias()"
+                        class="shrink-0 px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
+                        Limpiar
+                    </button>
+                </div>
+                <p x-show="busquedaCategorias.trim() !== '' && visibleIdsCache && visibleIdsCache.size === 0"
+                    x-cloak
+                    class="mt-2 text-sm text-amber-700 dark:text-amber-300">
+                    No hay categorías que coincidan con tu búsqueda.
+                </p>
+                <p x-show="busquedaCategorias.trim() !== '' && visibleIdsCache && visibleIdsCache.size > 0"
+                    x-cloak
+                    class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    Si la coincidencia tiene hijos, se muestra esa categoría y su ramificación hacia abajo (sin padres).
+                </p>
+            </div>
 
             @foreach ($categoriasRaiz as $categoria)
                 @include('admin.categorias.partial-categoria', ['categoria' => $categoria, 'nivel' => 0])

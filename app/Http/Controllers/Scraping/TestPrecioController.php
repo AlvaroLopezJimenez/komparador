@@ -13,10 +13,10 @@ class TestPrecioController extends Controller
      */
     public function index()
     {
-        // Obtener lista de controladores disponibles en la carpeta Tiendas
         $tiendas = $this->obtenerTiendasDisponibles();
-        
-        return view('admin.scraping.test-precio', compact('tiendas'));
+        $controladoresTiendas = $this->obtenerControladoresTiendas();
+
+        return view('admin.scraping.test-precio', compact('tiendas', 'controladoresTiendas'));
     }
 
     /**
@@ -82,5 +82,31 @@ class TestPrecioController extends Controller
             ->orderBy('nombre', 'asc')
             ->pluck('nombre')
             ->toArray();
+    }
+
+    /**
+     * Obtener lista de controladores de tiendas disponibles (misma lógica que DiagnosticoController).
+     */
+    private function obtenerControladoresTiendas()
+    {
+        $tiendasPath = app_path('Http/Controllers/Scraping/Tiendas');
+        $controladores = [];
+
+        if (file_exists($tiendasPath)) {
+            $archivos = scandir($tiendasPath);
+
+            foreach ($archivos as $archivo) {
+                if (pathinfo($archivo, PATHINFO_EXTENSION) === 'php' &&
+                    $archivo !== 'PlantillaTiendaController.php' &&
+                    $archivo !== 'INSTRUCCIONES_TIENDAS.txt') {
+
+                    $nombreTienda = str_replace('Controller.php', '', $archivo);
+                    $controladores[] = $nombreTienda;
+                }
+            }
+        }
+
+        sort($controladores);
+        return $controladores;
     }
 }

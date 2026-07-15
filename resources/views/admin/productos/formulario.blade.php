@@ -143,9 +143,27 @@
                         @error('nombre') <p class="text-red-500 text-sm mt-1">{{ $message }}</p> @enderror
                     </div>
 
-                    <div>
-                        <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">Slug *</label>
-                        <input type="text" id="slug" name="slug" value="{{ old('slug', $producto->slug ?? '') }}"
+                    <div id="slug-campo-wrap">
+                        <div class="flex items-center gap-1.5 mb-1">
+                            <label class="font-medium text-gray-700 dark:text-gray-200">Slug *</label>
+                            @if($producto && $producto->id)
+                            <button type="button" id="slug-candado-btn"
+                                class="inline-flex items-center justify-center w-7 h-7 rounded-md border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 transition"
+                                aria-label="Desbloquear campo slug"
+                                title="Candado de control: clic para poder cambiar el slug">
+                                <svg id="slug-candado-icono-cerrado" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                                    <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
+                                </svg>
+                                <svg id="slug-candado-icono-abierto" class="w-4 h-4 hidden" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                                    <path d="M10 2a5 5 0 00-5 5v2a2 2 0 00-2 2v5a2 2 0 002 2h10a2 2 0 002-2v-5a2 2 0 00-2-2H7V7a3 3 0 115.905-.75A5.002 5.002 0 0010 2z"/>
+                                </svg>
+                            </button>
+                            @endif
+                        </div>
+                        @if($producto && $producto->id)
+                        <input type="hidden" name="slug" id="slug-valor-hidden" value="{{ old('slug', $producto->slug ?? '') }}">
+                        @endif
+                        <input type="text" id="slug" @if(!($producto && $producto->id)) name="slug" @endif value="{{ old('slug', $producto->slug ?? '') }}"
                             class="w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border @error('slug') border-red-500 @enderror @if($producto && $producto->id) opacity-50 cursor-not-allowed bg-gray-200 dark:bg-gray-800 @endif"
                             @if($producto && $producto->id) readonly @endif>
                         <div id="slug_validation_message" class="mt-1 text-sm hidden"></div>
@@ -158,22 +176,25 @@
 
                     <div>
                         <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">Marca *</label>
-                        <input type="text" name="marca" value="{{ old('marca', $producto->marca ?? '') }}"
-                            class="w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border @error('marca') border-red-500 @enderror">
+                        <div class="kp-segmentacion-palabras-wrap hidden mb-1.5 flex flex-wrap gap-1.5" aria-live="polite"></div>
+                        <input type="text" name="marca" id="input_marca" value="{{ old('marca', $producto->marca ?? '') }}"
+                            class="kp-campo-segmentacion-nombre w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border @error('marca') border-red-500 @enderror">
                         @error('marca') <p class="text-red-500 text-sm mt-1">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
                         <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">Modelo *</label>
-                        <input type="text" name="modelo" value="{{ old('modelo', $producto->modelo ?? '') }}"
-                            class="w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border @error('modelo') border-red-500 @enderror">
+                        <div class="kp-segmentacion-palabras-wrap hidden mb-1.5 flex flex-wrap gap-1.5" aria-live="polite"></div>
+                        <input type="text" name="modelo" id="input_modelo" value="{{ old('modelo', $producto->modelo ?? '') }}"
+                            class="kp-campo-segmentacion-nombre w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border @error('modelo') border-red-500 @enderror">
                         @error('modelo') <p class="text-red-500 text-sm mt-1">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
                         <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">Talla</label>
-                        <input type="text" name="talla" value="{{ old('talla', $producto->talla ?? '') }}"
-                            class="w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border @error('talla') border-red-500 @enderror">
+                        <div class="kp-segmentacion-palabras-wrap hidden mb-1.5 flex flex-wrap gap-1.5" aria-live="polite"></div>
+                        <input type="text" name="talla" id="input_talla" value="{{ old('talla', $producto->talla ?? '') }}"
+                            class="kp-campo-segmentacion-nombre w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border @error('talla') border-red-500 @enderror">
                         @error('talla') <p class="text-red-500 text-sm mt-1">{{ $message }}</p> @enderror
                     </div>
 
@@ -185,13 +206,13 @@
                                 aria-label="Ayuda sobre palabras exigidas"
                                 data-tooltip='Estas palabras mínimas deberán coincidir con el titulo del producto de amazon, para poder ser guardada en el sistema (Utilizar las mínimas indispensables) Ej Gigabyte GeForce RTX 9060 XT, poner tan solo "Gigabyte 9060 XT"'>?</button>
                         </label>
+                        <div class="kp-segmentacion-palabras-wrap hidden mb-1.5 flex flex-wrap gap-1.5" aria-live="polite"></div>
                         <input type="text" id="input_palabras_exigidas" name="palabras_exigidas" required
                             value="{{ old('palabras_exigidas', $producto->palabras_exigidas ?? '') }}"
-                            class="w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border @error('palabras_exigidas') border-red-500 @enderror"
+                            class="kp-campo-segmentacion-nombre w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border @error('palabras_exigidas') border-red-500 @enderror"
                             placeholder="Ej: Gigabyte 9060 XT">
                         @error('palabras_exigidas') <p class="text-red-500 text-sm mt-1">{{ $message }}</p> @enderror
                     </div>
-
 
                     <div class="md:col-span-2 flex gap-2">
                         <button type="button" id="rellenar-info-automatica" disabled
@@ -215,47 +236,127 @@
                         </div>
                     </div>
 
-                    <div>
-                        <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">Precio (€)</label>
-                        <input type="number" step="0.01" name="precio" value="{{ old('precio', $producto->precio ?? '') }}"
-                            class="w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border @error('precio') border-red-500 @enderror">
-                        @error('precio') <p class="text-red-500 text-sm mt-1">{{ $message }}</p> @enderror
-                    </div>
+                    @php
+                        $esProductoNuevo = empty($producto?->id);
+                        $precioValorFormulario = old('precio', $esProductoNuevo ? 0 : ($producto->precio ?? ''));
+                    @endphp
+                    <div class="md:col-span-2">
+                        <div class="flex flex-wrap items-end gap-6">
+                            <div class="w-32 shrink-0">
+                                <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">Precio (€)</label>
+                                <input type="number" step="0.01" name="precio" value="{{ $precioValorFormulario }}"
+                                    class="w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border @error('precio') border-red-500 @enderror">
+                                @error('precio') <p class="text-red-500 text-sm mt-1">{{ $message }}</p> @enderror
+                            </div>
 
-                    <div>
-                        <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">¿Obsoleto? *</label>
-                        <div class="flex gap-6">
-                            <label class="inline-flex items-center">
-                                <input type="radio" name="obsoleto" value="no"
-                                    {{ old('obsoleto', $producto->obsoleto ?? 'no') === 'no' ? 'checked' : '' }}
-                                    class="form-radio text-pink-600">
-                                <span class="ml-2 text-gray-700 dark:text-gray-200">No</span>
-                            </label>
-                            <label class="inline-flex items-center">
-                                <input type="radio" name="obsoleto" value="si"
-                                    {{ old('obsoleto', $producto->obsoleto ?? 'no') === 'si' ? 'checked' : '' }}
-                                    class="form-radio text-pink-600">
-                                <span class="ml-2 text-gray-700 dark:text-gray-200">Sí</span>
-                            </label>
-                        </div>
-                    </div>
+                            <div class="shrink-0" id="obsoleto-campo-wrap">
+                                <div class="flex items-center gap-1.5 mb-1">
+                                    <span class="font-medium text-gray-700 dark:text-gray-200">¿Obsoleto? *</span>
+                                    <button type="button" id="obsoleto-candado-btn"
+                                        class="inline-flex items-center justify-center w-7 h-7 rounded-md border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 transition"
+                                        aria-label="Desbloquear campo obsoleto"
+                                        title="Candado de control: clic para poder cambiar obsoleto">
+                                        <svg id="obsoleto-candado-icono-cerrado" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                                            <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
+                                        </svg>
+                                        <svg id="obsoleto-candado-icono-abierto" class="w-4 h-4 hidden" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                                            <path d="M10 2a5 5 0 00-5 5v2a2 2 0 00-2 2v5a2 2 0 002 2h10a2 2 0 002-2v-5a2 2 0 00-2-2H7V7a3 3 0 115.905-.75A5.002 5.002 0 0010 2z"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                                <input type="hidden" name="obsoleto" id="obsoleto-valor-hidden" value="{{ old('obsoleto', $producto?->obsoleto ?? 'no') }}">
+                                <div id="obsoleto-radios-wrap" class="flex gap-6 h-[42px] items-center opacity-50 pointer-events-none select-none">
+                                    <label class="inline-flex items-center cursor-not-allowed">
+                                        <input type="radio" value="no"
+                                            {{ old('obsoleto', $producto?->obsoleto ?? 'no') === 'no' ? 'checked' : '' }}
+                                            class="obsoleto-radio form-radio text-pink-600">
+                                        <span class="ml-2 text-gray-700 dark:text-gray-200">No</span>
+                                    </label>
+                                    <label class="inline-flex items-center cursor-not-allowed">
+                                        <input type="radio" value="si"
+                                            {{ old('obsoleto', $producto?->obsoleto ?? 'no') === 'si' ? 'checked' : '' }}
+                                            class="obsoleto-radio form-radio text-pink-600">
+                                        <span class="ml-2 text-gray-700 dark:text-gray-200">Sí</span>
+                                    </label>
+                                </div>
+                            </div>
 
-                    <div>
-                        <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">¿Mostrar? *</label>
-                        <div class="flex gap-6">
-                            <label class="inline-flex items-center">
-                                <input type="radio" name="mostrar" value="si"
-                                    {{ old('mostrar', $producto->mostrar ?? 'si') === 'si' ? 'checked' : '' }}
-                                    class="form-radio text-pink-600">
-                                <span class="ml-2 text-gray-700 dark:text-gray-200">Sí</span>
-                            </label>
-                            <label class="inline-flex items-center">
-                                <input type="radio" name="mostrar" value="no"
-                                    {{ old('mostrar', $producto->mostrar ?? 'si') === 'no' ? 'checked' : '' }}
-                                    class="form-radio text-pink-600">
-                                <span class="ml-2 text-gray-700 dark:text-gray-200">No</span>
-                            </label>
+                            <div class="shrink-0">
+                                <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">¿Mostrar? *</label>
+                                <div class="flex gap-6 h-[42px] items-center">
+                                    <label class="inline-flex items-center">
+                                        <input type="radio" name="mostrar" value="si"
+                                            {{ old('mostrar', $producto->mostrar ?? 'si') === 'si' ? 'checked' : '' }}
+                                            class="form-radio text-pink-600">
+                                        <span class="ml-2 text-gray-700 dark:text-gray-200">Sí</span>
+                                    </label>
+                                    <label class="inline-flex items-center">
+                                        <input type="radio" name="mostrar" value="no"
+                                            {{ old('mostrar', $producto->mostrar ?? 'si') === 'no' ? 'checked' : '' }}
+                                            class="form-radio text-pink-600">
+                                        <span class="ml-2 text-gray-700 dark:text-gray-200">No</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <button type="button" id="btn-toggle-codigos-producto"
+                                class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-3 py-2 rounded-md shadow transition shrink-0 mb-0.5">
+                                <span>Códigos EAN, ISBN…</span>
+                                <span id="codigos-producto-badge" class="hidden min-w-[1.25rem] px-1.5 py-0.5 rounded-full bg-white/20 text-xs font-bold text-center"></span>
+                            </button>
                         </div>
+                        @php
+                            $codigosProductoInicial = old('ean_isbn_etc');
+                            if ($codigosProductoInicial === null) {
+                                $codigosProductoInicial = $producto?->ean_isbn_etc ?? [];
+                            }
+                            if (is_string($codigosProductoInicial)) {
+                                $codigosProductoInicial = json_decode($codigosProductoInicial, true) ?? [];
+                            }
+                            if (!is_array($codigosProductoInicial)) {
+                                $codigosProductoInicial = [];
+                            }
+                            foreach (['ean', 'isbn', 'upc', 'mpn', 'gtin'] as $tipoCodigoProducto) {
+                                if (!isset($codigosProductoInicial[$tipoCodigoProducto]) || !is_array($codigosProductoInicial[$tipoCodigoProducto])) {
+                                    $val = $codigosProductoInicial[$tipoCodigoProducto] ?? null;
+                                    $codigosProductoInicial[$tipoCodigoProducto] = ($val !== null && $val !== '') ? [(string) $val] : [];
+                                }
+                            }
+                        @endphp
+                        <div id="codigos-producto-panel" class="hidden mt-4 w-full rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50 p-4 space-y-4">
+                            <p class="text-sm text-gray-600 dark:text-gray-300">Códigos globales del producto (EAN, ISBN, UPC, MPN, GTIN) usados para buscar coincidencias en los feeds CSV.</p>
+                            @foreach (['ean' => 'EAN', 'isbn' => 'ISBN', 'upc' => 'UPC', 'mpn' => 'MPN', 'gtin' => 'GTIN'] as $tipoCodigo => $etiquetaCodigo)
+                                <div class="codigos-tipo-block rounded-md border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-3" data-tipo="{{ $tipoCodigo }}">
+                                    <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                                        <h4 class="text-sm font-semibold text-gray-800 dark:text-gray-100">{{ $etiquetaCodigo }}</h4>
+                                        <button type="button" class="btn-anadir-codigo-producto text-sm text-green-600 hover:text-green-700 font-medium" data-tipo="{{ $tipoCodigo }}">
+                                            + Añadir {{ $etiquetaCodigo }}
+                                        </button>
+                                    </div>
+                                    <div class="codigos-lista space-y-2" id="codigos-lista-{{ $tipoCodigo }}">
+                                        @foreach ($codigosProductoInicial[$tipoCodigo] ?? [] as $valorCodigo)
+                                            <div class="flex items-center gap-2 codigo-item">
+                                                <input type="text" maxlength="255"
+                                                    class="codigo-valor-input flex-1 px-3 py-2 rounded bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 text-sm font-mono"
+                                                    value="{{ $valorCodigo }}"
+                                                    placeholder="Código {{ $etiquetaCodigo }}">
+                                                <button type="button" class="btn-eliminar-codigo-producto px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm transition-colors shrink-0" title="Eliminar código">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                    <p class="codigos-lista-vacia text-xs text-gray-500 dark:text-gray-400 mt-1 {{ count($codigosProductoInicial[$tipoCodigo] ?? []) > 0 ? 'hidden' : '' }}">Sin códigos {{ $etiquetaCodigo }}.</p>
+                                </div>
+                            @endforeach
+                        </div>
+                        <input type="hidden" name="ean_isbn_etc" id="ean_isbn_etc_input"
+                            value="{{ old('ean_isbn_etc', is_array($codigosProductoInicial) ? json_encode($codigosProductoInicial, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : '') }}">
+                        @error('ean_isbn_etc')
+                            <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
+                        @enderror
                     </div>
 
                 </div>
@@ -321,8 +422,13 @@
 
                 @php
                     // Convertir imágenes existentes a formato JSON si es necesario
-                    $imagenesGrandes = old('imagenes_grandes', $producto && $producto->imagen_grande ? (is_array($producto->imagen_grande) ? $producto->imagen_grande : [$producto->imagen_grande]) : []);
-                    $imagenesPequenas = old('imagenes_pequenas', $producto && $producto->imagen_pequena ? (is_array($producto->imagen_pequena) ? $producto->imagen_pequena : [$producto->imagen_pequena]) : []);
+                    $imagenesGrandesRaw = old('imagenes_grandes', $producto && $producto->imagen_grande ? (is_array($producto->imagen_grande) ? $producto->imagen_grande : [$producto->imagen_grande]) : []);
+                    $imagenesPequenasRaw = old('imagenes_pequenas', $producto && $producto->imagen_pequena ? (is_array($producto->imagen_pequena) ? $producto->imagen_pequena : [$producto->imagen_pequena]) : []);
+                    // Tras error de validación, old() devuelve el JSON como string; normalizar a array
+                    $imagenesGrandes = is_string($imagenesGrandesRaw) ? (json_decode($imagenesGrandesRaw, true) ?? []) : $imagenesGrandesRaw;
+                    $imagenesPequenas = is_string($imagenesPequenasRaw) ? (json_decode($imagenesPequenasRaw, true) ?? []) : $imagenesPequenasRaw;
+                    $imagenesGrandes = is_array($imagenesGrandes) ? $imagenesGrandes : [];
+                    $imagenesPequenas = is_array($imagenesPequenas) ? $imagenesPequenas : [];
                 @endphp
 
                 <!-- Fila de imágenes existentes -->
@@ -419,8 +525,7 @@
             {{-- NEO (URLs objetivo) --}}
             <fieldset class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 space-y-6 border border-gray-200 dark:border-gray-700">
                 <legend class="text-lg font-semibold text-gray-700 dark:text-gray-200">Neo</legend>
-                <p class="text-sm text-gray-500 dark:text-gray-400 inline">URLs objetivo para este producto. Cada campo debe contener una URL válida o "No encontrado". La fecha indica cuándo se visitó.</p>
-                <button type="button" id="btn-neo-no-encontrado" class="ml-2 px-3 py-1.5 text-sm font-medium rounded bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-700 hover:bg-amber-200 dark:hover:bg-amber-800/50 transition-colors" title="Pega «No encontrado» en el campo de URL que tengas pinchado">No encontrado</button>
+                <p class="text-sm text-gray-500 dark:text-gray-400">URLs objetivo para este producto (opcional). Si rellenas un campo, debe contener una URL válida o "No encontrado". La fecha indica cuándo se visitó.</p>
                 <div id="neoobjetivo-list" class="mt-3">
                     @php
                         $neoobjetivos = old('neoobjetivo', $producto ? $producto->neoobjetivos : []);
@@ -432,7 +537,7 @@
                     <div class="flex items-center gap-2 mb-2 neoobjetivo-item flex-wrap">
                         <input type="hidden" name="neoobjetivo[{{ $index }}][id]" value="{{ is_object($neo) ? ($neo->id ?? '') : ($neo['id'] ?? '') }}">
                         <input type="text" name="neoobjetivo[{{ $index }}][url]" value="{{ is_object($neo) ? ($neo->url ?? '') : ($neo['url'] ?? '') }}"
-                            class="neoobjetivo-url flex-1 min-w-[200px] px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border border-red-500"
+                            class="neoobjetivo-url flex-1 min-w-[200px] px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border border-gray-300 dark:border-gray-600"
                             placeholder="https://...">
                         <input type="datetime-local" name="neoobjetivo[{{ $index }}][visitada]" value="{{ is_object($neo) && $neo->visitada ? \Carbon\Carbon::parse($neo->visitada)->format('Y-m-d\TH:i') : (is_array($neo) && !empty($neo['visitada']) ? (\Carbon\Carbon::parse($neo['visitada'])->format('Y-m-d\TH:i') ?? $neo['visitada']) : '') }}"
                             class="neoobjetivo-visitada w-44 px-3 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border border-gray-300 dark:border-gray-600">
@@ -1755,8 +1860,8 @@
         let slugModificadoManualmente = false;
         let slugValorOriginal = slugInput ? slugInput.value.trim() : '';
 
-        // Verificar si estamos editando (el slug está readonly)
-        const esEdicion = slugInput && slugInput.hasAttribute('readonly');
+        // Verificar si estamos editando un producto existente (tiene candado de slug)
+        const esEdicion = !!document.getElementById('slug-candado-btn');
 
         if (nombreInput && slugInput && !esEdicion) {
             // Detectar si el usuario modifica manualmente el slug
@@ -2860,7 +2965,7 @@
                 }
             }
 
-            // Si se pide habilitar, comprobar también validación Neo (al menos un campo con URL o "No encontrado", y ningún campo con valor inválido)
+            // Si se pide habilitar, comprobar formato Neo solo en campos rellenados
             if (habilitado && typeof window.validarNeo === 'function') {
                 const r = window.validarNeo();
                 if (!r.valido) {
@@ -2945,7 +3050,7 @@
                     return false;
                 }
 
-                // Validación Neo: al menos un campo con URL o "No encontrado", y ningún campo con valor inválido
+                // Validación Neo: solo formato en campos rellenados (Neo es opcional)
                 if (typeof window.validarNeo === 'function') {
                     const r = window.validarNeo();
                     if (!r.valido) {
@@ -3424,17 +3529,13 @@
                 return (val || '').trim().toLowerCase() === 'no encontrado';
             }
 
-            /** Valida la sección Neo: al menos un campo con URL o "No encontrado", y ningún campo con valor inválido. */
+            /** Valida la sección Neo: opcional; solo comprueba formato en campos rellenados. */
             function validarNeo() {
                 const inputs = neoList.querySelectorAll('.neoobjetivo-url');
                 const valores = Array.from(inputs).map(i => (i.value || '').trim());
-                const algunRelleno = valores.some(v => v !== '');
-                if (!algunRelleno) {
-                    return { valido: false, mensaje: 'Debes rellenar al menos un campo Neo con una URL válida o "No encontrado".' };
-                }
                 const algunInvalido = valores.some(v => v !== '' && !isValidUrl(v) && !isNoEncontrado(v));
                 if (algunInvalido) {
-                    return { valido: false, mensaje: 'Cada campo Neo debe contener una URL válida o "No encontrado". Revisa los campos marcados en rojo.' };
+                    return { valido: false, mensaje: 'Cada campo Neo rellenado debe contener una URL válida o "No encontrado". Revisa los campos marcados en rojo.' };
                 }
                 return { valido: true, mensaje: '' };
             }
@@ -3449,8 +3550,8 @@
             function actualizarBordeUrl(input) {
                 const val = (input.value || '').trim();
                 if (val === '') {
-                    input.classList.add('border-red-500');
-                    input.classList.remove('border-gray-300', 'dark:border-gray-600');
+                    input.classList.remove('border-red-500');
+                    input.classList.add('border-gray-300', 'dark:border-gray-600');
                 } else if (isValidUrl(val) || isNoEncontrado(val)) {
                     input.classList.remove('border-red-500');
                     input.classList.add('border-gray-300', 'dark:border-gray-600');
@@ -3461,28 +3562,13 @@
                 actualizarBotonGuardarSegunNeo();
             }
 
-            document.getElementById('btn-neo-no-encontrado').addEventListener('click', function() {
-                const active = document.activeElement;
-                if (active && active.classList && active.classList.contains('neoobjetivo-url')) {
-                    active.value = 'No encontrado';
-                    actualizarBordeUrl(active);
-                } else {
-                    const firstUrl = neoList.querySelector('.neoobjetivo-url');
-                    if (firstUrl) {
-                        firstUrl.focus();
-                        firstUrl.value = 'No encontrado';
-                        actualizarBordeUrl(firstUrl);
-                    }
-                }
-            });
-
             function crearFilaNeoobjetivo(index, url = '', visitada = '', id = '') {
                 const div = document.createElement('div');
                 div.className = 'flex items-center gap-2 mb-2 neoobjetivo-item flex-wrap';
-                const urlClass = 'neoobjetivo-url flex-1 min-w-[200px] px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border ';
+                const urlClass = 'neoobjetivo-url flex-1 min-w-[200px] px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border border-gray-300 dark:border-gray-600';
                 div.innerHTML = `
                     <input type="hidden" name="neoobjetivo[${index}][id]" value="${id || ''}">
-                    <input type="text" name="neoobjetivo[${index}][url]" value="${url}" class="${urlClass} border-red-500" placeholder="https://...">
+                    <input type="text" name="neoobjetivo[${index}][url]" value="${url}" class="${urlClass}" placeholder="https://...">
                     <input type="datetime-local" name="neoobjetivo[${index}][visitada]" value="${visitada}" class="neoobjetivo-visitada w-44 px-3 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border border-gray-300 dark:border-gray-600">
                     <button type="button" class="btn-eliminar-neoobjetivo px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm transition-colors" title="Eliminar esta URL">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
@@ -3528,9 +3614,6 @@
                 input.addEventListener('blur', () => actualizarBordeUrl(input));
                 actualizarBordeUrl(input);
             });
-
-            // Estado inicial del botón Guardar según Neo
-            actualizarBotonGuardarSegunNeo();
         });
     </script>
     {{-- BUSCADOR DE CATEGORÍAS PARA PRODUCTOS RELACIONADOS --}}
@@ -4539,6 +4622,7 @@
             const handler = () => {
                 kpAplicarCoincidenciasDesdeNombre();
                 kpActualizarBotonesPalabrasNombreBuscadores();
+                kpActualizarBotonesSegmentacionNombre();
                 if (typeof window.kpInternaGlobalRefrescarPalabras === 'function') {
                     window.kpInternaGlobalRefrescarPalabras('nueva');
                     window.kpInternaGlobalRefrescarPalabras('sublinea');
@@ -4575,6 +4659,168 @@
             kpConfigurarDelegacionPalabrasNombreBuscadores();
             kpActualizarBotonesPalabrasNombreBuscadores();
             kpInicializarDelegacionEditoresGrupo();
+            kpInicializarSegmentacionNombreCampos();
+        }
+
+        let kpCampoSegmentacionActivo = null;
+
+        function kpObtenerWrapPalabrasCampo(campo) {
+            if (!campo) return null;
+            const prev = campo.previousElementSibling;
+            if (prev && prev.classList.contains('kp-segmentacion-palabras-wrap')) {
+                return prev;
+            }
+            return campo.parentElement?.querySelector('.kp-segmentacion-palabras-wrap') || null;
+        }
+
+        function kpOcultarTodasSegmentacionPalabras() {
+            document.querySelectorAll('.kp-segmentacion-palabras-wrap').forEach((wrap) => {
+                wrap.classList.add('hidden');
+                wrap.innerHTML = '';
+            });
+        }
+
+        function kpMarcarBotonSegmentacionNombre(btn, activo) {
+            if (!btn) return;
+            const clasesActivo = [
+                'ring-2',
+                'ring-green-500',
+                'border-green-500',
+                'bg-green-100',
+                'dark:bg-green-900',
+                'dark:border-green-400',
+                'font-semibold',
+                'text-green-800',
+                'dark:text-green-200',
+            ];
+            if (activo) {
+                btn.classList.add(...clasesActivo);
+                btn.setAttribute('aria-pressed', 'true');
+            } else {
+                btn.classList.remove(...clasesActivo);
+                btn.setAttribute('aria-pressed', 'false');
+            }
+        }
+
+        function kpSincronizarBotonesSegmentacionWrap(wrap, campo) {
+            if (!wrap || !campo) return;
+
+            const tokens = kpTokensBuscadorGrupo(campo.value);
+            wrap.querySelectorAll('.segmentacion-palabra-nombre-btn').forEach((btn) => {
+                const palabra = btn.dataset.palabra || btn.textContent.trim();
+                const activo = tokens.some(
+                    (t) => t.toLowerCase() === palabra.toLowerCase()
+                );
+                kpMarcarBotonSegmentacionNombre(btn, activo);
+            });
+        }
+
+        function kpRenderizarPalabrasEnCampo(campo) {
+            const wrap = kpObtenerWrapPalabrasCampo(campo);
+            if (!wrap) return;
+
+            const palabras = kpObtenerPalabrasNombreProducto();
+            if (!palabras.length) {
+                wrap.innerHTML = '<span class="text-xs text-gray-500 dark:text-gray-400">Escribe el nombre del producto.</span>';
+                wrap.classList.remove('hidden');
+                return;
+            }
+
+            wrap.innerHTML = palabras
+                .map((palabra) => {
+                    const segura = String(palabra)
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/"/g, '&quot;');
+                    return `<button type="button" class="segmentacion-palabra-nombre-btn text-xs px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-blue-100 dark:hover:bg-blue-900 hover:border-blue-400 dark:hover:border-blue-500 transition-colors" data-palabra="${segura}" aria-pressed="false" title="Añadir «${segura}»">${segura}</button>`;
+                })
+                .join('');
+
+            wrap.classList.remove('hidden');
+            kpSincronizarBotonesSegmentacionWrap(wrap, campo);
+        }
+
+        function kpActualizarBotonesSegmentacionNombre() {
+            if (!kpCampoSegmentacionActivo) return;
+            kpRenderizarPalabrasEnCampo(kpCampoSegmentacionActivo);
+        }
+
+        function kpInsertarPalabraEnCampoSegmentacion(input, palabra) {
+            if (!input || !palabra) return;
+
+            let tokens = kpTokensBuscadorGrupo(input.value);
+            const estabaPresente = tokens.some(
+                (t) => t.toLowerCase() === palabra.toLowerCase()
+            );
+
+            if (estabaPresente) {
+                tokens = tokens.filter((t) => t.toLowerCase() !== palabra.toLowerCase());
+            } else {
+                tokens.push(palabra);
+            }
+
+            input.value = tokens.join(' ');
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+
+            const wrap = kpObtenerWrapPalabrasCampo(input);
+            kpSincronizarBotonesSegmentacionWrap(wrap, input);
+        }
+
+        function kpInicializarSegmentacionNombreCampos() {
+            const campos = document.querySelectorAll('.kp-campo-segmentacion-nombre');
+            if (!campos.length || document.body.dataset.segmentacionInit === '1') {
+                return;
+            }
+            document.body.dataset.segmentacionInit = '1';
+
+            campos.forEach((campo) => {
+                campo.addEventListener('focusin', () => {
+                    kpOcultarTodasSegmentacionPalabras();
+                    kpCampoSegmentacionActivo = campo;
+                    kpRenderizarPalabrasEnCampo(campo);
+                });
+
+                campo.addEventListener('focusout', (event) => {
+                    const wrap = kpObtenerWrapPalabrasCampo(campo);
+                    const related = event.relatedTarget;
+                    if (related && wrap && wrap.contains(related)) {
+                        return;
+                    }
+
+                    setTimeout(() => {
+                        if (document.activeElement === campo) return;
+                        if (wrap && wrap.contains(document.activeElement)) return;
+
+                        wrap?.classList.add('hidden');
+                        wrap.innerHTML = '';
+
+                        if (kpCampoSegmentacionActivo === campo) {
+                            kpCampoSegmentacionActivo = null;
+                        }
+                    }, 0);
+                });
+
+                campo.addEventListener('input', () => {
+                    if (kpCampoSegmentacionActivo === campo) {
+                        const wrap = kpObtenerWrapPalabrasCampo(campo);
+                        kpSincronizarBotonesSegmentacionWrap(wrap, campo);
+                    }
+                });
+            });
+
+            document.addEventListener('mousedown', (event) => {
+                const btn = event.target.closest('.segmentacion-palabra-nombre-btn');
+                if (btn) event.preventDefault();
+            });
+
+            document.addEventListener('click', (event) => {
+                const btn = event.target.closest('.segmentacion-palabra-nombre-btn');
+                if (!btn || !kpCampoSegmentacionActivo) return;
+
+                const palabra = btn.dataset.palabra || btn.textContent.trim();
+                kpInsertarPalabraEnCampoSegmentacion(kpCampoSegmentacionActivo, palabra);
+                kpCampoSegmentacionActivo.focus();
+            });
         }
 
         document.addEventListener('DOMContentLoaded', kpInicializarCoincidenciasNombreProducto);
@@ -5426,8 +5672,8 @@
             // Obtener orden guardado y columnas marcadas (siempre como string para includes/Map coherentes con dataset y JSON mixto numérico)
             const ordenGuardado = normalizarArrayIds(opcionesGuardadas._orden || []);
             const columnasGuardadas = normalizarColumnasLista(opcionesGuardadas._columnas);
-            // Mostrar checkbox "Columna oferta" si es unidad única O ya hay datos de columnas (p.ej. _columnas en mapa desde oferta/legacy): si no, el JSON tenía flags pero la UI ocultaba el control y al guardar se perdía todo
-            const mostrarUIColumnaOferta = esUnidadUnica || columnasGuardadas.length > 0;
+            const mostrarUIColumnaOferta = true;
+            const maxColumnasOferta = esUnidadUnica ? 4 : 1;
             
             // Ordenar filtros según el orden guardado, o mantener el orden original
             let filtrosOrdenados = [...especificaciones.filtros];
@@ -5704,9 +5950,11 @@
                     
                     checkbox.addEventListener('change', function() {
                         const columnasMarcadas = Array.from(contenedor.querySelectorAll('.columna-oferta-checkbox:checked'));
-                        if (columnasMarcadas.length > 4) {
+                        if (columnasMarcadas.length > maxColumnasOferta) {
                             this.checked = false;
-                            alert('Solo se pueden marcar hasta 4 líneas principales como columna oferta.');
+                            alert(esUnidadUnica
+                                ? 'Solo se pueden marcar hasta 4 líneas principales como columna oferta.'
+                                : 'Solo se puede marcar una línea principal como columna oferta.');
                             return;
                         }
                         
@@ -5858,11 +6106,9 @@
                         if (mostrarUIColumnaOferta) {
                             const columnaCheckbox = contenedor.querySelector(`.columna-oferta-checkbox[data-principal-id="${principalId}"]`);
                             if (columnaCheckbox && !columnaCheckbox.checked) {
-                                // Verificar que no se excedan las 4 columnas permitidas
                                 const columnasMarcadas = Array.from(contenedor.querySelectorAll('.columna-oferta-checkbox:checked'));
-                                if (columnasMarcadas.length < 4) {
+                                if (columnasMarcadas.length < maxColumnasOferta) {
                                     columnaCheckbox.checked = true;
-                                    // Disparar el evento change para actualizar los campos de texto alternativo
                                     columnaCheckbox.dispatchEvent(new Event('change'));
                                 }
                             }
@@ -6319,28 +6565,12 @@
             const contenedorPrincipalCol = document.querySelector('#especificaciones-principales-container');
             const hayUiColumnaCategoria = !!(contenedorPrincipalCol && contenedorPrincipalCol.querySelector('.columna-oferta-checkbox'));
 
-            if (esUnidadUnica && contenedorPrincipalCol) {
-                const lineasPrincipales = Array.from(contenedorPrincipalCol.querySelectorAll('.linea-principal-especificaciones'));
-                const orden = lineasPrincipales.map(linea => linea.dataset.principalId);
-                especificaciones._orden = orden;
-                
-                // Obtener columnas de categoría (solo las marcadas actualmente)
-                const columnasCheckboxes = contenedorPrincipalCol.querySelectorAll('.columna-oferta-checkbox:checked');
-                const columnasCategoria = Array.from(columnasCheckboxes).map(cb => cb.dataset.principalId);
-                
-                // Obtener columnas del producto (del contenedor de producto, solo las marcadas actualmente)
-                const contenedorProducto = document.querySelector('#especificaciones-producto-container');
-                let columnasProducto = [];
-                if (contenedorProducto) {
-                    const columnasCheckboxesProducto = contenedorProducto.querySelectorAll('.columna-oferta-producto-checkbox:checked');
-                    columnasProducto = Array.from(columnasCheckboxesProducto).map(cb => cb.dataset.principalId);
+            if (contenedorPrincipalCol && hayUiColumnaCategoria) {
+                if (esUnidadUnica) {
+                    const lineasPrincipales = Array.from(contenedorPrincipalCol.querySelectorAll('.linea-principal-especificaciones'));
+                    especificaciones._orden = lineasPrincipales.map(linea => linea.dataset.principalId);
                 }
-                
-                // Combinar solo las columnas actualmente marcadas: categoría + producto, eliminando duplicados
-                const todasLasColumnas = [...new Set([...columnasCategoria, ...columnasProducto])];
-                especificaciones._columnas = todasLasColumnas;
-            } else if (hayUiColumnaCategoria && contenedorPrincipalCol) {
-                // Unidad ≠ unidadUnica pero la UI muestra columnas porque había _columnas guardado: mantener objeto { principal: sublínea } si era así
+
                 const columnasCategoria = Array.from(contenedorPrincipalCol.querySelectorAll('.columna-oferta-checkbox:checked')).map(cb => String(cb.dataset.principalId));
                 const contenedorProductoCol = document.querySelector('#especificaciones-producto-container');
                 let columnasProducto = [];
@@ -6348,36 +6578,8 @@
                     columnasProducto = Array.from(contenedorProductoCol.querySelectorAll('.columna-oferta-producto-checkbox:checked')).map(cb => String(cb.dataset.principalId));
                 }
                 const todosMarcados = [...new Set([...columnasCategoria, ...columnasProducto])];
-                const prevCol = especificacionesGuardadas._columnas;
-
-                const inferirSublinea = (principalIdStr) => {
-                    const arr = especificaciones[principalIdStr] ?? especificaciones[String(principalIdStr)];
-                    if (!Array.isArray(arr) || arr.length === 0) return null;
-                    const first = arr[0];
-                    if (typeof first === 'object' && first !== null && first.id !== undefined && first.id !== null) {
-                        return first.id;
-                    }
-                    return first;
-                };
-
-                if (prevCol !== undefined && prevCol !== null && typeof prevCol === 'object' && !Array.isArray(prevCol)) {
-                    const nuevo = {};
-                    todosMarcados.forEach(pid => {
-                        let sub =
-                            prevCol[pid] ?? prevCol[String(pid)];
-                        if (sub == null || sub === '') {
-                            sub = inferirSublinea(pid);
-                        }
-                        if (sub != null && sub !== '') {
-                            nuevo[pid] = sub;
-                        }
-                    });
-                    especificaciones._columnas = nuevo;
-                } else {
-                    especificaciones._columnas = todosMarcados;
-                }
+                especificaciones._columnas = esUnidadUnica ? todosMarcados : todosMarcados.slice(0, 1);
             } else if (especificacionesGuardadas._columnas !== undefined && especificacionesGuardadas._columnas !== null && !hayUiColumnaCategoria) {
-                // No hay UI de columnas pero había datos (p.ej. otra vista): no pisar la clave
                 especificaciones._columnas = especificacionesGuardadas._columnas;
             }
 
@@ -9676,14 +9878,39 @@ document.addEventListener('DOMContentLoaded', function() {
         };
     }
     
+    function kpAsegurarArrayImagenes(val) {
+        if (Array.isArray(val)) return val;
+        if (typeof val === 'string') {
+            const t = val.trim();
+            if (!t) return [];
+            try {
+                const parsed = JSON.parse(t);
+                if (Array.isArray(parsed)) return parsed;
+                if (typeof parsed === 'string' && parsed.trim()) {
+                    try {
+                        const twice = JSON.parse(parsed);
+                        return Array.isArray(twice) ? twice : [parsed.trim()];
+                    } catch (e2) {
+                        return [parsed.trim()];
+                    }
+                }
+            } catch (e) {
+                return [t];
+            }
+        }
+        return [];
+    }
+
     // Cargar imágenes existentes al inicio
     function cargarImagenesExistentes() {
         const inputGrandes = document.getElementById('imagenes-grandes-json');
         const inputPequenas = document.getElementById('imagenes-pequenas-json');
         
         try {
-            imagenesGrandes = inputGrandes && inputGrandes.value ? JSON.parse(inputGrandes.value) : [];
-            imagenesPequenas = inputPequenas && inputPequenas.value ? JSON.parse(inputPequenas.value) : [];
+            const rawGrandes = inputGrandes && inputGrandes.value ? JSON.parse(inputGrandes.value) : [];
+            const rawPequenas = inputPequenas && inputPequenas.value ? JSON.parse(inputPequenas.value) : [];
+            imagenesGrandes = kpAsegurarArrayImagenes(rawGrandes);
+            imagenesPequenas = kpAsegurarArrayImagenes(rawPequenas);
         } catch (e) {
             console.error('Error al parsear imágenes:', e);
             imagenesGrandes = [];
@@ -11709,11 +11936,14 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // Primera sublínea del grupo: marcar también Columna oferta
-        if (esPrimeraSublinea && esUnidadUnica) {
+        if (esPrimeraSublinea) {
+            const unidadDeMedidaSelect = document.getElementById('unidadDeMedida');
+            const esUnidadUnicaLocal = unidadDeMedidaSelect && unidadDeMedidaSelect.value === 'unidadUnica';
+            const maxColumnasProducto = esUnidadUnicaLocal ? 4 : 1;
             const columnaCheckbox = lineaPrincipal.querySelector(`.columna-oferta-producto-checkbox[data-principal-id="${principalId}"]`);
             if (columnaCheckbox && !columnaCheckbox.checked) {
                 const columnasMarcadas = Array.from(container.querySelectorAll('.columna-oferta-producto-checkbox:checked'));
-                if (columnasMarcadas.length < 4) {
+                if (columnasMarcadas.length < maxColumnasProducto) {
                     columnaCheckbox.checked = true;
                     columnaCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
                 }
@@ -11751,12 +11981,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     <input type="checkbox" class="linea-principal-producto-importante" ${importante ? 'checked' : ''}>
                     <span class="text-sm text-gray-700 dark:text-gray-200">Importante</span>
                 </label>
-                ${esUnidadUnica ? `
                 <label class="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" class="columna-oferta-producto-checkbox rounded border-gray-300 text-orange-600 focus:ring-orange-500" data-principal-id="${idUnicoLinea}" ${esColumna ? 'checked' : ''}>
                     <span class="text-xs text-gray-600 dark:text-gray-400 font-medium">Columna oferta</span>
                 </label>
-                ` : ''}
                 <button type="button" class="btn-eliminar-principal-producto bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-sm" title="Eliminar línea principal">
                     -
                 </button>
@@ -11846,6 +12074,17 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (columnaCheckbox) {
             columnaCheckbox.addEventListener('change', function() {
+                const unidadDeMedidaSelect = document.getElementById('unidadDeMedida');
+                const esUnidadUnicaLocal = unidadDeMedidaSelect && unidadDeMedidaSelect.value === 'unidadUnica';
+                const maxColumnasProducto = esUnidadUnicaLocal ? 4 : 1;
+                const columnasMarcadas = Array.from(container.querySelectorAll('.columna-oferta-producto-checkbox:checked'));
+                if (columnasMarcadas.length > maxColumnasProducto) {
+                    this.checked = false;
+                    alert(esUnidadUnicaLocal
+                        ? 'Solo se pueden marcar hasta 4 líneas principales como columna oferta.'
+                        : 'Solo se puede marcar una línea principal como columna oferta.');
+                    return;
+                }
                 // Mostrar/ocultar campos de texto alternativo
                 const principalId = this.dataset.principalId;
                 const camposTextoAlternativo = container.querySelectorAll(`.texto-alternativo-sublinea-producto-input[data-principal-id="${principalId}"]`);
@@ -12172,21 +12411,17 @@ document.addEventListener('DOMContentLoaded', function() {
                     ofertaCheckbox.checked = true;
                 }
                 
-                // Marcar también "Columna oferta" del grupo (línea principal) si es unidadUnica y no está marcado
+                // Marcar también "Columna oferta" del grupo (línea principal) si no está marcado
                 const unidadDeMedidaSelect = document.getElementById('unidadDeMedida');
-                const esUnidadUnica = unidadDeMedidaSelect && unidadDeMedidaSelect.value === 'unidadUnica';
-                
-                if (esUnidadUnica) {
-                    const columnaCheckbox = lineaPrincipal.querySelector(`.columna-oferta-producto-checkbox[data-principal-id="${principalId}"]`);
-                    if (columnaCheckbox && !columnaCheckbox.checked) {
-                        // Verificar que no se excedan las 4 columnas permitidas
-                        const container = document.getElementById('especificaciones-producto-container');
-                        const columnasMarcadas = Array.from(container.querySelectorAll('.columna-oferta-producto-checkbox:checked'));
-                        if (columnasMarcadas.length < 4) {
-                            columnaCheckbox.checked = true;
-                            // Disparar el evento change para actualizar los campos de texto alternativo
-                            columnaCheckbox.dispatchEvent(new Event('change'));
-                        }
+                const esUnidadUnicaLocal = unidadDeMedidaSelect && unidadDeMedidaSelect.value === 'unidadUnica';
+                const maxColumnasProducto = esUnidadUnicaLocal ? 4 : 1;
+                const columnaCheckbox = lineaPrincipal.querySelector(`.columna-oferta-producto-checkbox[data-principal-id="${principalId}"]`);
+                if (columnaCheckbox && !columnaCheckbox.checked) {
+                    const containerProducto = document.getElementById('especificaciones-producto-container');
+                    const columnasMarcadas = Array.from(containerProducto.querySelectorAll('.columna-oferta-producto-checkbox:checked'));
+                    if (columnasMarcadas.length < maxColumnasProducto) {
+                        columnaCheckbox.checked = true;
+                        columnaCheckbox.dispatchEvent(new Event('change'));
                     }
                 }
             }
@@ -12609,15 +12844,16 @@ document.addEventListener('DOMContentLoaded', function() {
         // Guardar las líneas principales del producto en _producto.filtros
         especificacionesCompletas._producto.filtros = filtros;
         
-        // Si es unidadUnica, guardar orden y columnas (combinando con las de categoría)
-        if (esUnidadUnica) {
+        // Guardar orden y columnas (combinando con las de categoría)
+        const unidadDeMedidaSelectSave = document.getElementById('unidadDeMedida');
+        const esUnidadUnicaSave = unidadDeMedidaSelectSave && unidadDeMedidaSelectSave.value === 'unidadUnica';
+        {
             const lineasPrincipalesProducto = Array.from(container.querySelectorAll('.linea-principal-producto'));
             const ordenProducto = lineasPrincipalesProducto.map(linea => String(linea.dataset.idUnico));
 
             const contenedorCategoria = document.querySelector('#especificaciones-principales-container');
             const categoriaUiLista = contenedorCategoria && contenedorCategoria.querySelector('.linea-principal-especificaciones');
 
-            // Columnas marcadas en líneas propias del producto (DOM)
             const columnasCheckboxes = container.querySelectorAll('.columna-oferta-producto-checkbox:checked');
             const columnasProducto = Array.from(columnasCheckboxes).map(cb => String(cb.dataset.principalId));
 
@@ -12631,22 +12867,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 const columnasCheckboxesCategoria = contenedorCategoria.querySelectorAll('.columna-oferta-checkbox:checked');
                 columnasCategoria = Array.from(columnasCheckboxesCategoria).map(cb => String(cb.dataset.principalId));
             } else {
-                // La UI de categoría aún no está montada (p. ej. al cargar con _producto.filtros vacío):
-                // conservar en _columnas los ids de categoría ya guardados; no sustituir por [].
                 columnasCategoria = prevColumnasArr.filter(id => !idsProducto.has(String(id)));
             }
 
             const todasLasColumnas = [...new Set([...columnasCategoria, ...columnasProducto])];
-            especificacionesCompletas._columnas = todasLasColumnas;
+            especificacionesCompletas._columnas = esUnidadUnicaSave ? todasLasColumnas : todasLasColumnas.slice(0, 1);
 
-            // _orden: igual que en actualizarEspecificacionesElegidas — orden de líneas de categoría en el DOM
-            if (categoriaUiLista) {
-                const lineasCat = Array.from(contenedorCategoria.querySelectorAll('.linea-principal-especificaciones'));
-                especificacionesCompletas._orden = lineasCat.map(linea => String(linea.dataset.principalId));
-            } else if (ordenProducto.length > 0) {
-                especificacionesCompletas._orden = ordenProducto;
+            if (esUnidadUnicaSave) {
+                if (categoriaUiLista) {
+                    const lineasCat = Array.from(contenedorCategoria.querySelectorAll('.linea-principal-especificaciones'));
+                    especificacionesCompletas._orden = lineasCat.map(linea => String(linea.dataset.principalId));
+                } else if (ordenProducto.length > 0) {
+                    especificacionesCompletas._orden = ordenProducto;
+                }
             }
-            // Si no hay UI de categoría ni líneas de producto, no reasignar _orden (sigue el JSON ya parseado)
         }
         
         // Guardar el JSON completo
@@ -12893,6 +13127,272 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     })();
+});
+</script>
+
+{{-- Candado campo obsoleto --}}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const btnCandado = document.getElementById('obsoleto-candado-btn');
+    const wrapRadios = document.getElementById('obsoleto-radios-wrap');
+    const iconoCerrado = document.getElementById('obsoleto-candado-icono-cerrado');
+    const iconoAbierto = document.getElementById('obsoleto-candado-icono-abierto');
+    const radios = document.querySelectorAll('.obsoleto-radio');
+    const hiddenObsoleto = document.getElementById('obsoleto-valor-hidden');
+
+    if (!btnCandado || !wrapRadios) return;
+
+    let desbloqueado = false;
+
+    function sincronizarHiddenObsoleto() {
+        if (!hiddenObsoleto) return;
+        const checked = document.querySelector('.obsoleto-radio:checked');
+        hiddenObsoleto.value = checked ? checked.value : 'no';
+    }
+
+    function aplicarEstadoCandado() {
+        if (desbloqueado) {
+            btnCandado.className = 'inline-flex items-center justify-center w-7 h-7 rounded-md border border-green-400 dark:border-green-600 bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/50 transition';
+            btnCandado.setAttribute('aria-label', 'Campo obsoleto desbloqueado');
+            btnCandado.title = 'Obsoleto desbloqueado: puedes cambiar Sí/No';
+            iconoCerrado.classList.add('hidden');
+            iconoAbierto.classList.remove('hidden');
+            wrapRadios.classList.remove('opacity-50', 'pointer-events-none', 'select-none');
+            wrapRadios.querySelectorAll('label').forEach(function(label) {
+                label.classList.remove('cursor-not-allowed');
+                label.classList.add('cursor-pointer');
+            });
+            radios.forEach(function(radio) { radio.tabIndex = 0; });
+        } else {
+            btnCandado.className = 'inline-flex items-center justify-center w-7 h-7 rounded-md border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 transition';
+            btnCandado.setAttribute('aria-label', 'Candado de control obsoleto');
+            btnCandado.title = 'Candado de control: clic para poder cambiar obsoleto';
+            iconoCerrado.classList.remove('hidden');
+            iconoAbierto.classList.add('hidden');
+            wrapRadios.classList.add('opacity-50', 'pointer-events-none', 'select-none');
+            wrapRadios.querySelectorAll('label').forEach(function(label) {
+                label.classList.add('cursor-not-allowed');
+                label.classList.remove('cursor-pointer');
+            });
+            radios.forEach(function(radio) { radio.tabIndex = -1; });
+            sincronizarHiddenObsoleto();
+        }
+    }
+
+    radios.forEach(function(radio) {
+        radio.addEventListener('change', function() {
+            if (desbloqueado) {
+                sincronizarHiddenObsoleto();
+            }
+        });
+    });
+
+    btnCandado.addEventListener('click', function() {
+        if (desbloqueado) return;
+        desbloqueado = true;
+        aplicarEstadoCandado();
+    });
+
+    sincronizarHiddenObsoleto();
+    aplicarEstadoCandado();
+});
+</script>
+
+{{-- Candado campo slug --}}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const btnCandado = document.getElementById('slug-candado-btn');
+    const slugInput = document.getElementById('slug');
+    const hiddenSlug = document.getElementById('slug-valor-hidden');
+    const iconoCerrado = document.getElementById('slug-candado-icono-cerrado');
+    const iconoAbierto = document.getElementById('slug-candado-icono-abierto');
+
+    if (!btnCandado || !slugInput) return;
+
+    let desbloqueado = false;
+    const clasesBloqueado = ['opacity-50', 'cursor-not-allowed', 'bg-gray-200', 'dark:bg-gray-800'];
+
+    function sincronizarHiddenSlug() {
+        if (!hiddenSlug) return;
+        hiddenSlug.value = slugInput.value;
+    }
+
+    function aplicarEstadoCandadoSlug() {
+        if (desbloqueado) {
+            btnCandado.className = 'inline-flex items-center justify-center w-7 h-7 rounded-md border border-green-400 dark:border-green-600 bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/50 transition';
+            btnCandado.setAttribute('aria-label', 'Campo slug desbloqueado');
+            btnCandado.title = 'Slug desbloqueado: puedes modificar el slug';
+            iconoCerrado.classList.add('hidden');
+            iconoAbierto.classList.remove('hidden');
+            slugInput.removeAttribute('readonly');
+            clasesBloqueado.forEach(function(clase) { slugInput.classList.remove(clase); });
+        } else {
+            btnCandado.className = 'inline-flex items-center justify-center w-7 h-7 rounded-md border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 transition';
+            btnCandado.setAttribute('aria-label', 'Desbloquear campo slug');
+            btnCandado.title = 'Candado de control: clic para poder cambiar el slug';
+            iconoCerrado.classList.remove('hidden');
+            iconoAbierto.classList.add('hidden');
+            slugInput.setAttribute('readonly', 'readonly');
+            clasesBloqueado.forEach(function(clase) { slugInput.classList.add(clase); });
+            sincronizarHiddenSlug();
+        }
+    }
+
+    slugInput.addEventListener('input', function() {
+        if (desbloqueado) {
+            sincronizarHiddenSlug();
+        }
+    });
+
+    const form = slugInput.closest('form');
+    if (form) {
+        form.addEventListener('submit', function() {
+            sincronizarHiddenSlug();
+        });
+    }
+
+    btnCandado.addEventListener('click', function() {
+        if (desbloqueado) return;
+        desbloqueado = true;
+        aplicarEstadoCandadoSlug();
+        slugInput.focus();
+    });
+
+    sincronizarHiddenSlug();
+    aplicarEstadoCandadoSlug();
+});
+</script>
+
+{{-- Códigos EAN / ISBN / UPC / MPN / GTIN del producto --}}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const panel = document.getElementById('codigos-producto-panel');
+    const btnToggle = document.getElementById('btn-toggle-codigos-producto');
+    const badge = document.getElementById('codigos-producto-badge');
+    const inputHidden = document.getElementById('ean_isbn_etc_input');
+    const formulario = document.querySelector('form');
+
+    if (!panel || !btnToggle || !inputHidden) {
+        return;
+    }
+
+    const TIPOS_CODIGO = ['ean', 'isbn', 'upc', 'mpn', 'gtin'];
+    const ETIQUETAS = { ean: 'EAN', isbn: 'ISBN', upc: 'UPC', mpn: 'MPN', gtin: 'GTIN' };
+
+    function escapeHtml(texto) {
+        return String(texto)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function actualizarVisibilidadListaVacia(bloque) {
+        const lista = bloque.querySelector('.codigos-lista');
+        const vacio = bloque.querySelector('.codigos-lista-vacia');
+        if (!lista || !vacio) return;
+        vacio.classList.toggle('hidden', lista.querySelectorAll('.codigo-item').length > 0);
+    }
+
+    function crearFilaCodigo(tipo, valor = '') {
+        const div = document.createElement('div');
+        div.className = 'flex items-center gap-2 codigo-item';
+        div.innerHTML = `
+            <input type="text" maxlength="255"
+                class="codigo-valor-input flex-1 px-3 py-2 rounded bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 text-sm font-mono"
+                value="${escapeHtml(valor)}"
+                placeholder="Código ${ETIQUETAS[tipo] || tipo.toUpperCase()}">
+            <button type="button" class="btn-eliminar-codigo-producto px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm transition-colors shrink-0" title="Eliminar código">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        `;
+        return div;
+    }
+
+    function actualizarJsonCodigos() {
+        const estructura = {};
+        TIPOS_CODIGO.forEach(function(tipo) {
+            estructura[tipo] = [];
+        });
+
+        document.querySelectorAll('.codigos-tipo-block').forEach(function(bloque) {
+            const tipo = bloque.dataset.tipo;
+            if (!tipo || !estructura[tipo]) return;
+            bloque.querySelectorAll('.codigo-valor-input').forEach(function(input) {
+                const valor = input.value.trim();
+                if (valor !== '' && estructura[tipo].indexOf(valor) === -1) {
+                    estructura[tipo].push(valor);
+                }
+            });
+        });
+
+        const tieneAlguno = TIPOS_CODIGO.some(function(tipo) {
+            return estructura[tipo].length > 0;
+        });
+
+        inputHidden.value = tieneAlguno ? JSON.stringify(estructura) : '';
+        actualizarBadge();
+    }
+
+    function actualizarBadge() {
+        if (!badge) return;
+        let total = 0;
+        document.querySelectorAll('.codigo-valor-input').forEach(function(input) {
+            if (input.value.trim() !== '') total++;
+        });
+        if (total > 0) {
+            badge.textContent = String(total);
+            badge.classList.remove('hidden');
+        } else {
+            badge.textContent = '';
+            badge.classList.add('hidden');
+        }
+    }
+
+    btnToggle.addEventListener('click', function() {
+        panel.classList.toggle('hidden');
+    });
+
+    document.querySelectorAll('.btn-anadir-codigo-producto').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const tipo = btn.dataset.tipo;
+            const bloque = btn.closest('.codigos-tipo-block');
+            const lista = bloque ? bloque.querySelector('.codigos-lista') : null;
+            if (!lista || !tipo) return;
+            const fila = crearFilaCodigo(tipo);
+            lista.appendChild(fila);
+            fila.querySelector('.codigo-valor-input').focus();
+            actualizarVisibilidadListaVacia(bloque);
+            actualizarJsonCodigos();
+        });
+    });
+
+    panel.addEventListener('click', function(e) {
+        const btnEliminar = e.target.closest('.btn-eliminar-codigo-producto');
+        if (!btnEliminar) return;
+        const fila = btnEliminar.closest('.codigo-item');
+        const bloque = btnEliminar.closest('.codigos-tipo-block');
+        if (fila) fila.remove();
+        if (bloque) actualizarVisibilidadListaVacia(bloque);
+        actualizarJsonCodigos();
+    });
+
+    panel.addEventListener('input', function(e) {
+        if (e.target.classList.contains('codigo-valor-input')) {
+            actualizarJsonCodigos();
+        }
+    });
+
+    if (formulario) {
+        formulario.addEventListener('submit', function() {
+            actualizarJsonCodigos();
+        });
+    }
+
+    document.querySelectorAll('.codigos-tipo-block').forEach(actualizarVisibilidadListaVacia);
+    actualizarBadge();
 });
 </script>
 

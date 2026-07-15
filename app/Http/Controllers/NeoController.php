@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Categoria;
+use App\Models\CsvOferta;
 use App\Models\Neo;
 use App\Models\Neoobjetivo;
 use App\Models\OfertaProducto;
@@ -11,6 +12,7 @@ use App\Models\Tienda;
 use App\Models\UrlDescartada;
 use App\Services\ConsultarNeoCifrado;
 use App\Services\LimpiarUrlDeTiendas;
+use App\Support\UrlOfertaValidacion;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -64,13 +66,19 @@ class NeoController extends Controller
 
         $categoriasRaiz = Categoria::categoriasRaizConConteosAdministracion();
 
+        $tiendasConCsv = Tienda::query()
+            ->whereNotNull('url_csv')
+            ->orderBy('nombre')
+            ->get(['id', 'nombre']);
+
         return view('admin.neo.crear-masivo', compact(
             'totalNeoAniadidaNo',
             'totalNeoAniadidaNoSinUrl',
             'totalProductosNeoAniadidaNo',
             'totalCategoriasNeoAniadidaNo',
             'totalTiendasNeoAniadidaNo',
-            'categoriasRaiz'
+            'categoriasRaiz',
+            'tiendasConCsv'
         ));
     }
 
@@ -481,7 +489,18 @@ class NeoController extends Controller
             ->groupBy('tienda_id')
             ->get();
 
-        return response()->json($this->listaTiendasNeoDesdeGrupos($grupos));
+        $qNull = Neo::where('aniadida', 'no')
+            ->where('categoria_id', $categoriaId)
+            ->whereNotNull('url_cipher')
+            ->where('url_cipher', '!=', '')
+            ->whereNull('tienda_id');
+
+        $this->aplicarFiltroMostrarCategoriaNeoCrearMasivo($qNull, $request);
+
+        return response()->json([
+            'tiendas' => $this->listaTiendasNeoDesdeGrupos($grupos),
+            'filas_neo_tienda_id_null' => $qNull->count(),
+        ]);
     }
 
     /**
@@ -792,7 +811,7 @@ class NeoController extends Controller
 
     /**
      * Guardar una URL Neo (neoobjetivo) para un producto desde el listado "productos sin neo".
-     * Misma lógica que el formulario de producto: URL válida o "No encontrado", visitada = 2 semanas atrás.
+     * Misma lógica que el formulario de producto: URL válida o "No encontrado", visitada = hace DIAS_SIN_REVISAR días.
      */
     public function guardarNeoobjetivo(Request $request)
     {
@@ -807,7 +826,8 @@ class NeoController extends Controller
 
         $url = trim($validated['url']);
         $esNoEncontrado = strtolower($url) === 'no encontrado';
-        $esUrlValida = filter_var($url, FILTER_VALIDATE_URL);
+        // Mismo validador que las ofertas: admite acentos y URLs largas (a diferencia de filter_var).
+        $esUrlValida = UrlOfertaValidacion::pasa($url);
 
         if (!$esUrlValida && !$esNoEncontrado) {
             return response()->json([
@@ -821,12 +841,12 @@ class NeoController extends Controller
         }
 
         $producto = Producto::findOrFail($validated['producto_id']);
-        $dosSemanas = now()->subWeeks(2);
+        $visitadaPorDefecto = Neoobjetivo::fechaVisitadaPorDefectoAlCrear();
 
         Neoobjetivo::create([
             'producto_id' => $producto->id,
             'url'         => $url,
-            'visitada'    => $dosSemanas,
+            'visitada'    => $visitadaPorDefecto,
         ]);
 
         return response()->json([
@@ -969,6 +989,295 @@ class NeoController extends Controller
     }
 
     /**
+     * Formulario para añadir URLs a neo asociadas a una tienda y/o categoría (y opcionalmente producto).
+     */
+    public function anadirForm()
+    {
+        $tiendasConCsv = Tienda::query()
+            ->whereNotNull('url_csv')
+            ->orderBy('nombre')
+            ->get(['id', 'nombre']);
+
+        return view('admin.neo.formulario', compact('tiendasConCsv'));
+    }
+
+    /**
+     * Analiza las URLs pegadas: comprueba si cada una ya existe en neo (url o neo), en ofertas_producto
+     * o en urls_descartadas. Las que ya existen se descartarán al guardar.
+     */
+    public function anadirAnalizar(Request $request)
+    {
+        $validated = $request->validate([
+            'urls' => 'required|string',
+        ], [
+            'urls.required' => 'Pega al menos una URL.',
+        ]);
+
+        $procesadas = $this->procesarUrlsTextoParaAnadirNeo($validated['urls']);
+        $lineas = $procesadas['urls'];
+        $invalidas = $procesadas['invalidas'];
+
+        if ($lineas === [] && $invalidas === []) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No hay ninguna URL válida en el texto (líneas vacías).',
+            ], 422);
+        }
+
+        $unicosOrden = array_values(array_unique($lineas));
+        $repetidasEnTexto = count($lineas) > count($unicosOrden);
+
+        $cifrado = app(ConsultarNeoCifrado::class);
+        $lookupPorUrl = [];
+        foreach ($unicosOrden as $url) {
+            $lookupPorUrl[$url] = $cifrado->hashLookup($url);
+        }
+
+        $lookupsUnicos = array_values(array_unique(array_filter($lookupPorUrl)));
+
+        // Lookups presentes en neo (por url_lookup o neo_lookup).
+        $enNeo = [];
+        $enOfertas = [];
+        foreach (array_chunk($lookupsUnicos, 500) as $chunk) {
+            Neo::query()
+                ->where(function ($q) use ($chunk) {
+                    $q->whereIn('url_lookup', $chunk)
+                        ->orWhereIn('neo_lookup', $chunk);
+                })
+                ->get(['url_lookup', 'neo_lookup'])
+                ->each(function ($fila) use (&$enNeo) {
+                    if (!empty($fila->url_lookup)) {
+                        $enNeo[$fila->url_lookup] = true;
+                    }
+                    if (!empty($fila->neo_lookup)) {
+                        $enNeo[$fila->neo_lookup] = true;
+                    }
+                });
+
+            OfertaProducto::query()
+                ->whereIn('url_lookup', $chunk)
+                ->pluck('url_lookup')
+                ->each(function ($lookup) use (&$enOfertas) {
+                    if (!empty($lookup)) {
+                        $enOfertas[$lookup] = true;
+                    }
+                });
+        }
+
+        $enDescartadas = [];
+        foreach (array_chunk($unicosOrden, 500) as $chunk) {
+            UrlDescartada::query()
+                ->whereIn('url', $chunk)
+                ->pluck('url')
+                ->each(function ($urlDescartada) use (&$enDescartadas) {
+                    if ($urlDescartada !== '') {
+                        $enDescartadas[$urlDescartada] = true;
+                    }
+                });
+        }
+
+        $resultados = [];
+        $totalEnNeo = 0;
+        $totalEnOfertas = 0;
+        $totalEnDescartadas = 0;
+        $totalNuevas = 0;
+
+        foreach ($invalidas as $invalida) {
+            $resultados[] = [
+                'url'           => $invalida['original'],
+                'url_original'  => $invalida['original'],
+                'en_neo'        => false,
+                'en_ofertas'    => false,
+                'en_descartada' => false,
+                'invalida'      => true,
+                'error'         => $invalida['error'],
+                'existe'        => true,
+            ];
+        }
+
+        foreach ($unicosOrden as $url) {
+            $lookup = $lookupPorUrl[$url];
+            $existeNeo = $lookup !== '' && isset($enNeo[$lookup]);
+            $existeOfertas = $lookup !== '' && isset($enOfertas[$lookup]);
+            $existeDescartada = isset($enDescartadas[$url]);
+            $existe = $existeNeo || $existeOfertas || $existeDescartada;
+
+            if ($existeNeo) {
+                $totalEnNeo++;
+            }
+            if ($existeOfertas) {
+                $totalEnOfertas++;
+            }
+            if ($existeDescartada) {
+                $totalEnDescartadas++;
+            }
+            if (!$existe) {
+                $totalNuevas++;
+            }
+
+            $resultados[] = [
+                'url'           => $url,
+                'url_original'  => $procesadas['originales'][$url] ?? $url,
+                'en_neo'        => $existeNeo,
+                'en_ofertas'    => $existeOfertas,
+                'en_descartada' => $existeDescartada,
+                'invalida'      => false,
+                'error'         => null,
+                'existe'        => $existe,
+            ];
+        }
+
+        return response()->json([
+            'success'            => true,
+            'urls_en_texto'      => count($lineas) + count($invalidas),
+            'urls_unicas'        => count($unicosOrden) + count($invalidas),
+            'repetidas_en_texto' => $repetidasEnTexto,
+            'resumen'            => [
+                'total'           => count($unicosOrden) + count($invalidas),
+                'ya_en_neo'       => $totalEnNeo,
+                'ya_en_ofertas'   => $totalEnOfertas,
+                'ya_descartadas'  => $totalEnDescartadas,
+                'invalidas'       => count($invalidas),
+                'nuevas'          => $totalNuevas,
+            ],
+            'resultados'         => $resultados,
+        ]);
+    }
+
+    /**
+     * Guarda en neo (aniadida=no) las URLs que no existan en neo, ofertas_producto ni urls_descartadas,
+     * asociándolas a la tienda y/o categoría (y opcionalmente producto) indicadas.
+     */
+    public function anadirGuardar(Request $request)
+    {
+        $validated = $request->validate([
+            'urls'         => 'required|string',
+            'tienda_id'    => 'nullable|integer|exists:tiendas,id',
+            'categoria_id' => 'nullable|integer|exists:categorias,id',
+            'producto_id'  => 'nullable|integer|exists:productos,id',
+        ], [
+            'urls.required' => 'Pega al menos una URL.',
+        ]);
+
+        $tiendaId = $validated['tienda_id'] ?? null;
+        $categoriaId = $validated['categoria_id'] ?? null;
+        $productoId = $validated['producto_id'] ?? null;
+
+        if ($tiendaId === null && $categoriaId === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Debes seleccionar como mínimo una tienda o una categoría.',
+            ], 422);
+        }
+
+        if ($categoriaId !== null && Categoria::where('parent_id', $categoriaId)->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Solo puedes asignar categorías finales (sin subcategorías).',
+            ], 422);
+        }
+
+        $procesadas = $this->procesarUrlsTextoParaAnadirNeo($validated['urls']);
+        $lineas = $procesadas['urls'];
+
+        if ($lineas === []) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No hay ninguna URL válida en el texto (líneas vacías o no válidas tras limpiar).',
+            ], 422);
+        }
+
+        $unicosOrden = array_values(array_unique($lineas));
+
+        $cifrado = app(ConsultarNeoCifrado::class);
+        $lookupPorUrl = [];
+        foreach ($unicosOrden as $url) {
+            $lookupPorUrl[$url] = $cifrado->hashLookup($url);
+        }
+
+        $lookupsUnicos = array_values(array_unique(array_filter($lookupPorUrl)));
+
+        $enNeo = [];
+        $enOfertas = [];
+        foreach (array_chunk($lookupsUnicos, 500) as $chunk) {
+            Neo::query()
+                ->where(function ($q) use ($chunk) {
+                    $q->whereIn('url_lookup', $chunk)
+                        ->orWhereIn('neo_lookup', $chunk);
+                })
+                ->get(['url_lookup', 'neo_lookup'])
+                ->each(function ($fila) use (&$enNeo) {
+                    if (!empty($fila->url_lookup)) {
+                        $enNeo[$fila->url_lookup] = true;
+                    }
+                    if (!empty($fila->neo_lookup)) {
+                        $enNeo[$fila->neo_lookup] = true;
+                    }
+                });
+
+            OfertaProducto::query()
+                ->whereIn('url_lookup', $chunk)
+                ->pluck('url_lookup')
+                ->each(function ($lookup) use (&$enOfertas) {
+                    if (!empty($lookup)) {
+                        $enOfertas[$lookup] = true;
+                    }
+                });
+        }
+
+        $enDescartadas = [];
+        foreach (array_chunk($unicosOrden, 500) as $chunk) {
+            UrlDescartada::query()
+                ->whereIn('url', $chunk)
+                ->pluck('url')
+                ->each(function ($urlDescartada) use (&$enDescartadas) {
+                    if ($urlDescartada !== '') {
+                        $enDescartadas[$urlDescartada] = true;
+                    }
+                });
+        }
+
+        $guardadas = [];
+        $descartadas = [];
+        $insertadasEnEstaTanda = [];
+
+        foreach ($unicosOrden as $url) {
+            $lookup = $lookupPorUrl[$url];
+
+            if ($lookup === '') {
+                $descartadas[] = $url;
+                continue;
+            }
+
+            // Evitar duplicados dentro del propio guardado y contra BD.
+            if (isset($enNeo[$lookup]) || isset($enOfertas[$lookup]) || isset($enDescartadas[$url]) || isset($insertadasEnEstaTanda[$lookup])) {
+                $descartadas[] = $url;
+                continue;
+            }
+
+            Neo::create([
+                'producto_id'  => $productoId,
+                'categoria_id' => $categoriaId,
+                'tienda_id'    => $tiendaId,
+                'url'          => $url,
+                'neo'          => '',
+                'aniadida'     => 'no',
+            ]);
+
+            $insertadasEnEstaTanda[$lookup] = true;
+            $guardadas[] = $url;
+        }
+
+        return response()->json([
+            'success'           => true,
+            'total_guardadas'   => count($guardadas),
+            'total_descartadas' => count($descartadas),
+            'guardadas'         => $guardadas,
+            'descartadas'       => $descartadas,
+        ]);
+    }
+
+    /**
      * Comprueba qué URLs existen en neo.url y devuelve filas por URL (ids, aniadida, etc.).
      */
     public function eliminarNeoPorUrlsComprobar(Request $request)
@@ -988,6 +1297,13 @@ class NeoController extends Controller
         }
 
         $unicosOrden = array_values(array_unique($lineas));
+        if (count($unicosOrden) > 100) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Máximo 100 URLs por petición. El listado se procesa en bloques de 100.',
+            ], 422);
+        }
+
         $repetidasEnTexto = count($lineas) > count($unicosOrden);
 
         $cifrado = app(ConsultarNeoCifrado::class);
@@ -1050,16 +1366,19 @@ class NeoController extends Controller
     public function eliminarNeoPorUrlsEjecutar(Request $request)
     {
         $validated = $request->validate([
-            'acciones'            => 'required|array|min:1',
+            'acciones'            => 'required|array|min:1|max:100',
             'acciones.*.url'      => 'required|string|max:2048',
             'acciones.*.alcance'  => 'required|string|in:todas,una',
             'acciones.*.neo_id'   => 'nullable|integer|exists:neo,id',
         ], [
             'acciones.required' => 'No hay acciones de borrado.',
             'acciones.min'      => 'No hay acciones de borrado.',
+            'acciones.max'      => 'Máximo 100 acciones por petición. El listado se procesa en bloques de 100.',
         ]);
 
         $totalEliminadas = 0;
+        $totalCsvAniadidaNeoNo = 0;
+        $totalOmitidasOfertaProducto = 0;
         $detalle = [];
 
         foreach ($validated['acciones'] as $accion) {
@@ -1068,6 +1387,18 @@ class NeoController extends Controller
             $neoId = isset($accion['neo_id']) ? (int) $accion['neo_id'] : null;
 
             $lookup = app(ConsultarNeoCifrado::class)->hashLookup($url);
+
+            if ($lookup !== '' && OfertaProducto::query()->where('url_lookup', $lookup)->exists()) {
+                $totalOmitidasOfertaProducto++;
+                $detalle[] = [
+                    'url'        => $url,
+                    'eliminadas' => 0,
+                    'alcance'    => $alcance,
+                    'aviso'      => 'No se elimina: la URL existe en ofertas_producto.',
+                ];
+                continue;
+            }
+
             $idsConUrl = Neo::query()->where('url_lookup', $lookup)->pluck('id');
             if ($idsConUrl->isEmpty()) {
                 $detalle[] = ['url' => $url, 'eliminadas' => 0, 'aviso' => 'La URL ya no existe en neo.'];
@@ -1077,7 +1408,14 @@ class NeoController extends Controller
             if ($alcance === 'todas') {
                 $n = Neo::query()->where('url_lookup', $lookup)->delete();
                 $totalEliminadas += $n;
-                $detalle[] = ['url' => $url, 'eliminadas' => $n, 'alcance' => 'todas'];
+                $csvAniadidaNeoNo = $this->actualizarCsvOfertasTrasEliminarNeo($lookup);
+                $totalCsvAniadidaNeoNo += $csvAniadidaNeoNo;
+                $detalle[] = [
+                    'url'                 => $url,
+                    'eliminadas'          => $n,
+                    'alcance'             => 'todas',
+                    'csv_aniadida_neo_no' => $csvAniadidaNeoNo,
+                ];
                 continue;
             }
 
@@ -1111,14 +1449,97 @@ class NeoController extends Controller
 
             $fila->delete();
             $totalEliminadas += 1;
-            $detalle[] = ['url' => $url, 'eliminadas' => 1, 'alcance' => 'una', 'neo_id' => $idBorrar];
+            $csvAniadidaNeoNo = $this->actualizarCsvOfertasTrasEliminarNeo($lookup);
+            $totalCsvAniadidaNeoNo += $csvAniadidaNeoNo;
+            $detalle[] = [
+                'url'                 => $url,
+                'eliminadas'          => 1,
+                'alcance'             => 'una',
+                'neo_id'              => $idBorrar,
+                'csv_aniadida_neo_no' => $csvAniadidaNeoNo,
+            ];
         }
 
         return response()->json([
-            'success'          => true,
-            'total_eliminadas' => $totalEliminadas,
-            'detalle'          => $detalle,
+            'success'                     => true,
+            'total_eliminadas'            => $totalEliminadas,
+            'total_csv_aniadida_neo_no'   => $totalCsvAniadidaNeoNo,
+            'total_omitidas_oferta_producto' => $totalOmitidasOfertaProducto,
+            'detalle'                     => $detalle,
         ]);
+    }
+
+    /**
+     * Tras borrar filas neo de una URL: si ya no queda ninguna fila neo con ese lookup,
+     * la URL no está en ofertas_producto y hay filas en csv_ofertas con aniadida_neo=si,
+     * las marca como aniadida_neo=no.
+     */
+    private function actualizarCsvOfertasTrasEliminarNeo(string $lookup): int
+    {
+        if ($lookup === '') {
+            return 0;
+        }
+
+        if (Neo::query()->where('url_lookup', $lookup)->exists()) {
+            return 0;
+        }
+
+        if (OfertaProducto::query()->where('url_lookup', $lookup)->exists()) {
+            return 0;
+        }
+
+        return CsvOferta::query()
+            ->where('url_lookup', $lookup)
+            ->where('aniadida_neo', 'si')
+            ->update(['aniadida_neo' => 'no']);
+    }
+
+    /**
+     * Procesa líneas de texto: limpia con LimpiarUrlDeTiendas y valida con UrlOfertaValidacion
+     * (misma lógica que al pegar una URL en el formulario de ofertas).
+     *
+     * @return array{
+     *     urls: list<string>,
+     *     invalidas: list<array{original: string, error: string}>,
+     *     originales: array<string, string>
+     * }
+     */
+    private function procesarUrlsTextoParaAnadirNeo(string $texto): array
+    {
+        $lineas = preg_split('/\r\n|\r|\n/', $texto) ?: [];
+        $limpiar = app(LimpiarUrlDeTiendas::class);
+        $urls = [];
+        $invalidas = [];
+        $originales = [];
+
+        foreach ($lineas as $linea) {
+            $original = trim((string) $linea);
+            if ($original === '') {
+                continue;
+            }
+
+            $limpia = $limpiar->limpiar($original);
+            if ($limpia === '') {
+                $invalidas[] = ['original' => $original, 'error' => 'URL vacía tras limpiar'];
+                continue;
+            }
+
+            if (!UrlOfertaValidacion::pasa($limpia)) {
+                $invalidas[] = ['original' => $original, 'error' => 'URL no válida'];
+                continue;
+            }
+
+            $urls[] = $limpia;
+            if ($limpia !== $original) {
+                $originales[$limpia] = $original;
+            }
+        }
+
+        return [
+            'urls'       => $urls,
+            'invalidas'  => $invalidas,
+            'originales' => $originales,
+        ];
     }
 
     /**

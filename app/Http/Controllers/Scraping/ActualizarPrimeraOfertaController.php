@@ -8,11 +8,58 @@ use App\Models\OfertaProducto;
 use App\Models\EjecucionGlobal;
 use App\Models\Producto;
 use App\Models\ProductoOfertaMasBarataPorProducto;
+use App\Services\TiendaScrapingConfigResolver;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 
 class ActualizarPrimeraOfertaController extends ScraperBaseController
 {
+    /**
+     * Si el proceso termina sin llegar al update final (timeout FPM/nginx, SIGTERM, OOM, etc.),
+     * deja la fila con fin=null. Se cierra aquí para no bloquear crons ni el histórico.
+     */
+    private static function cerrarEjecucionPrimeraOfertaHuerfana(int $ejecucionId): void
+    {
+        try {
+            $e = EjecucionGlobal::query()->find($ejecucionId);
+            if (!$e || $e->fin !== null) {
+                return;
+            }
+            $log = is_array($e->log) ? $e->log : [];
+            if (($log['estado'] ?? '') === 'completada') {
+                return;
+            }
+            if (!in_array($log['estado'] ?? '', ['iniciada', 'en_progreso'], true)) {
+                // Ejecuciones antiguas sin campo estado pero con fin=null
+                if (($log['estado'] ?? null) !== null) {
+                    return;
+                }
+            }
+            $last = error_get_last();
+            if ($last !== null) {
+                $fatalMask = E_ERROR | E_PARSE | E_CORE_ERROR | E_COMPILE_ERROR | E_USER_ERROR;
+                if (($last['type'] ?? 0) & $fatalMask) {
+                    $log['error_shutdown'] = ($last['message'] ?? '') . ' @ ' . ($last['file'] ?? '') . ':' . ($last['line'] ?? '');
+                } else {
+                    $log['error_shutdown'] = $last['message'] ?? '';
+                }
+            }
+            $log['estado'] = 'fallida';
+            $procesadas = (int) ($log['procesadas'] ?? 0);
+            $actualizadas = (int) ($log['actualizadas'] ?? 0);
+            $errores = (int) ($log['errores'] ?? 0);
+            $e->update([
+                'fin'            => now(),
+                'total'          => $procesadas,
+                'total_guardado' => $actualizadas,
+                'total_errores'  => $errores,
+                'log'            => $log,
+            ]);
+        } catch (\Throwable $ignore) {
+            //
+        }
+    }
+
     /**
      * Vista principal de ejecución en tiempo real
      */
@@ -103,7 +150,7 @@ class ActualizarPrimeraOfertaController extends ScraperBaseController
             // Ejecución completada
             $ejecucion->update([
                 'fin' => now(),
-                'log' => array_merge($log, ['estado' => 'completada'])
+                'log' => $this->mergeMetricasPeticionesApiEnLog(array_merge($log, ['estado' => 'completada']))
             ]);
             
             return response()->json([
@@ -121,16 +168,22 @@ class ActualizarPrimeraOfertaController extends ScraperBaseController
         
         try {
             $resultado = $this->procesarOfertaScraper($oferta);
-            $log['resultados'][] = $resultado;
+            $log['resultados'][] = $this->enriquecerResultadoScraperLog($oferta, $resultado);
             
             if (!empty($resultado['success'])) {
-                $log['actualizadas'] = ($log['actualizadas'] ?? 0) + 1;
+                if (!empty($resultado['oferta_oculta'])) {
+                    $log['ocultadas'] = ($log['ocultadas'] ?? 0) + 1;
+                } else {
+                    $log['actualizadas'] = ($log['actualizadas'] ?? 0) + 1;
+                }
             } else {
                 $log['errores'] = ($log['errores'] ?? 0) + 1;
             }
             
             $log['procesadas'] = ($log['procesadas'] ?? 0) + 1;
             
+            $log = $this->mergeMetricasPeticionesApiEnLog($log);
+
             $ejecucion->update([
                 'total_guardado' => $log['actualizadas'],
                 'total_errores' => $log['errores'],
@@ -159,7 +212,7 @@ class ActualizarPrimeraOfertaController extends ScraperBaseController
         } catch (\Exception $e) {
             $log['errores'] = ($log['errores'] ?? 0) + 1;
             $log['procesadas'] = ($log['procesadas'] ?? 0) + 1;
-            $log['resultados'][] = [
+            $log['resultados'][] = $this->enriquecerResultadoScraperLog($oferta, [
                 'oferta_id' => $oferta->id,
                 'tienda_nombre' => $oferta->tienda->nombre ?? null,
                 'url' => $oferta->url,
@@ -170,7 +223,9 @@ class ActualizarPrimeraOfertaController extends ScraperBaseController
                 'error' => $e->getMessage(),
                 'cambios_detectados' => false,
                 'url_notificacion_llamada' => false,
-            ];
+            ]);
+
+            $log = $this->mergeMetricasPeticionesApiEnLog($log);
             
             $ejecucion->update([
                 'total_errores' => $log['errores'],
@@ -224,6 +279,34 @@ class ActualizarPrimeraOfertaController extends ScraperBaseController
         // Evitar timeout en ejecuciones largas
         set_time_limit(0);
         ignore_user_abort(true);
+
+        // Cerrar ejecuciones zombie (sin fin tras ≥1h) y bloquear si hay una en curso reciente
+        $ultimaEjecucion = EjecucionGlobal::where('nombre', 'actualizar_primera_oferta')
+            ->orderBy('inicio', 'desc')
+            ->first();
+
+        if ($ultimaEjecucion && $ultimaEjecucion->fin === null) {
+            $estadoUltima = $ultimaEjecucion->log['estado'] ?? null;
+            $estaTerminada = in_array($estadoUltima, ['completada', 'fallida'], true);
+
+            if (!$estaTerminada && $ultimaEjecucion->inicio->diffInHours(now()) >= 1) {
+                $logZombie = is_array($ultimaEjecucion->log) ? $ultimaEjecucion->log : [];
+                $logZombie['estado'] = 'fallida';
+                $logZombie['error_cierre'] = 'Sin fin tras 1h (timeout o proceso terminado); cerrada al lanzar un nuevo cron.';
+                $ultimaEjecucion->update([
+                    'fin'            => now(),
+                    'total'          => (int) ($logZombie['procesadas'] ?? 0),
+                    'total_guardado' => (int) ($logZombie['actualizadas'] ?? 0),
+                    'total_errores'  => (int) ($logZombie['errores'] ?? 0),
+                    'log'            => $logZombie,
+                ]);
+            } elseif (!$estaTerminada && $ultimaEjecucion->inicio->diffInHours(now()) < 1) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Ya hay una ejecución de primera oferta en curso (iniciada hace menos de 1 hora)',
+                ], 409);
+            }
+        }
         
         // Configurar headers para mostrar progreso en tiempo real
         header('Content-Type: text/html; charset=utf-8');
@@ -235,9 +318,11 @@ class ActualizarPrimeraOfertaController extends ScraperBaseController
             ob_end_clean();
         }
         ob_start();
+
+        $fastcgiFinalizado = false;
         
         // Función helper para mostrar mensaje y hacer flush
-        $mostrar = function($mensaje, $tipo = 'info') {
+        $mostrar = function($mensaje, $tipo = 'info') use (&$fastcgiFinalizado) {
             $color = match($tipo) {
                 'success' => '#28a745',
                 'error' => '#dc3545',
@@ -252,8 +337,9 @@ class ActualizarPrimeraOfertaController extends ScraperBaseController
                 ob_flush();
             }
             flush();
-            if (function_exists('fastcgi_finish_request')) {
+            if (!$fastcgiFinalizado && function_exists('fastcgi_finish_request')) {
                 fastcgi_finish_request();
+                $fastcgiFinalizado = true;
             }
         };
         
@@ -314,8 +400,23 @@ class ActualizarPrimeraOfertaController extends ScraperBaseController
             $ejecucion = EjecucionGlobal::create([
                 'inicio' => now(),
                 'nombre' => 'actualizar_primera_oferta',
-                'log'    => $token ? ['token' => $token] : [],
+                'total'  => $totalOfertas,
+                'log'    => [
+                    'token'         => $token,
+                    'estado'        => 'iniciada',
+                    'total_ofertas' => $totalOfertas,
+                    'ofertas'       => $ofertas->pluck('id')->toArray(),
+                    'actualizadas'  => 0,
+                    'ocultadas'     => 0,
+                    'errores'       => 0,
+                    'procesadas'    => 0,
+                    'resultados'    => [],
+                ],
             ]);
+            $idEjecucion = $ejecucion->id;
+            register_shutdown_function(function () use ($idEjecucion) {
+                self::cerrarEjecucionPrimeraOfertaHuerfana($idEjecucion);
+            });
             $mostrar("✓ Ejecución creada (ID: {$ejecucion->id})", 'success');
         } catch (\Exception $e) {
             $mostrar("✗ ERROR al crear ejecución: " . $e->getMessage(), 'error');
@@ -327,6 +428,7 @@ class ActualizarPrimeraOfertaController extends ScraperBaseController
         }
 
         $actualizadas = 0;
+        $ocultadas    = 0;
         $errores      = 0;
         $log          = [];
         $indiceActual = 0;
@@ -334,6 +436,10 @@ class ActualizarPrimeraOfertaController extends ScraperBaseController
         // 2) Procesar ofertas de forma secuencial
         $mostrar("Paso 3: Iniciando procesamiento de ofertas...", 'info');
         $mostrar("================================================", 'info');
+
+        $ejecucion->update([
+            'log' => array_merge($ejecucion->log ?? [], ['estado' => 'en_progreso']),
+        ]);
         
         foreach ($ofertas as $oferta) {
             $indiceActual++;
@@ -353,12 +459,17 @@ class ActualizarPrimeraOfertaController extends ScraperBaseController
                 $resultado = $this->procesarOfertaScraper($oferta);
                 
                 $tiempoProcesar = round(microtime(true) - $inicioProcesar, 2);
-                $log[] = $resultado;
+                $log[] = $this->enriquecerResultadoScraperLog($oferta, $resultado);
 
-                if (!empty($resultado['success'])) {
+                $clasificacion = $this->clasificarResultadoScraping($resultado);
+                if ($clasificacion === 'actualizada') {
                     $actualizadas++;
                     $precioNuevo = $resultado['precio_nuevo'] ?? 'N/A';
                     $mostrar("✓ ÉXITO - Precio nuevo: {$precioNuevo} € (tiempo: {$tiempoProcesar}s)", 'success');
+                } elseif ($clasificacion === 'ocultada') {
+                    $ocultadas++;
+                    $motivo = $resultado['motivo_ocultacion'] ?? 'Oferta ocultada';
+                    $mostrar("✓ OCULTADA - {$motivo} (tiempo: {$tiempoProcesar}s)", 'success');
                 } else {
                     $errores++;
                     $errorMsg = $resultado['error'] ?? 'Error desconocido';
@@ -372,7 +483,7 @@ class ActualizarPrimeraOfertaController extends ScraperBaseController
                 $mostrar("Archivo: " . $e->getFile() . " Línea: " . $e->getLine(), 'error');
                 $mostrar("Stack trace: " . substr($e->getTraceAsString(), 0, 300) . "...", 'error');
                 
-                $log[] = [
+                $log[] = $this->enriquecerResultadoScraperLog($oferta, [
                     'oferta_id'                 => $oferta->id,
                     'tienda_nombre'             => $oferta->tienda->nombre ?? null,
                     'url'                       => $oferta->url,
@@ -383,7 +494,7 @@ class ActualizarPrimeraOfertaController extends ScraperBaseController
                     'error'                     => $e->getMessage(),
                     'cambios_detectados'        => false,
                     'url_notificacion_llamada'  => false,
-                ];
+                ]);
             }
         }
 
@@ -392,16 +503,17 @@ class ActualizarPrimeraOfertaController extends ScraperBaseController
         $mostrar("Paso 4: Finalizando ejecución...", 'info');
 
         // Crear estructura JSON organizada
-        $logEstructurado = [
+        $logEstructurado = $this->mergeMetricasPeticionesApiEnLog([
             'token' => $token,
             'estado' => 'completada',
             'total_ofertas' => $totalOfertas,
             'ofertas' => $ofertas->pluck('id')->toArray(),
             'actualizadas' => $actualizadas,
+            'ocultadas' => $ocultadas,
             'errores' => $errores,
             'procesadas' => $totalOfertas,
             'resultados' => $log
-        ];
+        ]);
 
         try {
             $ejecucion->update([
@@ -420,6 +532,7 @@ class ActualizarPrimeraOfertaController extends ScraperBaseController
         $mostrar("=== RESUMEN FINAL ===", 'info');
         $mostrar("Total ofertas procesadas: {$totalOfertas}", 'info');
         $mostrar("Actualizadas correctamente: {$actualizadas}", 'success');
+        $mostrar("Ocultadas (sin stock, 404, CSV…): {$ocultadas}", $ocultadas > 0 ? 'success' : 'info');
         $mostrar("Errores: {$errores}", $errores > 0 ? 'error' : 'info');
         $mostrar("Ejecución ID: {$ejecucion->id}", 'info');
         
@@ -436,9 +549,9 @@ class ActualizarPrimeraOfertaController extends ScraperBaseController
      * Obtener la primera oferta (más barata) de cada producto
      * Consulta la tabla producto_oferta_mas_barata_por_producto para obtener el oferta_id
      * Luego obtiene todos los datos de la oferta desde la tabla de ofertas
-     * Solo incluye productos cuya oferta más barata tenga tienda con scrapear='si'
+     * Solo incluye ofertas con scrapear efectivo = 'si' (categoría si está configurada, si no tienda)
      */
-    protected function obtenerPrimerasOfertasElegibles()
+    protected function obtenerPrimerasOfertasElegibles(?int $limit = null)
     {
         // Obtener todos los IDs de ofertas más baratas desde la tabla producto_oferta_mas_barata_por_producto
         $idsOfertasMasBaratas = ProductoOfertaMasBarataPorProducto::pluck('oferta_id')
@@ -451,21 +564,20 @@ class ActualizarPrimeraOfertaController extends ScraperBaseController
             return collect();
         }
 
-        // Obtener todas las ofertas ORIGINALES desde la BD usando los IDs
-        // Esto garantiza que procesarOfertaScraper reciba ofertas con valores reales (sin descuentos aplicados)
-        $ofertasOriginales = OfertaProducto::with(['producto', 'tienda'])
+        // Obtener ofertas ORIGINALES (sin descuentos aplicados) con scrapear efectivo por categoría
+        $query = OfertaProducto::with(['producto', 'tienda'])
             ->whereIn('id', $idsOfertasMasBaratas)
             ->where('mostrar', 'si')
+            ->where('como_scrapear', 'automatico')
             ->whereNull('chollo_id')
-            ->get();
+            ->whereRaw(TiendaScrapingConfigResolver::sqlScrapearEfectivo() . " = 'si'")
+            ->orderBy('updated_at');
 
-        // Filtrar solo las ofertas cuya tienda tenga scrapear='si'
-        $ofertasFiltradas = $ofertasOriginales->filter(function($oferta) {
-            return $oferta->tienda && $oferta->tienda->scrapear === 'si';
-        });
+        if ($limit !== null) {
+            $query->limit($limit);
+        }
 
-        // Ordenar por fecha de actualización más antigua primero
-        return $ofertasFiltradas->sortBy('updated_at')->values();
+        return $query->get();
     }
 
     /**

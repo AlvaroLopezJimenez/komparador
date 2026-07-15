@@ -7,236 +7,327 @@ use Illuminate\Support\Facades\Log;
 
 class DescuentosController extends Controller
 {
+    public const SEPARADOR_DESCUENTOS = '||';
+
+    /** Descuentos que el scraper de Carrefour detecta y gestiona automáticamente */
+    public const DESCUENTOS_CARREFOUR = [
+        '3x2',
+        '2x1 - SoloCarrefour',
+        '2a al 70',
+        '2a al 50 - cheque - SoloCarrefour',
+        '-20%',
+    ];
+
+    public const DESCUENTO_20_PORCIENTO = '-20%';
+
     /**
-     * Aplica el descuento correspondiente a una oferta según su campo 'descuentos'
-     * 
+     * @return array<int, string>
+     */
+    public static function parseDescuentos(?string $descuentos): array
+    {
+        if ($descuentos === null || $descuentos === '') {
+            return [];
+        }
+
+        return array_values(array_filter(
+            array_map('trim', explode(self::SEPARADOR_DESCUENTOS, $descuentos)),
+            fn (string $d) => $d !== ''
+        ));
+    }
+
+    /**
+     * @param array<int, string> $descuentos
+     */
+    public static function joinDescuentos(array $descuentos): ?string
+    {
+        $descuentos = array_values(array_filter(
+            array_map('trim', $descuentos),
+            fn (string $d) => $d !== ''
+        ));
+
+        return $descuentos === [] ? null : implode(self::SEPARADOR_DESCUENTOS, $descuentos);
+    }
+
+    public static function esDescuentoCarrefour(string $descuento): bool
+    {
+        return in_array($descuento, self::DESCUENTOS_CARREFOUR, true);
+    }
+
+    /**
+     * @param array<int, string> $descuentos
+     * @return array<int, string>
+     */
+    public static function filtrarDescuentosNoCarrefour(array $descuentos): array
+    {
+        return array_values(array_filter(
+            $descuentos,
+            fn (string $d) => !self::esDescuentoCarrefour($d)
+        ));
+    }
+
+    public static function normalizarDescuento(string $descuento): string
+    {
+        $descuento = trim($descuento);
+
+        if ($descuento === '2a al 50% - cheque - Solo Carrefour') {
+            return '2a al 50 - cheque - SoloCarrefour';
+        }
+
+        if (preg_match('/^-20\s*%$/i', $descuento)) {
+            return self::DESCUENTO_20_PORCIENTO;
+        }
+
+        if (preg_match('/^2a al (\d+)\s*-\s*cupon;(.+)$/i', $descuento, $m)) {
+            return '2a al ' . (int) $m[1] . ' - cupon;' . trim($m[2]);
+        }
+
+        return $descuento;
+    }
+
+    public static function esDescuento2aCupon(string $descuento): bool
+    {
+        return (bool) preg_match('/^2a al \d+ - cupon;.+/i', $descuento);
+    }
+
+    /**
+     * @return array{porcentaje: int, codigo: string}|null
+     */
+    public static function parseDescuento2aCupon(string $descuento): ?array
+    {
+        if (!preg_match('/^2a al (\d+) - cupon;(.+)$/i', $descuento, $m)) {
+            return null;
+        }
+
+        return [
+            'porcentaje' => (int) $m[1],
+            'codigo' => trim($m[2]),
+        ];
+    }
+
+    /** Descuentos que el scraper de Tiendanimal detecta y puede sustituir al re-scrapear */
+    public static function esDescuentoScrapeadoTiendanimal(string $descuento): bool
+    {
+        if (self::esDescuento2aCupon($descuento)) {
+            return true;
+        }
+
+        return (bool) preg_match('/^cupon;[^;]+;%\d+$/i', $descuento);
+    }
+
+    /**
+     * @param array<int, string> $descuentos
+     * @return array<int, string>
+     */
+    public static function filtrarDescuentosNoTiendanimal(array $descuentos): array
+    {
+        return array_values(array_filter(
+            $descuentos,
+            fn (string $d) => !self::esDescuentoScrapeadoTiendanimal($d)
+        ));
+    }
+
+    /**
+     * Aplica todos los descuentos de una oferta (soporta varios separados por ||)
+     *
      * @param OfertaProducto $oferta La oferta original sin descuentos aplicados
      * @return OfertaProducto La oferta con descuentos aplicados (unidades, precio_total y precio_unidad ajustados)
      */
     public function aplicarDescuento(OfertaProducto $oferta): OfertaProducto
     {
-
-        // Si la oferta está asociada a un chollo, respetar sus valores originales
         if (!is_null($oferta->chollo_id)) {
             return $oferta;
         }
 
-        // Si no tiene descuento, devolver la oferta sin modificar
         if (empty($oferta->descuentos)) {
             return $oferta;
         }
 
-        // Crear una copia de la oferta para no modificar el original en BD
-        $ofertaConDescuento = clone $oferta;
-        
-        // Asegurar que se mantengan los campos importantes y las relaciones
-        $ofertaConDescuento->tienda_id = $oferta->tienda_id;
-        $ofertaConDescuento->descuentos = $oferta->descuentos;
-        
-        // Mantener la relación tienda si está cargada
-        if ($oferta->relationLoaded('tienda') && $oferta->tienda) {
-            $ofertaConDescuento->setRelation('tienda', $oferta->tienda);
+        $descuentos = self::parseDescuentos($oferta->descuentos);
+
+        if ($descuentos === []) {
+            return $oferta;
         }
 
-        // Verificar si es un cupón (formato: cupon;codigo;cantidad, cupon;valor o cupon;%valor)
-        if (strpos($oferta->descuentos, 'cupon;') === 0) {
-            $descuentoString = $oferta->descuentos;
-            
-            // Verificar si es cupón con porcentaje (cupon;%15)
-            if (strpos($descuentoString, 'cupon;%') === 0) {
-                // Extraer el porcentaje del cupón (ej: cupon;%15 -> 15)
-                $porcentajeCupon = (float)str_replace('cupon;%', '', $descuentoString);
-                
-                // Aplicar descuento porcentual: precio_total * (1 - porcentaje/100)
-                $precioTotalConDescuento = $oferta->precio_total * (1 - $porcentajeCupon / 100);
-                
-                $ofertaConDescuento->precio_total = $precioTotalConDescuento;
-                // Calcular precio_unidad con 3 decimales
-                $ofertaConDescuento->precio_unidad = $oferta->unidades > 0 
-                    ? round($precioTotalConDescuento / $oferta->unidades, 3) 
-                    : 0;
-            } else {
-                // Parsear formato: cupon;codigo;cantidad o cupon;cantidad (compatibilidad)
-                $partes = explode(';', $descuentoString);
-                
-                if (count($partes) === 3) {
-                    // Formato nuevo: cupon;codigo;cantidad
-                    $codigoCupon = $partes[1];
-                    $valorCupon = (float)$partes[2];
-                } else {
-                    // Formato antiguo: cupon;cantidad (solo cantidad, sin código)
-                    $valorCupon = (float)str_replace('cupon;', '', $descuentoString);
-                    $codigoCupon = null;
-                }
-                
-                // Aplicar descuento del cupón: restar el valor del cupón al precio total
-                $precioTotalConDescuento = max(0, $oferta->precio_total - $valorCupon);
-                
-                $ofertaConDescuento->precio_total = $precioTotalConDescuento;
-                // Calcular precio_unidad con 3 decimales
-                $ofertaConDescuento->precio_unidad = $oferta->unidades > 0 
-                    ? round($precioTotalConDescuento / $oferta->unidades, 3) 
-                    : 0;
-            }
-        } elseif (strpos($oferta->descuentos, 'CholloTienda1SoloCuponQueAplicaDescuento;') === 0) {
-            // Procesar cupón de tipo "1 Solo cupón" que aplica descuento al precio total
-            $descuentoString = $oferta->descuentos;
-            $partes = explode(';', $descuentoString);
-            
-            // Buscar los valores en el string
-            $descuento = null;
-            $tipoDescuento = 'euros'; // Por defecto euros
-            $cupon = null;
-            
-            for ($i = 0; $i < count($partes); $i++) {
-                if ($partes[$i] === 'descuento' && isset($partes[$i + 1])) {
-                    $descuento = (float)$partes[$i + 1];
-                }
-                if ($partes[$i] === 'tipo_descuento' && isset($partes[$i + 1])) {
-                    $tipoDescuento = $partes[$i + 1];
-                }
-                if ($partes[$i] === 'cupon' && isset($partes[$i + 1])) {
-                    $cupon = $partes[$i + 1];
-                }
-            }
-            
-            if ($descuento !== null && $descuento > 0) {
-                // Crear una copia de la oferta para no modificar el original en BD
-                $ofertaConDescuento = clone $oferta;
-                
-                // Asegurar que se mantengan los campos importantes y las relaciones
-                $ofertaConDescuento->tienda_id = $oferta->tienda_id;
-                $ofertaConDescuento->descuentos = $oferta->descuentos;
-                
-                // Mantener la relación tienda si está cargada
-                if ($oferta->relationLoaded('tienda') && $oferta->tienda) {
-                    $ofertaConDescuento->setRelation('tienda', $oferta->tienda);
-                }
-                
-                $precioOriginal = $oferta->precio_total;
-                
-                // Aplicar descuento según el tipo
-                if ($tipoDescuento === 'porcentaje') {
-                    // Descuento porcentual: precio_total * (1 - porcentaje/100)
-                    $precioTotalConDescuento = $precioOriginal * (1 - $descuento / 100);
-                } else {
-                    // Descuento en euros: restar directamente
-                    $precioTotalConDescuento = max(0, $precioOriginal - $descuento);
-                }
-                
-                $ofertaConDescuento->precio_total = $precioTotalConDescuento;
-                
-                // Recalcular precio_unidad con 3 decimales
-                $ofertaConDescuento->precio_unidad = $oferta->unidades > 0 
-                    ? round($precioTotalConDescuento / $oferta->unidades, 3) 
-                    : 0;
+        $ofertaConDescuento = $this->clonarOferta($oferta);
 
-                return $ofertaConDescuento;
-            }
-            
-            // Si no se pudo procesar, devolver la oferta sin modificar
-            return $oferta;
-        } elseif (strpos($oferta->descuentos, 'CholloTienda;') === 0) {
-            // Los cupones de CholloTienda no se procesan aquí, solo se guardan en el campo descuentos
-            // para mostrarlos en la vista. No modificar precios ni unidades.
-            return $oferta;
-        } else {
-            // Manejar otros tipos de descuentos existentes
-            switch ($oferta->descuentos) {
-                case '3x2':
-                    // Para 3x2: Compras 3 packs, pagas 2 packs
-                    // Ejemplo: 132 unidades a 21,99€ → con 3x2 recibes 396 uds (3 packs) y pagas 43,98€ (2 packs)
-                    $ofertaConDescuento->unidades = $oferta->unidades * 3;
-                    $ofertaConDescuento->precio_total = $oferta->precio_total * 2; // Pagas 2 packs
-                    $ofertaConDescuento->precio_unidad = ($oferta->precio_total * 2) / ($oferta->unidades * 3);
-                    break;
-
-                case '2x1 - SoloCarrefour':
-                    // Para 2x1: Compras 2 packs, pagas 1 pack
-                    // Ejemplo: 132 unidades a 21,99€ → con 2x1 recibes 264 uds (2 packs) y pagas 21,99€ (1 pack)
-                    $ofertaConDescuento->unidades = $oferta->unidades * 2;
-                    $ofertaConDescuento->precio_total = $oferta->precio_total; // Pagas 1 pack
-                    $ofertaConDescuento->precio_unidad = $oferta->precio_total / ($oferta->unidades * 2);
-                    break;
-                case '2a al 50 - cheque - SoloCarrefour':
-                    // Funciona igual que el 2x1 pero el descuento del segundo producto se acumula en un cheque
-                    $ofertaConDescuento->unidades = $oferta->unidades * 2;
-                    $ofertaConDescuento->precio_total = $oferta->precio_total * 1.5;
-                    $ofertaConDescuento->precio_unidad = $ofertaConDescuento->precio_total / $ofertaConDescuento->unidades;
-                    break;
-
-                case '2a al 70':
-                    // Para 2ª al 70%: La segunda unidad tiene 70% de descuento (pagas solo el 30%)
-                    // Ejemplo: 1 unidad a 10€ → con 2ª al 70% tienes 2 unidades
-                    // Precio total = 10€ + (10€ * 0.30) = 10€ + 3€ = 13€
-                    // Precio por unidad promedio = 13€ / 2 = 6.5€
-                    
-                    $precioUnidadOriginal = $oferta->precio_total / $oferta->unidades;
-                    $precioSegundaUnidad = $precioUnidadOriginal * 0.30; // La 2ª unidad al 30% (70% descuento)
-                    
-                    $ofertaConDescuento->unidades = $oferta->unidades * 2;
-                    $ofertaConDescuento->precio_total = $oferta->precio_total + ($precioUnidadOriginal * $oferta->unidades * 0.30);
-                    $ofertaConDescuento->precio_unidad = $ofertaConDescuento->precio_total / $ofertaConDescuento->unidades;
-                    break;
-
-                case '2a al 50':
-                    // Para 2ª al 50%: La segunda unidad tiene 50% de descuento (pagas solo el 50%)
-                    // Ejemplo: 1 unidad a 10€ → con 2ª al 50% tienes 2 unidades
-                    // Precio total = 10€ + (10€ * 0.50) = 10€ + 5€ = 15€
-                    // Precio por unidad promedio = 15€ / 2 = 7.5€
-                    
-                    $precioUnidadOriginal = $oferta->precio_total / $oferta->unidades;
-                    $precioSegundaUnidad = $precioUnidadOriginal * 0.50; // La 2ª unidad al 50% (50% descuento)
-                    
-                    $ofertaConDescuento->unidades = $oferta->unidades * 2;
-                    $ofertaConDescuento->precio_total = $oferta->precio_total + ($precioUnidadOriginal * $oferta->unidades * 0.50);
-                    $ofertaConDescuento->precio_unidad = $ofertaConDescuento->precio_total / $ofertaConDescuento->unidades;
-                    break;
-
-                case 'cupon':
-                    // Para cupones: el precio ya está ajustado, no hacer nada
-                    // El scraper ya aplicó el descuento al precio_total
-                    break;
-
-                case 'rebaja':
-                case 'promocion':
-                case 'oferta_especial':
-                case '+Juego':
-                    // Para estos tipos: no requieren cálculos especiales
-                    // Son solo informativos
-                    break;
-
-                default:
-                    Log::warning('DescuentosController - Tipo de descuento desconocido:', [
-                        'oferta_id' => $oferta->id,
-                        'descuento' => $oferta->descuentos
-                    ]);
-                    break;
-            }
+        foreach ($descuentos as $descuento) {
+            $ofertaConDescuento = $this->aplicarUnDescuento($ofertaConDescuento, $descuento);
         }
 
         return $ofertaConDescuento;
     }
 
     /**
+     * Aplica un único descuento sobre el estado actual de la oferta
+     */
+    private function aplicarUnDescuento(OfertaProducto $oferta, string $descuento): OfertaProducto
+    {
+        $ofertaConDescuento = $this->clonarOferta($oferta);
+
+        if (preg_match('/^2a al (\d+) - cupon;/i', $descuento, $m2aCupon)) {
+            $porcentajeDescuento = max(0, min(100, (int) $m2aCupon[1]));
+            $factorPagado = (100 - $porcentajeDescuento) / 100;
+            $precioUnidadOriginal = $oferta->unidades > 0
+                ? $oferta->precio_total / $oferta->unidades
+                : 0;
+            $ofertaConDescuento->unidades = $oferta->unidades * 2;
+            $ofertaConDescuento->precio_total = $oferta->precio_total
+                + ($precioUnidadOriginal * $oferta->unidades * $factorPagado);
+            $ofertaConDescuento->precio_unidad = $ofertaConDescuento->unidades > 0
+                ? $ofertaConDescuento->precio_total / $ofertaConDescuento->unidades
+                : 0;
+
+            return $ofertaConDescuento;
+        }
+
+        if (strpos($descuento, 'cupon;') === 0) {
+            if (strpos($descuento, 'cupon;%') === 0) {
+                $porcentajeCupon = (float) str_replace('cupon;%', '', $descuento);
+                $precioTotalConDescuento = $oferta->precio_total * (1 - $porcentajeCupon / 100);
+            } else {
+                $partes = explode(';', $descuento);
+                $ultimaParte = count($partes) >= 3 ? $partes[count($partes) - 1] : '';
+                if (str_starts_with($ultimaParte, '%')) {
+                    $porcentajeCupon = (float) str_replace('%', '', $ultimaParte);
+                    $precioTotalConDescuento = $oferta->precio_total * (1 - $porcentajeCupon / 100);
+                } else {
+                    $valorCupon = count($partes) === 3
+                        ? (float) $partes[2]
+                        : (float) str_replace('cupon;', '', $descuento);
+                    $precioTotalConDescuento = max(0, $oferta->precio_total - $valorCupon);
+                }
+            }
+
+            $ofertaConDescuento->precio_total = $precioTotalConDescuento;
+            $ofertaConDescuento->precio_unidad = $oferta->unidades > 0
+                ? round($precioTotalConDescuento / $oferta->unidades, 3)
+                : 0;
+
+            return $ofertaConDescuento;
+        }
+
+        if (strpos($descuento, 'CholloTienda1SoloCuponQueAplicaDescuento;') === 0) {
+            $partes = explode(';', $descuento);
+            $valorDescuento = null;
+            $tipoDescuento = 'euros';
+
+            for ($i = 0; $i < count($partes); $i++) {
+                if ($partes[$i] === 'descuento' && isset($partes[$i + 1])) {
+                    $valorDescuento = (float) $partes[$i + 1];
+                }
+                if ($partes[$i] === 'tipo_descuento' && isset($partes[$i + 1])) {
+                    $tipoDescuento = $partes[$i + 1];
+                }
+            }
+
+            if ($valorDescuento !== null && $valorDescuento > 0) {
+                $precioTotalConDescuento = $tipoDescuento === 'porcentaje'
+                    ? $oferta->precio_total * (1 - $valorDescuento / 100)
+                    : max(0, $oferta->precio_total - $valorDescuento);
+
+                $ofertaConDescuento->precio_total = $precioTotalConDescuento;
+                $ofertaConDescuento->precio_unidad = $oferta->unidades > 0
+                    ? round($precioTotalConDescuento / $oferta->unidades, 3)
+                    : 0;
+            }
+
+            return $ofertaConDescuento;
+        }
+
+        if (strpos($descuento, 'CholloTienda;') === 0) {
+            return $oferta;
+        }
+
+        switch ($descuento) {
+            case '3x2':
+                $ofertaConDescuento->unidades = $oferta->unidades * 3;
+                $ofertaConDescuento->precio_total = $oferta->precio_total * 2;
+                $ofertaConDescuento->precio_unidad = ($oferta->precio_total * 2) / ($oferta->unidades * 3);
+                break;
+
+            case '2x1 - SoloCarrefour':
+                $ofertaConDescuento->unidades = $oferta->unidades * 2;
+                $ofertaConDescuento->precio_total = $oferta->precio_total;
+                $ofertaConDescuento->precio_unidad = $oferta->precio_total / ($oferta->unidades * 2);
+                break;
+
+            case '2a al 50 - cheque - SoloCarrefour':
+                $ofertaConDescuento->unidades = $oferta->unidades * 2;
+                $ofertaConDescuento->precio_total = $oferta->precio_total * 1.5;
+                $ofertaConDescuento->precio_unidad = $ofertaConDescuento->precio_total / $ofertaConDescuento->unidades;
+                break;
+
+            case '2a al 70':
+                $precioUnidadOriginal = $oferta->precio_total / $oferta->unidades;
+                $ofertaConDescuento->unidades = $oferta->unidades * 2;
+                $ofertaConDescuento->precio_total = $oferta->precio_total + ($precioUnidadOriginal * $oferta->unidades * 0.30);
+                $ofertaConDescuento->precio_unidad = $ofertaConDescuento->precio_total / $ofertaConDescuento->unidades;
+                break;
+
+            case '2a al 50':
+                $precioUnidadOriginal = $oferta->precio_total / $oferta->unidades;
+                $ofertaConDescuento->unidades = $oferta->unidades * 2;
+                $ofertaConDescuento->precio_total = $oferta->precio_total + ($precioUnidadOriginal * $oferta->unidades * 0.50);
+                $ofertaConDescuento->precio_unidad = $ofertaConDescuento->precio_total / $ofertaConDescuento->unidades;
+                break;
+
+            case self::DESCUENTO_20_PORCIENTO:
+                $precioTotalConDescuento = $oferta->precio_total * 0.80;
+                $ofertaConDescuento->precio_total = $precioTotalConDescuento;
+                $ofertaConDescuento->precio_unidad = $oferta->unidades > 0
+                    ? round($precioTotalConDescuento / $oferta->unidades, 3)
+                    : 0;
+                break;
+
+            case 'cupon':
+            case 'rebaja':
+            case 'promocion':
+            case 'oferta_especial':
+            case '+Juego':
+                break;
+
+            default:
+                Log::warning('DescuentosController - Tipo de descuento desconocido:', [
+                    'oferta_id' => $oferta->id,
+                    'descuento' => $descuento,
+                ]);
+                break;
+        }
+
+        return $ofertaConDescuento;
+    }
+
+    private function clonarOferta(OfertaProducto $oferta): OfertaProducto
+    {
+        $copia = clone $oferta;
+        $copia->tienda_id = $oferta->tienda_id;
+        $copia->descuentos = $oferta->descuentos;
+
+        if ($oferta->relationLoaded('tienda') && $oferta->tienda) {
+            $copia->setRelation('tienda', $oferta->tienda);
+        }
+
+        return $copia;
+    }
+
+    /**
      * Aplica descuentos a una colección de ofertas y las ordena por precio_unidad
-     * 
+     *
      * @param \Illuminate\Database\Eloquent\Collection $ofertas Colección de ofertas
      * @return \Illuminate\Database\Eloquent\Collection Ofertas con descuentos aplicados y ordenadas
      */
     public function aplicarDescuentosYOrdenar($ofertas)
     {
-        $ofertasConDescuentos = $ofertas->map(function($oferta) {
+        $ofertasConDescuentos = $ofertas->map(function ($oferta) {
             return $this->aplicarDescuento($oferta);
         });
 
-        // Ordenar por precio_unidad (menor a mayor)
         return $ofertasConDescuentos->sortBy('precio_unidad')->values();
     }
 
     /**
      * Obtiene el precio por unidad más bajo de una colección de ofertas después de aplicar descuentos
-     * 
+     *
      * @param \Illuminate\Database\Eloquent\Collection $ofertas Colección de ofertas
      * @return float|null Precio por unidad más bajo
      */
@@ -247,9 +338,7 @@ class DescuentosController extends Controller
         }
 
         $ofertasConDescuentos = $this->aplicarDescuentosYOrdenar($ofertas);
-        
+
         return $ofertasConDescuentos->first()->precio_unidad ?? null;
     }
-
 }
-

@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Artisan;
 use App\Http\Controllers\ProductoController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\OfertaProductoController;
+use App\Http\Controllers\ImportarOfertasCholloController;
 use App\Http\Controllers\BuscadorController;
 use App\Http\Controllers\TiendaController;
 use App\Http\Controllers\CategoriaController;
@@ -183,6 +184,7 @@ Route::middleware(['auth', 'verified'])->prefix('admin/scraping')->name('admin.s
     Route::get('/test', [App\Http\Controllers\Scraping\TestController::class, 'index'])->name('test');
     Route::get('/test-precio', [App\Http\Controllers\Scraping\TestPrecioController::class, 'index'])->name('test.precio');
     Route::get('/diagnostico', [App\Http\Controllers\Scraping\DiagnosticoController::class, 'index'])->name('diagnostico');
+    Route::get('/diagnostico/resumen-tiendas', [App\Http\Controllers\Scraping\DiagnosticoController::class, 'resumenTiendas'])->name('diagnostico.resumen-tiendas');
     
     // Rutas para Verificar URLs
     Route::get('/verificar-urls', [App\Http\Controllers\Scraping\VerificarUrlsController::class, 'index'])->name('verificar-urls');
@@ -333,7 +335,7 @@ Route::prefix('admin')->group(function () {
         ]);
     })->name('admin.cron.avisos-generar-correo-precio');
 
-    // Cron neo objetivos: neoobjetivo con visitada > 7 días y URL de rama Neo → petición a VPS sacar-ofertas-idea
+    // Cron neo objetivos: neoobjetivo con visitada > DIAS_SIN_REVISAR días y URL de rama Neo → petición a VPS sacar-ofertas-idea
     Route::get('cron-neo-objetivos', function (Request $request) {
         if ($request->get('token') !== env('TOKEN_ACTUALIZAR_PRECIOS')) {
             abort(403, 'Token inválido');
@@ -360,6 +362,8 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
     // Antes del resource: productos/{producto} capturaría "buscar-amazon" como ID
     Route::get('productos/buscar-amazon', [\App\Http\Controllers\Crons\CronBuscarProductosAmazonController::class, 'buscarAmazon'])->name('productos.buscar-amazon');
     Route::post('productos/buscar-amazon', [\App\Http\Controllers\Crons\CronBuscarProductosAmazonController::class, 'buscarAmazonApi'])->name('productos.buscar-amazon.api');
+    Route::post('productos/buscar-amazon/cron', [\App\Http\Controllers\Crons\CronBuscarProductosAmazonController::class, 'ejecutarCronPanel'])
+        ->name('productos.buscar-amazon.cron.panel');
 
     Route::resource('productos', ProductoController::class)->except(['destroy']); // destroy comentado por seguridad
     Route::resource('chollos', CholloController::class)->except(['show', 'destroy']); // destroy comentado por seguridad
@@ -559,7 +563,7 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
             ->where('nombre', $nombreEjecucion)
             ->whereDate('inicio', $fechaSeleccionada->toDateString())
             ->orderByDesc('id')
-            ->get(['id', 'inicio', 'fin', 'total', 'total_guardado', 'total_errores']);
+            ->get(['id', 'inicio', 'fin', 'total', 'total_guardado', 'total_errores', 'log']);
 
         return view('admin.crons.cron_descarga_csv_tiendas_resultado', [
             'ejecucion_id' => $ejecucion?->id,
@@ -572,6 +576,11 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
             'fechasConEjecuciones' => $fechasConEjecuciones,
         ]);
     })->name('ejecuciones.descarga-csv-tiendas');
+
+    Route::delete(
+        'ejecuciones/descarga-csv-tiendas/{ejecucion}',
+        [\App\Http\Controllers\Crons\CronDescargaCSVTiendasController::class, 'cancelarEjecucion']
+    )->name('ejecuciones.descarga-csv-tiendas.cancelar');
 
     // Ejecuciones: cron buscar productos Amazon
     Route::get('ejecuciones/buscar-amazon-productos', [\App\Http\Controllers\Crons\CronBuscarProductosAmazonController::class, 'vistaHistorialEjecucionesBuscarAmazon'])
@@ -600,8 +609,12 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
     Route::get('neo/crear-masivo/urls-por-tienda-categoria/{tiendaId}/{categoriaId}', [NeoController::class, 'urlsPorTiendaCategoria'])->name('neo.crear-masivo.urls-por-tienda-categoria');
     Route::post('neo/crear-masivo/descartar-url', [NeoController::class, 'descartarUrlCrearMasivo'])->name('neo.crear-masivo.descartar-url');
     Route::post('neo/crear-masivo/actualizar-categoria-url', [NeoController::class, 'actualizarCategoriaUrlCrearMasivo'])->name('neo.crear-masivo.actualizar-categoria-url');
+    Route::get('neo/crear-masivo/buscar-csv-ofertas', [OfertaProductoController::class, 'buscarCsvOfertasCrearMasivo'])->name('neo.crear-masivo.buscar-csv-ofertas');
     Route::get('neo/productos-sin-neo', [NeoController::class, 'productosSinNeo'])->name('neo.productos-sin-neo');
     Route::post('neo/guardar-neoobjetivo', [NeoController::class, 'guardarNeoobjetivo'])->name('neo.guardar-neoobjetivo');
+    Route::get('neo/anadir', [NeoController::class, 'anadirForm'])->name('neo.anadir');
+    Route::post('neo/anadir/analizar', [NeoController::class, 'anadirAnalizar'])->name('neo.anadir.analizar');
+    Route::post('neo/anadir/guardar', [NeoController::class, 'anadirGuardar'])->name('neo.anadir.guardar');
     Route::get('neo/eliminar-por-urls', [NeoController::class, 'eliminarNeoPorUrlsForm'])->name('neo.eliminar-por-urls');
     Route::post('neo/eliminar-por-urls/comprobar', [NeoController::class, 'eliminarNeoPorUrlsComprobar'])->name('neo.eliminar-por-urls.comprobar');
     Route::post('neo/eliminar-por-urls/ejecutar', [NeoController::class, 'eliminarNeoPorUrlsEjecutar'])->name('neo.eliminar-por-urls.ejecutar');
@@ -633,6 +646,11 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
 
     // Ruta para ver todas las ofertas (sin producto asociado)
     Route::get('ofertas', [OfertaProductoController::class, 'todas'])->name('ofertas.todas');
+
+    // Importación temporal desde chollopañales
+    Route::get('ofertas/importar-chollo', [ImportarOfertasCholloController::class, 'index'])->name('ofertas.importar-chollo');
+    Route::post('ofertas/importar-chollo/analizar', [ImportarOfertasCholloController::class, 'analizar'])->name('ofertas.importar-chollo.analizar');
+    Route::post('ofertas/importar-chollo/importar', [ImportarOfertasCholloController::class, 'importar'])->name('ofertas.importar-chollo.importar');
 
     // Filas importadas desde feeds CSV-Awin (tabla csv_ofertas)
     Route::get('ofertas/todas-csv', [OfertaProductoController::class, 'csvOfertas'])->name('ofertas.todas_csv');
@@ -693,6 +711,11 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
     Route::post('tiendas', [TiendaController::class, 'store'])->name('tiendas.store');
 
     Route::put('tiendas/{tienda}', [TiendaController::class, 'update'])->name('tiendas.update');
+    Route::post('tiendas/{tienda}/categoria-scraping/campo', [TiendaController::class, 'actualizarCampoScrapingCategoria'])->name('tiendas.categoria-scraping.campo');
+    Route::post('tiendas/{tienda}/api-productos', [TiendaController::class, 'actualizarApiProductos'])->name('tiendas.api-productos');
+    Route::post('tiendas/{tienda}/categoria-url', [TiendaController::class, 'actualizarUrlCategoriaTienda'])->name('tiendas.categoria-url');
+    Route::post('tiendas/{tienda}/buscar-productos-categoria/preparar', [\App\Http\Controllers\Scraping\BuscarProductosCategoriasTiendasScrapingController::class, 'preparar'])->name('tiendas.buscar-productos-categoria.preparar');
+    Route::post('tiendas/{tienda}/buscar-productos-categoria/procesar-pagina', [\App\Http\Controllers\Scraping\BuscarProductosCategoriasTiendasScrapingController::class, 'procesarPagina'])->name('tiendas.buscar-productos-categoria.procesar-pagina');
 
     // Route::delete('tiendas/{tienda}', [TiendaController::class, 'destroy'])->name('tiendas.destroy'); // COMENTADO POR SEGURIDAD
 
@@ -810,11 +833,12 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
     Route::put('productos/categoria/{categoria}/especificaciones-internas', [ProductoController::class, 'actualizarEspecificacionesInternasCategoria'])->name('admin.productos.categoria.especificaciones-internas.actualizar');
     Route::get('productos/categoria/{categoria}/palabras-clave-relacionadas', [ProductoController::class, 'obtenerPalabrasClaveRelacionadas'])->name('admin.productos.categoria.palabras-clave-relacionadas');
     Route::get('productos/categoria/{categoria}/palabra-clave/{palabraClave}/productos', [ProductoController::class, 'obtenerProductosPorPalabraClave'])->name('admin.productos.categoria.palabra-clave.productos');
-    Route::get('productos/{producto}', [ProductoController::class, 'obtenerProducto'])->name('admin.productos.obtener');
+    Route::get('productos/{producto}', [ProductoController::class, 'obtenerProducto'])->name('productos.obtener');
     Route::post('productos/{producto}/grupos-ofertas/actualizar', [ProductoController::class, 'actualizarGruposOfertas'])->name('admin.productos.grupos-ofertas.actualizar');
     
     // Obtener ofertas de un producto para gestión de grupos
-    Route::get('ofertas/producto/{productoId}', [OfertaProductoController::class, 'obtenerOfertasPorProducto'])->name('admin.ofertas.por-producto');
+    Route::get('ofertas/producto/{productoId}', [OfertaProductoController::class, 'obtenerOfertasPorProducto'])->name('ofertas.por-producto');
+    Route::get('ofertas/producto/{productoId}/textos-cantidad-alternativo', [OfertaProductoController::class, 'textosCantidadAlternativoProducto'])->name('ofertas.textos-cantidad-alternativo');
 
     //Historico de ofertas
 

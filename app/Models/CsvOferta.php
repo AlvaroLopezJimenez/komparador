@@ -12,9 +12,16 @@ class CsvOferta extends Model
         'tienda_id',
         'url',
         'url_lookup',
+        'nombre',
+        'ean',
+        'isbn',
+        'upc',
+        'mpn',
+        'gtin',
         'precio',
         'envio',
         'stock',
+        'aniadida_neo',
     ];
 
     protected $casts = [

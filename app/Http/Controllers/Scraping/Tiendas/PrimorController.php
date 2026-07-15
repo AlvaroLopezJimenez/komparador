@@ -85,6 +85,11 @@ class PrimorController extends PlantillaTiendaController
             }
         }
 
+        // DETECCIÓN DE DESCUENTOS ESPECIALES (ej. 2ª unidad al 50%) EN PRIMOR
+        if ($oferta && $oferta instanceof OfertaProducto) {
+            $this->detectarYGuardarDescuentosPrimor($html, $oferta);
+        }
+
         // 0) PRIMERA OPCIÓN: Buscar "initialFinalPrice: " (con espacio) en el HTML
         $precioDesdeInitialFinalPrice = $this->precioDesdeInitialFinalPrice($html);
         if ($precioDesdeInitialFinalPrice !== null) {
@@ -144,6 +149,79 @@ class PrimorController extends PlantillaTiendaController
             'success' => false,
             'error'   => 'No se pudo encontrar el precio en la página de Primor'
         ]);
+    }
+
+    /**
+     * Detecta y guarda descuentos especiales de Primor sin modificar el precio.
+     * Actualmente sólo contempla la 2ª unidad al 50%.
+     */
+    private function detectarYGuardarDescuentosPrimor(string $html, $oferta): void
+    {
+        if (!$oferta || !($oferta instanceof OfertaProducto)) {
+            return;
+        }
+
+        $descuentoAnterior = $oferta->descuentos;
+        $descuentoNuevo = null;
+
+        if ($this->detectarOferta2a50Primor($html)) {
+            $descuentoNuevo = '2a al 50';
+        }
+
+        if ($descuentoNuevo !== null) {
+            $oferta->update(['descuentos' => $descuentoNuevo]);
+
+            if ($descuentoAnterior !== $descuentoNuevo) {
+                DB::table('avisos')->insertGetId([
+                    'texto_aviso'     => 'PRIMOR - Descuento 2ª unidad detectado',
+                    'fecha_aviso'     => now(),
+                    'user_id'         => 1,
+                    'avisoable_type'  => \App\Models\OfertaProducto::class,
+                    'avisoable_id'    => $oferta->id,
+                    'oculto'          => 0,
+                    'created_at'      => now(),
+                    'updated_at'      => now(),
+                ]);
+            }
+        } else {
+            // Si no se detecta descuento pero la oferta tenía descuento de Primor, limpiar el campo (Sin descuento)
+            if ($descuentoAnterior === '2a al 50') {
+                $oferta->update(['descuentos' => null]);
+            }
+        }
+    }
+
+    /**
+     * Detecta si en el bloque de labels del producto principal existe una oferta "2ª -50%".
+     * Ignora los bloques de productos relacionados/listados.
+     */
+    private function detectarOferta2a50Primor(string $html): bool
+    {
+        $bloque = $this->extraerBloqueLabelsPdpPrimor($html);
+        if ($bloque === null) {
+            return false;
+        }
+
+        // Buscar texto tipo "2ª -50%" (admite espacios opcionales)
+        return (bool) preg_match('/2ª\s*-\s*50%?/iu', $bloque);
+    }
+
+    /**
+     * Extrae el bloque HTML de labels especiales correspondiente a la PDP principal de Primor.
+     * Se basa en el contenedor Alpine x-data="productSpecialLabels()" y en productLabels[productId].
+     */
+    private function extraerBloqueLabelsPdpPrimor(string $html): ?string
+    {
+        $patron = '~<div[^>]+x-data=["\']productSpecialLabels\(\)["\'][^>]*>\s*'
+                . '<div[^>]+class=["\'][^"\']*product-special-labels[^"\']*["\'][^>]*'
+                . 'x-html=["\']productLabels\[productId\]\s*\|\|\s*\'\'["\'][^>]*>'
+                . '([\s\S]*?)</div>\s*</div>~i';
+
+        if (preg_match($patron, $html, $m)) {
+            return $m[1];
+        }
+
+        return null;
     }
 
     /**

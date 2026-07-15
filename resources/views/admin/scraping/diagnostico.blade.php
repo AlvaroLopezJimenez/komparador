@@ -14,8 +14,8 @@
             $hayRecomendaciones = $ofertasElegibles->count() === 0
                 || count($controladoresTiendas) === 0
                 || count($limitacionesAPI['tiendas_sin_api']) > 0
-                || !empty($tiendasScrapingSuperaMostrar)
                 || $tiendasMostrandoSinScraping->isNotEmpty()
+                || !empty($tiendasBrightDataFrecuenciaMenor24h)
                 || $ofertasMostrar === 0;
         @endphp
 
@@ -49,26 +49,6 @@
                     </div>
                 @endif
 
-                @if(!empty($tiendasScrapingSuperaMostrar))
-                    <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-4">
-                        <h4 class="font-semibold text-red-800 dark:text-red-200">❌ Categorías scrapeando por encima de las que se muestran</h4>
-                        <p class="text-red-700 dark:text-red-300 text-sm mt-1">
-                            Estas tiendas tienen más categorías con ofertas en scraping que en mostrar. Revisa la configuración por categoría en el formulario de cada tienda.
-                        </p>
-                        <ul class="mt-2 text-sm text-red-800 dark:text-red-200 space-y-1 max-h-40 overflow-y-auto">
-                            @foreach($tiendasScrapingSuperaMostrar as $aviso)
-                                <li>
-                                    <a href="{{ route('admin.tiendas.edit', $aviso['tienda']) }}"
-                                        class="font-medium underline hover:text-red-600 dark:hover:text-red-300">
-                                        {{ $aviso['tienda']->nombre }}
-                                    </a>
-                                    <span> — cat.mos {{ $aviso['cat_mos']['si'] }}/{{ $aviso['cat_mos']['total'] }}, cat.scraping {{ $aviso['cat_scraping']['si'] }}/{{ $aviso['cat_scraping']['total'] }}</span>
-                                </li>
-                            @endforeach
-                        </ul>
-                    </div>
-                @endif
-
                 @if($tiendasMostrandoSinScraping->isNotEmpty())
                     <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-4">
                         <h4 class="font-semibold text-red-800 dark:text-red-200">❌ Tiendas visibles sin scraping activo</h4>
@@ -90,6 +70,28 @@
                     </div>
                 @endif
 
+                @if(!empty($tiendasBrightDataFrecuenciaMenor24h))
+                    <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg p-4">
+                        <h4 class="font-semibold text-amber-800 dark:text-amber-200">⚠️ BrightData con frecuencia por debajo de 24 horas</h4>
+                        <p class="text-amber-700 dark:text-amber-300 text-sm mt-1">
+                            Estas tiendas usan BrightData y tienen más peticiones al día que ofertas activas (ofertas &lt; pet./día), lo que indica un umbral medio de actualización inferior a 24 horas. Revisa las frecuencias en el formulario de cada tienda.
+                        </p>
+                        <ul class="mt-2 text-sm text-amber-800 dark:text-amber-200 space-y-1 max-h-40 overflow-y-auto">
+                            @foreach($tiendasBrightDataFrecuenciaMenor24h as $aviso)
+                                <li>
+                                    <a href="{{ route('admin.tiendas.edit', $aviso['tienda']) }}"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="font-medium underline hover:text-amber-700 dark:hover:text-amber-300">
+                                        {{ $aviso['tienda']->nombre }}
+                                    </a>
+                                    <span> — {{ $aviso['api'] }}, ofertas {{ $aviso['ofertas_activas'] }}, pet./día {{ number_format($aviso['peticiones_por_dia'], 1) }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+
                 @if($ofertasMostrar == 0)
                     <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-4">
                         <h4 class="font-semibold text-red-800 dark:text-red-200">❌ No hay ofertas activas</h4>
@@ -101,6 +103,11 @@
             </div>
         </div>
         @endif
+
+        <div id="recomendacionesResumenCategorias" class="hidden mb-8 bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+            <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-4">💡 Recomendaciones (categorías)</h3>
+            <div id="avisosResumenCategoriasFuera" class="space-y-4"></div>
+        </div>
 
         <!-- Estadísticas Generales -->
         <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 border border-gray-200 dark:border-gray-700">
@@ -205,6 +212,12 @@
                     $apiColorMap[$apiBase] = $paletaApi[$i % count($paletaApi)];
                     $i++;
                 }
+
+                $apiColorMapJson = [];
+                foreach ($apiColorMap as $base => $color) {
+                    $apiColorMapJson[$base] = ['icon_bg' => $color['icon_bg']];
+                }
+                $apiColorMapJson['__defecto__'] = ['icon_bg' => $colorDefecto['icon_bg']];
             @endphp
             
             @if(count($porApiAgrupada) > 0)
@@ -265,6 +278,9 @@
                         📊 Desglose por Tienda ({{ $ejecucionesPorDia['total_ofertas_activas'] }} ofertas activas)
                         <span id="desgloseTiendasVisibles" class="text-sm font-normal text-gray-500 dark:text-gray-400"></span>
                     </h5>
+                    <p id="resumenCategoriasProgreso" class="text-xs text-gray-500 dark:text-gray-400 sm:text-right">
+                        Categorías: calculando… 0/{{ $totalTiendasResumen }}
+                    </p>
                     <div class="flex flex-row gap-2 items-center">
                         <button type="button" id="toggleFiltrosDesglose"
                             class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 inline-flex items-center gap-2">
@@ -378,34 +394,27 @@
                         <tbody id="desgloseTiendasBody" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                             @foreach($limitacionesAPI['por_tienda'] as $tienda => $datos)
                                 @php
-                                    $apiTienda = $datos['api'] ?? null;
+                                    $tiendaModel = $tiendasPorNombre->get($tienda);
+                                    $apiTienda = $tiendaModel?->api;
                                     $apiBase = $apiTienda ? explode(';', $apiTienda, 2)[0] : null;
-                                    $resumen = $resumenScrapingPorTienda[$tienda] ?? [
-                                        'cat_mos' => ['si' => 0, 'total' => 0],
-                                        'cat_scraping' => ['si' => 0, 'total' => 0],
-                                        'cat_api' => [],
-                                        'cat_sin_api' => 0,
-                                    ];
 
-                                    // Color según el grupo base
                                     if ($apiBase && isset($apiColorMap[$apiBase])) {
                                         $colorApi = $apiColorMap[$apiBase];
                                     } else {
                                         $colorApi = $colorDefecto;
                                     }
-                                    // Controlador disponible
                                     $controladorExiste = false;
                                     if (isset($ejecucionesPorDia['por_tienda'][$tienda])) {
                                         $controladorExiste = $ejecucionesPorDia['por_tienda'][$tienda]['controlador_existe'];
                                     }
                                     
-                                    // % del total
                                     $porcentaje = $ejecucionesPorDia['total_ejecuciones_por_dia'] > 0 
                                         ? ($datos['peticiones_por_dia'] / $ejecucionesPorDia['total_ejecuciones_por_dia']) * 100 
                                         : 0;
                                 @endphp
                                 <tr class="fila-desglose-tienda"
                                     data-orden-original="{{ $loop->index }}"
+                                    data-tienda-nombre-key="{{ $tienda }}"
                                     data-api-base="{{ $apiBase ?? '' }}"
                                     data-tienda-nombre="{{ strtolower($tienda) }}"
                                     data-sort-tienda="{{ strtolower($tienda) }}"
@@ -417,10 +426,9 @@
                                     data-sort-controlador="{{ $controladorExiste ? 1 : 0 }}"
                                     data-sort-scraping="{{ (isset($datos['scrapear']) && $datos['scrapear'] === 'si') ? 1 : 0 }}"
                                     data-sort-mostrar="{{ (isset($datos['mostrar_tienda']) && $datos['mostrar_tienda'] === 'si') ? 1 : 0 }}"
-                                    data-sort-cat-mos="{{ $resumen['cat_mos']['si'] }}"
-                                    data-sort-cat-scraping="{{ $resumen['cat_scraping']['si'] }}">
+                                    data-sort-cat-mos="0"
+                                    data-sort-cat-scraping="0">
                                     <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
-                                        @php $tiendaModel = $tiendasPorNombre[$tienda] ?? null; @endphp
                                         @if($tiendaModel)
                                             <a href="{{ route('admin.tiendas.edit', $tiendaModel) }}"
                                                 target="_blank"
@@ -474,39 +482,14 @@
                                             <span class="text-red-600 dark:text-red-400 font-semibold">❌</span>
                                         @endif
                                     </td>
-                                    <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 text-center" title="Categorías con ofertas mostrando">
-                                        {{ $resumen['cat_mos']['si'] }}/{{ $resumen['cat_mos']['total'] }}
+                                    <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 text-center celda-cat-mos" title="Categorías con ofertas mostrando">
+                                        <span class="text-gray-400 animate-pulse">…</span>
                                     </td>
-                                    <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 text-center" title="Categorías con ofertas scrapeando">
-                                        {{ $resumen['cat_scraping']['si'] }}/{{ $resumen['cat_scraping']['total'] }}
+                                    <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 text-center celda-cat-scraping" title="Categorías con ofertas scrapeando">
+                                        <span class="text-gray-400 animate-pulse">…</span>
                                     </td>
-                                    <td class="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">
-                                        <div class="flex flex-wrap items-center gap-2">
-                                            @foreach($resumen['cat_api'] as $filaApi)
-                                                @php
-                                                    $icon = $filaApi['icon'];
-                                                    $iconBg = isset($apiColorMap[$filaApi['base']]) ? $apiColorMap[$filaApi['base']]['icon_bg'] : $icon['icon_bg'];
-                                                @endphp
-                                                <span class="inline-flex items-center gap-1" title="{{ $icon['title'] }}">
-                                                    <span class="w-6 h-6 text-xs {{ $iconBg }} rounded-lg flex items-center justify-center text-white font-bold shrink-0">
-                                                        {{ $icon['label'] }}
-                                                    </span>
-                                                    <span class="text-sm font-medium">{{ $filaApi['count'] }}</span>
-                                                </span>
-                                            @endforeach
-                                            @if($resumen['cat_sin_api'] > 0)
-                                                @php $iconSinApi = \App\Services\TiendaScrapingConfigResolver::metaIconoApi(null, true); @endphp
-                                                <span class="inline-flex items-center gap-1" title="{{ $iconSinApi['title'] }}">
-                                                    <span class="w-6 h-6 text-xs {{ $iconSinApi['icon_bg'] }} rounded-lg flex items-center justify-center text-white font-bold shrink-0">
-                                                        {{ $iconSinApi['label'] }}
-                                                    </span>
-                                                    <span class="text-sm font-medium">{{ $resumen['cat_sin_api'] }}</span>
-                                                </span>
-                                            @endif
-                                            @if(empty($resumen['cat_api']) && $resumen['cat_sin_api'] === 0)
-                                                <span class="text-sm text-gray-400">—</span>
-                                            @endif
-                                        </div>
+                                    <td class="px-4 py-2 text-sm text-gray-900 dark:text-gray-100 celda-cat-api">
+                                        <span class="text-gray-400 animate-pulse text-xs">…</span>
                                     </td>
                                 </tr>
                             @endforeach
@@ -698,13 +681,14 @@
                  const textoBusqueda = buscadorTienda ? buscadorTienda.value.trim().toLowerCase() : '';
 
                  const apiBase = fila.dataset.apiBase || '';
+                 const basesCategoria = (fila.dataset.apiBases || '').split(',').filter(Boolean);
                  const nombreTienda = fila.dataset.tiendaNombre || '';
 
                  let coincideApi = true;
                  if (apiSeleccionada === '__sin_configurar__') {
                      coincideApi = apiBase === '';
                  } else if (apiSeleccionada !== '') {
-                     coincideApi = apiBase === apiSeleccionada;
+                     coincideApi = apiBase === apiSeleccionada || basesCategoria.includes(apiSeleccionada);
                  }
 
                  const coincideNombre = textoBusqueda === '' || nombreTienda.includes(textoBusqueda);
@@ -955,6 +939,165 @@
 
              actualizarTextosFiltrosSiNo();
              actualizarDesgloseTiendas();
+
+             window._refrescarDesgloseTrasResumen = function() {
+                 actualizarDesgloseTiendas();
+             };
+         });
+     </script>
+
+     <script>
+         document.addEventListener('DOMContentLoaded', function() {
+             const apiColorMap = @json($apiColorMapJson ?? ['__defecto__' => ['icon_bg' => 'bg-gray-600']]);
+             const resumenUrl = @json(route('admin.scraping.diagnostico.resumen-tiendas'));
+             const totalTiendasResumen = {{ (int) ($totalTiendasResumen ?? 0) }};
+             const resumenProgreso = document.getElementById('resumenCategoriasProgreso');
+             const avisosContainer = document.getElementById('recomendacionesResumenCategorias');
+             const avisosInner = document.getElementById('avisosResumenCategoriasFuera');
+
+             let resumenOffset = 0;
+             let resumenProcesadas = 0;
+             const resumenLimit = 10;
+             const avisosScrapingMap = new Map();
+
+             function iconBgParaBase(base) {
+                 const meta = apiColorMap[base] || apiColorMap.__defecto__ || { icon_bg: 'bg-gray-600' };
+                 return meta.icon_bg || 'bg-gray-600';
+             }
+
+             function escaparHtml(texto) {
+                 return String(texto ?? '')
+                     .replace(/&/g, '&amp;')
+                     .replace(/</g, '&lt;')
+                     .replace(/>/g, '&gt;')
+                     .replace(/"/g, '&quot;');
+             }
+
+             function renderCatApiHtml(resumen) {
+                 const partes = [];
+
+                 (resumen.cat_api || []).forEach(function(filaApi) {
+                     const icon = filaApi.icon || {};
+                     const bg = iconBgParaBase(filaApi.base) || icon.icon_bg || 'bg-gray-600';
+                     partes.push(
+                         '<span class="inline-flex items-center gap-1" title="' + escaparHtml(icon.title || filaApi.base) + '">' +
+                         '<span class="w-6 h-6 text-xs ' + bg + ' rounded-lg flex items-center justify-center text-white font-bold shrink-0">' +
+                         escaparHtml(icon.label || '') +
+                         '</span><span class="text-sm font-medium">' + filaApi.count + '</span></span>'
+                     );
+                 });
+
+                 if (partes.length === 0) {
+                     return '<span class="text-sm text-gray-400">—</span>';
+                 }
+
+                 return '<div class="flex flex-wrap items-center gap-2">' + partes.join('') + '</div>';
+             }
+
+             function actualizarProgresoResumen(procesadas, total) {
+                 if (!resumenProgreso) return;
+                 if (procesadas >= total) {
+                     resumenProgreso.textContent = 'Categorías: listo (' + total + ' tiendas)';
+                     return;
+                 }
+                 resumenProgreso.textContent = 'Categorías: calculando… ' + procesadas + '/' + total;
+             }
+
+             function actualizarFilaResumen(nombreTienda, resumen) {
+                 const fila = document.querySelector('.fila-desglose-tienda[data-tienda-nombre-key="' + CSS.escape(nombreTienda) + '"]');
+                 if (!fila || !resumen) return;
+
+                 fila.dataset.sortCatMos = resumen.cat_mos?.si ?? 0;
+                 fila.dataset.sortCatScraping = resumen.cat_scraping?.si ?? 0;
+                 if (resumen.apis_bases && resumen.apis_bases.length > 0) {
+                     fila.dataset.apiBases = resumen.apis_bases.join(',');
+                 }
+
+                 const celdaMos = fila.querySelector('.celda-cat-mos');
+                 const celdaScraping = fila.querySelector('.celda-cat-scraping');
+                 const celdaApi = fila.querySelector('.celda-cat-api');
+
+                 if (celdaMos) {
+                     celdaMos.textContent = (resumen.cat_mos?.si ?? 0) + '/' + (resumen.cat_mos?.total ?? 0);
+                 }
+                 if (celdaScraping) {
+                     celdaScraping.textContent = (resumen.cat_scraping?.si ?? 0) + '/' + (resumen.cat_scraping?.total ?? 0);
+                 }
+                 if (celdaApi) {
+                     celdaApi.innerHTML = renderCatApiHtml(resumen);
+                 }
+             }
+
+             function renderAvisosScrapingSuperaMostrar() {
+                 if (!avisosContainer || !avisosInner || avisosScrapingMap.size === 0) return;
+
+                 avisosContainer.classList.remove('hidden');
+
+                 let items = '';
+                 avisosScrapingMap.forEach(function(aviso) {
+                     items += '<li><a href="' + escaparHtml(aviso.edit_url) + '" target="_blank" rel="noopener noreferrer" class="font-medium underline hover:text-red-600 dark:hover:text-red-300">' +
+                         escaparHtml(aviso.tienda_nombre) + '</a>' +
+                         ' <span> — cat.mos ' + aviso.cat_mos.si + '/' + aviso.cat_mos.total +
+                         ', cat.scraping ' + aviso.cat_scraping.si + '/' + aviso.cat_scraping.total + '</span></li>';
+                 });
+
+                 avisosInner.innerHTML =
+                     '<div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-4">' +
+                     '<h4 class="font-semibold text-red-800 dark:text-red-200">❌ Categorías scrapeando por encima de las que se muestran</h4>' +
+                     '<p class="text-red-700 dark:text-red-300 text-sm mt-1">Estas tiendas tienen más categorías con ofertas en scraping que en mostrar. Revisa la configuración por categoría en el formulario de cada tienda.</p>' +
+                     '<ul class="mt-2 text-sm text-red-800 dark:text-red-200 space-y-1 max-h-40 overflow-y-auto">' + items + '</ul></div>';
+             }
+
+             function procesarAvisosLote(avisos) {
+                 (avisos || []).forEach(function(aviso) {
+                     avisosScrapingMap.set(aviso.tienda_id, aviso);
+                 });
+                 renderAvisosScrapingSuperaMostrar();
+             }
+
+             async function cargarResumenLote() {
+                 if (totalTiendasResumen === 0) {
+                     actualizarProgresoResumen(0, 0);
+                     return;
+                 }
+
+                 try {
+                     const response = await fetch(resumenUrl + '?offset=' + resumenOffset + '&limit=' + resumenLimit, {
+                         headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                     });
+
+                     if (!response.ok) {
+                         throw new Error('HTTP ' + response.status);
+                     }
+
+                     const data = await response.json();
+
+                     Object.entries(data.resumenes || {}).forEach(function(entry) {
+                         actualizarFilaResumen(entry[0], entry[1]);
+                     });
+
+                     procesarAvisosLote(data.avisos_scraping_supera_mostrar);
+
+                     resumenProcesadas += Object.keys(data.resumenes || {}).length;
+                     resumenOffset = data.next_offset ?? resumenOffset;
+                     actualizarProgresoResumen(resumenProcesadas, data.total ?? totalTiendasResumen);
+
+                     if (typeof window._refrescarDesgloseTrasResumen === 'function') {
+                         window._refrescarDesgloseTrasResumen();
+                     }
+
+                     if (!data.done) {
+                         cargarResumenLote();
+                     }
+                 } catch (error) {
+                     console.error('Error cargando resumen por categorías:', error);
+                     if (resumenProgreso) {
+                         resumenProgreso.textContent = 'Error al calcular categorías. Recarga la página.';
+                     }
+                 }
+             }
+
+             cargarResumenLote();
          });
      </script>
  </x-app-layout>

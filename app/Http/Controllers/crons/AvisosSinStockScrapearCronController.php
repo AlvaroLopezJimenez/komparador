@@ -3,35 +3,45 @@
 namespace App\Http\Controllers\Crons;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Scraping\ScrapingController;
 use App\Models\Aviso;
 use App\Models\EjecucionGlobal;
 use App\Models\OfertaProducto;
 use App\Services\CalcularPrecioUnidad;
-use Carbon\Carbon;
-use Illuminate\Http\Request;
-use App\Http\Controllers\Scraping\ScrapingController;
 use App\Services\CsvAwinOfertaService;
 use App\Services\TiendaScrapingConfigResolver;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
 
 /**
- * Cron que procesa avisos de tipo OfertaProducto (sin stock) vencidos:
- * - Tienda debe tener avisos_sin_stock_scrapear_automatico = 'si'
- * - Intenta obtener precio vía ScrapingController (misma lógica que test-precio)
- * - Si no hay precio: aplaza el aviso según 1a/2a/3a... vez (mismos rangos que AvisoController::aplazar)
- * - Si hay precio: actualiza oferta (precio_total, precio_unidad, mostrar=si), borra el aviso sin stock y crea aviso tipo oferta "Oferta Resucitada"
- * - Si no hay precio: solo se aplaza el aviso (no se crea aviso)
- * - Límite: 50 avisos por ejecución
- * - Solo se procesan avisos cuyo texto contiene "Xa vez" (1a a 9a vez). Sin ese patrón o 10a+ se ignoran.
+ * Cron que procesa avisos vencidos de oferta oculta (sin stock, URL CSV, 404, reacondicionado).
+ * Los avisos de segunda mano se omiten (revisión manual).
+ *
+ * - Usa la API efectiva actual de la oferta (CSV-Awin o scraping).
+ * - Si cambió la API, adapta el texto del aviso (p. ej. CSV 1.5a → Sin stock 2a, o Sin stock 2a → URL CSV 2.1a).
+ * - Solo un aviso de estos motivos por oferta.
+ * - Con precio/stock: actualiza oferta, mostrar=si, elimina aviso y crea «Oferta Resucitada».
+ * - Sin stock/precio: aplaza con el calendario CSV (+0.1 vez, +1 día) o scraping (1a→2a→3a…).
  */
 class AvisosSinStockScrapearCronController extends Controller
 {
     public const NOMBRE_EJECUCION_GLOBAL = 'cron_avisos_sin_stock_scrapear';
 
     private const LIMITE_AVISOS_POR_EJECUCION = 50;
+
     private const RETENCION_EJECUCIONES_DIAS = 30;
 
-    /** A partir de esta vez (ej. 10a vez) el aviso no se toca y queda para revisión manual */
-    private const VEZ_MAXIMA_PROCESAR = 9;
+    private const VEZ_MAXIMA_PROCESAR_SCRAPING = 9;
+
+    private const MOTIVO_SIN_STOCK = 'sin_stock';
+
+    private const MOTIVO_URL_CSV = 'url_csv';
+
+    private const MOTIVO_404 = '404';
+
+    private const MOTIVO_SEGUNDA_MANO = 'segunda_mano';
+
+    private const MOTIVO_REACONDICIONADO = 'reacondicionado';
 
     public function __construct(
         private readonly CsvAwinOfertaService $csvAwinOfertaService,
@@ -40,9 +50,8 @@ class AvisosSinStockScrapearCronController extends Controller
 
     public function __invoke(): int
     {
-        $inicio = now();
         $ejecucion = EjecucionGlobal::create([
-            'inicio'         => $inicio,
+            'inicio'         => now(),
             'fin'            => null,
             'nombre'         => self::NOMBRE_EJECUCION_GLOBAL,
             'total'          => 0,
@@ -71,15 +80,15 @@ class AvisosSinStockScrapearCronController extends Controller
             ]);
 
             $contadores = [
-                'candidatos_en_query'     => $avisos->count(),
-                'omitido_sin_oferta'      => 0,
-                'omitido_segunda_mano'    => 0,
-                'omitido_tienda_flag'     => 0,
-                'omitido_sin_patron_vez'  => 0,
-                'omitido_vez_maxima'      => 0,
-                'elegibles_antes_limite'  => 0,
+                'candidatos_en_query'              => $avisos->count(),
+                'omitido_sin_oferta'               => 0,
+                'omitido_segunda_mano'             => 0,
+                'omitido_tipo_no_gestionable'      => 0,
+                'omitido_tienda_flag'              => 0,
+                'omitido_vez_maxima'               => 0,
+                'elegibles_antes_limite'           => 0,
                 'elegibles_descartados_por_limite' => 0,
-                'procesados'              => 0,
+                'procesados'                       => 0,
             ];
 
             $resultados = [];
@@ -89,37 +98,40 @@ class AvisosSinStockScrapearCronController extends Controller
 
             foreach ($avisos as $aviso) {
                 $oferta = $aviso->avisoable;
-                if (!$oferta || !($oferta instanceof OfertaProducto)) {
+                if (! $oferta || ! ($oferta instanceof OfertaProducto)) {
                     $contadores['omitido_sin_oferta']++;
                     continue;
                 }
+
                 if (stripos((string) $aviso->texto_aviso, 'segunda mano') !== false) {
                     $contadores['omitido_segunda_mano']++;
                     continue;
                 }
+
+                if (! $this->esAvisoGestionableCron((string) $aviso->texto_aviso)) {
+                    $contadores['omitido_tipo_no_gestionable']++;
+                    continue;
+                }
+
                 $tienda = $oferta->tienda;
-                if (!$tienda || $tienda->avisos_sin_stock_scrapear_automatico !== 'si') {
+                if (! $tienda || $tienda->avisos_sin_stock_scrapear_automatico !== 'si') {
                     $contadores['omitido_tienda_flag']++;
                     continue;
                 }
-                if (!preg_match('/(\d+(?:\.\d+)?)\s*(?:a\s*)?vez/i', $aviso->texto_aviso, $m)) {
-                    $contadores['omitido_sin_patron_vez']++;
-                    continue;
-                }
-                $numeroVez = (float) $m[1];
-                $esCsvAwin = $this->esOfertaCsvAwin($oferta);
-                if ($esCsvAwin) {
+
+                $numeroVez = $this->extraerNumeroVez((string) $aviso->texto_aviso);
+                if ($this->esOfertaCsvAwin($oferta)) {
                     if ($numeroVez > CsvAwinOfertaService::VEZ_MAXIMA_PROCESAR) {
                         $contadores['omitido_vez_maxima']++;
                         continue;
                     }
-                } elseif ((int) $numeroVez > self::VEZ_MAXIMA_PROCESAR) {
+                } elseif ((int) $numeroVez > self::VEZ_MAXIMA_PROCESAR_SCRAPING) {
                     $contadores['omitido_vez_maxima']++;
                     continue;
                 }
 
                 $avisosElegibles[] = [
-                    'aviso' => $aviso,
+                    'aviso'  => $aviso,
                     'oferta' => $oferta,
                     'tienda' => $tienda,
                 ];
@@ -141,6 +153,7 @@ class AvisosSinStockScrapearCronController extends Controller
                 /** @var OfertaProducto $oferta */
                 $oferta = $item['oferta'];
                 $tienda = $item['tienda'];
+
                 $ret = $this->procesarAviso($aviso, $oferta);
                 $contadores['procesados']++;
                 if (($ret['accion'] ?? '') === 'precio_aplicado') {
@@ -164,14 +177,15 @@ class AvisosSinStockScrapearCronController extends Controller
             $logBase['resultados'] = $resultados;
 
             $ejecucion->update([
-                'fin'             => now(),
-                'total'           => $contadores['procesados'],
-                'total_guardado'  => $precioAplicados,
-                'total_errores'   => $aplazados,
-                'log'             => $logBase,
+                'fin'            => now(),
+                'total'          => $contadores['procesados'],
+                'total_guardado' => $precioAplicados,
+                'total_errores'  => $aplazados,
+                'log'            => $logBase,
             ]);
 
             $this->eliminarEjecucionesAntiguas();
+
             return 0;
         } catch (\Throwable $e) {
             $this->actualizarEjecucionError($ejecucion, $e);
@@ -181,64 +195,81 @@ class AvisosSinStockScrapearCronController extends Controller
     }
 
     /**
-     * @return array{accion: string, precio?: float, scraping: array<string, mixed>}
+     * @return array<string, mixed>
      */
     private function procesarAviso(Aviso $aviso, OfertaProducto $oferta): array
     {
+        $this->consolidarAvisoUnicoOcultacion($oferta, $aviso);
+        $this->reconciliarAvisoConApiActual($aviso, $oferta);
+        $aviso->refresh();
+
         if ($this->esOfertaCsvAwin($oferta)) {
             return $this->procesarAvisoCsvAwin($aviso, $oferta);
         }
 
+        return $this->procesarAvisoScraping($aviso, $oferta);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function procesarAvisoScraping(Aviso $aviso, OfertaProducto $oferta): array
+    {
         $urlOferta = trim((string) $oferta->url);
         if ($urlOferta === '') {
-            // Sin URL v2 no se puede scrapear; se aplaza el aviso.
-            $this->aplazarAvisoSinStock($aviso);
+            $this->aplazarAvisoSegunTipo($aviso);
+
             return [
-                'accion' => 'aplazado',
+                'accion'   => 'aplazado',
                 'scraping' => [
                     'success' => false,
-                    'error' => 'Oferta sin url v2 descifrada (url_cipher/url_lookup).',
+                    'error'   => 'Oferta sin url v2 descifrada (url_cipher/url_lookup).',
                 ],
             ];
         }
 
         $scrapingController = new ScrapingController();
         $request = new Request([
-            'url' => $urlOferta,
-            'tienda' => $oferta->tienda->nombre,
-            'variante' => $oferta->variante ?? null,
+            'url'         => $urlOferta,
+            'tienda'      => $oferta->tienda->nombre,
+            'variante'    => $oferta->variante ?? null,
+            'producto_id' => $oferta->producto_id,
         ]);
 
-        // No pasar $oferta para que los controladores de tienda NO creen un aviso "Sin stock 1a vez"
-        // cuando no encuentren precio; nosotros actualizamos el aviso existente (2a→3a vez, etc.)
+        // Sin $oferta: no crear avisos nuevos en el scraper; gestionamos el existente.
         $response = $scrapingController->obtenerPrecio($request, null);
         $data = $response->getData(true);
-
         $scrapingResumen = $this->resumirRespuestaScraping(is_array($data) ? $data : []);
 
-        $success = !empty($data['success']) && isset($data['precio']) && is_numeric($data['precio']);
+        $success = ! empty($data['success']) && isset($data['precio']) && is_numeric($data['precio']);
         $precioNuevo = $success ? (float) str_replace(',', '.', (string) $data['precio']) : null;
 
         if ($success && $precioNuevo !== null) {
             $this->aplicarPrecioYOfertaVisible($aviso, $oferta, $precioNuevo);
+
             return ['accion' => 'precio_aplicado', 'precio' => $precioNuevo, 'scraping' => $scrapingResumen];
         }
-        $this->aplazarAvisoSinStock($aviso);
+
+        $oferta->update(['mostrar' => 'no']);
+        $this->aplazarAvisoSegunTipo($aviso);
+
         return ['accion' => 'aplazado', 'scraping' => $scrapingResumen];
     }
 
     /**
-     * @return array{accion: string, precio?: float, csv: array<string, mixed>}
+     * @return array<string, mixed>
      */
     private function procesarAvisoCsvAwin(Aviso $aviso, OfertaProducto $oferta): array
     {
         $oferta->loadMissing('tienda');
         $fila = $this->csvAwinOfertaService->buscarFilaPorOferta($oferta);
+        $textoAviso = (string) $aviso->texto_aviso;
+        $esAvisoUrlNoEncontrada = $this->csvAwinOfertaService->esAvisoUrlCsvNoEncontrada($textoAviso);
 
         $csvResumen = [
             'encontrado' => $fila !== null,
-            'stock' => $fila?->stock,
-            'precio' => $fila?->precio,
+            'stock'      => $fila?->stock,
+            'precio'     => $fila?->precio,
         ];
 
         if (
@@ -253,15 +284,32 @@ class AvisosSinStockScrapearCronController extends Controller
             return [
                 'accion' => 'precio_aplicado',
                 'precio' => $precioNuevo,
-                'csv' => $csvResumen,
+                'csv'    => $csvResumen,
             ];
         }
 
-        $this->aplazarAvisoSinStockCsvAwin($aviso);
+        if (
+            $fila !== null
+            && $this->csvAwinOfertaService->tieneSinStock($fila)
+            && $esAvisoUrlNoEncontrada
+        ) {
+            $this->csvAwinOfertaService->convertirAvisoUrlCsvASinStock($aviso, $oferta);
+
+            return [
+                'accion' => 'convertido_sin_stock',
+                'csv'    => $csvResumen,
+            ];
+        }
+
+        if ($fila !== null && $this->csvAwinOfertaService->tieneSinStock($fila)) {
+            $oferta->update(['mostrar' => 'no']);
+        }
+
+        $this->aplazarAvisoSegunTipo($aviso);
 
         return [
             'accion' => 'aplazado',
-            'csv' => $csvResumen,
+            'csv'    => $csvResumen,
         ];
     }
 
@@ -271,13 +319,201 @@ class AvisosSinStockScrapearCronController extends Controller
             === TiendaScrapingConfigResolver::API_CSV_AWIN;
     }
 
-    private function aplazarAvisoSinStockCsvAwin(Aviso $aviso): void
+    private function esAvisoGestionableCron(string $textoAviso): bool
     {
-        $calc = $this->csvAwinOfertaService->calcularSiguienteAplazamientoSinStock($aviso);
+        if (stripos($textoAviso, 'segunda mano') !== false) {
+            return false;
+        }
+
+        if ($this->detectarMotivoAviso($textoAviso) === null) {
+            return false;
+        }
+
+        return (bool) preg_match('/(\d+(?:\.\d+)?)\s*(?:a\s*)?vez/i', $textoAviso);
+    }
+
+    private function detectarMotivoAviso(string $textoAviso): ?string
+    {
+        $texto = mb_strtolower($textoAviso);
+
+        if (str_contains($texto, mb_strtolower(CsvAwinOfertaService::PREFIJO_AVISO_URL_CSV_NO_ENCONTRADA))) {
+            return self::MOTIVO_URL_CSV;
+        }
+
+        if (preg_match('/404/u', $textoAviso) === 1) {
+            return self::MOTIVO_404;
+        }
+
+        if (str_contains($texto, 'segunda mano')) {
+            return self::MOTIVO_SEGUNDA_MANO;
+        }
+
+        if (str_contains($texto, 'reacondicionado')) {
+            return self::MOTIVO_REACONDICIONADO;
+        }
+
+        if (str_contains($texto, 'sin stock')) {
+            return self::MOTIVO_SIN_STOCK;
+        }
+
+        return null;
+    }
+
+    private function extraerNumeroVez(string $textoAviso): float
+    {
+        if (preg_match('/(\d+(?:\.\d+)?)\s*(?:a\s*)?vez/i', $textoAviso, $matches)) {
+            return (float) $matches[1];
+        }
+
+        return 0.0;
+    }
+
+    /**
+     * Adapta el texto del aviso a la API efectiva actual (CSV ↔ scraping).
+     */
+    private function reconciliarAvisoConApiActual(Aviso $aviso, OfertaProducto $oferta): void
+    {
+        $texto = (string) $aviso->texto_aviso;
+        $motivo = $this->detectarMotivoAviso($texto);
+        if ($motivo === null) {
+            return;
+        }
+
+        $vez = $this->extraerNumeroVez($texto);
+        $apiEsCsv = $this->esOfertaCsvAwin($oferta);
+        $nuevoTexto = null;
+
+        if ($apiEsCsv) {
+            if ($motivo === self::MOTIVO_URL_CSV) {
+                return;
+            }
+
+            if ($motivo === self::MOTIVO_SIN_STOCK && $this->esTextoSinStockCsv($texto)) {
+                return;
+            }
+
+            $vezCsv = $this->convertirVezScrapingACsv($vez);
+            if ($motivo === self::MOTIVO_SIN_STOCK) {
+                $nuevoTexto = $this->textoSinStockCsv($vezCsv);
+            } else {
+                $nuevoTexto = $this->textoUrlCsv($vezCsv);
+            }
+        } else {
+            if ($motivo === self::MOTIVO_URL_CSV || $this->esTextoSinStockCsv($texto)) {
+                $vezEntera = $this->convertirVezCsvAScraping($vez);
+                $nuevoTexto = $this->textoSinStockScraping($vezEntera);
+            } elseif (in_array($motivo, [self::MOTIVO_SIN_STOCK, self::MOTIVO_404, self::MOTIVO_SEGUNDA_MANO, self::MOTIVO_REACONDICIONADO], true)) {
+                $nuevoTexto = $this->textoScrapingPorMotivo($motivo, max(1, (int) round($vez)), $texto);
+            }
+        }
+
+        if ($nuevoTexto !== null && $nuevoTexto !== $texto) {
+            $aviso->update(['texto_aviso' => $nuevoTexto]);
+        }
+    }
+
+    /** Solo un aviso de ocultación (sin stock, CSV, 404, etc.) por oferta. */
+    private function consolidarAvisoUnicoOcultacion(OfertaProducto $oferta, Aviso $avisoMantener): void
+    {
+        Aviso::query()
+            ->where('avisoable_type', OfertaProducto::class)
+            ->where('avisoable_id', $oferta->id)
+            ->where('id', '!=', $avisoMantener->id)
+            ->get()
+            ->each(function (Aviso $otro) {
+                if ($this->esAvisoGestionableCron((string) $otro->texto_aviso)) {
+                    $otro->delete();
+                }
+            });
+    }
+
+    private function convertirVezCsvAScraping(float $vezCsv): int
+    {
+        return max(1, (int) ceil($vezCsv));
+    }
+
+    private function convertirVezScrapingACsv(float $vezScraping): float
+    {
+        $base = $vezScraping <= 0 ? 1.0 : $vezScraping;
+
+        return round($base + CsvAwinOfertaService::INCREMENTO_VEZ_SIN_STOCK, 1);
+    }
+
+    private function textoUrlCsv(float $vez): string
+    {
+        return 'No encontrada URL CSV ' . $this->formatearNumeroVez($vez) . 'a vez - Generado automaticamente';
+    }
+
+    private function textoSinStockCsv(float $vez): string
+    {
+        return 'Sin stock ' . $this->formatearNumeroVez($vez) . 'a vez - Generado automaticamente';
+    }
+
+    private function textoSinStockScraping(int $vez): string
+    {
+        return 'Sin stock ' . $vez . 'a vez - Generado automaticamente';
+    }
+
+    private function textoScrapingPorMotivo(string $motivo, int $vez, string $textoOriginal): string
+    {
+        $texto = match ($motivo) {
+            self::MOTIVO_404 => '404 - ' . $vez . 'a vez',
+            self::MOTIVO_SEGUNDA_MANO => 'Segunda mano ' . $vez . 'a vez',
+            self::MOTIVO_REACONDICIONADO => 'Reacondicionado ' . $vez . 'a vez - Generado automaticamente',
+            default => $this->textoSinStockScraping($vez),
+        };
+
+        if (
+            (str_contains($textoOriginal, 'Generado automaticamente') || str_contains($textoOriginal, 'GENERADO'))
+            && ! str_contains($texto, 'Generado')
+            && ! str_contains($texto, 'GENERADO')
+        ) {
+            return $texto . (str_contains(mb_strtoupper($textoOriginal), 'GENERADO AUTOMATICAMENTE')
+                ? ' - GENERADO AUTOMATICAMENTE'
+                : ' - Generado automaticamente');
+        }
+
+        return $texto;
+    }
+
+    private function esTextoSinStockCsv(string $textoAviso): bool
+    {
+        if (! str_contains(mb_strtolower($textoAviso), 'sin stock')) {
+            return false;
+        }
+
+        return fmod($this->extraerNumeroVez($textoAviso), 1.0) !== 0.0;
+    }
+
+    private function usaAplazamientoCsv(string $textoAviso): bool
+    {
+        $motivo = $this->detectarMotivoAviso($textoAviso);
+
+        return $motivo === self::MOTIVO_URL_CSV
+            || ($motivo === self::MOTIVO_SIN_STOCK && $this->esTextoSinStockCsv($textoAviso));
+    }
+
+    private function aplazarAvisoSegunTipo(Aviso $aviso): void
+    {
+        if ($this->usaAplazamientoCsv((string) $aviso->texto_aviso)) {
+            $calc = $this->csvAwinOfertaService->calcularSiguienteAplazamientoSinStock($aviso);
+        } else {
+            $calc = $this->calcularSiguienteAplazamientoScraping($aviso);
+        }
+
         $aviso->update([
             'texto_aviso' => $calc['nuevo_texto'],
             'fecha_aviso' => $calc['nueva_fecha'],
         ]);
+    }
+
+    private function formatearNumeroVez(float $numero): string
+    {
+        if (fmod($numero, 1.0) === 0.0) {
+            return (string) (int) $numero;
+        }
+
+        return rtrim(rtrim(number_format($numero, 1, '.', ''), '0'), '.');
     }
 
     /**
@@ -349,9 +585,6 @@ class AvisosSinStockScrapearCronController extends Controller
         }
     }
 
-    /**
-     * Aplica el precio a la oferta, precio_unidad según unidad de medida, mostrar=si y elimina solo este aviso.
-     */
     private function aplicarPrecioYOfertaVisible(Aviso $aviso, OfertaProducto $oferta, float $precioTotal): void
     {
         $producto = $oferta->producto;
@@ -368,32 +601,29 @@ class AvisosSinStockScrapearCronController extends Controller
         }
 
         $oferta->update([
-            'precio_total' => round($precioTotal, 2),
+            'precio_total'  => round($precioTotal, 2),
             'precio_unidad' => $precioUnidad,
-            'mostrar' => 'si',
+            'mostrar'       => 'si',
         ]);
 
         $aviso->delete();
 
-        // Aviso de tipo oferta: "Oferta Resucitada" con fecha actual
         Aviso::create([
-            'texto_aviso' => 'Oferta Resucitada',
-            'fecha_aviso' => now(),
-            'user_id' => 1,
+            'texto_aviso'    => 'Oferta Resucitada',
+            'fecha_aviso'    => now(),
+            'user_id'        => 1,
             'avisoable_type' => OfertaProducto::class,
-            'avisoable_id' => $oferta->id,
-            'oculto' => false,
+            'avisoable_id'   => $oferta->id,
+            'oculto'         => false,
         ]);
     }
 
     /**
-     * Calcula el siguiente texto y fecha de aplazamiento (misma lógica que AvisoController::aplazar).
-     *
      * @return array{nuevo_texto: string, nueva_fecha: Carbon}
      */
-    private function calcularSiguienteAplazamiento(Aviso $aviso): array
+    private function calcularSiguienteAplazamientoScraping(Aviso $aviso): array
     {
-        $textoAviso = $aviso->texto_aviso;
+        $textoAviso = (string) $aviso->texto_aviso;
         $numeroActual = 0;
         if (preg_match('/(\d+)\s*(?:a\s*)?vez/i', $textoAviso, $matches)) {
             $numeroActual = (int) $matches[1];
@@ -439,21 +669,6 @@ class AvisosSinStockScrapearCronController extends Controller
         ];
     }
 
-    /**
-     * Aplaza el aviso según 1a/2a/3a... vez (misma lógica que AvisoController::aplazar).
-     */
-    private function aplazarAvisoSinStock(Aviso $aviso): void
-    {
-        $calc = $this->calcularSiguienteAplazamiento($aviso);
-        $aviso->update([
-            'texto_aviso' => $calc['nuevo_texto'],
-            'fecha_aviso' => $calc['nueva_fecha'],
-        ]);
-    }
-
-    /**
-     * Borra ejecuciones antiguas de este cron para evitar crecimiento indefinido.
-     */
     private function eliminarEjecucionesAntiguas(): void
     {
         try {
@@ -462,8 +677,7 @@ class AvisosSinStockScrapearCronController extends Controller
                 ->where('created_at', '<', now()->subDays(self::RETENCION_EJECUCIONES_DIAS))
                 ->delete();
         } catch (\Throwable $e) {
-            // No bloquear el cron por fallo en limpieza histórica.
+            //
         }
     }
-
 }

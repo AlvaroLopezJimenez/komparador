@@ -39,6 +39,7 @@ return new class extends Migration {
             $table->json('especificaciones_busqueda')->nullable();
             $table->text('especificaciones_busqueda_texto')->nullable();
             $table->json('grupos_de_ofertas')->nullable();
+            $table->json('ean_isbn_etc')->nullable();
             $table->string('meta_titulo')->nullable();
             $table->text('meta_description')->nullable();
             $table->enum('obsoleto', ['si', 'no'])->default('no');

@@ -252,7 +252,7 @@
 
         @if (($logNeoObjetivos['origen'] ?? '') !== 'programa_externo')
         <p class="text-gray-600 dark:text-gray-400">
-            Filas con visitada &gt; 7 días y URL de rama «neo»: <strong>{{ $total_filas_neo }}</strong>
+            Filas con visitada &gt; {{ \App\Models\Neoobjetivo::DIAS_SIN_REVISAR }} días y URL de rama «neo»: <strong>{{ $total_filas_neo }}</strong>
         </p>
         @endif
 
@@ -261,7 +261,7 @@
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border-l-4 border-amber-500">
                 <h2 class="font-semibold text-lg mb-2">Rama categoria_tienda</h2>
                 <p class="text-sm text-gray-600 dark:text-gray-400">
-                    Filas con visitada &gt; 7 días y URL de rama <strong>categoria_tienda</strong>: <strong>{{ $total_filas_categoria_tienda }}</strong>
+                    Filas con visitada &gt; {{ \App\Models\Neoobjetivo::DIAS_SIN_REVISAR }} días y URL de rama <strong>categoria_tienda</strong>: <strong>{{ $total_filas_categoria_tienda }}</strong>
                     @if (isset($filas_sin_tienda_aviso) && (int) $filas_sin_tienda_aviso > 0)
                         — Sin tienda detectada (aviso creado): <strong>{{ $filas_sin_tienda_aviso }}</strong>
                     @endif

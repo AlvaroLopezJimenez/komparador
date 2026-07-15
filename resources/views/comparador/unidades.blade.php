@@ -907,9 +907,20 @@
       {{-- Asegurar que el contenido del botón también ocupe todo el ancho --}}
       .product-card[class*="grid-cols"] .boton[class*="order-4"] > span,
       .product-card[class*="grid-cols"] .boton[class*="order-5"] > span,
-      .product-card[class*="grid-cols"] .boton[class*="order-6"] > span {
+      .product-card[class*="grid-cols"] .boton[class*="order-6"] > span,
+      .product-card[class*="grid-cols"] .boton[class*="order-4"] > a,
+      .product-card[class*="grid-cols"] .boton[class*="order-5"] > a,
+      .product-card[class*="grid-cols"] .boton[class*="order-6"] > a {
         width: 100% !important;
         display: block !important;
+      }
+      
+      {{-- Badges múltiples en fila horizontal --}}
+      .descuentos-badges-grupo .descuento-badge-en-grupo {
+        position: relative !important;
+        top: auto !important;
+        right: auto !important;
+        transform: none !important;
       }
       
       {{-- Limitar el ancho de la etiqueta cupon-badge en móvil para que no se alargue --}}
@@ -1808,11 +1819,7 @@
       
       {{-- Segunda fila: Las mejores ofertas (máximo 4, distribuidas en filas de 2) --}}
       <div id="mejor-oferta-grid-movil">
-        @if(count($ofertas) === 0)
-          {{-- Si no hay ofertas, mostrar mensaje directamente --}}
-          <div class='bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-6 rounded text-lg text-center mb-4'>No hay ofertas disponibles actualmente para este producto.</div>
-        @else
-          {{-- Primera fila de ofertas --}}
+          {{-- Skeletons hasta que lleguen las ofertas por API --}}
           <div class="flex gap-2 items-start mb-2">
             {{-- Primera oferta --}}
             <div class="flex-1" id="mejor-oferta-contenedor-movil-1">
@@ -1885,7 +1892,6 @@
               </div>
             </div>
           </div>
-        @endif
       </div>
       
       {{-- Botón para ver todas las ofertas --}}
@@ -2724,8 +2730,34 @@
           </div>
           @endif
         </div>
-        {{-- x6: Contenedor del listado de ofertas --}}
-        <div id="x6" class="space-y-1"></div>
+        {{-- x6: Contenedor del listado de ofertas (skeletons mientras cargan por API) --}}
+        <div id="x6" class="space-y-1" aria-busy="true" aria-label="Cargando ofertas">
+          @for($i = 0; $i < 10; $i++)
+          <div class="oferta-skeleton bg-white rounded-lg shadow py-2 px-4 sm:px-6 grid grid-cols-1 sm:grid-cols-[100px_1fr_1fr_1fr_1fr_auto] gap-2 sm:gap-4 sm:items-center">
+            <div class="flex items-center justify-center min-h-[45px]">
+              <div class="w-24 h-9 bg-gray-200 rounded animate-pulse"></div>
+            </div>
+            <div class="flex flex-col items-center justify-center gap-1.5 py-1">
+              <div class="w-16 h-3 bg-gray-200 rounded animate-pulse"></div>
+            </div>
+            <div class="flex flex-col items-center justify-center gap-1.5 py-1">
+              <div class="w-14 h-3 bg-gray-200 rounded animate-pulse"></div>
+              <div class="w-10 h-3 bg-gray-200 rounded animate-pulse"></div>
+            </div>
+            <div class="flex flex-col items-center justify-center gap-1.5 py-1">
+              <div class="w-16 h-3 bg-gray-200 rounded animate-pulse"></div>
+              <div class="w-20 h-7 bg-gray-200 rounded animate-pulse"></div>
+            </div>
+            <div class="flex flex-col items-center justify-center gap-1.5 py-1">
+              <div class="w-16 h-3 bg-gray-200 rounded animate-pulse"></div>
+              <div class="w-20 h-7 bg-gray-200 rounded animate-pulse"></div>
+            </div>
+            <div class="flex items-center py-1">
+              <div class="w-full h-10 bg-gray-200 rounded animate-pulse"></div>
+            </div>
+          </div>
+          @endfor
+        </div>
         {{-- x7: Contenedor del botón mostrar más --}}
         <div id="x7" class="text-center mt-6 hidden">
           {{-- x8: Botón mostrar más ofertas --}}
@@ -2803,10 +2835,10 @@
           </div>
         </div>
         @php
-        // Preparar datos de columnas para unidadUnica
+        // Preparar datos de columnas para especificaciones marcadas como columna oferta
         $columnasData = null;
         $esUnidadUnica = ($producto->unidadDeMedida === 'unidadUnica');
-        if ($esUnidadUnica && $producto->categoria_id_especificaciones_internas && $producto->categoria_especificaciones_internas_elegidas) {
+        if ($producto->categoria_id_especificaciones_internas && $producto->categoria_especificaciones_internas_elegidas) {
           $categoriaEspecificaciones = \App\Models\Categoria::find($producto->categoria_id_especificaciones_internas);
           $especificacionesElegidas = $producto->categoria_especificaciones_internas_elegidas;
           
@@ -2829,12 +2861,19 @@
             
             // Nota: En el backend usamos las claves originales, solo se ofuscan al enviar al cliente
             $columnasIds = $especificacionesElegidas['_columnas'] ?? [];
+            if (is_array($columnasIds) && $columnasIds !== [] && !array_is_list($columnasIds)) {
+              $columnasIds = array_keys($columnasIds);
+            }
+            $columnasIds = array_map('strval', (array) $columnasIds);
+            if (!$esUnidadUnica) {
+              $columnasIds = array_slice($columnasIds, 0, 1);
+            }
             $filtros = $filtrosCombinados;
             
             // Crear mapa de líneas principales con sus datos
             $columnasData = [];
             foreach ($filtros as $filtro) {
-              if (in_array($filtro['id'], $columnasIds)) {
+              if (in_array((string) ($filtro['id'] ?? ''), $columnasIds, true)) {
                 // Procesar sublíneas para añadir texto alternativo si existe
                 $subprincipales = [];
                 foreach ($filtro['subprincipales'] ?? [] as $sub) {
@@ -3017,6 +3056,7 @@
               "envio" => $envioOferta,
               "unidades" => $unidadesFormateadas,
               "unidades_originales" => $unidadesFormateadas,
+              "texto_cantidad_alternativo" => $item->texto_cantidad_alternativo ?? null,
               "precio_total" => number_format($item->precio_total ?? 0, 2, ',', ''),
               "precio_unidad" => number_format($item->precio_unidad ?? 0, $decimalesPrecioUnidad, ',', ''),
               "descuentos" => $item->descuentos ?? '',
@@ -3120,12 +3160,14 @@
           });
           {{-- Cargar ofertas dinámicamente vía API --}}
           let ofertas = [];
+          let ofertasYaCargadas = false;
           const unidadMedida = '{{ $producto->unidadDeMedida }}';
           const esUnidadUnica = unidadMedida === 'unidadUnica';
           {{-- v14: columnasData - Datos de las columnas/especificaciones internas del producto --}}
           window.v14 = @json($columnasData ?? null);
           {{-- v20: columnasDataLocal - Referencia local a los datos de columnas/especificaciones internas --}}
           let v20 = window.v14;
+          let tieneColumnaEnCantidad = !esUnidadUnica && v20 && Array.isArray(v20) && v20.length > 0;
           
           let gruposDeOfertas = @json($producto->grupos_de_ofertas ?? null);
           
@@ -3154,6 +3196,12 @@
           {{-- Escuchar evento de ofertas cargadas --}}
           window.addEventListener('ofertas-cargadas', function(event) {
             ofertas = event.detail.ofertas || [];
+            ofertasYaCargadas = true;
+            if (event.detail.columnas_data) {
+              window.v14 = event.detail.columnas_data;
+              v20 = window.v14;
+              tieneColumnaEnCantidad = !esUnidadUnica && v20 && Array.isArray(v20) && v20.length > 0;
+            }
             
             {{-- Esperar a que las funciones estén definidas --}}
             const intentarRenderizar = () => {
@@ -3180,7 +3228,8 @@
               {{-- Actualizar v14 desde columnas_data (procesado en el backend) --}}
               if (event.detail.columnas_data) {
                 window.v14 = event.detail.columnas_data;
-                v20 = window.v14; {{-- Mantener referencia local también --}}
+                v20 = window.v14;
+                tieneColumnaEnCantidad = !esUnidadUnica && v20 && Array.isArray(v20) && v20.length > 0;
               }
             });
           })();
@@ -3229,7 +3278,30 @@
             primeraLineaSeleccionada = Object.keys(v13)[0];
           }
           
-          {{-- Función para parsear cupón y extraer código y cantidad (global) --}}
+          {{-- _p2ac1: parsear2aCupon - 2a al X - cupon;CODIGO --}}
+          window._p2ac1 = function _p2ac1(descuento) {
+            if (!descuento || typeof descuento !== 'string') return null;
+            const m = descuento.match(/^2a al (\d+) - cupon;(.+)$/i);
+            if (!m) return null;
+            return {
+              porcentaje: parseInt(m[1], 10),
+              codigo: m[2] || ''
+            };
+          };
+
+          {{-- _ecp1: esCuponPorcentaje - valor tipo %15 --}}
+          window._ecp1 = function _ecp1(valor) {
+            return String(valor || '').trim().startsWith('%');
+          };
+
+          {{-- _tdc1: textoDescuentoCupon - -5€ o -15% --}}
+          window._tdc1 = function _tdc1(valor) {
+            if (!valor) return '';
+            if (window._ecp1(valor)) {
+              return `-${String(valor).replace('%', '')}%`;
+            }
+            return `-${valor}€`;
+          };
           {{-- _pc1: parsearCupon - Parsea un string de descuentos para extraer código y valor del cupón --}}
           window._pc1 = function _pc1(descuentos) {
             try {
@@ -3261,9 +3333,135 @@
             }
           }
           
+          {{-- _pd1: parsearDescuentos - Separa múltiples descuentos (delimitador ||) --}}
+          window._pd1 = function _pd1(descuentosStr) {
+            if (!descuentosStr || typeof descuentosStr !== 'string') return [];
+            return descuentosStr.split('||').map(d => d.trim()).filter(d => d);
+          };
+
+          {{-- _esc1: escaparAttr - Escapa comillas para atributos HTML --}}
+          window._esc1 = function _esc1(str) {
+            return String(str ?? '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+          };
+
+          {{-- _edc1: esDescuentoConCupon - cupón %, cupón € o 2ª ud con cupón --}}
+          window._edc1 = function _edc1(descuento) {
+            if (!descuento || typeof descuento !== 'string') return false;
+            return window._p2ac1(descuento) !== null
+              || descuento.startsWith('cupon;')
+              || descuento === 'cupon'
+              || descuento.startsWith('CholloTienda')
+              || descuento.startsWith('SoloAliexpress');
+          };
+
+          {{-- _nlb1: normalizarListaBadges - un solo badge CUPÓN si hay varios descuentos con cupón --}}
+          window._nlb1 = function _nlb1(lista) {
+            const conCupon = lista.filter(d => window._edc1(d));
+            const sinCupon = lista.filter(d => !window._edc1(d));
+            if (conCupon.length >= 2) {
+              return [...sinCupon, 'CUPON_UNIFICADO'];
+            }
+            return lista;
+          };
+
+          {{-- _mck1: mapa clave descuento → clave modal v12 --}}
+          window._mck1 = {
+            '3x2': '3x2',
+            '2x1 - SoloCarrefour': '2x1',
+            '2a al 50 - cheque - SoloCarrefour': '2a-al-50-cheque',
+            '2a al 50': '2a-al-50',
+            '2a al 70': '2a-al-70',
+          };
+
+          {{-- _odb1: obtenerDatosBadge - Configuración visual de un badge de descuento --}}
+          window._odb1 = function _odb1(descuento) {
+            if (descuento === 'CUPON_UNIFICADO') {
+              return { label: 'CUPÓN', gradient: 'linear-gradient(135deg, #ff6900, #ff8c00)', fontWeight: 'bold' };
+            }
+            const info2aCupon = window._p2ac1(descuento);
+            if (info2aCupon) {
+              return {
+                label: `2a ${info2aCupon.porcentaje}%`,
+                gradient: 'linear-gradient(135deg, #f59e0b, #ff6900)',
+                fontWeight: 'bold'
+              };
+            }
+            if (descuento.startsWith('cupon;') || descuento === 'cupon' || descuento.startsWith('CholloTienda') || descuento.startsWith('SoloAliexpress')) {
+              return { label: 'CUPÓN', gradient: 'linear-gradient(135deg, #ff6900, #ff8c00)', fontWeight: 'bold' };
+            }
+            const mapa = {
+              '3x2': { label: '3x2', gradient: 'linear-gradient(135deg, #8b5cf6, #a855f7)', fontWeight: 'normal' },
+              '2x1 - SoloCarrefour': { label: '2x1', gradient: 'linear-gradient(135deg, #10b981, #059669)', fontWeight: 'normal' },
+              '2a al 50 - cheque - SoloCarrefour': { label: '2a al 50%', gradient: 'linear-gradient(135deg, #f59e0b, #d97706)', fontWeight: 'bold' },
+              '2a al 70': { label: '2a AL 70%', gradient: 'linear-gradient(135deg, #f59e0b, #d97706)', fontWeight: 'normal' },
+              '2a al 50': { label: '2a al 50%', gradient: 'linear-gradient(135deg, #f59e0b, #d97706)', fontWeight: 'normal' },
+              '-20%': { label: '-20%', gradient: 'linear-gradient(135deg, #ef4444, #dc2626)', fontWeight: 'bold' },
+              '+Juego': { label: '+Juego', gradient: 'linear-gradient(135deg, #0ea5e9, #6366f1)', fontWeight: '600' },
+            };
+            return mapa[descuento] || null;
+          };
+
+          {{-- _tieneAlgunDescuento: comprueba si la oferta tiene algún descuento visible --}}
+          window._tieneAlgunDescuento = function _tieneAlgunDescuento(descuentos) {
+            return window._pd1(descuentos).length > 0;
+          };
+
+          {{-- _tieneDescuentoModal: comprueba si algún descuento abre modal informativo --}}
+          window._tieneDescuentoModal = function _tieneDescuentoModal(descuentos) {
+            return window._pd1(descuentos).some(d => {
+              if (d === '+Juego' || d === '-20%' || d === 'rebaja' || d === 'promocion' || d === 'oferta_especial') return false;
+              return true;
+            });
+          };
+
+          {{-- _gba1: generarBadgesAtributos - Badges y data-attrs para botón de oferta --}}
+          window._gba1 = function _gba1(oferta) {
+            const descuentosStr = oferta.descuentos ? String(oferta.descuentos) : '';
+            const lista = window._pd1(descuentosStr);
+            if (lista.length === 0) {
+              return { badgeHtml: '', dataAttrs: '', tieneDescuento: false, tieneModal: false };
+            }
+
+            const listaBadges = window._nlb1(lista);
+
+            const badges = listaBadges.map(d => {
+              const cfg = window._odb1(d);
+              if (!cfg) return '';
+              const estiloComun = `background: ${cfg.gradient}; font-size: 0.7rem; padding: 2px 6px; font-weight: ${cfg.fontWeight}; white-space: nowrap; pointer-events: none;`;
+              if (listaBadges.length === 1) {
+                return `<span class="cupon-badge" style="${estiloComun} top: 0px; right: 0px; bottom: auto; z-index: 10;">${cfg.label}</span>`;
+              }
+              return `<span class="cupon-badge descuento-badge-en-grupo" style="${estiloComun} position: relative; top: auto; right: auto; transform: none; box-shadow: none;">${cfg.label}</span>`;
+            }).filter(Boolean).join('');
+
+            let badgeHtml = '';
+            if (listaBadges.length === 1) {
+              badgeHtml = badges;
+            } else if (badges) {
+              badgeHtml = `<div class="descuentos-badges-grupo absolute top-0 right-0 flex flex-row flex-wrap gap-1 justify-end z-10" style="pointer-events: none;">${badges}</div>`;
+            }
+
+            const tieneModal = window._tieneDescuentoModal(descuentosStr);
+            let dataAttrs = '';
+            if (tieneModal) {
+              dataAttrs = `data-oferta-descuentos="${window._esc1(descuentosStr)}" data-url="${window._esc1(oferta.url)}"`;
+              if (oferta.id) dataAttrs += ` data-oferta-id="${oferta.id}"`;
+            }
+
+            return {
+              badgeHtml,
+              dataAttrs,
+              tieneDescuento: lista.length > 0,
+              tieneModal,
+            };
+          };
+          
           {{-- Función para formatear la cantidad según la unidad de medida --}}
           {{-- _fc1: formatearCantidad - Formatea una cantidad según la unidad de medida (kilos, litros, etc.) --}}
-          function _fc1(cantidad, unidad) {
+          function _fc1(cantidad, unidad, textoAlternativo) {
+            if (textoAlternativo && String(textoAlternativo).trim() !== '') {
+              return String(textoAlternativo).trim();
+            }
             if (unidad === 'kilos') {
               if (cantidad >= 1) {
                 {{-- Mostrar como número entero si no tiene decimales, sino con decimales --}}
@@ -3341,86 +3539,36 @@
 
           {{-- Función para generar el botón de oferta --}}
           {{-- _gbo1: generarBotonOferta - Genera el HTML del botón de oferta con badges de cupones --}}
-          function _gbo1(oferta) {
-            {{-- Siempre usar el mismo botón azul con "Ir a la tienda" (igual que sin descuento) --}}
-            const botonBase = 'inline-block w-full py-1 px-1 text-white text-base font-semibold rounded transition-colors text-center relative cursor-pointer';
-            let badgeHtml = '';
-            let dataAttrs = '';
-            let tieneDescuento = false;
-            
-            {{-- Asegurar que descuentos sea un string --}}
-            const descuentosStr = oferta.descuentos ? String(oferta.descuentos) : '';
-            
-            if (descuentosStr && typeof descuentosStr === 'string' && descuentosStr.startsWith('CholloTienda1SoloCuponQueAplicaDescuento;')) {
-              tieneDescuento = true;
-              badgeHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap; pointer-events: none; z-index: 10;">CUPÓN</span>';
-              dataAttrs = `data-cupon-chollo-tienda-solo="true" data-descuentos="${oferta.descuentos}" data-oferta-id="${oferta.id}" data-url="${oferta.url}"`;
-            } else if (descuentosStr && typeof descuentosStr === 'string' && descuentosStr.startsWith('CholloTienda;')) {
-              tieneDescuento = true;
-              badgeHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap; pointer-events: none; z-index: 10;">CUPÓN</span>';
-              dataAttrs = `data-cupon-chollo-tienda="true" data-descuentos="${oferta.descuentos}" data-oferta-id="${oferta.id}" data-url="${oferta.url}"`;
-            } else if (descuentosStr && typeof descuentosStr === 'string' && descuentosStr.startsWith('cupon;')) {
-              try {
-                tieneDescuento = true;
-                const cuponInfo = window._pc1(oferta.descuentos);
-                const valorCupon = cuponInfo ? cuponInfo.valor : (oferta.descuentos.split(';')[1] || '');
-                const codigoCupon = cuponInfo ? cuponInfo.codigo : null;
-                {{-- Escapar valores para evitar problemas con comillas y caracteres especiales --}}
-                const codigoCuponEscapado = codigoCupon ? codigoCupon.replace(/"/g, '&quot;').replace(/'/g, '&#39;') : '';
-                const valorCuponEscapado = String(valorCupon).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-                const urlEscapada = oferta.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-                badgeHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap; pointer-events: none; z-index: 10;">CUPÓN</span>';
-                dataAttrs = codigoCupon 
-                  ? `data-cupon="true" data-codigo-cupon="${codigoCuponEscapado}" data-valor-cupon="${valorCuponEscapado}" data-url="${urlEscapada}"` 
-                  : `data-cupon="true" data-valor-cupon="${valorCuponEscapado}" data-url="${urlEscapada}"`;
-              } catch (e) {
-                tieneDescuento = true;
-                badgeHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap; pointer-events: none; z-index: 10;">CUPÓN</span>';
-                dataAttrs = `data-cupon="true" data-url="${oferta.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;')}"`;
-              }
-            } else if (oferta.descuentos === 'cupon') {
-              tieneDescuento = true;
-              badgeHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap; pointer-events: none; z-index: 10;">CUPÓN</span>';
-              dataAttrs = `data-cupon="true" data-url="${oferta.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;')}"`;
-            } else if (oferta.descuentos === '3x2') {
-              tieneDescuento = true;
-              badgeHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #8b5cf6, #a855f7); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap; pointer-events: none; z-index: 10;">3x2</span>';
-              dataAttrs = `data-3x2="true" data-url="${oferta.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;')}"`;
-            } else if (oferta.descuentos === '2x1 - SoloCarrefour') {
-              tieneDescuento = true;
-              badgeHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #10b981, #059669); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap; pointer-events: none; z-index: 10;">2x1</span>';
-              dataAttrs = `data-2x1="true" data-url="${oferta.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;')}"`;
-            } else if (oferta.descuentos === '2a al 50 - cheque - SoloCarrefour') {
-              tieneDescuento = true;
-              badgeHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap; pointer-events: none; z-index: 10;">2a al 50%</span>';
-              dataAttrs = `data-2a-al-50-cheque="true" data-url="${oferta.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;')}"`;
-            } else if (oferta.descuentos === '2a al 70') {
-              tieneDescuento = true;
-              badgeHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap; pointer-events: none; z-index: 10;">2a AL 70%</span>';
-              dataAttrs = `data-2a-al-70="true" data-url="${oferta.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;')}"`;
-            } else if (oferta.descuentos === '2a al 50') {
-              tieneDescuento = true;
-              badgeHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap; pointer-events: none; z-index: 10;">2a al 50%</span>';
-              dataAttrs = `data-2a-al-50="true" data-url="${oferta.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;')}"`;
-            } else if (oferta.descuentos === '+Juego') {
-              tieneDescuento = true;
-              badgeHtml = '<span class="cupon-badge" style="background: linear-gradient(135deg, #0ea5e9, #6366f1); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: 600; white-space: nowrap; pointer-events: none; z-index: 10;">+Juego</span>';
-              dataAttrs = '';
-            }
-            
-            {{-- Si tiene descuento, usar <span> en lugar de <a> para evitar enlaces anidados --}}
+          window._gbo1 = function _gbo1(oferta, opts = {}) {
+            const py = opts.py || 'py-1';
+            const px = opts.px || 'px-1';
+            const inList = opts.inList === true;
+            const botonBase = `inline-block w-full ${py} ${px} text-white text-base font-semibold rounded transition-colors text-center relative cursor-pointer`;
+            const { badgeHtml, dataAttrs, tieneDescuento, tieneModal } = window._gba1(oferta);
+            const urlEsc = window._esc1(oferta.url);
+            const estiloBoton = 'style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'"';
+
             if (tieneDescuento) {
-              {{-- Siempre mostrar "Ir a la tienda" en el botón, el badge ya indica que hay cupón --}}
-              return `<div class="relative w-full">${badgeHtml}<span class="${botonBase}" style="background-color: #70b216;" onmouseover="this.style.backgroundColor='#60a013'" onmouseout="this.style.backgroundColor='#70b216'" ${dataAttrs}>Ir a la tienda</span></div>`;
-            } else {
-              return `<div class="relative w-full">${badgeHtml}<a href="${oferta.url}" target="_blank" rel="sponsored noopener noreferrer" class="${botonBase}" style="background-color: #70b216;" onmouseover="this.style.backgroundColor='#60a013'" onmouseout="this.style.backgroundColor='#70b216'" ${dataAttrs}>Ir a la tienda</a></div>`;
+              const dataModal = tieneModal ? ` ${dataAttrs}` : '';
+              return `<div class="relative w-full">${badgeHtml}<span class="${botonBase}" ${estiloBoton}${dataModal}>Ir a la tienda</span></div>`;
             }
+
+            if (inList) {
+              return `<span class="${botonBase}" ${estiloBoton}>Ir a la tienda</span>`;
+            }
+
+            return `<div class="relative w-full">${badgeHtml}<a href="${urlEsc}" target="_blank" rel="sponsored noopener noreferrer" class="${botonBase}" ${estiloBoton}>Ir a la tienda</a></div>`;
           }
 
           {{-- Función para actualizar las mejores ofertas en móvil --}}
           {{-- _amom1: actualizarMejorOfertaMovil - Actualiza las mejores ofertas mostradas en la vista móvil --}}
           function _amom1(filtradas) {
             const gridContenedor = document.getElementById('mejor-oferta-grid-movil');
+            
+            {{-- Mientras cargan: no sustituir por el mensaje de "sin ofertas" --}}
+            if (!ofertasYaCargadas) {
+              return;
+            }
             
             {{-- Si no hay ofertas, mostrar mensaje en lugar de ocultar --}}
             if (filtradas.length === 0) {
@@ -3570,9 +3718,19 @@
                   {{-- Si es una sola oferta con mejor precio y no es unidadUnica, mostrar información completa --}}
                   let precioHtml = '';
                   if (esSolaOfertaMejorPrecio) {
+                    let cantidadMejorPrecioHtml = `<div class="text-base text-gray-600 mb-1">${_fc1(oferta.unidades, unidadMedida, oferta.texto_cantidad_alternativo)}</div>`;
+                    if (tieneColumnaEnCantidad && window.v14 && window.v14[0]) {
+                      const linea = window.v14[0];
+                      const columnasOferta = (oferta.especificaciones_internas || {})._c || {};
+                      const textoSublinea = _otsc1(linea.id, columnasOferta[linea.id]);
+                      cantidadMejorPrecioHtml = `
+                        <div class="text-base text-gray-600 mb-1">${_fc1(oferta.unidades, unidadMedida, oferta.texto_cantidad_alternativo)}</div>
+                        <div class="text-xs text-gray-500 mb-1"><span class="font-semibold">${linea.texto}:</span> ${textoSublinea}</div>
+                      `;
+                    }
                     precioHtml = `
                       <div class="text-center mb-2">
-                        <div class="text-base text-gray-600 mb-1">${_fc1(oferta.unidades, unidadMedida)}</div>
+                        ${cantidadMejorPrecioHtml}
                         <div class="flex items-center justify-center gap-2">
                           <div class="text-base text-gray-600"><b>Total:</b> ${oferta.precio_total} €</div>
                           <div class="text-2xl font-extrabold" style="color: #e97b11;">
@@ -3655,7 +3813,7 @@
                           <span class="text-lg font-extrabold" style="color: #e97b11;">${oferta.precio_unidad} <span class="text-xs text-gray-500 font-normal">${_gsp1(unidadMedida)}</span></span>
                         </div>
                         <div id="mejor-oferta-boton-movil-${index}" class="w-full">
-                          ${_gbo1(oferta)}
+                              ${_gbo1(oferta)}
                         </div>
                       </div>
                     </a>
@@ -3737,6 +3895,11 @@
           function _amod1(filtradas) {
             const gridContenedor = document.getElementById('mejor-oferta-grid-desktop');
             
+            {{-- Mientras cargan: no ocultar la sección de mejores ofertas --}}
+            if (!ofertasYaCargadas) {
+              return;
+            }
+            
             {{-- Si no hay ofertas, ocultar el contenedor --}}
             if (filtradas.length === 0) {
               if (gridContenedor && gridContenedor.parentElement) {
@@ -3816,7 +3979,7 @@
                         </div>
                         ${precioHtml}
                         <div id="mejor-oferta-boton-desktop-${index}" class="w-full mt-auto" style="margin-bottom: 0;">
-                          ${_gbo1(oferta)}
+                              ${_gbo1(oferta)}
                         </div>
                       </a>
                     </div>
@@ -3845,7 +4008,7 @@
                         </div>
                         ${precioHtmlNormal}
                         <div id="mejor-oferta-boton-desktop-${index}" class="w-full mt-auto" style="margin-bottom: 0;">
-                          ${_gbo1(oferta)}
+                              ${_gbo1(oferta)}
                         </div>
                       </a>
                     </div>
@@ -4517,6 +4680,40 @@
             const sublinea = linea.subprincipales.find(s => s.id === sublineaId);
             return sublinea ? sublinea.texto : '-';
           }
+
+          {{-- _gco1: obtenerConjuncionEspanola - Devuelve y/e/u según la palabra siguiente --}}
+          function _gco1(palabra) {
+            const w = String(palabra).trim().toLowerCase();
+            if (/^i|^hi/.test(w)) return 'e';
+            if (/^o|^ho/.test(w)) return 'u';
+            return 'y';
+          }
+
+          {{-- _uly1: unirListaEspanola - Une textos con comas y conjunción final (y/e/u) --}}
+          function _uly1(items) {
+            const lista = (items || []).filter(t => t != null && String(t).trim() !== '');
+            if (lista.length === 0) return '-';
+            if (lista.length === 1) return lista[0];
+            if (lista.length === 2) return `${lista[0]} ${_gco1(lista[1])} ${lista[1]}`;
+            const ultimo = lista[lista.length - 1];
+            return `${lista.slice(0, -1).join(', ')} ${_gco1(ultimo)} ${ultimo}`;
+          }
+
+          {{-- _nis1: normalizarIdsSublineas - Convierte id único o array en lista de ids --}}
+          function _nis1(valor) {
+            if (valor == null || valor === '') return [];
+            if (Array.isArray(valor)) return valor.filter(v => v != null && v !== '');
+            return [valor];
+          }
+
+          {{-- _otsc1: obtenerTextoColumnaSublineas - Texto de varias sublíneas marcadas como columna --}}
+          function _otsc1(lineaId, sublineaIdsRaw) {
+            const ids = _nis1(sublineaIdsRaw);
+            if (ids.length === 0) return '-';
+            const textos = ids.map(id => _ots1(lineaId, id)).filter(t => t && t !== '-');
+            if (textos.length === 0) return '-';
+            return _uly1(textos);
+          }
           
           {{-- _rcuu1: renderizarColumnasUnidadUnica - Renderiza las columnas dinámicas para productos de unidad única --}}
           function _rcuu1(oferta) {
@@ -4535,15 +4732,13 @@
             if (numColumnas === 1) {
               {{-- 1 línea: 1 columna normal (estilo como cantidad) --}}
               const linea = window.v14[0];
-              const sublineaId = columnasOferta[linea.id];
-              const textoSublinea = sublineaId ? _ots1(linea.id, sublineaId) : '-';
+              const textoSublinea = _otsc1(linea.id, columnasOferta[linea.id]);
               
               html += `<div class="columna-dinamica text-gray-700 divider text-center min-w-0 overflow-hidden order-4 sm:!order-[0]"><div class="font-semibold">${linea.texto}</div><div class="text-sm text-gray-500 leading-tight">${textoSublinea}</div></div>`;
             } else if (numColumnas === 2) {
               {{-- 2 líneas: 2 columnas normales (estilo como cantidad) --}}
               window.v14.forEach((linea, index) => {
-                const sublineaId = columnasOferta[linea.id];
-                const textoSublinea = sublineaId ? _ots1(linea.id, sublineaId) : '-';
+                const textoSublinea = _otsc1(linea.id, columnasOferta[linea.id]);
                 const ordenMovil = index === 0 ? 'order-4' : 'order-5';
                 
                 html += `<div class="columna-dinamica text-gray-700 divider text-center min-w-0 overflow-hidden ${ordenMovil} sm:!order-[0]"><div class="font-semibold">${linea.texto}</div><div class="text-sm text-gray-500 leading-tight">${textoSublinea}</div></div>`;
@@ -4551,8 +4746,7 @@
             } else if (numColumnas === 3) {
               {{-- 3 líneas: 1 columna normal (estilo como cantidad) + 1 columna dividida en 2 filas (nombre y opción en misma línea) --}}
               const linea1 = window.v14[0];
-              const sublineaId1 = columnasOferta[linea1.id];
-              const textoSublinea1 = sublineaId1 ? _ots1(linea1.id, sublineaId1) : '-';
+              const textoSublinea1 = _otsc1(linea1.id, columnasOferta[linea1.id]);
               
               html += `<div class="columna-dinamica text-gray-700 divider text-center min-w-0 overflow-hidden order-4 sm:!order-[0]"><div class="font-semibold">${linea1.texto}</div><div class="text-sm text-gray-500 leading-tight">${textoSublinea1}</div></div>`;
               
@@ -4560,8 +4754,7 @@
               html += `<div class="columna-dinamica text-gray-700 divider text-center min-w-0 overflow-hidden order-5 sm:!order-[0]">`;
               for (let i = 1; i < 3; i++) {
                 const linea = window.v14[i];
-                const sublineaId = columnasOferta[linea.id];
-                const textoSublinea = sublineaId ? _ots1(linea.id, sublineaId) : '-';
+                const textoSublinea = _otsc1(linea.id, columnasOferta[linea.id]);
                 
                 html += `<div class="text-xs leading-tight" style="font-weight: 600;"><span class="font-semibold">${linea.texto}:</span> <span class="text-gray-500">${textoSublinea}</span></div>`;
                 if (i < 2) html += `<div class="border-t border-gray-300 mt-2 mb-1"></div>`;
@@ -4575,8 +4768,7 @@
                 for (let fila = 0; fila < 2; fila++) {
                   const index = col * 2 + fila;
                   const linea = window.v14[index];
-                  const sublineaId = columnasOferta[linea.id];
-                  const textoSublinea = sublineaId ? _ots1(linea.id, sublineaId) : '-';
+                  const textoSublinea = _otsc1(linea.id, columnasOferta[linea.id]);
                   
                   html += `<div class="text-xs leading-tight" style="font-weight: 600;"><span class="font-semibold">${linea.texto}:</span> <span class="text-gray-500">${textoSublinea}</span></div>`;
                   if (fila < 1) html += `<div class="border-t border-gray-300 mt-2 mb-1"></div>`;
@@ -4586,6 +4778,23 @@
             }
             
             return html;
+          }
+          
+          {{-- _rcc1: renderizarCantidadConColumna - Cantidad arriba + especificación columna abajo (no unidadUnica) --}}
+          function _rcc1(oferta) {
+            const cantidadHtml = `<div class="font-semibold">Cantidad</div><div class="text-sm text-gray-500 leading-tight">${_fc1(oferta.unidades, unidadMedida, oferta.texto_cantidad_alternativo)}</div>`;
+            if (!tieneColumnaEnCantidad || !window.v14 || !Array.isArray(window.v14) || window.v14.length === 0) {
+              return `<div class="und text-gray-700 divider text-center min-w-0 overflow-hidden">${cantidadHtml}</div>`;
+            }
+            const linea = window.v14[0];
+            const especificacionesOferta = oferta.especificaciones_internas || {};
+            const columnasOferta = especificacionesOferta._c || {};
+            const textoSublinea = _otsc1(linea.id, columnasOferta[linea.id]);
+            return `<div class="und text-gray-700 divider text-center min-w-0 overflow-hidden">
+              ${cantidadHtml}
+              <div class="border-t border-gray-300 mt-2 mb-1"></div>
+              <div class="text-xs leading-tight" style="font-weight: 600;"><span class="font-semibold">${linea.texto}:</span> <span class="text-gray-500">${textoSublinea}</span></div>
+            </div>`;
           }
           
           {{-- Función para procesar grupos de ofertas y unificar las que están en grupos --}}
@@ -4691,14 +4900,14 @@
               ofertasGrupo.forEach(oferta => {
                 const especificaciones = oferta.especificaciones_internas || {};
                 const columnasOferta = especificaciones._c || {}; // _c = ofuscado de _columnas
-                const sublineaId = columnasOferta[linea.id];
-                
-                if (sublineaId) {
+                const sublineaIds = _nis1(columnasOferta[linea.id]);
+
+                sublineaIds.forEach(sublineaId => {
                   const textoSublinea = _ots1(linea.id, sublineaId);
                   if (textoSublinea && textoSublinea !== '-') {
                     variantes.add(textoSublinea);
                   }
-                }
+                });
               });
               
               variantesPorColumna[linea.id] = Array.from(variantes).sort();
@@ -4708,13 +4917,13 @@
             if (numColumnas === 1) {
               const linea = window.v14[0];
               const variantes = variantesPorColumna[linea.id] || [];
-              const textoVariantes = variantes.length > 0 ? variantes.join(', ') : '-';
+              const textoVariantes = variantes.length > 0 ? _uly1(variantes) : '-';
               
               html += `<div class="columna-dinamica text-gray-700 divider text-center min-w-0 overflow-hidden order-4 sm:!order-[0]"><div class="font-semibold">${linea.texto}</div><div class="text-sm text-gray-500 leading-tight">${textoVariantes}</div></div>`;
             } else if (numColumnas === 2) {
               window.v14.forEach((linea, index) => {
                 const variantes = variantesPorColumna[linea.id] || [];
-                const textoVariantes = variantes.length > 0 ? variantes.join(', ') : '-';
+                const textoVariantes = variantes.length > 0 ? _uly1(variantes) : '-';
                 const ordenMovil = index === 0 ? 'order-4' : 'order-5';
                 
                 html += `<div class="columna-dinamica text-gray-700 divider text-center min-w-0 overflow-hidden ${ordenMovil} sm:!order-[0]"><div class="font-semibold">${linea.texto}</div><div class="text-sm text-gray-500 leading-tight">${textoVariantes}</div></div>`;
@@ -4722,7 +4931,7 @@
             } else if (numColumnas === 3) {
               const linea1 = window.v14[0];
               const variantes1 = variantesPorColumna[linea1.id] || [];
-              const textoVariantes1 = variantes1.length > 0 ? variantes1.join(', ') : '-';
+              const textoVariantes1 = variantes1.length > 0 ? _uly1(variantes1) : '-';
               
               html += `<div class="columna-dinamica text-gray-700 divider text-center min-w-0 overflow-hidden order-4 sm:!order-[0]"><div class="font-semibold">${linea1.texto}</div><div class="text-sm text-gray-500 leading-tight">${textoVariantes1}</div></div>`;
               
@@ -4730,7 +4939,7 @@
               for (let i = 1; i < 3; i++) {
                 const linea = v20[i];
                 const variantes = variantesPorColumna[linea.id] || [];
-                const textoVariantes = variantes.length > 0 ? variantes.join(', ') : '-';
+                const textoVariantes = variantes.length > 0 ? _uly1(variantes) : '-';
                 
                 html += `<div class="text-xs leading-tight" style="font-weight: 600;"><span class="font-semibold">${linea.texto}:</span> <span class="text-gray-500">${textoVariantes}</span></div>`;
                 if (i < 2) html += `<div class="border-t border-gray-300 mt-2 mb-1"></div>`;
@@ -4744,7 +4953,7 @@
                   const index = col * 2 + fila;
                   const linea = v20[index];
                   const variantes = variantesPorColumna[linea.id] || [];
-                  const textoVariantes = variantes.length > 0 ? variantes.join(', ') : '-';
+                  const textoVariantes = variantes.length > 0 ? _uly1(variantes) : '-';
                   
                   html += `<div class="text-xs leading-tight" style="font-weight: 600;"><span class="font-semibold">${linea.texto}:</span> <span class="text-gray-500">${textoVariantes}</span></div>`;
                   if (fila < 1) html += `<div class="border-t border-gray-300 mt-2 mb-1"></div>`;
@@ -4756,9 +4965,51 @@
             return html;
           }
           
+          {{-- _gso1: generarSkeletonsOfertas - HTML de filas skeleton mientras cargan las ofertas --}}
+          function _gso1(cantidad = 10) {
+            let html = '';
+            for (let i = 0; i < cantidad; i++) {
+              html += `
+                <div class="oferta-skeleton bg-white rounded-lg shadow py-2 px-4 sm:px-6 grid grid-cols-1 sm:grid-cols-[100px_1fr_1fr_1fr_1fr_auto] gap-2 sm:gap-4 sm:items-center">
+                  <div class="flex items-center justify-center min-h-[45px]">
+                    <div class="w-24 h-9 bg-gray-200 rounded animate-pulse"></div>
+                  </div>
+                  <div class="flex flex-col items-center justify-center gap-1.5 py-1">
+                    <div class="w-16 h-3 bg-gray-200 rounded animate-pulse"></div>
+                  </div>
+                  <div class="flex flex-col items-center justify-center gap-1.5 py-1">
+                    <div class="w-14 h-3 bg-gray-200 rounded animate-pulse"></div>
+                    <div class="w-10 h-3 bg-gray-200 rounded animate-pulse"></div>
+                  </div>
+                  <div class="flex flex-col items-center justify-center gap-1.5 py-1">
+                    <div class="w-16 h-3 bg-gray-200 rounded animate-pulse"></div>
+                    <div class="w-20 h-7 bg-gray-200 rounded animate-pulse"></div>
+                  </div>
+                  <div class="flex flex-col items-center justify-center gap-1.5 py-1">
+                    <div class="w-16 h-3 bg-gray-200 rounded animate-pulse"></div>
+                    <div class="w-20 h-7 bg-gray-200 rounded animate-pulse"></div>
+                  </div>
+                  <div class="flex items-center py-1">
+                    <div class="w-full h-10 bg-gray-200 rounded animate-pulse"></div>
+                  </div>
+                </div>`;
+            }
+            return html;
+          }
+
           {{-- _ro1: renderOfertas - Renderiza todas las ofertas en el contenedor principal --}}
           function _ro1() {
             try {
+            {{-- Mientras las ofertas no hayan llegado por API, mantener skeletons --}}
+            if (!ofertasYaCargadas) {
+              const cont = document.getElementById('x6');
+              if (cont && !cont.querySelector('.oferta-skeleton')) {
+                cont.innerHTML = _gso1(10);
+                cont.setAttribute('aria-busy', 'true');
+              }
+              return;
+            }
+
             {{-- x1: Filtro de tienda --}}
             const tienda = document.getElementById('x1').value;
             {{-- x2: Filtro de envío gratis --}}
@@ -4871,6 +5122,13 @@
             const totalItems = todasLasOfertas.length + gruposUnificados.length;
             
             if (totalItems === 0) {
+              if (!ofertasYaCargadas) {
+                cont.innerHTML = _gso1(10);
+                cont.setAttribute('aria-busy', 'true');
+                botonMostrarMas.classList.add('hidden');
+                return;
+              }
+              cont.removeAttribute('aria-busy');
               if (filtroInteractuado) {
                 cont.innerHTML = `<div class='bg-red-100 border-l-4 border-red-500 text-red-800 p-6 rounded text-lg text-center'>No hay ofertas que coincidan con los filtros seleccionados.</div>`;
               } else {
@@ -4880,6 +5138,7 @@
               return;
             }
             
+            cont.removeAttribute('aria-busy');
             {{-- Determinar cuántas ofertas mostrar (considerando grupos como un solo item) --}}
             const itemsAMostrar = mostrarTodasLasOfertas ? totalItems : Math.min(totalItems, OFERTAS_INICIALES);
             const itemsRestantes = totalItems - itemsAMostrar;
@@ -4911,17 +5170,7 @@
                 const esMejorOferta = mejoresOfertas.some(mejor => mejor.id === primeraOferta.id);
                 
                 {{-- Crear contenedor para el grupo unificado --}}
-                const tieneDescuentosEnGrupo = grupo.ofertas.some(item => 
-                  item.descuentos === 'cupon' || 
-                  item.descuentos === '3x2' ||
-                  item.descuentos === '+Juego' ||
-                  (item.descuentos && typeof item.descuentos === 'string' && (
-                    item.descuentos.startsWith('cupon;') ||
-                    item.descuentos.startsWith('SoloAliexpress;') ||
-                    item.descuentos.startsWith('CholloTienda;') ||
-                    item.descuentos.startsWith('CholloTienda1SoloCuponQueAplicaDescuento;')
-                  ))
-                );
+                const tieneDescuentosEnGrupo = grupo.ofertas.some(item => window._tieneAlgunDescuento(item.descuentos));
                 
                 if (esMejorOferta) {
                   html += `<div class="mejor-oferta-wrapper" ${tieneDescuentosEnGrupo ? 'style="padding-top: 8px;"' : 'style="padding-top: 8px;"'}>`;
@@ -5011,69 +5260,10 @@
                 }
                 
                 {{-- Usar la primera oferta del grupo para datos comunes (logo, envío, precio, descuentos) --}}
-                const tieneDescuento = primeraOferta.descuentos && (
-                  primeraOferta.descuentos === 'cupon' || 
-                  primeraOferta.descuentos === '3x2' ||
-                  primeraOferta.descuentos === '+Juego' ||
-                  (typeof primeraOferta.descuentos === 'string' && (
-                    primeraOferta.descuentos.startsWith('cupon;') ||
-                    primeraOferta.descuentos.startsWith('SoloAliexpress;') ||
-                    primeraOferta.descuentos.startsWith('CholloTienda;') ||
-                    primeraOferta.descuentos.startsWith('CholloTienda1SoloCuponQueAplicaDescuento;')
-                  ))
-                );
+                const tieneDescuento = window._tieneAlgunDescuento(primeraOferta.descuentos);
                 
                 {{-- Generar botón con descuentos (usando la primera oferta) --}}
-                let botonHtml = '';
-                if (primeraOferta.descuentos && typeof primeraOferta.descuentos === 'string' && primeraOferta.descuentos.startsWith('SoloAliexpress;')) {
-                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon-aliexpress="true" data-descuentos="' + primeraOferta.descuentos.replace(/"/g, '&quot;') + '" data-oferta-id="' + primeraOferta.id + '" data-url="' + primeraOferta.url + '">Ir a la tienda</span></div>';
-                } else if (primeraOferta.descuentos && typeof primeraOferta.descuentos === 'string' && primeraOferta.descuentos.startsWith('CholloTienda1SoloCuponQueAplicaDescuento;')) {
-                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon-chollo-tienda-solo="true" data-descuentos="' + primeraOferta.descuentos.replace(/"/g, '&quot;') + '" data-oferta-id="' + primeraOferta.id + '" data-url="' + primeraOferta.url + '">Ir a la tienda</span></div>';
-                } else if (primeraOferta.descuentos && typeof primeraOferta.descuentos === 'string' && primeraOferta.descuentos.startsWith('CholloTienda;')) {
-                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon-chollo-tienda="true" data-descuentos="' + primeraOferta.descuentos.replace(/"/g, '&quot;') + '" data-oferta-id="' + primeraOferta.id + '" data-url="' + primeraOferta.url + '">Ir a la tienda</span></div>';
-                } else if (primeraOferta.descuentos && typeof primeraOferta.descuentos === 'string' && primeraOferta.descuentos.startsWith('cupon;')) {
-                  try {
-                    const cuponInfo = window._pc1(primeraOferta.descuentos);
-                    const valorCupon = cuponInfo ? cuponInfo.valor : (primeraOferta.descuentos.split(';')[1] || '');
-                    const codigoCupon = cuponInfo ? cuponInfo.codigo : null;
-                    const codigoCuponEscapado = codigoCupon ? codigoCupon.replace(/"/g, '&quot;').replace(/'/g, '&#39;') : '';
-                    const valorCuponEscapado = String(valorCupon).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-                    const urlEscapada = primeraOferta.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-                    const dataAttrs = codigoCupon 
-                      ? `data-cupon="true" data-codigo-cupon="${codigoCuponEscapado}" data-valor-cupon="${valorCuponEscapado}" data-url="${urlEscapada}"` 
-                      : `data-cupon="true" data-valor-cupon="${valorCuponEscapado}" data-url="${urlEscapada}"`;
-                    botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold;">CUPÓN</span>' +
-                               '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" ' + dataAttrs + ' target="_blank">Ir a la tienda</span></div>';
-                  } catch (e) {
-                    botonHtml = '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'">Ir a la tienda</span>';
-                  }
-                } else if (primeraOferta.descuentos === 'cupon') {
-                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon="true" target="_blank">Ir a la tienda</span></div>';
-                } else if (primeraOferta.descuentos === '3x2') {
-                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #8b5cf6, #a855f7); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">3x2</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-3x2="true" target="_blank">Ir a la tienda</span></div>';
-                } else if (primeraOferta.descuentos === '+Juego') {
-                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #0ea5e9, #6366f1); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: 600; white-space: nowrap;">+Juego</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'">Ir a la tienda</span></div>';
-                } else if (primeraOferta.descuentos === '2x1 - SoloCarrefour') {
-                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #10b981, #059669); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">2x1</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2x1="true" target="_blank">Ir a la tienda</span></div>';
-                } else if (primeraOferta.descuentos === '2a al 50 - cheque - SoloCarrefour') {
-                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">2a al 50%</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2a-al-50-cheque="true" target="_blank">Ir a la tienda</span></div>';
-                } else if (primeraOferta.descuentos === '2a al 70') {
-                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">2a AL 70%</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2a-al-70="true" target="_blank">Ir a la tienda</span></div>';
-                } else if (primeraOferta.descuentos === '2a al 50') {
-                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">2a al 50%</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2a-al-50="true" target="_blank">Ir a la tienda</span></div>';
-                } else {
-                  botonHtml = '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded">Ir a la tienda</span>';
-                }
+                let botonHtml = _gbo1(primeraOferta, { py: 'py-3', px: 'px-2', inList: true });
                 
                 html += `
                   @auth
@@ -5090,12 +5280,12 @@
                         `${primeraOferta.envio_gratis ? '<p class="text-sm text-gray-500 font-bold"><img src=\'{{ asset('images/van.png') }}\' loading="lazy" alt=\'Van\' class=\'icon-small\'> ' + primeraOferta.envio_gratis + '</p>' : ''}${primeraOferta.envio_normal ? '<p class="text-sm text-gray-500"><img src=\'{{ asset('images/van.png') }}\' loading="lazy" alt=\'Van\' class=\'icon-small\'> ' + primeraOferta.envio_normal + '</p>' : ''}`
                       }
                     </div>
-                    ${mostrarCantidad ? `
+                    ${mostrarCantidad ? (tieneColumnaEnCantidad ? _rcc1(primeraOferta) : `
                     <div class="und text-gray-700 divider text-center min-w-0 overflow-hidden">
                       <div class="font-semibold">Cantidad</div>
-                      <div class="text-sm text-gray-500 leading-tight">${_fc1(primeraOferta.unidades, unidadMedida)}</div>
+                      <div class="text-sm text-gray-500 leading-tight">${_fc1(primeraOferta.unidades, unidadMedida, primeraOferta.texto_cantidad_alternativo)}</div>
                     </div>
-                    ` : ''}
+                    `) : ''}
                     ${columnasDinamicas}
                     ${!mostrarPrecioTotal && !mostrarPrecioUnidad ? `
                     <div class="precio-total text-gray-700 divider text-center min-w-0 overflow-hidden ${ordenPrecio}">
@@ -5178,17 +5368,7 @@
                   {{-- Solo renderizar si hay ofertas en el grupo --}}
                   if (grupoMejoresOfertas.length > 0) {
                     {{-- Crear contenedor para el grupo de mejores ofertas --}}
-                    const tieneDescuentosEnGrupo = grupoMejoresOfertas.some(item => 
-                      item.descuentos === 'cupon' || 
-                      item.descuentos === '3x2' ||
-                      item.descuentos === '+Juego' ||
-                      (item.descuentos && typeof item.descuentos === 'string' && (
-                        item.descuentos.startsWith('cupon;') ||
-                        item.descuentos.startsWith('SoloAliexpress;') ||
-                        item.descuentos.startsWith('CholloTienda;') ||
-                        item.descuentos.startsWith('CholloTienda1SoloCuponQueAplicaDescuento;')
-                      ))
-                    );
+                    const tieneDescuentosEnGrupo = grupoMejoresOfertas.some(item => window._tieneAlgunDescuento(item.descuentos));
                     html += `<div class="mejor-oferta-wrapper" ${tieneDescuentosEnGrupo ? 'style="padding-top: 8px;"' : 'style="padding-top: 8px;"'}>`;
                   
                     html += '<div class="mejor-oferta-badge-grupo">🏆 Mejor precio</div>';
@@ -5302,12 +5482,12 @@
                           `${itemGrupo.envio_gratis ? '<p class="text-sm text-gray-500 font-bold"><img src=\'{{ asset('images/van.png') }}\' loading="lazy" alt=\'Van\' class=\'icon-small\'> ' + itemGrupo.envio_gratis + '</p>' : ''}${itemGrupo.envio_normal ? '<p class="text-sm text-gray-500"><img src=\'{{ asset('images/van.png') }}\' loading="lazy" alt=\'Van\' class=\'icon-small\'> ' + itemGrupo.envio_normal + '</p>' : ''}`
                         }
                       </div>
-                      ${mostrarCantidad ? `
+                      ${mostrarCantidad ? (tieneColumnaEnCantidad ? _rcc1(itemGrupo) : `
                       <div class="und text-gray-700 divider text-center min-w-0 overflow-hidden">
                         <div class="font-semibold">Cantidad</div>
-                        <div class="text-sm text-gray-500 leading-tight">${_fc1(itemGrupo.unidades, unidadMedida)}</div>
+                        <div class="text-sm text-gray-500 leading-tight">${_fc1(itemGrupo.unidades, unidadMedida, itemGrupo.texto_cantidad_alternativo)}</div>
                       </div>
-                      ` : ''}
+                      `) : ''}
                       ${columnasDinamicas}
                       ${!mostrarPrecioTotal && !mostrarPrecioUnidad ? `
                       <div class="precio-total text-gray-700 divider text-center min-w-0 overflow-hidden ${ordenPrecio}">
@@ -5338,59 +5518,7 @@
                       </div>
                       ` : ''}
                       <div class="boton text-center min-w-0 relative overflow-visible ${ordenBoton}">
-                  ${itemGrupo.descuentos && typeof itemGrupo.descuentos === 'string' && itemGrupo.descuentos.startsWith('SoloAliexpress;') ? 
-                    '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon-aliexpress="true" data-descuentos="' + itemGrupo.descuentos.replace(/"/g, '&quot;') + '" data-oferta-id="' + itemGrupo.id + '" data-url="' + itemGrupo.url + '">Ir a la tienda</span></div>' :
-                    (itemGrupo.descuentos && typeof itemGrupo.descuentos === 'string' && itemGrupo.descuentos.startsWith('CholloTienda1SoloCuponQueAplicaDescuento;')) ?
-                    '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon-chollo-tienda-solo="true" data-descuentos="' + itemGrupo.descuentos.replace(/"/g, '&quot;') + '" data-oferta-id="' + itemGrupo.id + '" data-url="' + itemGrupo.url + '">Ir a la tienda</span></div>' :
-                    itemGrupo.descuentos && typeof itemGrupo.descuentos === 'string' && itemGrupo.descuentos.startsWith('CholloTienda;') ?
-                    '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon-chollo-tienda="true" data-descuentos="' + itemGrupo.descuentos.replace(/"/g, '&quot;') + '" data-oferta-id="' + itemGrupo.id + '" data-url="' + itemGrupo.url + '">Ir a la tienda</span></div>' :
-                    itemGrupo.descuentos && typeof itemGrupo.descuentos === 'string' && itemGrupo.descuentos.startsWith('cupon;') ? 
-                    (() => {
-                      try {
-                        const cuponInfo = window._pc1(itemGrupo.descuentos);
-                        const valorCupon = cuponInfo ? cuponInfo.valor : (itemGrupo.descuentos.split(';')[1] || '');
-                        const codigoCupon = cuponInfo ? cuponInfo.codigo : null;
-                        {{-- Escapar valores para evitar problemas con comillas y caracteres especiales --}}
-                        const codigoCuponEscapado = codigoCupon ? codigoCupon.replace(/"/g, '&quot;').replace(/'/g, '&#39;') : '';
-                        const valorCuponEscapado = String(valorCupon).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-                        const urlEscapada = itemGrupo.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-                        const dataAttrs = codigoCupon 
-                          ? `data-cupon="true" data-codigo-cupon="${codigoCuponEscapado}" data-valor-cupon="${valorCuponEscapado}" data-url="${urlEscapada}"` 
-                          : `data-cupon="true" data-valor-cupon="${valorCuponEscapado}" data-url="${urlEscapada}"`;
-                        {{-- Si es mejor oferta (primera del grupo), badge dentro (top: 0px), sino medio fuera (sin especificar top) --}}
-                        const badgeTop = 'top: 0px;'; {{-- Para mejor oferta, dentro del botón --}}
-                        return '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); ' + badgeTop + ' right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold;">CUPÓN</span>' +
-                               '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" ' + dataAttrs + ' target="_blank">Ir a la tienda</span></div>';
-                      } catch (e) {
-                        return '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'">Ir a la tienda</span>';
-                      }
-                    })() : 
-                    itemGrupo.descuentos === 'cupon' ? 
-                    '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon="true" target="_blank">Ir a la tienda</span></div>' : 
-                    itemGrupo.descuentos === '3x2' ?
-                    '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #8b5cf6, #a855f7); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">3x2</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-3x2="true" target="_blank">Ir a la tienda</span></div>' :
-                    itemGrupo.descuentos === '2x1 - SoloCarrefour' ?
-                    '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #10b981, #059669); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">2x1</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2x1="true" target="_blank">Ir a la tienda</span></div>' :
-                    itemGrupo.descuentos === '2a al 50 - cheque - SoloCarrefour' ?
-                    '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">2a al 50%</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2a-al-50-cheque="true" target="_blank">Ir a la tienda</span></div>' :
-                    itemGrupo.descuentos === '2a al 70' ?
-                    '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">2a AL 70%</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2a-al-70="true" target="_blank">Ir a la tienda</span></div>' :
-                    itemGrupo.descuentos === '2a al 50' ?
-                    '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">2a al 50%</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2a-al-50="true" target="_blank">Ir a la tienda</span></div>' :
-                    itemGrupo.descuentos === '+Juego' ?
-                    '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #0ea5e9, #6366f1); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: 600; white-space: nowrap;">+Juego</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'">Ir a la tienda</span></div>' :
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'">Ir a la tienda</span>'
-                  }
+                  ${_gbo1(itemGrupo, { py: 'py-3', px: 'px-2', inList: true })}
                       </div>
                     </a>
                     @auth
@@ -5483,57 +5611,7 @@
                 }
                 
                 {{-- Generar botón --}}
-                let botonHtml = '';
-                if (item.descuentos && typeof item.descuentos === 'string' && item.descuentos.startsWith('SoloAliexpress;')) {
-                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon-aliexpress="true" data-descuentos="' + item.descuentos.replace(/"/g, '&quot;') + '" data-oferta-id="' + item.id + '" data-url="' + item.url + '">Ir a la tienda</span></div>';
-                } else if (item.descuentos && typeof item.descuentos === 'string' && item.descuentos.startsWith('CholloTienda1SoloCuponQueAplicaDescuento;')) {
-                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon-chollo-tienda-solo="true" data-descuentos="' + item.descuentos.replace(/"/g, '&quot;') + '" data-oferta-id="' + item.id + '" data-url="' + item.url + '">Ir a la tienda</span></div>';
-                } else if (item.descuentos && typeof item.descuentos === 'string' && item.descuentos.startsWith('CholloTienda;')) {
-                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon-chollo-tienda="true" data-descuentos="' + item.descuentos.replace(/"/g, '&quot;') + '" data-oferta-id="' + item.id + '" data-url="' + item.url + '">Ir a la tienda</span></div>';
-                } else if (item.descuentos && typeof item.descuentos === 'string' && item.descuentos.startsWith('cupon;')) {
-                  try {
-                    const cuponInfo = window._pc1(item.descuentos);
-                    const valorCupon = cuponInfo ? cuponInfo.valor : (item.descuentos.split(';')[1] || '');
-                    const codigoCupon = cuponInfo ? cuponInfo.codigo : null;
-                    const codigoCuponEscapado = codigoCupon ? codigoCupon.replace(/"/g, '&quot;').replace(/'/g, '&#39;') : '';
-                    const valorCuponEscapado = String(valorCupon).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-                    const urlEscapada = item.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-                    const dataAttrs = codigoCupon 
-                      ? `data-cupon="true" data-codigo-cupon="${codigoCuponEscapado}" data-valor-cupon="${valorCuponEscapado}" data-url="${urlEscapada}"` 
-                      : `data-cupon="true" data-valor-cupon="${valorCuponEscapado}" data-url="${urlEscapada}"`;
-                    botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
-                               '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" ' + dataAttrs + '>Ir a la tienda</span></div>';
-                  } catch (e) {
-                    botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
-                               '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon="true" data-url="' + item.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;') + '">Ir a la tienda</span></div>';
-                  }
-                } else if (item.descuentos === 'cupon') {
-                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">CUPÓN</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon="true" data-url="' + item.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;') + '">Ir a la tienda</span></div>';
-                } else if (item.descuentos === '3x2') {
-                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #8b5cf6, #a855f7); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">3x2</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-3x2="true" data-url="' + item.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;') + '">Ir a la tienda</span></div>';
-                } else if (item.descuentos === '2x1 - SoloCarrefour') {
-                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #10b981, #059669); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">2x1</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2x1="true" data-url="' + item.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;') + '">Ir a la tienda</span></div>';
-                } else if (item.descuentos === '2a al 50 - cheque - SoloCarrefour') {
-                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap;">2a al 50%</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2a-al-50-cheque="true" data-url="' + item.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;') + '">Ir a la tienda</span></div>';
-                } else if (item.descuentos === '2a al 70') {
-                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">2a AL 70%</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2a-al-70="true" data-url="' + item.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;') + '">Ir a la tienda</span></div>';
-                } else if (item.descuentos === '2a al 50') {
-                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap;">2a al 50%</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2a-al-50="true" data-url="' + item.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;') + '">Ir a la tienda</span></div>';
-                } else if (item.descuentos === '+Juego') {
-                  botonHtml = '<div class="relative w-full"><span class="cupon-badge" style="background: linear-gradient(135deg, #0ea5e9, #6366f1); top: 0px; right: 0px; bottom: auto; font-size: 0.7rem; padding: 2px 6px; font-weight: 600; white-space: nowrap;">+Juego</span>' +
-                    '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'">Ir a la tienda</span></div>';
-                } else {
-                  botonHtml = '<span class="inline-block w-full py-3 px-2 text-white text-base font-semibold rounded" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'">Ir a la tienda</span>';
-                }
+                let botonHtml = _gbo1(item, { py: 'py-3', px: 'px-2', inList: true });
                 
                 html += `
                   @auth
@@ -5550,12 +5628,12 @@
                         `${item.envio_gratis ? '<p class="text-sm text-gray-500 font-bold"><img src=\'{{ asset('images/van.png') }}\' loading="lazy" alt=\'Van\' class=\'icon-small\'> ' + item.envio_gratis + '</p>' : ''}${item.envio_normal ? '<p class="text-sm text-gray-500"><img src=\'{{ asset('images/van.png') }}\' loading="lazy" alt=\'Van\' class=\'icon-small\'> ' + item.envio_normal + '</p>' : ''}`
                       }
                     </div>
-                    ${mostrarCantidad ? `
+                    ${mostrarCantidad ? (tieneColumnaEnCantidad ? _rcc1(item) : `
                     <div class="und text-gray-700 divider text-center min-w-0 overflow-hidden">
                       <div class="font-semibold">Cantidad</div>
-                      <div class="text-sm text-gray-500 leading-tight">${_fc1(item.unidades, unidadMedida)}</div>
+                      <div class="text-sm text-gray-500 leading-tight">${_fc1(item.unidades, unidadMedida, item.texto_cantidad_alternativo)}</div>
                     </div>
-                    ` : ''}
+                    `) : ''}
                     ${columnasDinamicas}
                     ${!mostrarPrecioTotal && !mostrarPrecioUnidad ? `
                     <div class="precio-total text-gray-700 divider text-center min-w-0 overflow-hidden ${ordenPrecio}">
@@ -5700,6 +5778,13 @@
             const mejorOfertaBoton2 = document.getElementById('mejor-oferta-boton-movil-2');
             
             
+            const botonesDescuentosUnificados = document.querySelectorAll('[data-oferta-descuentos]');
+            
+            botonesDescuentosUnificados.forEach(button => {
+              button.removeEventListener('click', _hodm1);
+              button.addEventListener('click', _hodm1);
+            });
+            
             cuponButtons.forEach((button, index) => {
               {{-- Remover event listeners anteriores para evitar duplicados --}}
               button.removeEventListener('click', _hcc1);
@@ -5773,7 +5858,7 @@
                 
                 if (botonContainer) {
                   {{-- Buscar tanto <a> como <span> (los botones con descuento son <span>) --}}
-                  const botonElement = botonContainer.querySelector('a, span[data-cupon], span[data-cupon-aliexpress], span[data-cupon-chollo-tienda], span[data-3x2], span[data-2x1], span[data-2a-al-50-cheque], span[data-2a-al-50], span[data-2a-al-70]');
+                  const botonElement = botonContainer.querySelector('a, span[data-oferta-descuentos], span[data-cupon], span[data-cupon-aliexpress], span[data-cupon-chollo-tienda], span[data-3x2], span[data-2x1], span[data-2a-al-50-cheque], span[data-2a-al-50], span[data-2a-al-70]');
                   
                   if (botonElement) {
                     {{-- Remover event listeners anteriores para evitar duplicados --}}
@@ -5804,7 +5889,7 @@
                     
                     if (botonContainer) {
                       {{-- Buscar tanto <a> como <span> con atributos de descuento --}}
-                      const botonElement = botonContainer.querySelector('a, span[data-cupon], span[data-cupon-aliexpress], span[data-cupon-chollo-tienda], span[data-3x2], span[data-2x1], span[data-2a-al-50-cheque], span[data-2a-al-50], span[data-2a-al-70]');
+                      const botonElement = botonContainer.querySelector('a, span[data-oferta-descuentos], span[data-cupon], span[data-cupon-aliexpress], span[data-cupon-chollo-tienda], span[data-3x2], span[data-2x1], span[data-2a-al-50-cheque], span[data-2a-al-50], span[data-2a-al-70]');
                       
                       if (botonElement) {
                         const tieneDescuento = botonElement.hasAttribute('data-cupon') || 
@@ -7378,6 +7463,10 @@ document.addEventListener('DOMContentLoaded', function() {
 {{-- Función para manejar clic en tarjeta de oferta --}}
 {{-- _hpcc1: handleProductCardClick - Maneja el evento de clic en las tarjetas de producto --}}
 function _hpcc1(e) {
+  {{-- Si el clic fue en un botón con descuentos unificados --}}
+  if (e.target.closest('[data-oferta-descuentos]')) {
+    return;
+  }
   {{-- Si el clic fue en un botón específico, no hacer nada (ya se maneja por separado) --}}
   if (e.target.closest('[data-cupon], [data-cupon-aliexpress], [data-cupon-chollo-tienda], [data-cupon-chollo-tienda-solo], [data-3x2], [data-2x1], [data-2a-al-50-cheque], [data-2a-al-50], [data-2a-al-70]')) {
     return;
@@ -7386,7 +7475,20 @@ function _hpcc1(e) {
   const card = e.currentTarget;
   const url = card.href;
   
-  {{-- Buscar qué tipo de descuento tiene esta oferta --}}
+  {{-- Buscar botón con descuentos unificados --}}
+  const botonDescuentos = card.querySelector('[data-oferta-descuentos]');
+  if (botonDescuentos) {
+    e.preventDefault();
+    e.stopPropagation();
+    _sodm1(
+      botonDescuentos.getAttribute('data-url') || url,
+      botonDescuentos.getAttribute('data-oferta-descuentos'),
+      botonDescuentos.getAttribute('data-oferta-id')
+    );
+    return;
+  }
+  
+  {{-- Buscar qué tipo de descuento tiene esta oferta (compatibilidad) --}}
   const cuponButton = card.querySelector('[data-cupon="true"]');
   const cuponAliExpressButton = card.querySelector('[data-cupon-aliexpress="true"]');
   const cuponCholloTiendaButton = card.querySelector('[data-cupon-chollo-tienda="true"]');
@@ -7661,14 +7763,14 @@ function _hmomc1(e) {
   
   {{-- Si el target es el badge o algo dentro, buscar el elemento del botón --}}
   if (link.tagName === 'SPAN' && link.classList.contains('cupon-badge')) {
-    link = link.parentElement.querySelector('a, span[data-cupon], span[data-cupon-aliexpress], span[data-cupon-chollo-tienda], span[data-cupon-chollo-tienda-solo], span[data-3x2], span[data-2x1], span[data-2a-al-50], span[data-2a-al-70]');
+    link = link.parentElement.querySelector('a, span[data-oferta-descuentos], span[data-cupon], span[data-cupon-aliexpress], span[data-cupon-chollo-tienda], span[data-cupon-chollo-tienda-solo], span[data-3x2], span[data-2x1], span[data-2a-al-50], span[data-2a-al-70]');
   }
   
   {{-- Si no es el botón, buscar el botón más cercano --}}
-  if (!link || (!link.hasAttribute('data-cupon') && !link.hasAttribute('data-cupon-aliexpress') && !link.hasAttribute('data-cupon-chollo-tienda') && !link.hasAttribute('data-cupon-chollo-tienda-solo') && !link.hasAttribute('data-3x2') && !link.hasAttribute('data-2x1') && !link.hasAttribute('data-2a-al-50-cheque') && !link.hasAttribute('data-2a-al-50') && !link.hasAttribute('data-2a-al-70'))) {
+  if (!link || (!link.hasAttribute('data-oferta-descuentos') && !link.hasAttribute('data-cupon') && !link.hasAttribute('data-cupon-aliexpress') && !link.hasAttribute('data-cupon-chollo-tienda') && !link.hasAttribute('data-cupon-chollo-tienda-solo') && !link.hasAttribute('data-3x2') && !link.hasAttribute('data-2x1') && !link.hasAttribute('data-2a-al-50-cheque') && !link.hasAttribute('data-2a-al-50') && !link.hasAttribute('data-2a-al-70'))) {
     const botonContainer = e.target.closest('[id^="mejor-oferta-boton-movil-"]');
     if (botonContainer) {
-      link = botonContainer.querySelector('a, span[data-cupon], span[data-cupon-aliexpress], span[data-cupon-chollo-tienda], span[data-cupon-chollo-tienda-solo], span[data-3x2], span[data-2x1], span[data-2a-al-50-cheque], span[data-2a-al-50], span[data-2a-al-70]');
+      link = botonContainer.querySelector('a, span[data-oferta-descuentos], span[data-cupon], span[data-cupon-aliexpress], span[data-cupon-chollo-tienda], span[data-cupon-chollo-tienda-solo], span[data-3x2], span[data-2x1], span[data-2a-al-50-cheque], span[data-2a-al-50], span[data-2a-al-70]');
     }
   }
   
@@ -7680,7 +7782,9 @@ function _hmomc1(e) {
   const url = link.href || link.getAttribute('data-url');
   
   {{-- Verificar qué tipo de descuento tiene --}}
-  if (link.hasAttribute('data-cupon-aliexpress')) {
+  if (link.hasAttribute('data-oferta-descuentos')) {
+    _sodm1(link.getAttribute('data-url') || url, link.getAttribute('data-oferta-descuentos'), link.getAttribute('data-oferta-id'));
+  } else if (link.hasAttribute('data-cupon-aliexpress')) {
     const descuentos = link.getAttribute('data-descuentos');
     const ofertaId = link.getAttribute('data-oferta-id');
     showCuponAliExpressModal(url, descuentos, ofertaId);
@@ -7746,7 +7850,7 @@ function _scm1(url, valorCupon = null, codigoCupon = null) {
   let cuponesHtml = '';
   if (codigoCupon && valorCupon) {
     cuponesHtml = _ghc1({
-      descuentoTexto: `-${valorCupon}€`,
+      descuentoTexto: window._tdc1 ? window._tdc1(valorCupon) : `-${valorCupon}€`,
       codigoCupon,
       mostrarSobrePrecio: false,
       urlRedireccion: url
@@ -7962,6 +8066,167 @@ const v12 = {
     text: 'Esta oferta tiene descuento 2ª al 70%. Para obtener este precio, debes comprar 2 unidades y en el carrito se te aplicará automáticamente el descuento o puede que tengas que marcar alguna casilla en la vista del producto.'
   }
 };
+
+{{-- _ghds1: generarHTMLDescuentoSeccion - HTML de una sección informativa de descuento --}}
+function _ghds1(titulo, texto) {
+  return `<div class="mb-4 p-3 border border-gray-200 rounded-lg bg-gray-50 dark:bg-gray-700">
+    <h4 class="font-semibold text-gray-800 dark:text-gray-200 mb-1">${titulo}</h4>
+    <p class="text-sm text-gray-700 dark:text-gray-300">${texto}</p>
+  </div>`;
+}
+
+{{-- _ssmm1: showSimpleMultiModal - Modal combinado con varios descuentos --}}
+function _ssmm1(url, lista, ofertaId) {
+  _cm1();
+  const modal = document.getElementById('x20');
+  const continueBtn = document.getElementById('x26');
+  const title = document.getElementById('x22');
+  const text = document.getElementById('x23');
+  const cuponesList = document.getElementById('x24');
+  if (!modal || !continueBtn || !title || !text || !cuponesList) return;
+
+  const urlFinal = ofertaId ? `/redirigir/${ofertaId}${window.location.search}` : url;
+  continueBtn.href = urlFinal;
+  continueBtn.textContent = 'Ir a la tienda';
+  continueBtn.onclick = function(e) {
+    e.preventDefault();
+    window.open(urlFinal, '_blank', 'noopener,noreferrer');
+    _hcm1();
+  };
+
+  title.textContent = lista.length > 1 ? '¡Varias ofertas disponibles!' : (v12[window._mck1[lista[0]]]?.title || '¡Oferta especial!');
+
+  const descuentosConCupon = lista.filter(d => window._edc1(d));
+  const hayVariosCupones = descuentosConCupon.length >= 2;
+
+  if (hayVariosCupones) {
+    title.textContent = descuentosConCupon.length === 2 ? '¡Aplicar ambos cupones!' : '¡Aplicar todos los cupones!';
+    text.textContent = descuentosConCupon.length === 2
+      ? 'Para conseguir este precio hay que aplicar ambos cupones:'
+      : 'Para conseguir este precio hay que aplicar todos los cupones:';
+    text.classList.remove('hidden');
+  } else if (lista.length > 1) {
+    text.textContent = 'Esta oferta combina varias promociones. Para obtener el precio mostrado, aplica todas ellas:';
+    text.classList.remove('hidden');
+  } else if (lista.length === 1 && window._p2ac1(lista[0])) {
+    const info2a = window._p2ac1(lista[0]);
+    title.textContent = `¡2ª unidad al ${info2a.porcentaje}% con cupón!`;
+    text.textContent = '';
+    text.classList.add('hidden');
+  } else {
+    text.textContent = 'Para obtener este precio, sigue las instrucciones de la promoción:';
+    text.classList.remove('hidden');
+  }
+
+  let sectionsHtml = '';
+  lista.forEach(descuento => {
+    if (descuento.startsWith('SoloAliexpress;')) {
+      if (typeof showCuponAliExpressModal === 'function') {
+        return;
+      }
+    } else if (descuento.startsWith('CholloTienda1SoloCuponQueAplicaDescuento;') || descuento.startsWith('CholloTienda;')) {
+      const cuponesInfo = _pcct1(descuento);
+      const esSoloCupon = descuento.startsWith('CholloTienda1SoloCuponQueAplicaDescuento;');
+      sectionsHtml += _ghds1('Cupón de tienda', esSoloCupon
+        ? 'Para conseguir este precio, hay que aplicar este cupón.'
+        : 'Los cupones son válidos para la gran mayoría de productos, pero no para todos.');
+      cuponesInfo.forEach(cupon => {
+        const descuentoTexto = (esSoloCupon && cupon.tipo_descuento === 'porcentaje')
+          ? `-${cupon.descuento}%`
+          : `-${cupon.descuento}€`;
+        sectionsHtml += _ghc1({
+          descuentoTexto,
+          codigoCupon: cupon.cupon,
+          mostrarSobrePrecio: !esSoloCupon && cupon.sobrePrecioTotal !== undefined,
+          sobrePrecioTotal: cupon.sobrePrecioTotal,
+          urlRedireccion: urlFinal,
+        });
+      });
+    } else if (window._p2ac1(descuento)) {
+      const info2a = window._p2ac1(descuento);
+      sectionsHtml += _ghds1(
+        `2ª unidad al ${info2a.porcentaje}% con cupón`,
+        'Para conseguir este precio, añade 2 unidades al carrito y aplica el cupón. El descuento se aplica en la 2ª unidad.'
+      );
+      sectionsHtml += _ghc1({
+        descuentoTexto: `-${info2a.porcentaje}% en 2ª ud.`,
+        codigoCupon: info2a.codigo,
+        mostrarSobrePrecio: false,
+        urlRedireccion: urlFinal,
+      });
+    } else if (descuento.startsWith('cupon;') || descuento === 'cupon') {
+      const cuponInfo = window._pc1(descuento);
+      if (!hayVariosCupones) {
+        sectionsHtml += _ghds1('Cupón de descuento', 'Para conseguir este precio, hay que aplicar este cupón.');
+      }
+      if (cuponInfo && cuponInfo.codigo) {
+        sectionsHtml += _ghc1({
+          descuentoTexto: window._tdc1(cuponInfo.valor),
+          codigoCupon: cuponInfo.codigo,
+          mostrarSobrePrecio: false,
+          urlRedireccion: urlFinal,
+        });
+      }
+    } else {
+      const configKey = window._mck1[descuento];
+      if (configKey && v12[configKey]) {
+        sectionsHtml += _ghds1(v12[configKey].title, v12[configKey].text);
+      }
+    }
+  });
+
+  cuponesList.innerHTML = sectionsHtml;
+  _cbc1(cuponesList, urlFinal);
+
+  modal.classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+
+{{-- _sodm1: showOfertaDescuentosModal - Abre modal para uno o varios descuentos --}}
+function _sodm1(url, descuentos, ofertaId) {
+  const lista = window._pd1(descuentos).filter(d => d !== '+Juego' && d !== '-20%' && d !== 'rebaja' && d !== 'promocion' && d !== 'oferta_especial');
+  if (lista.length === 0) return;
+
+  if (lista.length === 1) {
+    const d = lista[0];
+    if (d.startsWith('SoloAliexpress;') && typeof showCuponAliExpressModal === 'function') {
+      showCuponAliExpressModal(url, d, ofertaId);
+      return;
+    }
+    if (d.startsWith('CholloTienda1SoloCuponQueAplicaDescuento;') || d.startsWith('CholloTienda;')) {
+      _scctm1(url, d, ofertaId);
+      return;
+    }
+    if (d.startsWith('cupon;') || d === 'cupon') {
+      const cuponInfo = window._pc1(d);
+      _scm1(url, cuponInfo ? cuponInfo.valor : null, cuponInfo ? cuponInfo.codigo : null);
+      return;
+    }
+    if (window._p2ac1(d)) {
+      _ssmm1(url, lista, ofertaId);
+      return;
+    }
+    const configKey = window._mck1[d];
+    if (configKey && v12[configKey]) {
+      _ssm1(url, v12[configKey]);
+      return;
+    }
+  }
+
+  _ssmm1(url, lista, ofertaId);
+}
+
+{{-- _hodm1: handleOfertaDescuentosModalClick - Click en botón con data-oferta-descuentos --}}
+function _hodm1(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const btn = e.target.closest('[data-oferta-descuentos]');
+  if (!btn) return;
+  const url = btn.getAttribute('data-url');
+  const descuentos = btn.getAttribute('data-oferta-descuentos');
+  const ofertaId = btn.getAttribute('data-oferta-id');
+  _sodm1(url, descuentos, ofertaId);
+}
 
 {{-- Función genérica para modales simples --}}
 {{-- _ssm1: showSimpleModal - Muestra un modal simple con configuración personalizada --}}
@@ -8948,6 +9213,7 @@ function _rod1() {
   const unidadMedida = '{{ $producto->unidadDeMedida }}';
   const esUnidadUnica = unidadMedida === 'unidadUnica';
   const columnasDataModal = @json($columnasData ?? null);
+  const tieneColumnaEnCantidadModal = !esUnidadUnica && columnasDataModal && Array.isArray(columnasDataModal) && columnasDataModal.length > 0;
   
   {{-- Función auxiliar para obtener texto de sublínea (usa columnasDataModal local) --}}
   {{-- _otsm1: obtenerTextoSublineaModal - Obtiene el texto de una sublínea para el modal --}}
@@ -8957,6 +9223,14 @@ function _rod1() {
     if (!linea || !linea.subprincipales) return '-';
     const sublinea = linea.subprincipales.find(s => s.id === sublineaId);
     return sublinea ? sublinea.texto : '-';
+  }
+
+  function _otscm1(lineaId, sublineaIdsRaw) {
+    const ids = typeof _nis1 === 'function' ? _nis1(sublineaIdsRaw) : (Array.isArray(sublineaIdsRaw) ? sublineaIdsRaw : (sublineaIdsRaw ? [sublineaIdsRaw] : []));
+    if (ids.length === 0) return '-';
+    const textos = ids.map(id => _otsm1(lineaId, id)).filter(t => t && t !== '-');
+    if (textos.length === 0) return '-';
+    return typeof _uly1 === 'function' ? _uly1(textos) : textos.join(', ');
   }
   
   {{-- Función para renderizar columnas dinámicas (adaptada para modal) --}}
@@ -8974,8 +9248,7 @@ function _rod1() {
     
     {{-- Para el modal, cada columna se muestra como independiente, centrada y con separador --}}
     columnasDataModal.forEach((linea, index) => {
-      const sublineaId = columnasOferta[linea.id];
-      const textoSublinea = sublineaId ? _otsm1(linea.id, sublineaId) : '-';
+      const textoSublinea = _otscm1(linea.id, columnasOferta[linea.id]);
       {{-- Añadir separador (border-b) excepto en la última columna --}}
       const separatorClass = index < numColumnas - 1 ? 'pb-4 mb-4 border-b border-gray-200' : '';
       html += `<div class="text-center ${separatorClass}">
@@ -9040,14 +9313,31 @@ function _rod1() {
   
   {{-- Cantidad (solo si no es unidad única, usando la función correcta) --}}
   if (mostrarCantidad) {
-    html += `
-      <div class="text-center mb-4 pb-4 border-b border-gray-200">
-        <div class="und text-gray-700">
-          <div class="font-semibold">Cantidad</div>
-          <div class="text-sm text-gray-500 leading-tight">${_fc1(primeraOferta.unidades, unidadMedida)}</div>
+    if (tieneColumnaEnCantidadModal) {
+      const linea = columnasDataModal[0];
+      const especificacionesOferta = primeraOferta.especificaciones_internas || {};
+      const columnasOferta = especificacionesOferta._c || {};
+      const textoSublinea = _otscm1(linea.id, columnasOferta[linea.id]);
+      html += `
+        <div class="text-center mb-4 pb-4 border-b border-gray-200">
+          <div class="und text-gray-700">
+            <div class="font-semibold">Cantidad</div>
+            <div class="text-sm text-gray-500 leading-tight">${_fc1(primeraOferta.unidades, unidadMedida, primeraOferta.texto_cantidad_alternativo)}</div>
+            <div class="border-t border-gray-300 mt-2 mb-1"></div>
+            <div class="text-xs leading-tight" style="font-weight: 600;"><span class="font-semibold">${linea.texto}:</span> <span class="text-gray-500">${textoSublinea}</span></div>
+          </div>
         </div>
-      </div>
-    `;
+      `;
+    } else {
+      html += `
+        <div class="text-center mb-4 pb-4 border-b border-gray-200">
+          <div class="und text-gray-700">
+            <div class="font-semibold">Cantidad</div>
+            <div class="text-sm text-gray-500 leading-tight">${_fc1(primeraOferta.unidades, unidadMedida, primeraOferta.texto_cantidad_alternativo)}</div>
+          </div>
+        </div>
+      `;
+    }
   }
   
   {{-- Columnas dinámicas (si es unidad única con columnas) --}}
@@ -9095,78 +9385,7 @@ function _rod1() {
   }
   
   {{-- Generar botón con descuentos (misma lógica que en el listado) --}}
-  let botonHtml = '';
-  if (primeraOferta.descuentos && typeof primeraOferta.descuentos === 'string' && primeraOferta.descuentos.startsWith('SoloAliexpress;')) {
-    botonHtml = '<div class="relative">' +
-      '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap; position: absolute; top: -12px; right: 8px; z-index: 10;">CUPÓN</span>' +
-      '<span class="inline-block w-full py-3 px-4 text-white text-center font-semibold rounded transition-colors cursor-pointer" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon-aliexpress="true" data-descuentos="' + primeraOferta.descuentos.replace(/"/g, '&quot;') + '" data-oferta-id="' + primeraOferta.id + '" data-url="' + primeraOferta.url + '">Ir a la tienda</span>' +
-      '</div>';
-  } else if (primeraOferta.descuentos && typeof primeraOferta.descuentos === 'string' && primeraOferta.descuentos.startsWith('CholloTienda1SoloCuponQueAplicaDescuento;')) {
-    botonHtml = '<div class="relative">' +
-      '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap; position: absolute; top: -12px; right: 8px; z-index: 10;">CUPÓN</span>' +
-      '<span class="inline-block w-full py-3 px-4 text-white text-center font-semibold rounded transition-colors cursor-pointer" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon-chollo-tienda-solo="true" data-descuentos="' + primeraOferta.descuentos.replace(/"/g, '&quot;') + '" data-oferta-id="' + primeraOferta.id + '" data-url="' + primeraOferta.url + '">Ir a la tienda</span>' +
-      '</div>';
-  } else if (primeraOferta.descuentos && typeof primeraOferta.descuentos === 'string' && primeraOferta.descuentos.startsWith('CholloTienda;')) {
-    botonHtml = '<div class="relative">' +
-      '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap; position: absolute; top: -12px; right: 8px; z-index: 10;">CUPÓN</span>' +
-      '<span class="inline-block w-full py-3 px-4 text-white text-center font-semibold rounded transition-colors cursor-pointer" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon-chollo-tienda="true" data-descuentos="' + primeraOferta.descuentos.replace(/"/g, '&quot;') + '" data-oferta-id="' + primeraOferta.id + '" data-url="' + primeraOferta.url + '">Ir a la tienda</span>' +
-      '</div>';
-  } else if (primeraOferta.descuentos && typeof primeraOferta.descuentos === 'string' && primeraOferta.descuentos.startsWith('cupon;')) {
-    try {
-      const cuponInfo = window._pc1(primeraOferta.descuentos);
-      const valorCupon = cuponInfo ? cuponInfo.valor : (primeraOferta.descuentos.split(';')[1] || '');
-      const codigoCupon = cuponInfo ? cuponInfo.codigo : null;
-      const codigoCuponEscapado = codigoCupon ? codigoCupon.replace(/"/g, '&quot;').replace(/'/g, '&#39;') : '';
-      const valorCuponEscapado = String(valorCupon).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-      const urlEscapada = primeraOferta.url.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-      const dataAttrs = codigoCupon 
-        ? `data-cupon="true" data-codigo-cupon="${codigoCuponEscapado}" data-valor-cupon="${valorCuponEscapado}" data-url="${urlEscapada}"` 
-        : `data-cupon="true" data-valor-cupon="${valorCuponEscapado}" data-url="${urlEscapada}"`;
-      botonHtml = '<div class="relative">' +
-        '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); font-size: 0.7rem; padding: 2px 6px; font-weight: bold; position: absolute; top: -12px; right: 8px; z-index: 10;">CUPÓN</span>' +
-        '<span class="inline-block w-full py-3 px-4 text-white text-center font-semibold rounded transition-colors cursor-pointer" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" ' + dataAttrs + '>Ir a la tienda</span>' +
-        '</div>';
-    } catch (e) {
-      botonHtml = '<a href="' + primeraOferta.url + '" target="_blank" rel="sponsored noopener noreferrer" class="block w-full py-3 px-4 text-white text-center font-semibold rounded transition-colors" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'">Ir a la tienda</a>';
-    }
-  } else if (primeraOferta.descuentos === 'cupon') {
-    botonHtml = '<div class="relative">' +
-      '<span class="cupon-badge" style="background: linear-gradient(135deg, #ff6900, #ff8c00); font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap; position: absolute; top: -12px; right: 8px; z-index: 10;">CUPÓN</span>' +
-      '<span class="inline-block w-full py-3 px-4 text-white text-center font-semibold rounded transition-colors cursor-pointer" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-cupon="true" data-url="' + primeraOferta.url.replace(/"/g, '&quot;') + '">Ir a la tienda</span>' +
-      '</div>';
-  } else if (primeraOferta.descuentos === '3x2') {
-    botonHtml = '<div class="relative">' +
-      '<span class="cupon-badge" style="background: linear-gradient(135deg, #8b5cf6, #a855f7); font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap; position: absolute; top: -12px; right: 8px; z-index: 10;">3x2</span>' +
-      '<span class="inline-block w-full py-3 px-4 text-white text-center font-semibold rounded transition-colors cursor-pointer" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-3x2="true" data-url="' + primeraOferta.url.replace(/"/g, '&quot;') + '">Ir a la tienda</span>' +
-      '</div>';
-  } else if (primeraOferta.descuentos === '+Juego') {
-    botonHtml = '<div class="relative">' +
-      '<span class="cupon-badge" style="background: linear-gradient(135deg, #0ea5e9, #6366f1); font-size: 0.7rem; padding: 2px 6px; font-weight: 600; white-space: nowrap; position: absolute; top: -12px; right: 8px; z-index: 10;">+Juego</span>' +
-      '<span class="inline-block w-full py-3 px-4 text-white text-center font-semibold rounded transition-colors cursor-pointer" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'">Ir a la tienda</span>' +
-      '</div>';
-  } else if (primeraOferta.descuentos === '2x1 - SoloCarrefour') {
-    botonHtml = '<div class="relative">' +
-      '<span class="cupon-badge" style="background: linear-gradient(135deg, #10b981, #059669); font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap; position: absolute; top: -12px; right: 8px; z-index: 10;">2x1</span>' +
-      '<span class="inline-block w-full py-3 px-4 text-white text-center font-semibold rounded transition-colors cursor-pointer" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2x1="true" data-url="' + primeraOferta.url.replace(/"/g, '&quot;') + '">Ir a la tienda</span>' +
-      '</div>';
-  } else if (primeraOferta.descuentos === '2a al 50 - cheque - SoloCarrefour') {
-    botonHtml = '<div class="relative">' +
-      '<span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); font-size: 0.7rem; padding: 2px 6px; font-weight: bold; white-space: nowrap; position: absolute; top: -12px; right: 8px; z-index: 10;">2a al 50%</span>' +
-      '<span class="inline-block w-full py-3 px-4 text-white text-center font-semibold rounded transition-colors cursor-pointer" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2a-al-50-cheque="true" data-url="' + primeraOferta.url.replace(/"/g, '&quot;') + '">Ir a la tienda</span>' +
-      '</div>';
-  } else if (primeraOferta.descuentos === '2a al 70') {
-    botonHtml = '<div class="relative">' +
-      '<span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap; position: absolute; top: -12px; right: 8px; z-index: 10;">2a al 70%</span>' +
-      '<span class="inline-block w-full py-3 px-4 text-white text-center font-semibold rounded transition-colors cursor-pointer" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2a-al-70="true" data-url="' + primeraOferta.url.replace(/"/g, '&quot;') + '">Ir a la tienda</span>' +
-      '</div>';
-  } else if (primeraOferta.descuentos === '2a al 50') {
-    botonHtml = '<div class="relative">' +
-      '<span class="cupon-badge" style="background: linear-gradient(135deg, #f59e0b, #d97706); font-size: 0.7rem; padding: 2px 6px; font-weight: normal; white-space: nowrap; position: absolute; top: -12px; right: 8px; z-index: 10;">2a al 50%</span>' +
-      '<span class="inline-block w-full py-3 px-4 text-white text-center font-semibold rounded transition-colors cursor-pointer" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'" data-2a-al-50="true" data-url="' + primeraOferta.url.replace(/"/g, '&quot;') + '">Ir a la tienda</span>' +
-      '</div>';
-  } else {
-    botonHtml = '<a href="' + primeraOferta.url + '" target="_blank" rel="sponsored noopener noreferrer" class="block w-full py-3 px-4 text-white text-center font-semibold rounded transition-colors" style="background-color: #70b216;" onmouseover="this.style.backgroundColor=\'#60a013\'" onmouseout="this.style.backgroundColor=\'#70b216\'">Ir a la tienda</a>';
-  }
+  let botonHtml = window._gbo1(primeraOferta, { py: 'py-3', px: 'px-4' });
   
   html += botonHtml;
   html += `

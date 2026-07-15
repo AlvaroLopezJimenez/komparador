@@ -85,9 +85,21 @@
 
             {{-- INFORMACIÓN GENERAL --}}
             <fieldset class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 space-y-6 border border-gray-200 dark:border-gray-700">
-                <legend class="text-lg font-semibold text-gray-700 dark:text-gray-200">Información general</legend>
+                <legend class="flex flex-wrap items-baseline justify-between gap-x-4 w-full text-lg font-semibold text-gray-700 dark:text-gray-200 mb-0 pb-0 float-none">
+                    <span>Información general</span>
+                    <span id="oferta-api-scraping-wrap" class="text-sm font-normal text-gray-500 dark:text-gray-400 {{ !empty($apiScrapingOferta) ? '' : 'hidden' }} shrink-0 flex flex-wrap items-baseline justify-end gap-x-4">
+                        <span id="oferta-api-tienda-line" class="whitespace-nowrap">
+                            API tienda:
+                            <span id="oferta-api-tienda-nombre" class="text-gray-700 dark:text-gray-300" title="{{ data_get($apiScrapingOferta, 'api_tienda', '') }}">{{ data_get($apiScrapingOferta, 'api_tienda_nombre', '') }}</span>
+                        </span>
+                        <span id="oferta-api-categoria-line" class="whitespace-nowrap {{ data_get($apiScrapingOferta, 'tiene_dos_apis') ? '' : 'hidden' }}">
+                            API categoría:
+                            <span id="oferta-api-categoria-nombre" class="text-gray-700 dark:text-gray-300" title="{{ data_get($apiScrapingOferta, 'api_categoria', '') }}">{{ data_get($apiScrapingOferta, 'api_categoria_nombre', '') }}</span>
+                        </span>
+                    </span>
+                </legend>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 -mt-4">
                     {{-- PRODUCTO --}}
                     <div class="col-span-1 md:col-span-2">
                         <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">Producto *</label>
@@ -183,7 +195,7 @@
 
                             {{-- UNIDADES --}}
                             <div>
-                                <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">Unidades *</label>
+                                <label id="label_unidades" class="block mb-1 font-medium text-gray-700 dark:text-gray-200">Unidades *</label>
                                 <input type="number" name="unidades" min="0.01" step="0.01" required
                                     value="{{ old('unidades', $oferta->unidades ?? '') }}"
                                     class="w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border">
@@ -213,7 +225,7 @@
 
                             {{-- PRECIO POR UNIDAD --}}
                             <div>
-                                <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">Precio por unidad (€) *</label>
+                                <label id="label_precio_unidad" class="block mb-1 font-medium text-gray-700 dark:text-gray-200">Precio por unidad (€) *</label>
                                 <input type="number" name="precio_unidad" step="0.001" max="99999.999" required
                                     value="{{ old('precio_unidad', $oferta->precio_unidad ?? '') }}"
                                     class="w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -222,6 +234,22 @@
                                 @enderror
                             </div>
                         </div>
+                    </div>
+
+                    {{-- TEXTO CANTIDAD ALTERNATIVO (solo si la categoría del producto lo exige) --}}
+                    <div id="wrap_texto_cantidad_alternativo" class="col-span-1 md:col-span-2 hidden">
+                        <label for="texto_cantidad_alternativo_input" class="block mb-1 font-medium text-gray-700 dark:text-gray-200">
+                            Texto cantidad alternativo <span class="text-red-500">*</span>
+                        </label>
+                        <div id="texto_cantidad_alternativo_botones" class="flex flex-wrap gap-1.5 mb-1.5" aria-live="polite"></div>
+                        <input type="text" name="texto_cantidad_alternativo" id="texto_cantidad_alternativo_input"
+                            value="{{ old('texto_cantidad_alternativo', $oferta->texto_cantidad_alternativo ?? '') }}"
+                            maxlength="255"
+                            placeholder="Ej: 6 botellines"
+                            class="w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border @error('texto_cantidad_alternativo') border-red-500 @enderror">
+                        @error('texto_cantidad_alternativo')
+                        <p class="text-sm text-red-500 mt-1">{{ $message }}</p>
+                        @enderror
                     </div>
 
                     {{-- URL --}}
@@ -397,11 +425,11 @@
                         </div>
                     </div>
 
-                    {{-- VARIANTE Y ACTUALIZAR CADA --}}
-                    <div>
-                        <div class="grid gap-4" style="grid-template-columns: 1.8fr 1fr;">
+                    {{-- VARIANTE, ACTUALIZAR CADA Y DESCUENTOS --}}
+                    <div class="col-span-1 md:col-span-2">
+                        <div class="variante-frecuencia-descuentos-grid">
                             {{-- VARIANTE --}}
-                            <div>
+                            <div class="min-w-0">
                                 <div class="flex items-center gap-2 mb-1">
                                     <label class="font-medium text-gray-700 dark:text-gray-200">Variante</label>
                                     <button type="button" onclick="abrirModalVariante()" class="text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors">
@@ -433,91 +461,63 @@
                             $frecuencia_unidad = 'minutos';
                             }
                             @endphp
-                            <div>
+                            <div class="min-w-0">
                                 <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">Actualizar cada *</label>
                                 <div class="flex gap-2">
                                     <input type="number" step="0.1" min="0.1" name="frecuencia_valor" required
                                         value="{{ old('frecuencia_valor', $frecuencia_valor ?? 1) }}"
                                         class="w-20 px-2 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border text-center">
                                     <select name="frecuencia_unidad"
-                                        class="px-3 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border">
+                                        class="flex-1 min-w-0 px-3 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border">
                                         <option value="minutos" {{ old('frecuencia_unidad', $frecuencia_unidad ?? '') == 'minutos' ? 'selected' : '' }}>Minutos</option>
                                         <option value="horas" {{ old('frecuencia_unidad', $frecuencia_unidad ?? '') == 'horas' ? 'selected' : '' }}>Horas</option>
                                         <option value="dias" {{ old('frecuencia_unidad', $frecuencia_unidad ?? '') == 'dias' ? 'selected' : '' }}>Días</option>
                                     </select>
                                 </div>
                             </div>
-                        </div>
-                    </div>
 
+                            {{-- DESCUENTOS --}}
+                            <div class="min-w-0">
+                                <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">Descuentos</label>
+                                @php
+                                    $descuentosIniciales = [];
+                                    $descuentoActual = old('descuentos', $oferta->descuentos ?? '');
 
-                    {{-- DESCUENTOS --}}
-                    <div>
-                        <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">Descuentos</label>
-                        @php
-                            // Determinar el valor a mostrar en el select
-                            $descuentoActual = old('descuentos', $oferta->descuentos ?? '');
-                            $descuentoParaSelect = '';
-                            $codigoCuponManual = '';
-                            $valorCuponManual = '';
-                            
-                            if ($descuentoActual && strpos($descuentoActual, 'cupon;') === 0) {
-                                // Es un cupón, extraer el valor y mostrar como "cupon"
-                                $descuentoParaSelect = 'cupon';
-                                
-                                // Parsear formato: cupon;codigo;cantidad
-                                $partes = explode(';', $descuentoActual);
-                                if (count($partes) === 3) {
-                                    // Formato nuevo: cupon;codigo;cantidad
-                                    $codigoCuponManual = $partes[1];
-                                    $valorCuponManual = $partes[2];
-                                } else {
-                                    // Formato antiguo: cupon;cantidad (solo cantidad)
-                                    $valorCuponManual = str_replace('cupon;', '', $descuentoActual);
-                                }
-                            } else {
-                                // Es un descuento normal
-                                $descuentoParaSelect = $descuentoActual;
-                            }
-                        @endphp
-                        
-                        <div class="flex gap-2">
-                            <select name="descuentos" id="select_descuentos" class="px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border">
-                                <option value="">Sin descuento</option>
-                                <option value="cupon" {{ $descuentoParaSelect === 'cupon' ? 'selected' : '' }}>Cupón</option>
-                                <option value="3x2" {{ $descuentoParaSelect === '3x2' ? 'selected' : '' }}>3x2</option>
-                                <option value="+Juego" {{ $descuentoParaSelect === '+Juego' ? 'selected' : '' }}>+Juego</option>
-                                <option value="2x1 - SoloCarrefour" {{ $descuentoParaSelect === '2x1 - SoloCarrefour' ? 'selected' : '' }}>2x1 - SoloCarrefour</option>
-                                <option value="2a al 70" {{ $descuentoParaSelect === '2a al 70' ? 'selected' : '' }}>2ª al 70%</option>
-                                <option value="2a al 50" {{ $descuentoParaSelect === '2a al 50' ? 'selected' : '' }}>2ª al 50%</option>
-                                <option value="2a al 50 - cheque - SoloCarrefour" {{ $descuentoParaSelect === '2a al 50 - cheque - SoloCarrefour' ? 'selected' : '' }}>2ª al 50% - Cheque - SoloCarrefour</option>
-                            </select>
-                            
-                            {{-- Campos para cupón (código y cantidad) --}}
-                            <div id="cupon_campos_container" class="hidden flex gap-2">
-                                <input type="text" 
-                                       id="cupon_codigo" 
-                                       name="cupon_codigo" 
-                                       value="{{ old('cupon_codigo', $codigoCuponManual) }}"
-                                       placeholder="Código" 
-                                       class="w-48 px-3 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border">
-                                <input type="number" 
-                                       id="cupon_cantidad" 
-                                       name="cupon_cantidad" 
-                                       step="0.01" 
-                                       min="0" 
-                                       value="{{ old('cupon_cantidad', $valorCuponManual) }}"
-                                       placeholder="€" 
-                                       class="w-20 px-3 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border text-center">
+                                    foreach (\App\Http\Controllers\DescuentosController::parseDescuentos($descuentoActual) as $descuentoItem) {
+                                        if ($info2aCupon = \App\Http\Controllers\DescuentosController::parseDescuento2aCupon($descuentoItem)) {
+                                            $descuentosIniciales[] = [
+                                                'tipo' => '2a-cupon',
+                                                'porcentaje' => $info2aCupon['porcentaje'],
+                                                'codigo' => $info2aCupon['codigo'],
+                                            ];
+                                        } elseif (str_starts_with($descuentoItem, 'cupon;')) {
+                                            $partesCupon = explode(';', $descuentoItem);
+                                            $descuentosIniciales[] = [
+                                                'tipo' => 'cupon',
+                                                'codigo' => count($partesCupon) >= 3
+                                                    ? implode(';', array_slice($partesCupon, 1, -1))
+                                                    : '',
+                                                'cantidad' => count($partesCupon) >= 3
+                                                    ? $partesCupon[count($partesCupon) - 1]
+                                                    : str_replace('cupon;', '', $descuentoItem),
+                                            ];
+                                        } else {
+                                            $descuentosIniciales[] = ['tipo' => $descuentoItem];
+                                        }
+                                    }
+                                @endphp
+
+                                <input type="hidden" name="descuentos" id="descuentos_hidden" value="{{ old('descuentos', $oferta->descuentos ?? '') }}">
+                                <div id="descuentos_lista" class="space-y-2"></div>
+                                <button type="button" id="btn_anadir_descuento"
+                                    class="mt-2 px-3 py-1.5 text-sm rounded bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors">
+                                    + Añadir descuento
+                                </button>
+                                @error('descuentos')
+                                <p class="text-sm text-red-500 mt-1">{{ $message }}</p>
+                                @enderror
                             </div>
                         </div>
-                    
-                        @error('descuentos')
-                        <p class="text-sm text-red-500 mt-1">{{ $message }}</p>
-                        @enderror
-                        @error('cupon_cantidad')
-                        <p class="text-sm text-red-500 mt-1">{{ $message }}</p>
-                        @enderror
                     </div>
                     
 
@@ -864,6 +864,37 @@
                         <button type="button" onclick="cerrarModalVariante()" 
                             class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500">
                             Cerrar
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Modal: segunda petición con API de categoría tras fallo CSV --}}
+            <div id="modal-api-alternativa-precio" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-lg w-full">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Producto no encontrado en CSV</h2>
+                        <button type="button" onclick="cerrarModalApiAlternativaPrecio()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <p class="text-gray-600 dark:text-gray-300 mb-2">
+                        No se ha encontrado esta URL en el CSV de la tienda.
+                    </p>
+                    <p class="text-gray-600 dark:text-gray-300">
+                        La categoría del producto usa la API <strong id="modal-api-alternativa-nombre" class="text-gray-900 dark:text-white"></strong>.
+                        ¿Quieres intentar obtener el precio con esa API?
+                    </p>
+                    <div class="flex justify-end gap-2 mt-6">
+                        <button type="button" onclick="cerrarModalApiAlternativaPrecio()"
+                            class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500">
+                            No
+                        </button>
+                        <button type="button" id="btn-confirmar-api-alternativa-precio"
+                            class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
+                            Sí, intentar
                         </button>
                     </div>
                 </div>
@@ -1290,6 +1321,18 @@
             border-bottom: none;
         }
         
+        /* Fila variante + actualizar cada + descuentos */
+        .variante-frecuencia-descuentos-grid {
+            display: grid;
+            gap: 1rem;
+            grid-template-columns: 1fr;
+        }
+        @media (min-width: 768px) {
+            .variante-frecuencia-descuentos-grid {
+                grid-template-columns: 1.2fr 1fr 1.8fr;
+            }
+        }
+        
         /* Estilos para el tooltip de variantes */
         #tooltipVariante {
             backdrop-filter: blur(8px);
@@ -1502,6 +1545,44 @@
              indiceSeleccionadoTienda = -1;
          }
 
+         function actualizarIndicadorApiScraping(apis) {
+             const apiWrap = document.getElementById('oferta-api-scraping-wrap');
+             const nombreTienda = document.getElementById('oferta-api-tienda-nombre');
+             const lineCategoria = document.getElementById('oferta-api-categoria-line');
+             const nombreCategoria = document.getElementById('oferta-api-categoria-nombre');
+             const productoId = document.getElementById('producto_id')?.value;
+             const tiendaId = document.getElementById('tienda_id')?.value;
+
+             if (!apiWrap || !nombreTienda || !lineCategoria || !nombreCategoria) {
+                 return;
+             }
+
+             if (!tiendaId || !productoId || !apis || !apis.api_tienda) {
+                 nombreTienda.textContent = '';
+                 nombreTienda.removeAttribute('title');
+                 nombreCategoria.textContent = '';
+                 nombreCategoria.removeAttribute('title');
+                 lineCategoria.classList.add('hidden');
+                 apiWrap.classList.add('hidden');
+                 return;
+             }
+
+             nombreTienda.textContent = apis.api_tienda_nombre || apis.api_tienda;
+             nombreTienda.title = apis.api_tienda || '';
+
+             if (apis.tiene_dos_apis && apis.api_categoria) {
+                 nombreCategoria.textContent = apis.api_categoria_nombre || apis.api_categoria;
+                 nombreCategoria.title = apis.api_categoria;
+                 lineCategoria.classList.remove('hidden');
+             } else {
+                 nombreCategoria.textContent = '';
+                 nombreCategoria.removeAttribute('title');
+                 lineCategoria.classList.add('hidden');
+             }
+
+             apiWrap.classList.remove('hidden');
+         }
+
          async function actualizarAvisosVisibilidadOferta() {
              const wrap = document.getElementById('avisos-visibilidad-oferta-wrap');
              const lista = document.getElementById('avisos-visibilidad-oferta-lista');
@@ -1515,6 +1596,7 @@
              if (!tiendaId) {
                  wrap.classList.add('hidden');
                  lista.innerHTML = '';
+                 actualizarIndicadorApiScraping(null);
                  return;
              }
 
@@ -1534,6 +1616,7 @@
 
                  const data = await response.json();
                  const avisos = Array.isArray(data.avisos) ? data.avisos : [];
+                 actualizarIndicadorApiScraping(data.apis_scraping ?? null);
 
                  if (avisos.length === 0) {
                      wrap.classList.add('hidden');
@@ -1586,6 +1669,169 @@
              }
          }
 
+         const ETIQUETAS_UNIDAD_MEDIDA_OFERTA = {
+             unidad: 'Unidades',
+             kilos: 'Kilos',
+             litros: 'Litros',
+             unidadMilesima: 'Unidad milésima',
+             unidadUnica: 'Unidad única',
+             '800gramos': '800 gramos',
+             '100ml': '100 ml',
+         };
+
+         const ETIQUETAS_PRECIO_UNIDAD_OFERTA = {
+             unidad: 'Precio por unidad (€)',
+             kilos: 'Precio por kilo (€)',
+             litros: 'Precio por litro (€)',
+             unidadMilesima: 'Precio por unidad (€)',
+             unidadUnica: 'Precio (€)',
+             '800gramos': 'Precio por 800 gramos (€)',
+             '100ml': 'Precio por 100 ml (€)',
+         };
+
+         let unidadMedidaProductoActual = null;
+
+         async function actualizarCampoTextoCantidadAlternativo(productoId, productoCompleto) {
+             const wrap = document.getElementById('wrap_texto_cantidad_alternativo');
+             const input = document.getElementById('texto_cantidad_alternativo_input');
+             const botonesWrap = document.getElementById('texto_cantidad_alternativo_botones');
+             if (!wrap || !input) return;
+
+             let requiere = productoCompleto && productoCompleto.permitir_texto_cantidad_alternativo === 'si';
+
+             if (!requiere && productoId) {
+                 try {
+                     const response = await fetch(`/panel-privado/productos/${productoId}`);
+                     const data = await response.json();
+                     requiere = data.permitir_texto_cantidad_alternativo === 'si';
+                 } catch (e) {
+                     requiere = false;
+                 }
+             }
+
+             if (requiere) {
+                 wrap.classList.remove('hidden');
+                 input.required = true;
+                 await cargarBotonesTextoCantidadAlternativo(productoId, botonesWrap);
+             } else {
+                 wrap.classList.add('hidden');
+                 input.required = false;
+                 if (botonesWrap) botonesWrap.innerHTML = '';
+             }
+         }
+
+         function tokensTextoCantidadAltFormulario(valor) {
+             return String(valor || '').trim().split(/\s+/).filter(Boolean);
+         }
+
+         function marcarBotonTextoCantidadAltFormulario(btn, activo) {
+             if (!btn) return;
+             const clasesActivo = [
+                 'ring-2',
+                 'ring-green-500',
+                 'border-green-500',
+                 'bg-green-100',
+                 'dark:bg-green-900',
+                 'dark:border-green-400',
+                 'font-semibold',
+                 'text-green-800',
+                 'dark:text-green-200',
+             ];
+             if (activo) {
+                 btn.classList.add(...clasesActivo);
+                 btn.setAttribute('aria-pressed', 'true');
+             } else {
+                 btn.classList.remove(...clasesActivo);
+                 btn.setAttribute('aria-pressed', 'false');
+             }
+         }
+
+         function sincronizarBotonesTextoCantidadAltFormulario() {
+             const input = document.getElementById('texto_cantidad_alternativo_input');
+             const botonesWrap = document.getElementById('texto_cantidad_alternativo_botones');
+             if (!input || !botonesWrap) return;
+             const tokens = tokensTextoCantidadAltFormulario(input.value).map((t) => t.toLowerCase());
+             botonesWrap.querySelectorAll('.texto-cantidad-alt-btn').forEach((btn) => {
+                 const palabra = String(btn.dataset.palabra || btn.textContent || '').trim().toLowerCase();
+                 marcarBotonTextoCantidadAltFormulario(btn, palabra !== '' && tokens.includes(palabra));
+             });
+         }
+
+         function togglePalabraTextoCantidadAltFormulario(btn, input) {
+             if (!btn || !input) return;
+             const palabra = String(btn.dataset.palabra || btn.textContent || '').trim();
+             if (!palabra) return;
+
+             let tokens = tokensTextoCantidadAltFormulario(input.value);
+             const indice = tokens.findIndex((t) => t.toLowerCase() === palabra.toLowerCase());
+             if (indice >= 0) {
+                 tokens.splice(indice, 1);
+             } else {
+                 tokens.push(palabra);
+             }
+             input.value = tokens.join(' ');
+             input.dispatchEvent(new Event('input', { bubbles: true }));
+         }
+
+         async function cargarBotonesTextoCantidadAlternativo(productoId, botonesWrap) {
+             if (!botonesWrap || !productoId) {
+                 if (botonesWrap) botonesWrap.innerHTML = '';
+                 return;
+             }
+
+             const ofertaId = {{ $oferta ? $oferta->id : 'null' }};
+             let url = `/panel-privado/ofertas/producto/${productoId}/textos-cantidad-alternativo`;
+             if (ofertaId) {
+                 url += `?excluir_oferta_id=${ofertaId}`;
+             }
+
+             botonesWrap.innerHTML = '<span class="text-xs text-gray-400 dark:text-gray-500">Cargando…</span>';
+
+             try {
+                 const response = await fetch(url);
+                 const data = await response.json();
+                 const palabras = Array.isArray(data.palabras) ? data.palabras : [];
+
+                 if (!palabras.length) {
+                     botonesWrap.innerHTML = '';
+                     return;
+                 }
+
+                 botonesWrap.innerHTML = palabras.map((palabra) => {
+                     const seguro = String(palabra)
+                         .replace(/&/g, '&amp;')
+                         .replace(/</g, '&lt;')
+                         .replace(/"/g, '&quot;');
+                     return `<button type="button" class="texto-cantidad-alt-btn text-xs px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-blue-100 dark:hover:bg-blue-900 hover:border-blue-400 dark:hover:border-blue-500 transition-colors" data-palabra="${seguro}" aria-pressed="false" title="Añadir o quitar «${seguro}»">${seguro}</button>`;
+                 }).join('');
+
+                 sincronizarBotonesTextoCantidadAltFormulario();
+             } catch (e) {
+                 botonesWrap.innerHTML = '';
+             }
+         }
+
+         function etiquetaUnidadesOferta(codigo) {
+             return ETIQUETAS_UNIDAD_MEDIDA_OFERTA[codigo] || 'Unidades';
+         }
+
+         function etiquetaPrecioUnidadOferta(codigo) {
+             return ETIQUETAS_PRECIO_UNIDAD_OFERTA[codigo] || 'Precio por unidad (€)';
+         }
+
+         function actualizarEtiquetasUnidadMedida(unidadDeMedida) {
+             unidadMedidaProductoActual = unidadDeMedida || null;
+             const labelUnidades = document.getElementById('label_unidades');
+             const labelPrecioUnidad = document.getElementById('label_precio_unidad');
+
+             if (labelUnidades) {
+                 labelUnidades.textContent = etiquetaUnidadesOferta(unidadDeMedida) + ' *';
+             }
+             if (labelPrecioUnidad) {
+                 labelPrecioUnidad.textContent = etiquetaPrecioUnidadOferta(unidadDeMedida) + ' *';
+             }
+         }
+
                  // Función para seleccionar un producto
          async function seleccionarProducto(producto) {
              const productoIdInput = document.getElementById('producto_id');
@@ -1606,6 +1852,9 @@
              try {
                  const response = await fetch(`/panel-privado/productos/${producto.id}`);
                  productoCompleto = await response.json();
+
+                 actualizarEtiquetasUnidadMedida(productoCompleto?.unidadDeMedida);
+                 await actualizarCampoTextoCantidadAlternativo(producto.id, productoCompleto);
                  
                  // Verificar si el producto tiene unidad de medida única
                  if (productoCompleto && productoCompleto.unidadDeMedida === 'unidadUnica') {
@@ -1631,6 +1880,8 @@
              } catch (error) {
                  console.error('Error al obtener información del producto:', error);
                  productoCompleto = null;
+                 actualizarEtiquetasUnidadMedida(null);
+                 await actualizarCampoTextoCantidadAlternativo(producto.id, null);
                  // En caso de error, habilitar el campo por defecto
                  if (unidadesInput) {
                      unidadesInput.readOnly = false;
@@ -1688,6 +1939,12 @@
              aplicarFrecuenciaSugerida(tienda.id, categoriaIdParaFrecuencia);
 
              actualizarAvisosVisibilidadOferta();
+
+             // Revalidar URL al cambiar de tienda (los duplicados se miran solo en la misma tienda)
+             const urlParaRevalidar = document.getElementById('url_input')?.value?.trim();
+             if (urlParaRevalidar && typeof window.validarUrlOferta === 'function') {
+                 window.validarUrlOferta(urlParaRevalidar);
+             }
              
              // Si el checkbox del chollo está marcado, verificar si existe otra oferta con chollo
              const cholloCheckbox = document.getElementById('es_chollo_checkbox');
@@ -2188,95 +2445,316 @@
             });
         }
 
-        // Manejar cambios en el select de descuentos para mostrar/ocultar campos de cupón
-        const selectDescuentos = document.querySelector('[name="descuentos"]');
-        const cuponCamposContainer = document.getElementById('cupon_campos_container');
-        const cuponCodigoInput = document.getElementById('cupon_codigo');
-        const cuponCantidadInput = document.getElementById('cupon_cantidad');
-        
-        // Función para mostrar/ocultar los campos del cupón
-        function toggleCuponCampos() {
-            const valorSeleccionado = selectDescuentos.value;
-            
-            if (valorSeleccionado === 'cupon') {
-                cuponCamposContainer.classList.remove('hidden');
-                cuponCodigoInput.required = true;
-                cuponCantidadInput.required = true;
-                // Reducir el select a un ancho máximo pequeño
-                selectDescuentos.style.flex = '0 1 auto';
-                selectDescuentos.style.maxWidth = '150px';
-                selectDescuentos.style.minWidth = '120px';
-            } else {
-                cuponCamposContainer.classList.add('hidden');
-                cuponCodigoInput.required = false;
-                cuponCantidadInput.required = false;
-                cuponCodigoInput.value = '';
-                cuponCantidadInput.value = '';
-                // Restaurar el select a tamaño completo
-                selectDescuentos.style.flex = '1 1 0%';
-                selectDescuentos.style.maxWidth = 'none';
-                selectDescuentos.style.minWidth = 'auto';
+        // Gestión de múltiples descuentos
+        const descuentosLista = document.getElementById('descuentos_lista');
+        const descuentosHidden = document.getElementById('descuentos_hidden');
+        const btnAnadirDescuento = document.getElementById('btn_anadir_descuento');
+        const descuentosIniciales = @json($descuentosIniciales);
+
+        const opcionesDescuento = [
+            { value: '', label: 'Selecciona tipo...' },
+            { value: 'cupon', label: 'Cupón' },
+            { value: '2a-cupon', label: '-x% 2ª unidad cupón' },
+            { value: '3x2', label: '3x2' },
+            { value: '+Juego', label: '+Juego' },
+            { value: '2x1 - SoloCarrefour', label: '2x1 - SoloCarrefour' },
+            { value: '2a al 70', label: '2ª al 70%' },
+            { value: '2a al 50', label: '2ª al 50%' },
+            { value: '2a al 50 - cheque - SoloCarrefour', label: '2ª al 50% - Cheque - SoloCarrefour' },
+            { value: '-20%', label: '-20% (Días Locos)' },
+        ];
+
+        function crearOpcionesSelect(tipoSeleccionado) {
+            return opcionesDescuento.map(op => {
+                const selected = op.value === tipoSeleccionado ? ' selected' : '';
+                return `<option value="${op.value}"${selected}>${op.label}</option>`;
+            }).join('');
+        }
+
+        function toggleCuponCamposFila(fila) {
+            const select = fila.querySelector('.descuento-tipo-select');
+            const cuponCampos = fila.querySelector('.descuento-cupon-campos');
+            const cupon2aCampos = fila.querySelector('.descuento-2a-cupon-campos');
+            const esCupon = select.value === 'cupon';
+            const es2aCupon = select.value === '2a-cupon';
+            cuponCampos.classList.toggle('hidden', !esCupon);
+            if (cupon2aCampos) {
+                cupon2aCampos.classList.toggle('hidden', !es2aCupon);
+            }
+            fila.querySelector('.descuento-cupon-codigo').required = esCupon;
+            fila.querySelector('.descuento-cupon-cantidad').required = esCupon;
+            const codigo2a = fila.querySelector('.descuento-2a-cupon-codigo');
+            const porcentaje2a = fila.querySelector('.descuento-2a-cupon-porcentaje');
+            if (codigo2a) codigo2a.required = es2aCupon;
+            if (porcentaje2a) porcentaje2a.required = es2aCupon;
+        }
+
+        function esCantidadCuponPorcentaje(cantidad) {
+            return String(cantidad || '').trim().startsWith('%');
+        }
+
+        function validarCantidadCupon(cantidad) {
+            const valor = String(cantidad || '').trim();
+            if (!valor) return false;
+            if (esCantidadCuponPorcentaje(valor)) {
+                const porcentaje = parseFloat(valor.replace('%', '').replace(',', '.'));
+                return !isNaN(porcentaje) && porcentaje > 0 && porcentaje <= 100;
+            }
+            return parseFloat(valor) > 0;
+        }
+
+        function serializarCantidadCupon(cantidad) {
+            const valor = String(cantidad || '').trim();
+            if (esCantidadCuponPorcentaje(valor)) {
+                const porcentaje = parseFloat(valor.replace('%', '').replace(',', '.'));
+                return '%' + Math.round(porcentaje);
+            }
+            return valor;
+        }
+
+        function serializarFilaDescuento(fila) {
+            const tipo = fila.querySelector('.descuento-tipo-select').value;
+            if (!tipo) return null;
+            if (tipo === 'cupon') {
+                const codigo = fila.querySelector('.descuento-cupon-codigo').value.trim();
+                const cantidad = fila.querySelector('.descuento-cupon-cantidad').value;
+                if (!codigo || !validarCantidadCupon(cantidad)) return null;
+                return 'cupon;' + codigo + ';' + serializarCantidadCupon(cantidad);
+            }
+            if (tipo === '2a-cupon') {
+                const codigo = fila.querySelector('.descuento-2a-cupon-codigo').value.trim();
+                const porcentaje = fila.querySelector('.descuento-2a-cupon-porcentaje').value;
+                if (!codigo || !porcentaje || parseFloat(porcentaje) <= 0 || parseFloat(porcentaje) > 100) return null;
+                return '2a al ' + Math.round(parseFloat(porcentaje)) + ' - cupon;' + codigo;
+            }
+            return tipo;
+        }
+
+        function actualizarDescuentosHidden() {
+            const valores = [];
+            descuentosLista.querySelectorAll('.descuento-fila').forEach(fila => {
+                const valor = serializarFilaDescuento(fila);
+                if (valor) valores.push(valor);
+            });
+            descuentosHidden.value = valores.join('||');
+        }
+
+        function parsearDescuentoParaFormulario(descuentoItem) {
+            const item = String(descuentoItem || '').trim();
+            if (!item) return null;
+
+            const match2aCupon = item.match(/^2a al (\d+) - cupon;(.+)$/i);
+            if (match2aCupon) {
+                return {
+                    tipo: '2a-cupon',
+                    porcentaje: parseInt(match2aCupon[1], 10),
+                    codigo: match2aCupon[2],
+                };
+            }
+
+            if (item.startsWith('cupon;')) {
+                const partes = item.split(';');
+                if (partes.length >= 3) {
+                    return {
+                        tipo: 'cupon',
+                        codigo: partes.slice(1, -1).join(';'),
+                        cantidad: partes[partes.length - 1],
+                    };
+                }
+            }
+
+            return { tipo: item };
+        }
+
+        function sincronizarDescuentosEnFormulario(descuentosStr) {
+            if (!descuentosLista) {
+                return false;
+            }
+
+            descuentosLista.innerHTML = '';
+            const items = String(descuentosStr || '').split('||').map(s => s.trim()).filter(Boolean);
+
+            items.forEach(item => {
+                const data = parsearDescuentoParaFormulario(item);
+                if (data) {
+                    crearFilaDescuento(data);
+                }
+            });
+            actualizarDescuentosHidden();
+            return true;
+        }
+
+        function crearFilaDescuento(data = {}) {
+            const fila = document.createElement('div');
+            fila.className = 'descuento-fila flex flex-wrap items-center gap-2 p-2 rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800';
+            fila.innerHTML = `
+                <select class="descuento-tipo-select px-3 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border min-w-[180px]">
+                    ${crearOpcionesSelect(data.tipo || '')}
+                </select>
+                <div class="descuento-cupon-campos flex gap-2 ${data.tipo === 'cupon' ? '' : 'hidden'}">
+                    <input type="text" class="descuento-cupon-codigo w-40 px-3 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border" placeholder="Código">
+                    <input type="text" class="descuento-cupon-cantidad w-24 px-3 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border text-center" placeholder="€ o %15">
+                </div>
+                <div class="descuento-2a-cupon-campos flex gap-2 ${data.tipo === '2a-cupon' ? '' : 'hidden'}">
+                    <input type="number" class="descuento-2a-cupon-porcentaje w-20 px-3 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border text-center" step="1" min="1" max="100" placeholder="% 2ª ud">
+                    <input type="text" class="descuento-2a-cupon-codigo w-40 px-3 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border" placeholder="Código cupón">
+                </div>
+                <button type="button" class="descuento-eliminar-btn px-2 py-1 text-sm rounded bg-red-500 hover:bg-red-600 text-white" title="Quitar descuento">✕</button>
+            `;
+
+            if (data.tipo === 'cupon') {
+                if (data.codigo) fila.querySelector('.descuento-cupon-codigo').value = data.codigo;
+                if (data.cantidad) fila.querySelector('.descuento-cupon-cantidad').value = data.cantidad;
+            }
+            if (data.tipo === '2a-cupon') {
+                if (data.porcentaje && fila.querySelector('.descuento-2a-cupon-porcentaje')) {
+                    fila.querySelector('.descuento-2a-cupon-porcentaje').value = data.porcentaje;
+                }
+                if (data.codigo && fila.querySelector('.descuento-2a-cupon-codigo')) {
+                    fila.querySelector('.descuento-2a-cupon-codigo').value = data.codigo;
+                }
+            }
+
+            fila.querySelector('.descuento-tipo-select').addEventListener('change', () => {
+                toggleCuponCamposFila(fila);
+                actualizarDescuentosHidden();
+            });
+            fila.querySelectorAll('.descuento-cupon-codigo, .descuento-cupon-cantidad, .descuento-2a-cupon-codigo, .descuento-2a-cupon-porcentaje').forEach(input => {
+                input.addEventListener('input', actualizarDescuentosHidden);
+            });
+            fila.querySelector('.descuento-eliminar-btn').addEventListener('click', () => {
+                fila.remove();
+                actualizarDescuentosHidden();
+            });
+
+            toggleCuponCamposFila(fila);
+            descuentosLista.appendChild(fila);
+            actualizarDescuentosHidden();
+        }
+
+        if (btnAnadirDescuento && descuentosLista) {
+            btnAnadirDescuento.addEventListener('click', () => crearFilaDescuento());
+
+            if (descuentosIniciales.length > 0) {
+                descuentosIniciales.forEach(item => crearFilaDescuento(item));
             }
         }
-        
-        // Event listener para cambios en el select
-        selectDescuentos.addEventListener('change', function() {
-            toggleCuponCampos();
-        });
-        
-        // Mostrar/ocultar campos al cargar la página
-        document.addEventListener('DOMContentLoaded', function() {
-            // Verificar el valor del select y mostrar campos si es necesario
-            const valorSelect = selectDescuentos.value;
-            if (valorSelect === 'cupon') {
-                cuponCamposContainer.classList.remove('hidden');
-                cuponCodigoInput.required = true;
-                cuponCantidadInput.required = true;
-            }
-            toggleCuponCampos();
-        });
 
-        // Interceptar el envío del formulario para construir el valor del cupón
+        // Interceptar el envío del formulario
         document.querySelector('form').addEventListener('submit', function(e) {
             // Limpiar el campo de envío si está vacío con placeholder "gratis" (no enviar valor)
             const envioInput = document.getElementById('envio_input');
             if (envioInput && (!envioInput.value || envioInput.value.trim() === '') && envioInput.placeholder === 'gratis') {
                 envioInput.value = '';
             }
-            
-            const valorSeleccionado = selectDescuentos.value;
-            const codigoCupon = cuponCodigoInput.value.trim();
-            const cantidadCupon = cuponCantidadInput.value;
-            
-            if (valorSeleccionado === 'cupon') {
-                if (!codigoCupon) {
-                    e.preventDefault();
-                    alert('Por favor, introduce el código del cupón');
-                    cuponCodigoInput.focus();
-                    return false;
+
+            if (descuentosLista) {
+                for (const fila of descuentosLista.querySelectorAll('.descuento-fila')) {
+                    const tipo = fila.querySelector('.descuento-tipo-select').value;
+                    if (tipo === 'cupon') {
+                        const codigo = fila.querySelector('.descuento-cupon-codigo').value.trim();
+                        const cantidad = fila.querySelector('.descuento-cupon-cantidad').value;
+                        if (!codigo) {
+                            e.preventDefault();
+                            alert('Por favor, introduce el código del cupón');
+                            fila.querySelector('.descuento-cupon-codigo').focus();
+                            return false;
+                        }
+                        if (!validarCantidadCupon(cantidad)) {
+                            e.preventDefault();
+                            alert('Introduce una cantidad válida para el cupón (euros o %15)');
+                            fila.querySelector('.descuento-cupon-cantidad').focus();
+                            return false;
+                        }
+                    }
+                    if (tipo === '2a-cupon') {
+                        const codigo = fila.querySelector('.descuento-2a-cupon-codigo').value.trim();
+                        const porcentaje = fila.querySelector('.descuento-2a-cupon-porcentaje').value;
+                        if (!codigo) {
+                            e.preventDefault();
+                            alert('Por favor, introduce el código del cupón de 2ª unidad');
+                            fila.querySelector('.descuento-2a-cupon-codigo').focus();
+                            return false;
+                        }
+                        if (!porcentaje || parseFloat(porcentaje) <= 0 || parseFloat(porcentaje) > 100) {
+                            e.preventDefault();
+                            alert('Introduce un porcentaje válido para la 2ª unidad (1-100)');
+                            fila.querySelector('.descuento-2a-cupon-porcentaje').focus();
+                            return false;
+                        }
+                    }
                 }
-                
-                if (!cantidadCupon || cantidadCupon <= 0) {
-                    e.preventDefault();
-                    alert('Por favor, introduce una cantidad válida para el cupón');
-                    cuponCantidadInput.focus();
-                    return false;
-                }
-                
-                // Construir el valor del cupón con formato cupon;codigo;cantidad
-                selectDescuentos.value = 'cupon;' + codigoCupon + ';' + cantidadCupon;
+                actualizarDescuentosHidden();
             }
         });
 
         // Función para obtener precio automáticamente
-        async function obtenerPrecioAutomatico() {
+        let apiAlternativaPrecioPendiente = null;
+
+        function cerrarModalApiAlternativaPrecio() {
+            document.getElementById('modal-api-alternativa-precio').classList.add('hidden');
+            apiAlternativaPrecioPendiente = null;
+        }
+
+        async function aplicarPrecioObtenidoEnFormulario(precio, extras = {}) {
+            const unidadesInput = document.querySelector('[name="unidades"]');
+            const precioTotalInput = document.querySelector('[name="precio_total"]');
+            const precioUnidadInput = document.querySelector('[name="precio_unidad"]');
+            const productoId = document.getElementById('producto_id')?.value;
+
+            precioTotalInput.value = precio;
+
+            const unidades = parseFloat(unidadesInput.value);
+            const precioTotal = parseFloat(precio);
+
+            if (productoId && unidades > 0) {
+                try {
+                    const response = await fetch('{{ route("admin.ofertas.calcular.precio-unidad") }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                        },
+                        body: JSON.stringify({
+                            producto_id: productoId,
+                            precio_total: precioTotal,
+                            unidades: unidades
+                        })
+                    });
+
+                    const data = await response.json();
+                    if (data.success) {
+                        precioUnidadInput.value = data.precio_unidad;
+                    } else {
+                        precioUnidadInput.value = (precioTotal / unidades).toFixed(4);
+                    }
+                } catch (error) {
+                    console.error('Error al calcular precio por unidad:', error);
+                    precioUnidadInput.value = (precioTotal / unidades).toFixed(4);
+                }
+            } else {
+                precioUnidadInput.value = (precioTotal / unidades).toFixed(4);
+            }
+
+            let mensaje = '✅ Precio obtenido correctamente: ' + precio + '€';
+
+            if (extras.descuentos_sincronizados) {
+                sincronizarDescuentosEnFormulario(extras.descuentos ?? '');
+                const hayDescuentos = String(extras.descuentos || '').trim() !== '';
+                mensaje += hayDescuentos
+                    ? ' | Descuentos sincronizados'
+                    : ' | Sin descuentos (formulario actualizado)';
+            }
+
+            mostrarNotificacion(mensaje, 'success');
+        }
+
+        async function obtenerPrecioAutomatico(opciones = {}) {
             const btnObtenerPrecio = document.getElementById('btnObtenerPrecio');
             const urlInput = document.querySelector('[name="url"]');
             const tiendaSelect = document.getElementById('tienda_nombre');
             const varianteInput = document.querySelector('[name="variante"]');
             const unidadesInput = document.querySelector('[name="unidades"]');
-            const precioTotalInput = document.querySelector('[name="precio_total"]');
-            const precioUnidadInput = document.querySelector('[name="precio_unidad"]');
 
             // Validar que todos los campos necesarios estén completos
             if (!urlInput.value.trim()) {
@@ -2292,7 +2770,8 @@
             }
 
             if (!unidadesInput.value || unidadesInput.value <= 0) {
-                alert('Por favor, introduce el número de unidades');
+                const etiquetaUnidades = etiquetaUnidadesOferta(unidadMedidaProductoActual).toLowerCase();
+                alert('Por favor, introduce ' + (unidadMedidaProductoActual === 'unidadUnica' ? 'la unidad única' : 'el número de ' + etiquetaUnidades));
                 unidadesInput.focus();
                 return;
             }
@@ -2302,84 +2781,71 @@
             btnObtenerPrecio.innerHTML = '<svg class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>';
 
             try {
-                             // Obtener el nombre de la tienda seleccionada
-             const tiendaNombre = tiendaSelect.value;
-                
-                // Preparar datos para la petición
+                const tiendaNombre = tiendaSelect.value;
+                const productoId = document.getElementById('producto_id')?.value;
+                const ofertaId = {{ $oferta ? $oferta->id : 'null' }};
+
                 const datos = {
                     url: urlInput.value.trim(),
                     tienda: tiendaNombre,
-                    variante: varianteInput.value.trim() || null
+                    variante: varianteInput.value.trim() || null,
+                    producto_id: productoId || null,
+                    oferta_id: ofertaId || null,
                 };
 
-                // Hacer petición al scraper
+                if (opciones.apiForzada) {
+                    datos.api_forzada = opciones.apiForzada;
+                }
+
                 const response = await fetch('{{ route("admin.ofertas.scraper.obtener-precio") }}', {
                     method: 'POST',
-                                    headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
                     body: JSON.stringify(datos)
                 });
 
                 const resultado = await response.json();
 
+                if (resultado.ofrecer_api_alternativa && resultado.api_alternativa) {
+                    apiAlternativaPrecioPendiente = resultado.api_alternativa;
+                    document.getElementById('modal-api-alternativa-nombre').textContent =
+                        resultado.api_alternativa_nombre || resultado.api_alternativa;
+                    document.getElementById('modal-api-alternativa-precio').classList.remove('hidden');
+                    return;
+                }
+
                 if (resultado.success) {
-                    // Actualizar precio total
-                    precioTotalInput.value = resultado.precio;
-                    
-                    // Calcular precio por unidad usando el servicio
-                    const productoId = document.getElementById('producto_id').value;
-                    const unidades = parseFloat(unidadesInput.value);
-                    const precioTotal = parseFloat(resultado.precio);
-                    
-                    if (productoId && unidades > 0) {
-                        try {
-                            const response = await fetch('{{ route("admin.ofertas.calcular.precio-unidad") }}', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                                },
-                                body: JSON.stringify({
-                                    producto_id: productoId,
-                                    precio_total: precioTotal,
-                                    unidades: unidades
-                                })
-                            });
-
-                            const data = await response.json();
-                            if (data.success) {
-                                precioUnidadInput.value = data.precio_unidad;
-                            } else {
-                                // Fallback a cálculo simple
-                                precioUnidadInput.value = (precioTotal / unidades).toFixed(4);
-                            }
-                        } catch (error) {
-                            console.error('Error al calcular precio por unidad:', error);
-                            // Fallback a cálculo simple
-                            precioUnidadInput.value = (precioTotal / unidades).toFixed(4);
-                        }
-                    } else {
-                        // Si no hay producto seleccionado, usar cálculo simple
-                        precioUnidadInput.value = (precioTotal / unidades).toFixed(4);
-                    }
-
-                    // Mostrar mensaje de éxito
-                    mostrarNotificacion('✅ Precio obtenido correctamente: ' + resultado.precio + '€', 'success');
+                    await aplicarPrecioObtenidoEnFormulario(resultado.precio, {
+                        descuentos_sincronizados: !!resultado.descuentos_sincronizados,
+                        descuentos: resultado.descuentos,
+                    });
                 } else {
-                    // Mostrar error
                     mostrarNotificacion('❌ Error al obtener precio: ' + resultado.error, 'error');
                 }
             } catch (error) {
                 console.error('Error:', error);
                 mostrarNotificacion('❌ Error de conexión al obtener precio', 'error');
             } finally {
-                // Restaurar botón
                 btnObtenerPrecio.disabled = false;
                 btnObtenerPrecio.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>';
             }
         }
+
+        document.getElementById('btn-confirmar-api-alternativa-precio')?.addEventListener('click', async function() {
+            const apiAlternativa = apiAlternativaPrecioPendiente;
+            cerrarModalApiAlternativaPrecio();
+            if (apiAlternativa) {
+                await obtenerPrecioAutomatico({ apiForzada: apiAlternativa });
+            }
+        });
+
+        document.getElementById('modal-api-alternativa-precio')?.addEventListener('click', function(e) {
+            if (e.target === this) {
+                cerrarModalApiAlternativaPrecio();
+            }
+        });
 
         // Función para abrir modal de variantes
         function abrirModalVariante() {
@@ -2782,10 +3248,13 @@
                         unidadesInput.classList.remove('opacity-50', 'cursor-not-allowed', 'bg-gray-200', 'dark:bg-gray-600');
                         unidadesInput.classList.add('opacity-100');
                     }
+
+                    actualizarEtiquetasUnidadMedida(null);
                     
                     // Ocultar aviso de oferta existente si se limpia el producto
                     ocultarAvisoOfertaExistente();
-                    
+                    actualizarAvisosVisibilidadOferta();
+
                     return;
                 }
                 
@@ -3238,6 +3707,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         try {
             const productoId = document.getElementById('producto_id').value;
+            const tiendaId = document.getElementById('tienda_id')?.value || '';
             
             const response = await fetch('{{ route("admin.ofertas.verificar.url") }}', {
                 method: 'POST',
@@ -3248,7 +3718,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify({
                     url: url,
                     oferta_id: ofertaId,
-                    producto_id: productoId
+                    producto_id: productoId,
+                    tienda_id: tiendaId
                 })
             });
             
@@ -3299,6 +3770,13 @@ document.addEventListener('DOMContentLoaded', function() {
         urlValidationInProgress = false;
         actualizarEstadoBoton();
     }
+
+    // Exponer para revalidar al seleccionar tienda (script anterior)
+    window.validarUrlOferta = function(url) {
+        urlValidationInProgress = true;
+        actualizarEstadoBoton();
+        return validarUrl(url);
+    };
     
     // Función para mostrar mensaje de validación
     function mostrarMensajeUrl(tipo, mensaje) {
@@ -3977,9 +4455,21 @@ async function cargarEspecificacionesInternas(productoId) {
             }
         }
         
-        // Verificar si es unidadUnica y obtener columnas marcadas
+        function normalizarColumnasProducto(raw) {
+            if (raw == null) return [];
+            if (Array.isArray(raw)) {
+                return raw.map(id => String(id));
+            }
+            if (typeof raw === 'object') {
+                return Object.keys(raw)
+                    .filter(k => k && !String(k).startsWith('_'))
+                    .map(k => String(k));
+            }
+            return [];
+        }
+
         const esUnidadUnica = producto.unidadDeMedida === 'unidadUnica';
-        const columnasProducto = esUnidadUnica && especificacionesElegidas._columnas ? especificacionesElegidas._columnas : [];
+        const columnasProducto = normalizarColumnasProducto(especificacionesElegidas._columnas);
         
         // Mostrar los desplegables solo con las sublíneas marcadas como "Oferta"
         mostrarDesplegablesEspecificaciones(filtrosFiltrados, especificacionesGuardadas, esUnidadUnica, columnasProducto, especificacionesElegidas);
@@ -4035,10 +4525,13 @@ function mostrarDesplegablesEspecificaciones(filtros, especificacionesGuardadas 
         html += `<div class="mt-2 space-y-2 pl-4 border-l-2 border-gray-300 dark:border-gray-600">`;
         
         // Verificar si esta línea principal está marcada como columna en el producto
-        const esLineaColumna = esUnidadUnica && columnasProducto.includes(idPrincipal);
+        const esLineaColumna = columnasProducto.includes(String(idPrincipal));
         
-        // Obtener la sublínea marcada como columna en esta oferta (si existe)
+        // Obtener las sublíneas marcadas como columna en esta oferta (si existen)
         const columnaGuardada = especificacionesGuardadas._columnas ? especificacionesGuardadas._columnas[idPrincipal] : null;
+        const columnasGuardadasIds = columnaGuardada == null
+            ? []
+            : (Array.isArray(columnaGuardada) ? columnaGuardada : [columnaGuardada]);
         
         // Mostrar cada sublínea con un checkbox
         subprincipales.forEach((sub, subIndex) => {
@@ -4048,7 +4541,7 @@ function mostrarDesplegablesEspecificaciones(filtros, especificacionesGuardadas 
             const isChecked = sublineasSeleccionadas.some(selected => 
                 String(selected) === String(idSublinea)
             );
-            const esColumnaMarcada = columnaGuardada && String(columnaGuardada) === String(idSublinea);
+            const esColumnaMarcada = columnasGuardadasIds.some(id => String(id) === String(idSublinea));
 
             // --- Imágenes de sublínea (solo ver) ---
             const keyImg = `${String(idPrincipal)}::${String(idSublinea)}`;
@@ -4132,8 +4625,8 @@ function mostrarDesplegablesEspecificaciones(filtros, especificacionesGuardadas 
             
             html += `</label>`;
             
-            // Checkbox "Columna" (solo si es unidadUnica y esta línea principal está marcada como columna en el producto)
-            if (esUnidadUnica && esLineaColumna) {
+            // Checkbox "Columna" (si esta línea principal está marcada como columna en el producto)
+            if (esLineaColumna) {
                 html += `<div class="flex items-center gap-1">`;
                 html += `<label class="flex items-center gap-1 cursor-pointer" title="Columna en ofertas">`;
                 html += `<input type="checkbox" class="columna-oferta-sublinea-checkbox rounded border-gray-300 text-orange-600 focus:ring-orange-500" data-principal-id="${idPrincipal}" data-sublinea-id="${idSublinea}" ${esColumnaMarcada ? 'checked' : ''} ${!isChecked ? 'disabled' : ''}>`;
@@ -4143,7 +4636,7 @@ function mostrarDesplegablesEspecificaciones(filtros, especificacionesGuardadas 
                 // Icono de ayuda "?" solo en la primera sublínea
                 if (esPrimeraSublinea) {
                     html += `<div class="relative">`;
-                    html += `<button type="button" class="tooltip-btn text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-help focus:outline-none" aria-label="Ayuda" data-tooltip='Al ser un producto con unidad de medida unica, las columnas de las ofertas se modifican. Y este filtro aparecerá como columna en el listado de ofertas, por lo que cada oferta debe marcar una opcion que corresponda al producto de la tienda al que se le va a llevar al usuario'>`;
+                    html += `<button type="button" class="tooltip-btn text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-help focus:outline-none" aria-label="Ayuda" data-tooltip='${esUnidadUnica ? 'Al ser un producto con unidad de medida unica, las columnas de las ofertas se modifican. Y este filtro aparecerá como columna en el listado de ofertas, por lo que cada oferta debe marcar al menos una opción (puedes marcar varias) que corresponda al producto de la tienda al que se le va a llevar al usuario' : 'Esta especificación aparecerá debajo de la cantidad en el listado de ofertas. Marca la o las opciones que correspondan al producto de la tienda.'}'>`;
                     html += `<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">`;
                     html += `<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path>`;
                     html += `</svg>`;
@@ -4209,13 +4702,6 @@ function mostrarDesplegablesEspecificaciones(filtros, especificacionesGuardadas 
                         // Si no hay otra sublínea marcada, marcar automáticamente el checkbox de columna
                         if (!hayOtraMarcada && columnaCheckbox && !columnaCheckbox.disabled) {
                             columnaCheckbox.checked = true;
-                            // Desmarcar otros checkboxes de columna en la misma línea principal
-                            const otrosColumnaCheckboxes = document.querySelectorAll(`.columna-oferta-sublinea-checkbox[data-principal-id="${principalId}"]`);
-                            otrosColumnaCheckboxes.forEach(cb => {
-                                if (cb !== columnaCheckbox) {
-                                    cb.checked = false;
-                                }
-                            });
                         }
                     }
                 }
@@ -4230,9 +4716,8 @@ function mostrarDesplegablesEspecificaciones(filtros, especificacionesGuardadas 
             });
         });
         
-        // Añadir event listeners a los checkboxes de columna (solo si es unidadUnica)
-        // Buscar en todo el documento, no solo en container, para asegurar que se encuentren todos
-        if (esUnidadUnica) {
+        // Añadir event listeners a los checkboxes de columna
+        if (columnasProducto.length > 0) {
             // Esperar un momento para que el DOM se actualice completamente
             setTimeout(() => {
                 const columnaCheckboxes = document.querySelectorAll('.columna-oferta-sublinea-checkbox');
@@ -4243,15 +4728,6 @@ function mostrarDesplegablesEspecificaciones(filtros, especificacionesGuardadas 
                     
                     checkbox.addEventListener('change', function() {
                         const principalId = this.dataset.principalId;
-                        const sublineaId = this.dataset.sublineaId;
-                        
-                        // Desmarcar otros checkboxes de columna en la misma línea principal (buscar en todo el documento)
-                        const otrosCheckboxes = document.querySelectorAll(`.columna-oferta-sublinea-checkbox[data-principal-id="${principalId}"]`);
-                        otrosCheckboxes.forEach(cb => {
-                            if (cb !== this && cb.checked) {
-                                cb.checked = false;
-                            }
-                        });
                         
                         actualizarEspecificacionesJSON();
                         // Validar columna después de cambiar
@@ -4271,7 +4747,7 @@ function mostrarDesplegablesEspecificaciones(filtros, especificacionesGuardadas 
         configurarBotonesImagenesSublineasOferta(container);
         
         // Validar todas las líneas principales que tienen checkbox de columna al cargar
-        if (esUnidadUnica && columnasProducto.length > 0) {
+        if (columnasProducto.length > 0) {
             columnasProducto.forEach(principalId => {
                 validarColumnaOferta(container, principalId);
             });
@@ -4583,14 +5059,17 @@ function actualizarEspecificacionesJSON() {
         }
     });
     
-    // Guardar columnas si existen checkboxes de columna
+    // Guardar columnas si existen checkboxes de columna (varias opciones por línea principal)
     const columnaCheckboxes = document.querySelectorAll('.columna-oferta-sublinea-checkbox:checked');
     if (columnaCheckboxes.length > 0) {
         especificaciones._columnas = {};
         columnaCheckboxes.forEach(checkbox => {
             const principalId = checkbox.dataset.principalId;
             const sublineaId = checkbox.dataset.sublineaId;
-            especificaciones._columnas[principalId] = sublineaId;
+            if (!especificaciones._columnas[principalId]) {
+                especificaciones._columnas[principalId] = [];
+            }
+            especificaciones._columnas[principalId].push(sublineaId);
         });
     }
     
@@ -4656,6 +5135,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 const response = await fetch(`/panel-privado/productos/${productoId}`);
                 const productoCompleto = await response.json();
                 const unidadesInput = document.querySelector('[name="unidades"]');
+
+                actualizarEtiquetasUnidadMedida(productoCompleto?.unidadDeMedida);
                 
                 // Verificar si el producto tiene unidad de medida única
                 if (productoCompleto && productoCompleto.unidadDeMedida === 'unidadUnica') {
@@ -5436,10 +5917,28 @@ if (tiendaIdInput) {
 document.addEventListener('DOMContentLoaded', async function() {
     const productoId = document.getElementById('producto_id')?.value;
     const tiendaId = document.getElementById('tienda_id')?.value;
+
+    const textoAltInput = document.getElementById('texto_cantidad_alternativo_input');
+    if (textoAltInput && !textoAltInput.__textoAltBound) {
+        textoAltInput.__textoAltBound = true;
+        textoAltInput.addEventListener('input', sincronizarBotonesTextoCantidadAltFormulario);
+    }
+
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.texto-cantidad-alt-btn');
+        if (!btn) return;
+        const input = document.getElementById('texto_cantidad_alternativo_input');
+        if (input) {
+            togglePalabraTextoCantidadAltFormulario(btn, input);
+            sincronizarBotonesTextoCantidadAltFormulario();
+        }
+    });
+
     if (productoId) {
         try {
             const response = await fetch(`/panel-privado/productos/${productoId}`);
             const producto = await response.json();
+            await actualizarCampoTextoCantidadAlternativo(productoId, producto);
             actualizarSeccionGrupos(producto);
             if (tiendaId) {
                 cargarGruposOfertas();

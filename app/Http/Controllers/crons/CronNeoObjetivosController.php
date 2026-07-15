@@ -24,7 +24,7 @@ use Illuminate\Support\Str;
 
 /**
  * Cron neo objetivos:
- * - Busca en neoobjetivo filas con visitada > 7 días
+ * - Busca en neoobjetivo filas con visitada > {@see Neoobjetivo::DIAS_SIN_REVISAR} días
  * - Si NEO_CRON_EXCLUIR_RAMA_NEO_DEL_CUPO es true, las filas de la rama Neo no entran en el cupo de 5 ni se modifican (constante en este controlador)
  * - Si la URL contiene la marca de rama Neo (VPS) y NEO_CRON_PETICIONES_VPS_HABILITADAS es true, POST al VPS /sacar-ofertas-idea
  * - Si NEO_CRON_REDIRECCION_HABILITADA es false, no se llama al VPS /redireccion y se guarda en neo sin URL final
@@ -49,7 +49,7 @@ class CronNeoObjetivosController extends Controller
      */
     private const NEO_CRON_EXCLUIR_RAMA_NEO_DEL_CUPO = false;
     /**
-     * true: en este cron solo se consideran neoobjetivos de tiendas (tienda_id con valor) con visitada > 7 días.
+     * true: en este cron solo se consideran neoobjetivos de tiendas (tienda_id con valor) con visitada > {@see Neoobjetivo::DIAS_SIN_REVISAR} días.
      * false: comportamiento normal (sin exigir tienda_id en el filtro inicial).
      */
     private const SOLO_EJECUTAR_NEOOBJETIVO_DE_TIENDAS = true;
@@ -139,14 +139,14 @@ class CronNeoObjetivosController extends Controller
             ],
         ]);
         $this->actualizarEjecucionPaso($ejecucion, 'consulta_neoobjetivo', [
-            'detalle' => 'Buscando filas visitadas hace más de 7 días',
+            'detalle' => 'Buscando filas visitadas hace más de ' . Neoobjetivo::DIAS_SIN_REVISAR . ' días',
         ]);
 
         try {
         // Cargar todas las candidatas antiguas, normalizar "No encontrado" y luego escoger 5 más antiguas válidas.
         $soloTiendasActiva = self::SOLO_EJECUTAR_NEOOBJETIVO_DE_TIENDAS;
         $queryFilasNeo = Neoobjetivo::query()
-            ->where('visitada', '<', now()->subDays(7));
+            ->where('visitada', '<', Neoobjetivo::fechaLimiteVisitadaPendiente());
         if ($soloTiendasActiva) {
             $queryFilasNeo->whereNotNull('tienda_id');
         }
@@ -404,7 +404,7 @@ class CronNeoObjetivosController extends Controller
                 'tipo_listado'     => $tipoListado,
             ];
 
-            $apiScrapingCategoria = app(TiendaScrapingConfigResolver::class)->resolverApi(
+            $apiScrapingCategoria = app(TiendaScrapingConfigResolver::class)->resolverApiProductos(
                 $tienda,
                 $neo->categoria_id ? (int) $neo->categoria_id : null
             );
@@ -627,7 +627,7 @@ class CronNeoObjetivosController extends Controller
             'id' => 0,
             'url' => $url,
             'tienda_id' => $tienda?->id,
-            'visitada' => now()->subDays(8),
+            'visitada' => Neoobjetivo::fechaVisitadaPruebaManual(),
         ]);
 
         $pasos = [];
@@ -1101,7 +1101,7 @@ class CronNeoObjetivosController extends Controller
     private function obtenerFilasPendientesVisitar(int $limite)
     {
         return Neoobjetivo::query()
-            ->where('visitada', '<', now()->subDays(7))
+            ->where('visitada', '<', Neoobjetivo::fechaLimiteVisitadaPendiente())
             ->whereNotNull('url_cipher')
             ->where('url_cipher', '!=', '')
             ->orderBy('visitada')
@@ -1595,7 +1595,7 @@ class CronNeoObjetivosController extends Controller
      *
      * @return array{skipped?: bool, reason?: string, url_final?: string, log_pasos: array, accion_final: string, success?: bool, error?: string}
      */
-    private function procesarUrlCategoria(string $urlProducto, Neoobjetivo $neoobjetivo, int $numeroUrl): array
+    public function procesarUrlCategoria(string $urlProducto, Neoobjetivo $neoobjetivo, int $numeroUrl): array
     {
         $log = [];
         $log[] = ['paso' => count($log) + 1, 'texto' => "URL producto (#{$numeroUrl}):", 'valor' => $urlProducto];
@@ -2256,6 +2256,321 @@ class CronNeoObjetivosController extends Controller
     }
 
     /**
+     * Resuelve tienda, controlador de scraping y tipo de listado para un neoobjetivo de categoría/tienda.
+     *
+     * @return array{
+     *   ok: true,
+     *   neo: Neoobjetivo,
+     *   tienda: Tienda,
+     *   controlador: object,
+     *   tipo_listado: string,
+     *   url_listado: string
+     * }|array{ok: false, http_code: int, error: string, tipo_listado?: mixed}
+     */
+    public function resolverContextoCategoriaTiendaNeoobjetivo(int $neoobjetivoId): array
+    {
+        $neo = Neoobjetivo::with(['categoria', 'tienda'])->find($neoobjetivoId);
+        if (!$neo) {
+            return ['ok' => false, 'http_code' => 404, 'error' => 'No se encontró neoobjetivo con el id indicado.'];
+        }
+        if ($neo->tienda_id === null) {
+            return ['ok' => false, 'http_code' => 422, 'error' => 'Este neoobjetivo no tiene tienda_id (no es categoría/tienda).'];
+        }
+        $urlListado = trim((string) $neo->url);
+        if ($urlListado === '' || strtolower($urlListado) === 'no encontrado') {
+            return ['ok' => false, 'http_code' => 422, 'error' => 'URL de listado vacía o inválida en neoobjetivo.'];
+        }
+        if (NeoProgramaExternoRamaNeoUrlNormalizer::esRamaNeoObjetivoUrl($urlListado)) {
+            return ['ok' => false, 'http_code' => 422, 'error' => 'La fila corresponde a la rama Neo (Idealo), no a categoría en tienda.'];
+        }
+
+        $tienda = $neo->tienda ?? Tienda::find($neo->tienda_id);
+        if (!$tienda) {
+            $this->crearAvisoTiendaNoEncontradaNeoObjetivo($neo->id);
+
+            return ['ok' => false, 'http_code' => 422, 'error' => 'No existe la tienda asociada al neoobjetivo.'];
+        }
+
+        $nombreControlador = $this->normalizarNombreTienda($tienda->nombre);
+        $claseControlador = "App\\Http\\Controllers\\Scraping\\Tiendas\\{$nombreControlador}Controller";
+        if (!class_exists($claseControlador)) {
+            $this->crearAvisoControladorNoEncontradoNeoObjetivo($neo->id, $tienda->nombre);
+
+            return [
+                'ok'        => false,
+                'http_code' => 422,
+                'error'     => 'No existe controlador de scraping para esta tienda: ' . $nombreControlador . 'Controller',
+            ];
+        }
+
+        $controladorTienda = new $claseControlador();
+        $tipoListado = $controladorTienda->tipoListadoCategoria();
+        if ($tipoListado === null || !in_array($tipoListado, ['sitemap', 'paginacion', 'mostrar_mas'], true)) {
+            $this->crearAvisoSinTipoListadoNeoObjetivo($neo->id, $tienda->nombre, $tipoListado);
+
+            return [
+                'ok'           => false,
+                'http_code'    => 422,
+                'error'        => 'tipoListadoCategoria() no válido o no soportado para esta tienda.',
+                'tipo_listado' => $tipoListado,
+            ];
+        }
+
+        return [
+            'ok'            => true,
+            'neo'           => $neo,
+            'tienda'        => $tienda,
+            'controlador'   => $controladorTienda,
+            'tipo_listado'  => $tipoListado,
+            'url_listado'   => $urlListado,
+        ];
+    }
+
+    /**
+     * @return array{urls_productos: array<int, string>, siguiente_url: ?string}
+     */
+    private function extraerUrlsProductoPaginaCategoriaTienda(object $controladorTienda, string $tipoListado, string $html, string $urlPagina): array
+    {
+        if ($tipoListado === 'sitemap') {
+            return [
+                'urls_productos' => $controladorTienda->urlsProductosDesdeSitemap($html),
+                'siguiente_url'  => null,
+            ];
+        }
+
+        if ($tipoListado === 'paginacion') {
+            $extraccion = $controladorTienda->extraerProductosYSiguientePagina($html, $urlPagina);
+
+            return [
+                'urls_productos' => $extraccion['urls_productos'] ?? [],
+                'siguiente_url'  => isset($extraccion['siguiente_url']) && $extraccion['siguiente_url'] !== ''
+                    ? $extraccion['siguiente_url']
+                    : null,
+            ];
+        }
+
+        return [
+            'urls_productos' => $controladorTienda->urlsProductosDesdeHtmlMostrarMas($html),
+            'siguiente_url'  => null,
+        ];
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $redirecciones
+     * @return array{
+     *   urls_productos_skipped_count: int,
+     *   urls_productos_insertadas_count: int,
+     *   urls_productos_actualizadas_neo_count: int,
+     *   urls_productos_error_count: int,
+     *   urls_nuevas_neo: array<int, string>
+     * }
+     */
+    private function contabilizarRedireccionesCategoriaTienda(array $redirecciones): array
+    {
+        $skippedCount = 0;
+        $insertadasCount = 0;
+        $actualizadasTiendaCount = 0;
+        $urlErroresCount = 0;
+        $urlsNuevasNeo = [];
+
+        foreach ($redirecciones as $r) {
+            if (!is_array($r)) {
+                continue;
+            }
+            if (!empty($r['error'])) {
+                $urlErroresCount++;
+                continue;
+            }
+            if (!empty($r['skipped'])) {
+                $skippedCount++;
+                continue;
+            }
+            if (!empty($r['success'])) {
+                $af = (string) ($r['accion_final'] ?? '');
+                if (str_contains($af, 'Actualizada fila neo existente')) {
+                    $actualizadasTiendaCount++;
+                } else {
+                    $insertadasCount++;
+                    if (str_contains($af, 'aniadida=no')) {
+                        $urlsNuevasNeo[] = (string) ($r['url_final'] ?? '');
+                    }
+                }
+            }
+        }
+
+        return [
+            'urls_productos_skipped_count'            => $skippedCount,
+            'urls_productos_insertadas_count'         => $insertadasCount,
+            'urls_productos_actualizadas_neo_count'   => $actualizadasTiendaCount,
+            'urls_productos_error_count'              => $urlErroresCount,
+            'urls_nuevas_neo'                         => array_values(array_filter($urlsNuevasNeo)),
+        ];
+    }
+
+    /**
+     * @return array{
+     *   hay_siguiente: bool,
+     *   visitada_actualizada: bool,
+     *   aviso_sin_productos_registrado: bool,
+     *   total_urls_producto_sesion: int
+     * }
+     */
+    private function finalizarSesionCategoriaTiendaTrasPagina(
+        Neoobjetivo $neo,
+        Tienda $tienda,
+        string $urlPagina,
+        string $urlListado,
+        int $urlsProductoAcumuladoAntes,
+        int $urlsEnEstaPagina,
+        ?string $siguienteUrl,
+    ): array {
+        $haySiguiente = $siguienteUrl !== null && $siguienteUrl !== '';
+        $visitadaActualizada = false;
+        $avisoSinProductos = false;
+        $antes = max(0, $urlsProductoAcumuladoAntes);
+        $totalSesion = $antes + $urlsEnEstaPagina;
+
+        if (!$haySiguiente) {
+            $puedeSerListadoVacio = $this->esUrlPaginaRelacionadaConListadoNeoobjetivo($urlPagina, $urlListado);
+            if ($totalSesion === 0 && $puedeSerListadoVacio) {
+                $this->registrarOActualizarAvisoNoProductosCategoriaNeoObjetivo($neo->id, $tienda->nombre, $neo->categoria?->nombre, $urlListado);
+                $avisoSinProductos = true;
+            } elseif ($totalSesion > 0) {
+                $this->eliminarAvisoNoProductosCategoriaNeoObjetivoSiExiste($neo->id, $tienda->nombre, $neo->categoria?->nombre, $urlListado);
+                $neo->update(['visitada' => now()]);
+                $visitadaActualizada = true;
+            } else {
+                $neo->update(['visitada' => now()]);
+                $visitadaActualizada = true;
+            }
+        }
+
+        return [
+            'hay_siguiente'                  => $haySiguiente,
+            'visitada_actualizada'           => $visitadaActualizada,
+            'aviso_sin_productos_registrado' => $avisoSinProductos,
+            'total_urls_producto_sesion'     => $totalSesion,
+        ];
+    }
+
+    /**
+     * Una página de categoría/tienda obtenida vía API interna (Productos scraping de la tienda).
+     * Reutiliza extractores de tienda y procesarUrlCategoria; no duplica la lógica del programa externo.
+     *
+     * @return array<string, mixed>
+     */
+    public function procesarPaginaCategoriaTiendaDesdeApiInterna(
+        int $neoobjetivoId,
+        string $urlPagina,
+        int $urlsProductoAcumuladoAntes = 0,
+        int $numeroPagina = 1,
+    ): array {
+        $urlPagina = trim($urlPagina);
+        $ctx = $this->resolverContextoCategoriaTiendaNeoobjetivo($neoobjetivoId);
+        if (empty($ctx['ok'])) {
+            return $ctx;
+        }
+
+        /** @var Neoobjetivo $neo */
+        $neo = $ctx['neo'];
+        /** @var Tienda $tienda */
+        $tienda = $ctx['tienda'];
+        $controladorTienda = $ctx['controlador'];
+        $tipoListado = $ctx['tipo_listado'];
+        $urlListado = $ctx['url_listado'];
+
+        $apiProductos = app(TiendaScrapingConfigResolver::class)->resolverApiProductos(
+            $tienda,
+            $neo->categoria_id ? (int) $neo->categoria_id : null
+        );
+
+        if ($apiProductos === 'navegadorLocal') {
+            return [
+                'ok'        => false,
+                'http_code' => 422,
+                'error'     => 'La API "navegador local" requiere el programa externo. Elige otra API en "Productos scraping".',
+            ];
+        }
+
+        if ($apiProductos === TiendaScrapingConfigResolver::API_CSV_AWIN) {
+            return [
+                'ok'        => false,
+                'http_code' => 422,
+                'error'     => 'CSV-Awin no sirve para listados de categoría. Elige otra API en "Productos scraping".',
+            ];
+        }
+
+        try {
+            $apiHTML = app(PeticionApiHTMLController::class);
+            $cargarMasSelector = $tipoListado === 'mostrar_mas'
+                ? $controladorTienda->selectorCargarMasParaVps()
+                : null;
+            $resultado = $apiHTML->obtenerHTML($urlPagina, null, $apiProductos, $cargarMasSelector);
+
+            if (empty($resultado['success'])) {
+                return [
+                    'ok'            => false,
+                    'http_code'     => 502,
+                    'error'         => $resultado['error'] ?? 'No se pudo obtener HTML de la URL.',
+                    'url_pagina'    => $urlPagina,
+                    'numero_pagina' => $numeroPagina,
+                    'api_utilizada' => $resultado['proveedor'] ?? $apiProductos,
+                ];
+            }
+
+            $html = (string) ($resultado['html'] ?? '');
+            $extraccion = $this->extraerUrlsProductoPaginaCategoriaTienda($controladorTienda, $tipoListado, $html, $urlPagina);
+        } catch (\Throwable $e) {
+            return [
+                'ok'            => false,
+                'http_code'     => 422,
+                'error'         => 'Error al extraer URLs del HTML: ' . $e->getMessage(),
+                'tipo_listado'  => $tipoListado,
+                'url_pagina'    => $urlPagina,
+                'numero_pagina' => $numeroPagina,
+            ];
+        }
+
+        $urlsPagina = $extraccion['urls_productos'];
+        $siguienteUrl = $extraccion['siguiente_url'];
+
+        $redirecciones = [];
+        $numeroUrl = 0;
+        foreach ($urlsPagina as $urlProducto) {
+            $numeroUrl++;
+            $redirecciones[] = $this->procesarUrlCategoria($urlProducto, $neo, $numeroUrl);
+        }
+
+        $stats = $this->contabilizarRedireccionesCategoriaTienda($redirecciones);
+        $finalizacion = $this->finalizarSesionCategoriaTiendaTrasPagina(
+            $neo,
+            $tienda,
+            $urlPagina,
+            $urlListado,
+            $urlsProductoAcumuladoAntes,
+            count($urlsPagina),
+            $siguienteUrl,
+        );
+
+        return array_merge([
+            'ok'                   => true,
+            'http_code'            => 200,
+            'neoobjetivo_id'       => $neo->id,
+            'tienda_id'            => $tienda->id,
+            'tienda_nombre'        => $tienda->nombre,
+            'tipo_listado'         => $tipoListado,
+            'url_pagina_procesada' => $urlPagina,
+            'numero_pagina'        => $numeroPagina,
+            'urls_productos'       => $urlsPagina,
+            'urls_productos_count' => count($urlsPagina),
+            'siguiente_url'        => $siguienteUrl,
+            'redirecciones'        => $redirecciones,
+            'api_utilizada'        => $resultado['proveedor'] ?? $apiProductos,
+            'completada'           => !$finalizacion['hay_siguiente'],
+        ], $stats, $finalizacion);
+    }
+
+    /**
      * Programa externo (HTML obtenido con navegador local): una página de categoría por llamada.
      * Usa el mismo controlador de tienda y procesarUrlCategoria que el cron (rama categoría/tienda).
      *
@@ -2291,77 +2606,32 @@ class CronNeoObjetivosController extends Controller
         $urlPagina = trim($urlPagina);
         $html = (string) $html;
 
-        $neo = Neoobjetivo::with(['categoria', 'tienda'])->find($neoobjetivoId);
-        if (!$neo) {
-            return ['ok' => false, 'http_code' => 404, 'error' => 'No se encontró neoobjetivo con el id indicado.'];
-        }
-        if ($neo->tienda_id === null) {
-            return ['ok' => false, 'http_code' => 422, 'error' => 'Este neoobjetivo no tiene tienda_id (no es categoría/tienda).'];
-        }
-        $urlListado = trim((string) $neo->url);
-        if ($urlListado === '' || strtolower($urlListado) === 'no encontrado') {
-            return ['ok' => false, 'http_code' => 422, 'error' => 'URL de listado vacía o inválida en neoobjetivo.'];
-        }
-        if (NeoProgramaExternoRamaNeoUrlNormalizer::esRamaNeoObjetivoUrl($urlListado)) {
-            return ['ok' => false, 'http_code' => 422, 'error' => 'La fila corresponde a la rama Neo (Idealo), no a categoría en tienda.'];
+        $ctx = $this->resolverContextoCategoriaTiendaNeoobjetivo($neoobjetivoId);
+        if (empty($ctx['ok'])) {
+            return $ctx;
         }
 
-        $tienda = $neo->tienda ?? Tienda::find($neo->tienda_id);
-        if (!$tienda) {
-            $this->crearAvisoTiendaNoEncontradaNeoObjetivo($neo->id);
+        /** @var Neoobjetivo $neo */
+        $neo = $ctx['neo'];
+        /** @var Tienda $tienda */
+        $tienda = $ctx['tienda'];
+        $controladorTienda = $ctx['controlador'];
+        $tipoListado = $ctx['tipo_listado'];
+        $urlListado = $ctx['url_listado'];
 
-            return ['ok' => false, 'http_code' => 422, 'error' => 'No existe la tienda asociada al neoobjetivo.'];
-        }
-
-        $nombreControlador = $this->normalizarNombreTienda($tienda->nombre);
-        $claseControlador = "App\\Http\\Controllers\\Scraping\\Tiendas\\{$nombreControlador}Controller";
-        if (!class_exists($claseControlador)) {
-            $this->crearAvisoControladorNoEncontradoNeoObjetivo($neo->id, $tienda->nombre);
-
-            return [
-                'ok'    => false,
-                'http_code' => 422,
-                'error' => 'No existe controlador de scraping para esta tienda: ' . $nombreControlador . 'Controller',
-            ];
-        }
-
-        $controladorTienda = new $claseControlador();
-        $tipoListado = $controladorTienda->tipoListadoCategoria();
-        if ($tipoListado === null || !in_array($tipoListado, ['sitemap', 'paginacion', 'mostrar_mas'], true)) {
-            $this->crearAvisoSinTipoListadoNeoObjetivo($neo->id, $tienda->nombre, $tipoListado);
-
-            return [
-                'ok'            => false,
-                'http_code'     => 422,
-                'error'         => 'tipoListadoCategoria() no válido o no soportado para esta tienda.',
-                'tipo_listado'  => $tipoListado,
-            ];
-        }
-
-        $urlsPagina = [];
-        $siguienteUrl = null;
         try {
-            if ($tipoListado === 'sitemap') {
-                $urlsPagina = $controladorTienda->urlsProductosDesdeSitemap($html);
-                $siguienteUrl = null;
-            } elseif ($tipoListado === 'paginacion') {
-                $extraccion = $controladorTienda->extraerProductosYSiguientePagina($html, $urlPagina);
-                $urlsPagina = $extraccion['urls_productos'] ?? [];
-                $siguienteUrl = isset($extraccion['siguiente_url']) && $extraccion['siguiente_url'] !== ''
-                    ? $extraccion['siguiente_url']
-                    : null;
-            } else {
-                $urlsPagina = $controladorTienda->urlsProductosDesdeHtmlMostrarMas($html);
-                $siguienteUrl = null;
-            }
+            $extraccion = $this->extraerUrlsProductoPaginaCategoriaTienda($controladorTienda, $tipoListado, $html, $urlPagina);
         } catch (\Throwable $e) {
             return [
-                'ok'            => false,
-                'http_code'     => 422,
-                'error'         => 'Error al extraer URLs del HTML: ' . $e->getMessage(),
-                'tipo_listado'  => $tipoListado,
+                'ok'           => false,
+                'http_code'    => 422,
+                'error'        => 'Error al extraer URLs del HTML: ' . $e->getMessage(),
+                'tipo_listado' => $tipoListado,
             ];
         }
+
+        $urlsPagina = $extraccion['urls_productos'];
+        $siguienteUrl = $extraccion['siguiente_url'];
 
         $redirecciones = [];
         $numeroUrl = 0;
@@ -2370,54 +2640,18 @@ class CronNeoObjetivosController extends Controller
             $redirecciones[] = $this->procesarUrlCategoria($urlProducto, $neo, $numeroUrl);
         }
 
-        $skippedCount = 0;
-        $insertadasCount = 0;
-        $actualizadasTiendaCount = 0;
-        $urlErroresCount = 0;
-        foreach ($redirecciones as $r) {
-            if (!is_array($r)) {
-                continue;
-            }
-            if (!empty($r['error'])) {
-                $urlErroresCount++;
-                continue;
-            }
-            if (!empty($r['skipped'])) {
-                $skippedCount++;
-                continue;
-            }
-            if (!empty($r['success'])) {
-                $af = (string) ($r['accion_final'] ?? '');
-                if (str_contains($af, 'Actualizada fila neo existente')) {
-                    $actualizadasTiendaCount++;
-                } else {
-                    $insertadasCount++;
-                }
-            }
-        }
+        $stats = $this->contabilizarRedireccionesCategoriaTienda($redirecciones);
+        $finalizacion = $this->finalizarSesionCategoriaTiendaTrasPagina(
+            $neo,
+            $tienda,
+            $urlPagina,
+            $urlListado,
+            $urlsProductoAcumuladoAntes,
+            count($urlsPagina),
+            $siguienteUrl,
+        );
 
-        $haySiguiente = $siguienteUrl !== null && $siguienteUrl !== '';
-        $visitadaActualizada = false;
-        $avisoSinProductos = false;
-        $antes = max(0, $urlsProductoAcumuladoAntes);
-        $totalSesion = $antes + count($urlsPagina);
-
-        if (!$haySiguiente) {
-            $puedeSerListadoVacio = $this->esUrlPaginaRelacionadaConListadoNeoobjetivo($urlPagina, $urlListado);
-            if ($totalSesion === 0 && $puedeSerListadoVacio) {
-                $this->registrarOActualizarAvisoNoProductosCategoriaNeoObjetivo($neo->id, $tienda->nombre, $neo->categoria?->nombre, $urlListado);
-                $avisoSinProductos = true;
-            } elseif ($totalSesion > 0) {
-                $this->eliminarAvisoNoProductosCategoriaNeoObjetivoSiExiste($neo->id, $tienda->nombre, $neo->categoria?->nombre, $urlListado);
-                $neo->update(['visitada' => now()]);
-                $visitadaActualizada = true;
-            } else {
-                $neo->update(['visitada' => now()]);
-                $visitadaActualizada = true;
-            }
-        }
-
-        return [
+        return array_merge([
             'ok'                          => true,
             'http_code'                   => 200,
             'neoobjetivo_id'              => $neo->id,
@@ -2429,14 +2663,8 @@ class CronNeoObjetivosController extends Controller
             'urls_productos_count'        => count($urlsPagina),
             'siguiente_url'               => $siguienteUrl,
             'redirecciones'               => $redirecciones,
-            'urls_productos_skipped_count' => $skippedCount,
-            'urls_productos_insertadas_count' => $insertadasCount,
-            'urls_productos_actualizadas_neo_count' => $actualizadasTiendaCount,
-            'urls_productos_error_count'  => $urlErroresCount,
-            'visitada_actualizada'        => $visitadaActualizada,
-            'aviso_sin_productos_registrado' => $avisoSinProductos,
-            'total_urls_producto_sesion'  => $totalSesion,
-        ];
+            'completada'                  => !$finalizacion['hay_siguiente'],
+        ], $stats, $finalizacion);
     }
 
     /**

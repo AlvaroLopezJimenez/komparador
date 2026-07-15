@@ -496,6 +496,265 @@ private function extraerPrecioDeMicrodata(string $html): ?float
         }
     }
 
+    // -------------------------------------------------------------------------
+    // Cron Neo Objetivos - listado de categoría por paginación (/2/, /3/, …)
+    // -------------------------------------------------------------------------
+
+    public function tipoListadoCategoria(): ?string
+    {
+        return 'paginacion';
+    }
+
+    /**
+     * PLP categoría El Corte Inglés:
+     * - Página 1: /electrodomesticos/cafeteras/capsulas-de-cafe
+     * - Página 2+: /electrodomesticos/cafeteras/capsulas-de-cafe/2/
+     * - Productos en <li class="products_list-item"> (excluye product_sponsor / hidden)
+     * - Para cuando la página no devuelve productos
+     */
+    public function extraerProductosYSiguientePagina(string $html, string $urlPeticionActual): array
+    {
+        $html = html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $base = $this->obtenerBaseUrlDesdeUrlPeticion($urlPeticionActual);
+
+        $urlsProductos = $this->extraerUrlsProductosDesdeListadoCategoria($html);
+        foreach ($urlsProductos as $i => $u) {
+            $urlsProductos[$i] = $this->normalizarUrlCorta($u, $base);
+        }
+        $urlsProductos = array_values(array_unique(array_filter($urlsProductos)));
+
+        $siguienteUrl = null;
+        if (count($urlsProductos) > 0) {
+            $siguienteUrl = $this->construirUrlSiguientePaginaCategoria($urlPeticionActual);
+            if ($siguienteUrl !== null) {
+                $siguienteUrl = $this->normalizarUrlCorta($siguienteUrl, $base);
+            }
+        }
+
+        return [
+            'urls_productos' => $urlsProductos,
+            'siguiente_url'  => $siguienteUrl,
+        ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function extraerUrlsProductosDesdeListadoCategoria(string $html): array
+    {
+        $urls = [];
+        $offset = 0;
+        $needle = '<li class="products_list-item';
+
+        while (($pos = stripos($html, $needle, $offset)) !== false) {
+            $endPos = stripos($html, '</li>', $pos);
+            if ($endPos === false) {
+                break;
+            }
+
+            $bloque = substr($html, $pos, $endPos - $pos + 5);
+            $offset = $endPos + 5;
+
+            if ($this->esBloqueProductoPatrocinado($bloque)) {
+                continue;
+            }
+
+            $urls = array_merge($urls, $this->extraerUrlsProductoDesdeBloqueListItem($bloque));
+        }
+
+        if ($urls === []) {
+            $htmlSinPatrocinados = $this->quitarBloquesPatrocinados($html);
+            $urls = $this->extraerUrlsProductoRegexGlobal($htmlSinPatrocinados);
+        }
+
+        return array_values(array_unique(array_filter(
+            $urls,
+            fn (string $u) => $this->esUrlProductoElCorteIngles($u)
+        )));
+    }
+
+    private function esBloqueProductoPatrocinado(string $bloque): bool
+    {
+        if (str_contains($bloque, 'product_sponsor') || str_contains($bloque, 'skeleton-product')) {
+            return true;
+        }
+
+        return (bool) preg_match('~\bproducts_list-item\b[^>]*\bhidden\b~i', $bloque);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function extraerUrlsProductoDesdeBloqueListItem(string $bloque): array
+    {
+        $urls = [];
+
+        if (
+            preg_match_all(
+                '~\bdata-url=(["\'])(?<u>/[^"\']+/A\d+-\d+-pr-[^"\']+/)\1~i',
+                $bloque,
+                $mDataUrl
+            )
+        ) {
+            foreach ($mDataUrl['u'] as $u) {
+                $urls[] = trim((string) $u);
+            }
+        }
+
+        if (
+            preg_match_all(
+                '~<a[^>]*\bclass=(["\'])[^"\']*product_preview-title[^"\']*\1[^>]*\bhref=(["\'])(?<u>/[^"\']+/A\d+-\d+-pr-[^"\']+/)\2~i',
+                $bloque,
+                $mTitle
+            )
+        ) {
+            foreach ($mTitle['u'] as $u) {
+                $urls[] = trim((string) $u);
+            }
+        }
+
+        if ($urls === []) {
+            if (
+                preg_match_all(
+                    '~\bhref=(["\'])(?<u>/[^"\']+/A\d+-\d+-pr-[^"\']+/)\1~i',
+                    $bloque,
+                    $mHref
+                )
+            ) {
+                foreach ($mHref['u'] as $u) {
+                    $urls[] = trim((string) $u);
+                }
+            }
+        }
+
+        return $urls;
+    }
+
+    private function quitarBloquesPatrocinados(string $html): string
+    {
+        $patrones = [
+            '~<li[^>]*\bproducts_list-item\b[^>]*\bhidden\b[^>]*>[\s\S]*?</li>~i',
+            '~<div[^>]*\bproduct_sponsor\b[^>]*>[\s\S]*?</div>\s*</div>\s*</div>~i',
+            '~<article[^>]*\bskeleton-product\b[^>]*>[\s\S]*?</article>~i',
+        ];
+
+        foreach ($patrones as $patron) {
+            $reemplazo = preg_replace($patron, '', $html);
+            if (is_string($reemplazo)) {
+                $html = $reemplazo;
+            }
+        }
+
+        return $html;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function extraerUrlsProductoRegexGlobal(string $html): array
+    {
+        $urls = [];
+
+        if (preg_match_all('~(?:\bhref=|\bdata-url=)(["\'])(?<u>/[^"\']+/A\d+-\d+-pr-[^"\']+/)\1~i', $html, $m)) {
+            foreach ($m['u'] as $u) {
+                $urls[] = trim((string) $u);
+            }
+        }
+
+        return $urls;
+    }
+
+    private function esUrlProductoElCorteIngles(string $url): bool
+    {
+        $path = (string) (parse_url($url, PHP_URL_PATH) ?? $url);
+
+        return (bool) preg_match('~/A\d+-\d+-pr-[a-z0-9\-]+/?$~iu', $path);
+    }
+
+    private function construirUrlSiguientePaginaCategoria(string $urlPeticionActual): ?string
+    {
+        $baseCategoria = $this->obtenerUrlBaseCategoria($urlPeticionActual);
+        if ($baseCategoria === null) {
+            return null;
+        }
+
+        $paginaActual = $this->extraerNumeroPaginaActual($urlPeticionActual);
+        $siguiente = $paginaActual + 1;
+
+        return rtrim($baseCategoria, '/') . '/' . $siguiente . '/';
+    }
+
+    private function obtenerUrlBaseCategoria(string $urlPeticionActual): ?string
+    {
+        $parts = parse_url($urlPeticionActual);
+        if ($parts === false || empty($parts['host'])) {
+            return null;
+        }
+
+        $scheme = $parts['scheme'] ?? 'https';
+        $host = $parts['host'];
+        $port = isset($parts['port']) ? ':' . (int) $parts['port'] : '';
+        $path = $parts['path'] ?? '/';
+        $query = isset($parts['query']) && $parts['query'] !== '' ? '?' . $parts['query'] : '';
+        $fragment = isset($parts['fragment']) && $parts['fragment'] !== '' ? '#' . $parts['fragment'] : '';
+
+        $path = rtrim($path, '/');
+        if (preg_match('~/(\d+)$~', $path, $m)) {
+            $path = substr($path, 0, -strlen($m[0]));
+            $path = rtrim($path, '/');
+        }
+
+        if ($path === '') {
+            $path = '/';
+        }
+
+        return $scheme . '://' . $host . $port . $path . $query . $fragment;
+    }
+
+    private function extraerNumeroPaginaActual(string $urlPeticionActual): int
+    {
+        $path = rtrim((string) (parse_url($urlPeticionActual, PHP_URL_PATH) ?? ''), '/');
+        if ($path !== '' && preg_match('~/(\d+)$~', $path, $m)) {
+            return max(1, (int) ($m[1] ?? 1));
+        }
+
+        return 1;
+    }
+
+    private function obtenerBaseUrlDesdeUrlPeticion(string $urlPeticionActual): string
+    {
+        $pu = parse_url($urlPeticionActual);
+        $scheme = $pu['scheme'] ?? 'https';
+        $host = $pu['host'] ?? 'www.elcorteingles.es';
+
+        return $scheme . '://' . $host;
+    }
+
+    private function normalizarUrlCorta(string $url, string $base): string
+    {
+        $url = trim($url);
+        if ($url === '') {
+            return $url;
+        }
+
+        if (str_starts_with($url, '//')) {
+            $pu = parse_url($base);
+            $scheme = $pu['scheme'] ?? 'https';
+
+            return $scheme . ':' . $url;
+        }
+
+        if (preg_match('~^https?://~i', $url)) {
+            return $url;
+        }
+
+        if (str_starts_with($url, '/')) {
+            return $base . $url;
+        }
+
+        return $base . '/' . $url;
+    }
+
 }
 
 

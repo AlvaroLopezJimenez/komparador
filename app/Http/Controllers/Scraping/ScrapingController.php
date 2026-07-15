@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Scraping;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\DescuentosController;
+use App\Models\OfertaProducto;
 use App\Services\CsvAwinOfertaService;
 use App\Services\TiendaScrapingConfigResolver;
 use App\Support\UrlOfertaValidacion;
@@ -23,6 +25,7 @@ class ScrapingController extends Controller
                 'url' => UrlOfertaValidacion::rules(),
                 'tienda' => 'required|string',
                 'variante' => 'nullable|string',
+                'producto_id' => 'nullable|integer|exists:productos,id',
             ]);
 
             $url = $request->input('url');
@@ -39,20 +42,33 @@ class ScrapingController extends Controller
                 ]);
             }
 
-            $apiEfectiva = $tiendaModel->api;
+            $apiForzada = $request->input('api_forzada');
+            if (is_string($apiForzada) && $apiForzada !== '') {
+                $apiEfectiva = $apiForzada;
+            } else {
+                $apiEfectiva = $tiendaModel->api;
 
-            // API efectiva: categoría del producto si está configurada, si no la de la tienda
-            if ($oferta !== null) {
-                $oferta->loadMissing('producto');
-                $categoriaId = $oferta->producto?->categoria_id;
-                $apiEfectiva = app(TiendaScrapingConfigResolver::class)->resolverApi(
-                    $tiendaModel,
-                    $categoriaId !== null ? (int) $categoriaId : null
-                ) ?? $apiEfectiva;
+                // API efectiva: categoría del producto si está configurada, si no la de la tienda
+                $categoriaId = null;
+                if ($oferta !== null) {
+                    $oferta->loadMissing('producto');
+                    $categoriaId = $oferta->producto?->categoria_id;
+                } elseif ($request->filled('producto_id')) {
+                    $categoriaId = \App\Models\Producto::whereKey($request->input('producto_id'))->value('categoria_id');
+                }
+
+                if ($categoriaId !== null || $oferta !== null) {
+                    $apiEfectiva = app(TiendaScrapingConfigResolver::class)->resolverApi(
+                        $tiendaModel,
+                        $categoriaId !== null ? (int) $categoriaId : null
+                    ) ?? $apiEfectiva;
+                }
             }
 
             if ($apiEfectiva === TiendaScrapingConfigResolver::API_CSV_AWIN) {
-                return app(CsvAwinOfertaService::class)->obtenerPrecioJson($url, $tiendaModel, $oferta);
+                $response = app(CsvAwinOfertaService::class)->obtenerPrecioJson($url, $tiendaModel, $oferta);
+
+                return $this->respuestaConDescuentosOfertaSiCorresponde($response, $oferta);
             }
 
             // Normalizar nombre de tienda para buscar el controlador
@@ -72,23 +88,15 @@ class ScrapingController extends Controller
             // Instanciar el controlador de la tienda
             $controladorTienda = new $claseControlador();
 
-            if ($oferta !== null && $apiEfectiva !== null) {
+            if ($apiEfectiva !== null && $apiEfectiva !== $tiendaModel->api) {
                 $tiendaModel = clone $tiendaModel;
                 $tiendaModel->api = $apiEfectiva;
             }
             
             // Llamar al método obtenerPrecio del controlador de la tienda
             $response = $controladorTienda->obtenerPrecio($url, $variante, $tiendaModel, $oferta);
-            
-            // Verificar que la respuesta sea válida
-            if (!$response || !method_exists($response, 'getData')) {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Respuesta inválida del controlador de tienda'
-                ]);
-            }
-            
-            return $response;
+
+            return $this->respuestaConDescuentosOfertaSiCorresponde($response, $oferta);
 
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
@@ -107,6 +115,35 @@ class ScrapingController extends Controller
                 'error' => 'Error en el scraping: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Tras un scraping con oferta, los controladores de tienda pueden haber actualizado
+     * ofertas_producto.descuentos. Devolvemos ese estado al formulario sin tocar cada tienda.
+     *
+     * @param  mixed  $response
+     */
+    private function respuestaConDescuentosOfertaSiCorresponde($response, $oferta)
+    {
+        if (!$response || !method_exists($response, 'getData')) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Respuesta inválida del controlador de tienda',
+            ]);
+        }
+
+        $data = $response->getData(true);
+
+        if ($oferta instanceof OfertaProducto && !empty($data['success'])) {
+            $oferta->refresh();
+            $descuentos = $oferta->descuentos ?? '';
+
+            $data['descuentos'] = $descuentos;
+            $data['descuentos_detectados'] = DescuentosController::parseDescuentos($descuentos);
+            $data['descuentos_sincronizados'] = true;
+        }
+
+        return response()->json($data);
     }
 
     /**

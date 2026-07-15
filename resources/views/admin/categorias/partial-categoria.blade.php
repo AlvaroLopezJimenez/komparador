@@ -77,8 +77,12 @@
         @endif
     </div>
 @else
-<div class="ml-{{ $ml }} border-l-4 border-{{ $color }} pl-2">
+<div class="ml-{{ $ml }} border-l-4 border-{{ $color }} pl-2 js-categoria-nodo"
+    x-show="categoriaEnRamaVisible({{ $categoria->id }})"
+    data-categoria-id="{{ $categoria->id }}"
+    data-categoria-nombre="{{ $categoria->nombre }}">
     <div class="flex justify-between items-center cursor-pointer py-1"
+        x-show="categoriaVisible({{ $categoria->id }})"
         @click="toggle({{ $categoria->id }})">
         <div class="flex items-center gap-2">
             <svg :class="{ 'rotate-90': isOpen({{ $categoria->id }}) }" class="w-4 h-4 transition-transform"

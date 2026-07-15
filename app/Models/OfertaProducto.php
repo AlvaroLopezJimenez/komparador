@@ -16,6 +16,7 @@ class OfertaProducto extends Model
         'tienda_id',
         'chollo_id',
         'unidades',
+        'texto_cantidad_alternativo',
         'precio_total',
         'envio',
         'fecha_actualizacion_envio',

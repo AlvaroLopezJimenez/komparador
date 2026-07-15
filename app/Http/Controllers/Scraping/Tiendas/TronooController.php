@@ -63,7 +63,7 @@ class TronooController extends PlantillaTiendaController
             ]);
         }
 
-        $precio = $this->extraerPrecioDesdeBloquePrincipal($html);
+        $precio = $this->extraerPrecio($html);
         if ($precio === null) {
             return response()->json([
                 'success' => false,
@@ -92,11 +92,24 @@ class TronooController extends PlantillaTiendaController
     }
 
     /**
-     * Precio SOLO del bloque principal del producto:
+     * Intenta extraer el precio del bloque Divi (et_pb_wc_price) o de Elementor (elementor-widget-container).
+     */
+    private function extraerPrecio(string $html): ?float
+    {
+        $precio = $this->extraerPrecioDesdeBloqueDivi($html);
+        if ($precio !== null) {
+            return $precio;
+        }
+
+        return $this->extraerPrecioDesdeElementor($html);
+    }
+
+    /**
+     * Precio del bloque principal Divi:
      * et_pb_wc_title + et_pb_wc_price -> p.price -> .woocommerce-Price-amount.amount -> bdi
      * para evitar capturar precios de "Productos relacionados".
      */
-    private function extraerPrecioDesdeBloquePrincipal(string $html): ?float
+    private function extraerPrecioDesdeBloqueDivi(string $html): ?float
     {
         if (
             preg_match(
@@ -120,6 +133,61 @@ class TronooController extends PlantillaTiendaController
         }
 
         return null;
+    }
+
+    /**
+     * Precio en páginas Elementor:
+     * elementor-widget-container -> p.price -> .woocommerce-Price-amount.amount -> bdi
+     */
+    private function extraerPrecioDesdeElementor(string $html): ?float
+    {
+        $htmlProducto = $this->aislarHtmlAntesDeRelacionados($html);
+
+        $patronPrecioBdi = '[\s\S]*?<bdi>\s*(?<p>[0-9][0-9\.,\s]*[0-9])';
+        $patrones = [
+            // Widget de precio WooCommerce en Elementor
+            '~<div[^>]*\bclass=(["\'])[^"\']*\belementor-widget-woocommerce-product-price\b[^"\']*\1[^>]*>' . $patronPrecioBdi . '~i',
+            // elementor-widget-container con p.price (estructura actual de Tronoo)
+            '~<div[^>]*\bclass=(["\'])[^"\']*\belementor-widget-container\b[^"\']*\1[^>]*>\s*<p[^>]*\bclass=(["\'])[^"\']*\bprice\b[^"\']*\2[^>]*>[\s\S]*?<span[^>]*\bclass=(["\'])[^"\']*\bwoocommerce-Price-amount\b[^"\']*\bamount\b[^"\']*\3[^>]*>' . $patronPrecioBdi . '~i',
+            // Primer p.price con woocommerce-Price-amount en la zona principal
+            '~<p[^>]*\bclass=(["\'])[^"\']*\bprice\b[^"\']*\1[^>]*>[\s\S]*?<span[^>]*\bclass=(["\'])[^"\']*\bwoocommerce-Price-amount\b[^"\']*\bamount\b[^"\']*\2[^>]*>' . $patronPrecioBdi . '~i',
+        ];
+
+        foreach ($patrones as $patron) {
+            if (preg_match($patron, $htmlProducto, $m)) {
+                $precio = $this->normalizarImporte($m['p'] ?? '');
+                if ($precio !== null) {
+                    return $precio;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /** Recorta el HTML antes de bloques de productos relacionados / upsells. */
+    private function aislarHtmlAntesDeRelacionados(string $html): string
+    {
+        $marcadores = [
+            'productos relacionados',
+            'related products',
+            'upsells',
+            'cross-sells',
+            'elementor-widget-woocommerce-product-related',
+            'woocommerce-LoopProduct-link',
+        ];
+
+        $htmlLower = mb_strtolower($html, 'UTF-8');
+        $corte = strlen($html);
+
+        foreach ($marcadores as $marcador) {
+            $pos = mb_strpos($htmlLower, $marcador, 0, 'UTF-8');
+            if ($pos !== false && $pos < $corte) {
+                $corte = $pos;
+            }
+        }
+
+        return substr($html, 0, $corte);
     }
 
     /**

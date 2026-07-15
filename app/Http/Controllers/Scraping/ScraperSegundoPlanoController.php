@@ -208,6 +208,7 @@ class ScraperSegundoPlanoController extends ScraperBaseController
                     'total_ofertas' => $totalOfertas,
                     'ofertas' => $ofertas->pluck('id')->toArray(),
                     'actualizadas' => 0,
+                    'ocultadas' => 0,
                     'errores' => 0,
                     'procesadas' => 0,
                     'resultados' => []
@@ -220,6 +221,7 @@ class ScraperSegundoPlanoController extends ScraperBaseController
             });
 
             $actualizadas = 0;
+            $ocultadas    = 0;
             $errores      = 0;
             $log          = [];
 
@@ -234,7 +236,7 @@ class ScraperSegundoPlanoController extends ScraperBaseController
                         // Verificar si la oferta sigue siendo válida
                         if (!$oferta->exists) {
                             $errores++;
-                            $log[] = [
+                            $log[] = $this->enriquecerResultadoScraperLog($oferta, [
                                 'oferta_id'                 => $oferta->id ?? 'desconocido',
                                 'tienda_nombre'             => 'Oferta eliminada',
                                 'url'                       => 'N/A',
@@ -245,25 +247,38 @@ class ScraperSegundoPlanoController extends ScraperBaseController
                                 'error'                     => 'La oferta ya no existe en la base de datos',
                                 'cambios_detectados'        => false,
                                 'url_notificacion_llamada'  => false,
-                            ];
+                            ]);
                             $procesadas++;
                             continue;
                         }
 
                         $resultado = $this->procesarOfertaScraper($oferta);
-                        $log[] = $resultado;
 
-                        if (!empty($resultado['success'])) {
-                            $actualizadas++;
-                        } else {
-                            $errores++;
+                        if (!empty($resultado['success'])
+                            && !empty($resultado['precio_guardado'])
+                            && empty($resultado['oferta_oculta'])) {
+                            $precioTrasScraping = $resultado['precio_nuevo'];
+                            if ($this->scraping()->aplicarPrecioCsvPostScrapingSiCorresponde($oferta)) {
+                                $oferta->refresh();
+                                $resultado['precio_csv_silencioso'] = true;
+                                $resultado['precio_tras_scraping'] = $precioTrasScraping;
+                                $resultado['precio_nuevo'] = $oferta->precio_total;
+                            }
                         }
+
+                        $log[] = $this->enriquecerResultadoScraperLog($oferta, $resultado);
+
+                        match ($this->clasificarResultadoScraping($resultado)) {
+                            'actualizada' => $actualizadas++,
+                            'ocultada'    => $ocultadas++,
+                            default       => $errores++,
+                        };
 
                         $procesadas++;
 
                     } catch (\Throwable $e) {
                         $errores++;
-                        $log[] = [
+                        $log[] = $this->enriquecerResultadoScraperLog($oferta, [
                             'oferta_id'                 => $oferta->id ?? 'desconocido',
                             'tienda_nombre'             => $oferta->tienda->nombre ?? 'Desconocida',
                             'url'                       => $oferta->url ?? 'N/A',
@@ -274,7 +289,7 @@ class ScraperSegundoPlanoController extends ScraperBaseController
                             'error'                     => 'Error procesando oferta: ' . $e->getMessage(),
                             'cambios_detectados'        => false,
                             'url_notificacion_llamada'  => false,
-                        ];
+                        ]);
                         $procesadas++;
 
                         // Log del error para debugging
@@ -288,7 +303,7 @@ class ScraperSegundoPlanoController extends ScraperBaseController
                 }
 
                 // Actualizar progreso después de cada lote
-                $logEstructurado = [
+                $logEstructurado = $this->mergeMetricasPeticionesApiEnLog([
                     'token' => $token,
                     'estado' => 'en_progreso',
                     'tienda_id' => $tiendaId,
@@ -296,10 +311,11 @@ class ScraperSegundoPlanoController extends ScraperBaseController
                     'total_ofertas' => $totalOfertas,
                     'ofertas' => $ofertas->pluck('id')->toArray(),
                     'actualizadas' => $actualizadas,
+                    'ocultadas' => $ocultadas,
                     'errores' => $errores,
                     'procesadas' => $procesadas,
                     'resultados' => $log
-                ];
+                ]);
 
                 $ejecucion->update([
                     'log' => $logEstructurado,
@@ -312,7 +328,7 @@ class ScraperSegundoPlanoController extends ScraperBaseController
             }
 
             // Crear estructura JSON organizada final
-            $logEstructurado = [
+            $logEstructurado = $this->mergeMetricasPeticionesApiEnLog([
                 'token' => $token,
                 'estado' => 'completada',
                 'tienda_id' => $tiendaId,
@@ -320,10 +336,11 @@ class ScraperSegundoPlanoController extends ScraperBaseController
                 'total_ofertas' => $totalOfertas,
                 'ofertas' => $ofertas->pluck('id')->toArray(),
                 'actualizadas' => $actualizadas,
+                'ocultadas' => $ocultadas,
                 'errores' => $errores,
                 'procesadas' => $totalOfertas,
                 'resultados' => $log
-            ];
+            ]);
 
             $ejecucion->update([
                 'fin'            => now(),
@@ -385,6 +402,7 @@ class ScraperSegundoPlanoController extends ScraperBaseController
                 'status'         => 'ok',
                 'total_ofertas'  => $totalOfertas,
                 'actualizadas'   => $actualizadas,
+                'ocultadas'      => $ocultadas,
                 'errores'        => $errores,
             ]);
 
@@ -426,7 +444,7 @@ class ScraperSegundoPlanoController extends ScraperBaseController
                 $procesadasCatch = isset($procesadas) ? (int) $procesadas : (int) ($logBase['procesadas'] ?? 0);
                 $actualizadasCatch = isset($actualizadas) ? (int) $actualizadas : (int) ($logBase['actualizadas'] ?? 0);
                 $erroresCatch = isset($errores) ? (int) $errores : (int) ($logBase['errores'] ?? 0);
-                $logEstructurado = array_merge($logBase, [
+                $logEstructurado = $this->mergeMetricasPeticionesApiEnLog(array_merge($logBase, [
                     'token' => $token ?? ($logBase['token'] ?? null),
                     'estado' => 'fallida',
                     'tienda_id' => $tiendaId ?? ($logBase['tienda_id'] ?? null),
@@ -437,7 +455,7 @@ class ScraperSegundoPlanoController extends ScraperBaseController
                     'errores' => $erroresCatch + 1,
                     'procesadas' => $procesadasCatch,
                     'resultados' => $resultados,
-                ]);
+                ]));
 
                 $ejecucion->update([
                     'fin'            => now(),

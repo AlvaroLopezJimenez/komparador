@@ -6,19 +6,25 @@ namespace App\Http\Controllers\Crons;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Scraping\PeticionApiHTMLController;
+use App\Models\Categoria;
+use App\Models\CsvOferta;
 use App\Models\EjecucionGlobal;
 use App\Models\Neo;
 use App\Models\OfertaProducto;
 use App\Models\Producto;
+use App\Models\Tienda;
 use App\Models\UrlDescartada;
 use App\Services\ConsultarNeoCifrado;
+use App\Services\CsvAwinOfertaService;
 use App\Services\LimpiarUrlDeTiendas;
+use App\Services\TiendaScrapingConfigResolver;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
@@ -34,6 +40,21 @@ class CronBuscarProductosAmazonController extends Controller
     /** Productos elegibles por llamada al cron (≈4 min; evita timeout ~300s del hosting). */
     private const LIMITE_PRODUCTOS_POR_EJECUCION = 12;
 
+    /** Mínimo de tokens de nombre + modelo que deben coincidir en el candidato. */
+    private const UMBRAL_COINCIDENCIA_NOMBRE_MODELO = 0.8;
+
+    /** Mínimo de palabras_exigidas que deben coincidir en el candidato. */
+    private const UMBRAL_COINCIDENCIA_PALABRAS_EXIGIDAS = 0.6;
+
+    /** Rutas de Carrefour / El Corte Inglés que no deben entrar en Neo desde csv_ofertas. */
+    private const RUTAS_CSV_EXCLUIDAS_CARREFOUR_ECI = ['/musica/', '/libros/', '/cine/'];
+
+    /** @var array<int, string> */
+    private const HOSTS_CSV_RUTAS_EXCLUIDAS = ['carrefour.es', 'elcorteingles.es'];
+
+    /** Máximo de filas nuevas insertadas en Neo por producto y ejecución. */
+    private const LIMITE_INSERCIONES_NEO_POR_PRODUCTO = 100;
+
     private static ?int $ejecucionEnCursoId = null;
 
     /** @var array<string, int>|null */
@@ -44,10 +65,18 @@ class CronBuscarProductosAmazonController extends Controller
 
     private static bool $ejecucionFinalizada = false;
 
+    /** Fase actual al procesar un producto (panel/categoría); útil si hay error fatal PHP. */
+    private ?string $faseBusquedaUrlsActual = null;
+
+    /** @var array<string, mixed> */
+    private array $contextoDiagnosticoBusquedaUrls = [];
+
     public function __construct(
         private readonly PeticionApiHTMLController $peticionApiHtml,
         private readonly LimpiarUrlDeTiendas $limpiarUrlDeTiendas,
         private readonly ConsultarNeoCifrado $consultarNeoCifrado,
+        private readonly CsvAwinOfertaService $csvAwinOfertaService,
+        private readonly TiendaScrapingConfigResolver $tiendaScrapingConfigResolver,
     ) {}
 
     /**
@@ -191,6 +220,15 @@ class CronBuscarProductosAmazonController extends Controller
             'urls_omitida_descartada'      => 0,
             'urls_omitida_neo'             => 0,
             'urls_insertadas_neo'          => 0,
+            'csv_filas_coincidentes'       => 0,
+            'csv_filas_coincidentes_codigo' => 0,
+            'csv_ofertas_consultadas_codigos' => 0,
+            'csv_codigos_nuevos_en_producto' => 0,
+            'csv_omitida_oferta'           => 0,
+            'csv_ya_en_neo'                => 0,
+            'csv_insertadas_neo'           => 0,
+            'csv_insertadas_neo_codigo'    => 0,
+            'csv_aniadida_neo_si'          => 0,
             'limite_por_ejecucion'         => self::LIMITE_PRODUCTOS_POR_EJECUCION,
         ];
         $resultados = [];
@@ -215,85 +253,40 @@ class CronBuscarProductosAmazonController extends Controller
 
             $totalProductos = $productos->count();
             $indiceProducto = 0;
+            $todasLasTiendas = Tienda::query()
+                ->select('id', 'nombre', 'url')
+                ->orderBy('nombre')
+                ->get();
 
             foreach ($productos as $producto) {
                 $indiceProducto++;
                 $ultimoProductoIdActual = (int) $producto->id;
-                $nombre = trim((string) $producto->nombre);
-                $palabrasExigidas = trim((string) ($producto->palabras_exigidas ?? ''));
 
-                if ($nombre === '') {
-                    $contadores['omitido_sin_nombre']++;
+                $resultadoProducto = $this->procesarProductoBusquedaUrlsIndividual(
+                    $producto,
+                    $todasLasTiendas,
+                    $contadores
+                );
+
+                if ($resultadoProducto === null) {
+                    $this->persistirProgresoEjecucion($ejecucion, $contadores, $resultados, $ultimoProductoIdActual);
+                    $this->pulsoConexionHttp();
+                    if ($indiceProducto < $totalProductos) {
+                        sleep(self::ESPERA_ENTRE_PRODUCTOS_SEGUNDOS);
+                    }
                     continue;
                 }
 
-                if ($palabrasExigidas === '') {
-                    $contadores['omitido_sin_palabras']++;
-                    continue;
-                }
-
-                $resultadoProducto = [
-                    'producto_id'        => $producto->id,
-                    'nombre'             => $nombre,
-                    'palabras_exigidas'  => $palabrasExigidas,
-                    'paginas_amazon'     => 0,
-                    'urls_amazon'        => 0,
-                    'urls_aliexpress'    => 0,
-                    'urls_insertadas'    => 0,
-                    'urls_omitidas'      => 0,
-                    'detalle_urls'       => [],
-                    'error_amazon'       => null,
-                    'error_aliexpress'   => null,
-                ];
-
-                $statsAmazon = $this->procesarBusquedaAmazonEnCron($producto, $nombre, $palabrasExigidas, $contadores);
-                $resultadoProducto['paginas_amazon'] = $statsAmazon['paginas'];
-                $resultadoProducto['urls_amazon'] = $statsAmazon['urls_filtradas'];
-                if ($statsAmazon['error'] !== null) {
-                    $resultadoProducto['error_amazon'] = $statsAmazon['error'];
-                    $this->actualizarEjecucionPaso($ejecucion, 'producto_error_amazon', [
-                        'detalle' => 'Error Amazon para producto #' . $producto->id,
-                        'producto_id' => $producto->id,
-                        'error' => $statsAmazon['error'],
-                    ]);
-                } else {
-                    $resultadoProducto['urls_insertadas'] += $statsAmazon['insertadas'];
-                    $resultadoProducto['urls_omitidas'] += $statsAmazon['omitidas'];
-                    $resultadoProducto['detalle_urls'] = array_merge(
-                        $resultadoProducto['detalle_urls'],
-                        $statsAmazon['detalle_urls']
-                    );
-                }
-
-                sleep(self::ESPERA_ENTRE_TIENDAS_SEGUNDOS);
-
-                $statsAli = $this->procesarBusquedaAliexpressEnCron($producto, $nombre, $palabrasExigidas, $contadores);
-                $resultadoProducto['urls_aliexpress'] = $statsAli['urls_filtradas'];
-                if ($statsAli['error'] !== null) {
-                    $resultadoProducto['error_aliexpress'] = $statsAli['error'];
-                    $this->actualizarEjecucionPaso($ejecucion, 'producto_error_aliexpress', [
-                        'detalle' => 'Error AliExpress para producto #' . $producto->id,
-                        'producto_id' => $producto->id,
-                        'error' => $statsAli['error'],
-                    ]);
-                } else {
-                    $resultadoProducto['urls_insertadas'] += $statsAli['insertadas'];
-                    $resultadoProducto['urls_omitidas'] += $statsAli['omitidas'];
-                    $resultadoProducto['detalle_urls'] = array_merge(
-                        $resultadoProducto['detalle_urls'],
-                        $statsAli['detalle_urls']
-                    );
-                }
-
-                $contadores['productos_procesados']++;
                 $resultados[] = $resultadoProducto;
 
                 $this->actualizarEjecucionPaso($ejecucion, 'producto', [
-                    'detalle' => 'Producto #' . $producto->id . ' procesado (Amazon + AliExpress)',
+                    'detalle' => 'Producto #' . $producto->id . ' procesado (códigos CSV + Amazon + AliExpress + CSV)',
                     'producto_id' => $producto->id,
                     'paginas_amazon' => $resultadoProducto['paginas_amazon'],
                     'urls_amazon' => $resultadoProducto['urls_amazon'],
                     'urls_aliexpress' => $resultadoProducto['urls_aliexpress'],
+                    'csv_coincidentes' => $resultadoProducto['csv_coincidentes'],
+                    'csv_insertadas' => $resultadoProducto['csv_insertadas'],
                     'urls_insertadas' => $resultadoProducto['urls_insertadas'],
                     'urls_omitidas' => $resultadoProducto['urls_omitidas'],
                     'error_amazon' => $resultadoProducto['error_amazon'],
@@ -370,6 +363,29 @@ class CronBuscarProductosAmazonController extends Controller
                 auth()->check() ? route('admin.ejecuciones.buscar-amazon-productos') : null
             );
         }
+    }
+
+    /**
+     * Panel admin (p. ej. formulario de categoría): mismo cron, JSON por pasos.
+     * accion: iniciar | procesar | detener | estado
+     */
+    public function ejecutarCronPanel(Request $request): JsonResponse
+    {
+        $request->validate([
+            'accion'       => 'required|in:iniciar,procesar,detener,estado',
+            'categoria_id' => 'nullable|integer|exists:categorias,id',
+            'ejecucion_id' => 'nullable|integer|min:1',
+            'producto_id'  => 'nullable|integer|min:1',
+            'indice'       => 'nullable|integer|min:1',
+        ]);
+
+        return match ((string) $request->input('accion')) {
+            'iniciar'  => $this->panelCronIniciarPorCategoria($request),
+            'procesar' => $this->panelCronProcesarProducto($request),
+            'detener'  => $this->panelCronDetener($request),
+            'estado'   => $this->panelCronEstado($request),
+            default    => response()->json(['ok' => false, 'error' => 'Acción no válida.'], 422),
+        };
     }
 
     /**
@@ -596,7 +612,7 @@ class CronBuscarProductosAmazonController extends Controller
      */
     private function obtenerLoteProductosElegibles(int $ultimoProductoId, int $limite): \Illuminate\Database\Eloquent\Collection
     {
-        $columnas = ['id', 'nombre', 'categoria_id', 'palabras_exigidas'];
+        $columnas = ['id', 'nombre', 'modelo', 'categoria_id', 'palabras_exigidas'];
         $lote = new \Illuminate\Database\Eloquent\Collection();
 
         $faltan = $limite;
@@ -667,28 +683,53 @@ class CronBuscarProductosAmazonController extends Controller
         string $estado,
         ?string $detalleExtra
     ): void {
+        $this->finalizarEjecucionBusqueda(
+            $ejecucion,
+            $contadores,
+            $resultados,
+            $ultimoProductoId,
+            $estado,
+            $detalleExtra
+        );
+
+        self::$ejecucionFinalizada = true;
+        self::$ejecucionEnCursoId = null;
+        $this->eliminarEjecucionesAntiguas();
+    }
+
+    /**
+     * @param array<string, int> $contadores
+     * @param array<int, array<string, mixed>> $resultados
+     * @param array<string, mixed> $logExtras
+     */
+    private function finalizarEjecucionBusqueda(
+        EjecucionGlobal $ejecucion,
+        array $contadores,
+        array $resultados,
+        int $ultimoProductoId,
+        string $estado,
+        ?string $detalleExtra = null,
+        array $logExtras = []
+    ): void {
         $ejecucion->refresh();
         $logBase = is_array($ejecucion->log) ? $ejecucion->log : [];
         $logBase['estado'] = $estado;
         $logBase['paso_actual'] = 'finalizado';
         $logBase['contadores'] = $contadores;
-        $logBase['resultados'] = $resultados;
+        $logBase['resultados'] = $this->compactarResultadosParaPersistencia($resultados);
         $logBase['ultimo_producto_id'] = $ultimoProductoId;
         if ($detalleExtra !== null) {
             $logBase['detalle_final'] = $detalleExtra;
         }
+        $logBase = array_merge($logBase, $logExtras);
 
         $ejecucion->update([
             'fin'            => now(),
-            'total'          => $contadores['productos_procesados'],
-            'total_guardado' => $contadores['urls_insertadas_neo'],
+            'total'          => (int) ($contadores['productos_procesados'] ?? 0),
+            'total_guardado' => (int) ($contadores['urls_insertadas_neo'] ?? 0),
             'total_errores'  => self::contarErroresTiendasCron($contadores),
             'log'            => $logBase,
         ]);
-
-        self::$ejecucionFinalizada = true;
-        self::$ejecucionEnCursoId = null;
-        $this->eliminarEjecucionesAntiguas();
     }
 
     /**
@@ -698,6 +739,21 @@ class CronBuscarProductosAmazonController extends Controller
     private function obtenerItemsAmazonFiltrados(array $itemsRaw, string $palabrasCoincidentes): array
     {
         $itemsFiltrados = $this->filtrarItemsAmazonPorPalabrasCoincidentes($itemsRaw, $palabrasCoincidentes);
+        $items = array_map(fn (array $item) => $this->mapearItemAmazonBusqueda($item), $itemsFiltrados);
+
+        return array_values(array_filter($items, fn (array $item) => !empty($item['asin'])));
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $itemsRaw
+     * @return array<int, array<string, mixed>>
+     */
+    private function obtenerItemsAmazonFiltradosPorProducto(
+        array $itemsRaw,
+        Producto $producto,
+        string $palabrasExigidas
+    ): array {
+        $itemsFiltrados = $this->filtrarItemsAmazonPorUmbralProducto($itemsRaw, $producto, $palabrasExigidas);
         $items = array_map(fn (array $item) => $this->mapearItemAmazonBusqueda($item), $itemsFiltrados);
 
         return array_values(array_filter($items, fn (array $item) => !empty($item['asin'])));
@@ -725,7 +781,8 @@ class CronBuscarProductosAmazonController extends Controller
         EjecucionGlobal $ejecucion,
         array $contadores,
         array $resultados,
-        int $ultimoProductoId
+        int $ultimoProductoId,
+        array $logExtras = []
     ): void {
         try {
             $ejecucion->refresh();
@@ -733,8 +790,9 @@ class CronBuscarProductosAmazonController extends Controller
             $log['estado'] = 'running';
             $log['paso_actual'] = 'producto';
             $log['contadores'] = $contadores;
-            $log['resultados'] = $resultados;
+            $log['resultados'] = $this->compactarResultadosParaPersistencia($resultados);
             $log['ultimo_producto_id'] = $ultimoProductoId;
+            $log = array_merge($log, $logExtras);
 
             $ejecucion->update([
                 'total'          => (int) ($contadores['productos_procesados'] ?? 0),
@@ -780,7 +838,7 @@ class CronBuscarProductosAmazonController extends Controller
         }
 
         $itemsRaw = $this->extraerItemsBusquedaAmazon($resultadoAmazon['raw'] ?? []);
-        $items = $this->obtenerItemsAmazonFiltrados($itemsRaw, $palabrasExigidas);
+        $items = $this->obtenerItemsAmazonFiltradosPorProducto($itemsRaw, $producto, $palabrasExigidas);
         $contadores['urls_amazon_filtradas'] += count($items);
 
         $insercion = $this->insertarItemsEnNeoDesdeCron($producto, $items, 'amazon', $contadores);
@@ -826,7 +884,7 @@ class CronBuscarProductosAmazonController extends Controller
         }
 
         $itemsRaw = $this->extraerItemsBusquedaAliexpress($resultadoAli['raw'] ?? []);
-        $items = $this->obtenerItemsAliexpressFiltrados($itemsRaw, $palabrasExigidas);
+        $items = $this->obtenerItemsAliexpressFiltradosPorProducto($itemsRaw, $producto, $palabrasExigidas);
         $contadores['urls_aliexpress_filtradas'] += count($items);
 
         $insercion = $this->insertarItemsEnNeoDesdeCron($producto, $items, 'aliexpress', $contadores);
@@ -841,6 +899,73 @@ class CronBuscarProductosAmazonController extends Controller
     }
 
     /**
+     * @param array<string, int> $contadores
+     */
+    private function limiteInsercionesNeoProductoAlcanzado(array $contadores): bool
+    {
+        return (int) ($contadores['neo_insertadas_en_producto'] ?? 0) >= self::LIMITE_INSERCIONES_NEO_POR_PRODUCTO;
+    }
+
+    /**
+     * En el log de ejecución solo guardamos resúmenes; el detalle_urls va en la respuesta del producto actual.
+     *
+     * @param  array<int, array<string, mixed>>  $resultados
+     * @return array<int, array<string, mixed>>
+     */
+    private function compactarResultadosParaPersistencia(array $resultados): array
+    {
+        return array_map(fn (array $resultado): array => $this->compactarResultadoProductoParaPersistencia($resultado), $resultados);
+    }
+
+    /**
+     * @param array<string, mixed> $resultado
+     * @return array<string, mixed>
+     */
+    private function compactarResultadoProductoParaPersistencia(array $resultado): array
+    {
+        unset($resultado['detalle_urls'], $resultado['diagnostico']);
+
+        return $resultado;
+    }
+
+    private function marcarFaseBusquedaUrls(string $fase, array $contextoExtra = []): void
+    {
+        $this->faseBusquedaUrlsActual = $fase;
+        if ($contextoExtra !== []) {
+            $this->contextoDiagnosticoBusquedaUrls = array_merge($this->contextoDiagnosticoBusquedaUrls, $contextoExtra);
+        }
+    }
+
+    /**
+     * Tokens válidos para el prefiltro SQL de csv_ofertas (evita LIKE '%3%' u otros patrones masivos).
+     *
+     * @param  array<int, string>  $tokens
+     * @return array<int, string>
+     */
+    private function filtrarTokensParaPrefiltroSqlCsv(array $tokens): array
+    {
+        return array_values(array_filter($tokens, static function (string $token): bool {
+            $token = trim($token);
+            if ($token === '') {
+                return false;
+            }
+            if (preg_match('/^\d+$/u', $token) === 1) {
+                return false;
+            }
+
+            return mb_strlen($token) >= 3;
+        }));
+    }
+
+    /**
+     * @param array<string, int> $contadores
+     */
+    private function registrarInsercionNeoEnProducto(array &$contadores): void
+    {
+        $contadores['neo_insertadas_en_producto'] = (int) ($contadores['neo_insertadas_en_producto'] ?? 0) + 1;
+    }
+
+    /**
      * @param array<int, array<string, mixed>> $items
      * @param array<string, int> $contadores
      * @return array{insertadas: int, omitidas: int, detalle_urls: array<int, array<string, mixed>>}
@@ -852,6 +977,10 @@ class CronBuscarProductosAmazonController extends Controller
         $detalleUrls = [];
 
         foreach ($items as $item) {
+            if ($this->limiteInsercionesNeoProductoAlcanzado($contadores)) {
+                break;
+            }
+
             $urlLimpia = $this->limpiarUrlDeTiendas->limpiar((string) ($item['url'] ?? ''));
             if ($urlLimpia === '') {
                 continue;
@@ -877,6 +1006,7 @@ class CronBuscarProductosAmazonController extends Controller
                 'aniadida'     => 'no',
             ]);
 
+            $this->registrarInsercionNeoEnProducto($contadores);
             $contadores['urls_insertadas_neo']++;
             $insertadas++;
             $detalleUrls[] = [
@@ -967,7 +1097,7 @@ class CronBuscarProductosAmazonController extends Controller
                 $log['contadores'] = $contadores;
             }
             if ($resultados !== null) {
-                $log['resultados'] = $resultados;
+                $log['resultados'] = $this->compactarResultadosParaPersistencia($resultados);
             }
             if ($ultimoProductoId > 0) {
                 $log['ultimo_producto_id'] = $ultimoProductoId;
@@ -1007,6 +1137,21 @@ class CronBuscarProductosAmazonController extends Controller
         $items = array_values(array_filter($items, fn (array $item) => ($item['url'] ?? '') !== ''));
 
         return $this->filtrarItemsMapeadosPorPalabrasCoincidentes($items, $palabrasCoincidentes);
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $itemsRaw
+     * @return array<int, array<string, mixed>>
+     */
+    private function obtenerItemsAliexpressFiltradosPorProducto(
+        array $itemsRaw,
+        Producto $producto,
+        string $palabrasExigidas
+    ): array {
+        $items = array_map(fn (array $item) => $this->mapearItemAliexpressBusqueda($item), $itemsRaw);
+        $items = array_values(array_filter($items, fn (array $item) => ($item['url'] ?? '') !== ''));
+
+        return $this->filtrarItemsMapeadosPorUmbralProducto($items, $producto, $palabrasExigidas);
     }
 
     /**
@@ -1140,6 +1285,38 @@ class CronBuscarProductosAmazonController extends Controller
     }
 
     /**
+     * @param array<int, array<string, mixed>> $items
+     * @return array<int, array<string, mixed>>
+     */
+    private function filtrarItemsAmazonPorUmbralProducto(
+        array $items,
+        Producto $producto,
+        string $palabrasExigidas
+    ): array {
+        return array_values(array_filter($items, function (array $item) use ($producto, $palabrasExigidas) {
+            $titulo = $this->extraerTituloItemAmazon($item);
+
+            return $titulo !== '' && $this->cumpleCriteriosCoincidenciaProducto([$titulo], $producto, $palabrasExigidas);
+        }));
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $items
+     * @return array<int, array<string, mixed>>
+     */
+    private function filtrarItemsMapeadosPorUmbralProducto(
+        array $items,
+        Producto $producto,
+        string $palabrasExigidas
+    ): array {
+        return array_values(array_filter($items, function (array $item) use ($producto, $palabrasExigidas) {
+            $titulo = trim((string) ($item['titulo'] ?? ''));
+
+            return $titulo !== '' && $this->cumpleCriteriosCoincidenciaProducto([$titulo], $producto, $palabrasExigidas);
+        }));
+    }
+
+    /**
      * @return array<int, string>
      */
     private function parsearPalabrasCoincidentesAmazon(string $palabras): array
@@ -1191,6 +1368,199 @@ class CronBuscarProductosAmazonController extends Controller
         $texto = preg_replace('/\s+/u', '', $texto) ?? $texto;
 
         return $texto;
+    }
+
+    /**
+     * Tokens únicos de nombre + modelo del producto (identidad del producto).
+     *
+     * @return array<int, string>
+     */
+    private function construirTokensNombreModeloProducto(Producto $producto): array
+    {
+        return $this->deduplicarTokensCoincidencia(array_merge(
+            $this->extraerPalabrasClaveProductoParaCsv(trim((string) $producto->nombre)),
+            $this->parsearModelosProductoParaCsv(trim((string) ($producto->modelo ?? '')))
+        ));
+    }
+
+    /**
+     * @param  array<int, string>  $tokens
+     * @return array<int, string>
+     */
+    private function deduplicarTokensCoincidencia(array $tokens): array
+    {
+        $vistos = [];
+        $resultado = [];
+
+        foreach ($tokens as $token) {
+            $token = trim($token);
+            $norm = $this->normalizarTextoCoincidenciaAmazon($token);
+            if ($norm === '' || isset($vistos[$norm])) {
+                continue;
+            }
+
+            $vistos[$norm] = true;
+            $resultado[] = $token;
+        }
+
+        return $resultado;
+    }
+
+    /**
+     * Comprueba los dos criterios independientes: palabras_exigidas (≥60%, o 100% si palabra+número)
+     * y nombre+modelo (≥80%).
+     *
+     * @param  array<int, string>  $textos
+     */
+    private function cumpleCriteriosCoincidenciaProducto(
+        array $textos,
+        Producto $producto,
+        string $palabrasExigidas
+    ): bool {
+        $tokensExigidas = $this->deduplicarTokensCoincidencia(
+            $this->parsearPalabrasCoincidentesAmazon($palabrasExigidas)
+        );
+        if ($tokensExigidas === []) {
+            return false;
+        }
+
+        $umbralExigidas = $this->umbralCoincidenciaPalabrasExigidas($tokensExigidas);
+        $modoPalabraYNumero = $umbralExigidas >= 1.0;
+
+        if (!$this->alcanzaUmbralCoincidenciaTokens(
+            $tokensExigidas,
+            $textos,
+            $umbralExigidas,
+            $modoPalabraYNumero
+        )) {
+            return false;
+        }
+
+        $tokensNombreModelo = $this->construirTokensNombreModeloProducto($producto);
+        if ($tokensNombreModelo === []) {
+            return true;
+        }
+
+        return $this->alcanzaUmbralCoincidenciaTokens(
+            $tokensNombreModelo,
+            $textos,
+            self::UMBRAL_COINCIDENCIA_NOMBRE_MODELO
+        );
+    }
+
+    /**
+     * Si palabras_exigidas tienen al menos una palabra y exactamente un número (p. ej. "Sensitive 3", "geforce 9060"), exige 100%.
+     *
+     * @param  array<int, string>  $tokensExigidas
+     */
+    private function umbralCoincidenciaPalabrasExigidas(array $tokensExigidas): float
+    {
+        if ($this->esPatronPalabrasExigidasPalabraYNumero($tokensExigidas)) {
+            return 1.0;
+        }
+
+        return self::UMBRAL_COINCIDENCIA_PALABRAS_EXIGIDAS;
+    }
+
+    /**
+     * Palabra(s) + un solo número: "Sensitive 3", "geforce 9060", "geforce rtx 9060".
+     *
+     * @param  array<int, string>  $tokens
+     */
+    private function esPatronPalabrasExigidasPalabraYNumero(array $tokens): bool
+    {
+        if (count($tokens) < 2) {
+            return false;
+        }
+
+        $tokensNumericos = 0;
+        $tokensPalabra = 0;
+
+        foreach ($tokens as $token) {
+            $token = trim($token);
+            if ($token === '') {
+                continue;
+            }
+            if (preg_match('/^\d+$/u', $token) === 1) {
+                $tokensNumericos++;
+
+                continue;
+            }
+            if (preg_match('/\p{L}/u', $token) === 1) {
+                $tokensPalabra++;
+            }
+        }
+
+        return $tokensPalabra >= 1 && $tokensNumericos === 1;
+    }
+
+    /**
+     * @param  array<int, string>  $tokensReferencia
+     * @param  array<int, string>  $textos
+     */
+    private function alcanzaUmbralCoincidenciaTokens(
+        array $tokensReferencia,
+        array $textos,
+        float $umbral,
+        bool $modoPalabraYNumero = false
+    ): bool {
+        if ($tokensReferencia === []) {
+            return false;
+        }
+
+        $textos = array_values(array_filter(array_map('trim', $textos)));
+        if ($textos === []) {
+            return false;
+        }
+
+        $coincidencias = 0;
+        foreach ($tokensReferencia as $token) {
+            foreach ($textos as $texto) {
+                $coincide = $modoPalabraYNumero
+                    ? $this->tokenCoincideModoPalabraYNumero($texto, $token)
+                    : $this->palabraCoincideEnTituloAmazon($texto, $token);
+                if ($coincide) {
+                    $coincidencias++;
+                    break;
+                }
+            }
+        }
+
+        return ($coincidencias / count($tokensReferencia)) >= $umbral;
+    }
+
+    /**
+     * Modo palabra(s)+número (100%): palabras en cualquier parte; número sin dígitos contiguos extra.
+     * Número: sí en talla3, texto9060texto, asdf9060sdfasd; no en 90604656, 79060 (si buscas 9060), 13…
+     */
+    private function tokenCoincideModoPalabraYNumero(string $texto, string $token): bool
+    {
+        $token = trim($token);
+        if ($token === '') {
+            return true;
+        }
+
+        if (preg_match('/^\d+$/u', $token) === 1) {
+            return $this->tokenNumericoCoincideEnTexto($texto, $token);
+        }
+
+        return $this->palabraCoincideEnTituloAmazon($texto, $token);
+    }
+
+    /**
+     * El número debe aparecer tal cual, sin otro dígito pegado antes o después.
+     * 9060 cuenta en "geforce9060", "asdf9060sdfasd"; no en "90604656" ni "19060" (subcadena con dígitos extra).
+     */
+    private function tokenNumericoCoincideEnTexto(string $texto, string $token): bool
+    {
+        $token = trim($token);
+        if ($token === '' || preg_match('/^\d+$/u', $token) !== 1) {
+            return false;
+        }
+
+        $pattern = '/(?<!\d)' . preg_quote($token, '/') . '(?!\d)/u';
+
+        return preg_match($pattern, $texto) === 1;
     }
 
     /**
@@ -1323,5 +1693,1304 @@ class CronBuscarProductosAmazonController extends Controller
         }
 
         return $items;
+    }
+
+    /**
+     * Repasa filas de csv_ofertas que cumplen palabras_exigidas (≥60%, o 100% si palabra(s)+número)
+     * y nombre+modelo (≥80%) con aniadida_neo=no.
+     *
+     * @param  \Illuminate\Support\Collection<int, Tienda>  $todasLasTiendas
+     * @param  array<string, int>  $contadores
+     * @return array{coincidentes: int, insertadas: int, omitidas: int, detalle_urls: array<int, array<string, mixed>>}
+     */
+    private function procesarCsvOfertasCoincidentes(
+        Producto $producto,
+        string $palabrasExigidas,
+        $todasLasTiendas,
+        array &$contadores
+    ): array {
+        $insertadas = 0;
+        $omitidas = 0;
+        $detalleUrls = [];
+        $coincidentes = 0;
+        $filasEscaneadasSql = 0;
+
+        foreach ($this->iterarFilasCsvOfertasCoincidentes($producto, $palabrasExigidas) as $fila) {
+            $filasEscaneadasSql++;
+
+            if ($this->limiteInsercionesNeoProductoAlcanzado($contadores)) {
+                break;
+            }
+
+            $coincidentes++;
+            $contadores['csv_filas_coincidentes']++;
+            $resultado = $this->procesarFilaCsvOfertaEnNeo($fila, $producto, $todasLasTiendas, $contadores);
+
+            if (($resultado['accion'] ?? '') === 'insertada') {
+                $insertadas++;
+                $detalleUrls[] = $resultado;
+            } elseif (($resultado['accion'] ?? '') === 'omitida') {
+                $omitidas++;
+            }
+        }
+
+        $this->marcarFaseBusquedaUrls('csv_palabras', [
+            'csv_filas_escaneadas_sql' => $filasEscaneadasSql,
+            'csv_coincidentes'         => $coincidentes,
+        ]);
+
+        return [
+            'coincidentes' => $coincidentes,
+            'insertadas'   => $insertadas,
+            'omitidas'     => $omitidas,
+            'detalle_urls' => $detalleUrls,
+        ];
+    }
+
+    /**
+     * @return \Generator<int, CsvOferta>
+     */
+    private function iterarFilasCsvOfertasCoincidentes(Producto $producto, string $palabrasExigidas): \Generator
+    {
+        $tokensExigidas = $this->deduplicarTokensCoincidencia(
+            $this->parsearPalabrasCoincidentesAmazon($palabrasExigidas)
+        );
+        $tokensNombreModelo = $this->construirTokensNombreModeloProducto($producto);
+        $tokensReferencia = $this->deduplicarTokensCoincidencia(array_merge($tokensExigidas, $tokensNombreModelo));
+        $tokensSql = $this->filtrarTokensParaPrefiltroSqlCsv($tokensReferencia);
+
+        if ($tokensSql === []) {
+            $tokensSql = $this->filtrarTokensParaPrefiltroSqlCsv($tokensExigidas);
+        }
+
+        $this->marcarFaseBusquedaUrls('csv_palabras_prefiltro', [
+            'csv_tokens_sql'        => $tokensSql,
+            'csv_tokens_referencia' => $tokensReferencia,
+        ]);
+
+        if ($tokensSql === []) {
+            return;
+        }
+
+        $query = CsvOferta::query()
+            ->where('aniadida_neo', 'no')
+            ->whereNotNull('nombre')
+            ->where('nombre', '!=', '');
+
+        $query->where(function ($sub) use ($tokensSql) {
+            foreach ($tokensSql as $token) {
+                $termino = mb_strtolower($token, 'UTF-8');
+                $sub->orWhereRaw('LOWER(nombre) LIKE ?', ['%' . $termino . '%'])
+                    ->orWhereRaw('LOWER(url) LIKE ?', ['%' . $termino . '%']);
+            }
+        });
+
+        foreach ($query->cursor() as $fila) {
+            if (!($fila instanceof CsvOferta)) {
+                continue;
+            }
+
+            if ($this->filaCsvCoincideConProducto($fila, $producto, $palabrasExigidas)) {
+                yield $fila;
+            }
+        }
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, CsvOferta>
+     */
+    private function obtenerFilasCsvOfertasCoincidentes(Producto $producto, string $palabrasExigidas): \Illuminate\Support\Collection
+    {
+        return collect(iterator_to_array($this->iterarFilasCsvOfertasCoincidentes($producto, $palabrasExigidas), false));
+    }
+
+    private function filaCsvCoincideConProducto(
+        CsvOferta $fila,
+        Producto $producto,
+        string $palabrasExigidas
+    ): bool {
+        if ($this->urlCsvExcluidaPorRutaCategoriaTienda((string) $fila->url)) {
+            return false;
+        }
+
+        $textos = array_values(array_filter([
+            trim((string) $fila->nombre),
+            $this->extraerTextoSlugUrlParaCoincidenciaCsv((string) $fila->url),
+        ]));
+
+        return $this->cumpleCriteriosCoincidenciaProducto($textos, $producto, $palabrasExigidas);
+    }
+
+    private function urlCsvExcluidaPorRutaCategoriaTienda(string $url): bool
+    {
+        $url = trim($url);
+        if ($url === '') {
+            return false;
+        }
+
+        if (!preg_match('#^https?://#i', $url)) {
+            $url = 'https://' . $url;
+        }
+
+        $host = mb_strtolower((string) (parse_url($url, PHP_URL_HOST) ?? ''), 'UTF-8');
+        $path = mb_strtolower((string) (parse_url($url, PHP_URL_PATH) ?? ''), 'UTF-8');
+
+        if ($host === '' || !$this->esHostCarrefourOElCorteIngles($host)) {
+            return false;
+        }
+
+        foreach (self::RUTAS_CSV_EXCLUIDAS_CARREFOUR_ECI as $segmento) {
+            if (str_contains($path, $segmento)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function esHostCarrefourOElCorteIngles(string $host): bool
+    {
+        foreach (self::HOSTS_CSV_RUTAS_EXCLUIDAS as $dominio) {
+            if ($host === $dominio || str_ends_with($host, '.' . $dominio)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function parsearModelosProductoParaCsv(string $modelo): array
+    {
+        $modelo = trim($modelo);
+        if ($modelo === '') {
+            return [];
+        }
+
+        $partes = preg_split('/[\s,;+\/]+/u', $modelo, -1, PREG_SPLIT_NO_EMPTY);
+        if (!is_array($partes)) {
+            return [];
+        }
+
+        $modelos = [];
+        foreach ($partes as $parte) {
+            $parte = trim($parte);
+            $norm = $this->normalizarTextoCoincidenciaAmazon($parte);
+            if ($norm === '' || strlen($norm) < 3) {
+                continue;
+            }
+            $modelos[] = $parte;
+        }
+
+        return array_values(array_unique($modelos));
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function extraerPalabrasClaveProductoParaCsv(string $nombreProducto): array
+    {
+        $nombreProducto = trim($nombreProducto);
+        if ($nombreProducto === '') {
+            return [];
+        }
+
+        $partes = preg_split('/[\s\/\-\_\.,;:+()\[\]]+/u', $nombreProducto, -1, PREG_SPLIT_NO_EMPTY);
+        if (!is_array($partes)) {
+            return [];
+        }
+
+        $stopwords = [
+            'gb', 'mb', 'tb', 'un', 'una', 'uno', 'para', 'con', 'the', 'and',
+            'de', 'la', 'el', 'en', 'del', 'los', 'las', 'new', 'pack',
+        ];
+        $claves = [];
+
+        foreach ($partes as $parte) {
+            $norm = $this->normalizarTextoCoincidenciaAmazon($parte);
+            if ($norm === '' || strlen($norm) < 3) {
+                continue;
+            }
+            if (in_array($norm, $stopwords, true)) {
+                continue;
+            }
+            $claves[] = $parte;
+        }
+
+        return array_values(array_unique($claves));
+    }
+
+    private function extraerTextoSlugUrlParaCoincidenciaCsv(string $url): string
+    {
+        $url = trim($url);
+        if ($url === '') {
+            return '';
+        }
+
+        if (!preg_match('#^https?://#i', $url)) {
+            $url = 'https://' . $url;
+        }
+
+        $path = (string) (parse_url($url, PHP_URL_PATH) ?? '');
+        $path = rawurldecode($path);
+        $path = str_replace(['-', '_', '/'], ' ', $path);
+
+        return trim(preg_replace('/\s+/u', ' ', $path) ?? $path);
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, Tienda>  $todasLasTiendas
+     * @param  array<string, int>  $contadores
+     * @return array<string, mixed>
+     */
+    private function procesarFilaCsvOfertaEnNeo(
+        CsvOferta $fila,
+        Producto $producto,
+        $todasLasTiendas,
+        array &$contadores
+    ): array {
+        $urlLimpia = $this->limpiarUrlDeTiendas->limpiar(trim((string) $fila->url));
+        $base = [
+            'csv_oferta_id' => $fila->id,
+            'url'           => $urlLimpia,
+            'origen'        => 'csv_ofertas',
+            'nombre_csv'    => $fila->nombre,
+        ];
+
+        if ($urlLimpia === '') {
+            return array_merge($base, ['accion' => 'omitida', 'motivo' => 'url_vacia']);
+        }
+
+        if ($this->urlCsvExcluidaPorRutaCategoriaTienda($urlLimpia)) {
+            return array_merge($base, ['accion' => 'omitida', 'motivo' => 'ruta_excluida']);
+        }
+
+        if (UrlDescartada::query()->where('url', $urlLimpia)->exists()) {
+            $contadores['urls_omitida_descartada']++;
+
+            return array_merge($base, ['accion' => 'omitida', 'motivo' => 'descartada']);
+        }
+
+        $lookup = $this->consultarNeoCifrado->hashLookup($urlLimpia);
+
+        if ($lookup !== '' && OfertaProducto::query()->where('url_lookup', $lookup)->exists()) {
+            $fila->update(['aniadida_neo' => 'si']);
+            $contadores['csv_omitida_oferta']++;
+            $contadores['csv_aniadida_neo_si']++;
+
+            return array_merge($base, [
+                'accion'       => 'omitida',
+                'motivo'       => 'oferta',
+                'aniadida_neo' => 'si',
+            ]);
+        }
+
+        if ($lookup !== '' && Neo::query()->where('url_lookup', $lookup)->exists()) {
+            $fila->update(['aniadida_neo' => 'si']);
+            $contadores['csv_ya_en_neo']++;
+            $contadores['csv_aniadida_neo_si']++;
+
+            return array_merge($base, [
+                'accion'       => 'omitida',
+                'motivo'       => 'neo',
+                'aniadida_neo' => 'si',
+            ]);
+        }
+
+        if ($this->limiteInsercionesNeoProductoAlcanzado($contadores)) {
+            $contadores['urls_omitida_limite_neo'] = (int) ($contadores['urls_omitida_limite_neo'] ?? 0) + 1;
+
+            return array_merge($base, [
+                'accion' => 'omitida',
+                'motivo' => 'limite_neo_producto',
+            ]);
+        }
+
+        $tienda = $this->detectarTiendaPorUrl($urlLimpia, $todasLasTiendas);
+        $tiendaId = $tienda?->id ?? $fila->tienda_id;
+
+        Neo::create([
+            'producto_id'  => $producto->id,
+            'categoria_id' => $producto->categoria_id,
+            'tienda_id'    => $tiendaId,
+            'url'          => $urlLimpia,
+            'aniadida'     => 'no',
+        ]);
+
+        $fila->update(['aniadida_neo' => 'si']);
+
+        $this->registrarInsercionNeoEnProducto($contadores);
+        $contadores['urls_insertadas_neo']++;
+        $contadores['csv_insertadas_neo']++;
+        $contadores['csv_aniadida_neo_si']++;
+
+        return array_merge($base, [
+            'accion'       => 'insertada',
+            'tienda_id'    => $tiendaId,
+            'aniadida_neo' => 'si',
+        ]);
+    }
+
+    /**
+     * Detecta la tienda a partir del host de la URL (misma lógica que formulario de ofertas / analizarUrls).
+     *
+     * @param  \Illuminate\Support\Collection<int, Tienda>|\App\Models\Tienda[]  $todasLasTiendas
+     */
+    private function detectarTiendaPorUrl(string $url, $todasLasTiendas): ?Tienda
+    {
+        try {
+            $urlParaParsear = trim($url);
+            if ($urlParaParsear === '') {
+                return null;
+            }
+            if (!preg_match('#^https?://#i', $urlParaParsear)) {
+                $urlParaParsear = 'https://' . $urlParaParsear;
+            }
+            $parsed = parse_url($urlParaParsear);
+            $hostUser = strtolower($parsed['host'] ?? '');
+            $hostUser = preg_replace('/^www\./', '', $hostUser);
+            if ($hostUser === '') {
+                return null;
+            }
+
+            foreach ($todasLasTiendas as $t) {
+                $tu = trim($t->url ?? '');
+                if ($tu === '') {
+                    continue;
+                }
+                $tu = preg_replace('#^https?://#i', '', $tu);
+                $tu = preg_replace('/^www\./i', '', strtolower($tu));
+                $tu = preg_replace('#/.*$#', '', $tu);
+                $tu = rtrim($tu, '/');
+                if ($tu === '' || !str_contains($tu, '.')) {
+                    continue;
+                }
+                if ($hostUser === $tu || str_ends_with($hostUser, '.' . $tu) || str_ends_with($tu, '.' . $hostUser)) {
+                    return $t;
+                }
+            }
+
+            $mejor = null;
+            $mejorLongitud = 0;
+            foreach ($todasLasTiendas as $t) {
+                foreach ($this->clavesHostTiendaDetectar($t) as $clave) {
+                    if (strlen($clave) < 4) {
+                        continue;
+                    }
+                    if (str_contains($hostUser, $clave) && strlen($clave) > $mejorLongitud) {
+                        $mejor = $t;
+                        $mejorLongitud = strlen($clave);
+                    }
+                }
+            }
+
+            return $mejor instanceof Tienda ? $mejor : null;
+        } catch (\Throwable $e) {
+            //
+        }
+
+        return null;
+    }
+
+    /**
+     * Antes del resto del cron: copia EAN/ISBN/UPC/MPN/GTIN desde csv_ofertas (por URL de oferta)
+     * en tiendas con enlace CSV, mostrar=si y scrapear=si.
+     *
+     * @param  array<string, int>  $contadores
+     * @return array{actualizado: bool, ofertas_consultadas: int, tiendas_csv: int}
+     */
+    private function sincronizarCodigosProductoDesdeOfertasCsv(Producto $producto, array &$contadores): array
+    {
+        $tiendaIds = $this->obtenerIdsTiendasCsvElegiblesDelProducto($producto);
+        if ($tiendaIds === []) {
+            return ['actualizado' => false, 'ofertas_consultadas' => 0, 'tiendas_csv' => 0];
+        }
+
+        $ofertas = OfertaProducto::query()
+            ->where('producto_id', $producto->id)
+            ->whereIn('tienda_id', $tiendaIds)
+            ->get();
+
+        $estructura = $this->csvAwinOfertaService->normalizarEstructuraCodigosProducto($producto->ean_isbn_etc);
+        $ofertasConsultadas = 0;
+        $huboCambios = false;
+
+        foreach ($ofertas as $oferta) {
+            $ofertasConsultadas++;
+            $contadores['csv_ofertas_consultadas_codigos']++;
+
+            $filaCsv = $this->csvAwinOfertaService->buscarFilaPorOferta($oferta);
+            if ($filaCsv === null) {
+                continue;
+            }
+
+            if ($this->csvAwinOfertaService->fusionarCodigosCsvEnEstructura($estructura, $filaCsv)) {
+                $huboCambios = true;
+                $contadores['csv_codigos_nuevos_en_producto']++;
+            }
+        }
+
+        if ($huboCambios) {
+            $producto->ean_isbn_etc = $estructura;
+            $producto->save();
+        }
+
+        return [
+            'actualizado' => $huboCambios,
+            'ofertas_consultadas' => $ofertasConsultadas,
+            'tiendas_csv' => count($tiendaIds),
+        ];
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function obtenerIdsTiendasCsvElegiblesDelProducto(Producto $producto): array
+    {
+        $ofertas = OfertaProducto::query()
+            ->where('producto_id', $producto->id)
+            ->with('tienda')
+            ->get();
+
+        $ids = [];
+
+        foreach ($ofertas as $oferta) {
+            $tienda = $oferta->tienda;
+            if ($tienda === null) {
+                continue;
+            }
+            if (!$this->tiendaElegibleParaSincronizarCodigosCsv($tienda, $producto)) {
+                continue;
+            }
+            $ids[$tienda->id] = true;
+        }
+
+        return array_map('intval', array_keys($ids));
+    }
+
+    private function tiendaElegibleParaSincronizarCodigosCsv(Tienda $tienda, Producto $producto): bool
+    {
+        if (!$this->tiendaTieneEnlaceDescargaCsv($tienda)) {
+            return false;
+        }
+
+        $categoriaId = $producto->categoria_id !== null ? (int) $producto->categoria_id : null;
+
+        return $this->tiendaScrapingConfigResolver->resolverScrapearFinal($tienda, $categoriaId) === 'si'
+            && $this->tiendaScrapingConfigResolver->resolverMostrarFinal($tienda, $categoriaId) === 'si';
+    }
+
+    private function tiendaTieneEnlaceDescargaCsv(Tienda $tienda): bool
+    {
+        $urls = $tienda->url_csv;
+        if (!is_array($urls)) {
+            return false;
+        }
+
+        foreach ($urls as $url) {
+            if (trim((string) $url) !== '') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function listarCodigosPlanosProducto(Producto $producto): array
+    {
+        $estructura = $this->csvAwinOfertaService->normalizarEstructuraCodigosProducto($producto->ean_isbn_etc);
+        $planos = [];
+
+        foreach (CsvAwinOfertaService::CAMPOS_CODIGOS_IDENTIFICADOR as $campo) {
+            foreach ($estructura[$campo] as $valor) {
+                $planos[] = $valor;
+            }
+        }
+
+        return array_values(array_unique($planos));
+    }
+
+    /**
+     * Busca en csv_ofertas filas cuyos códigos coinciden con los del producto (aniadida_neo=no).
+     *
+     * @param  \Illuminate\Support\Collection<int, Tienda>  $todasLasTiendas
+     * @param  array<string, int>  $contadores
+     * @return array{coincidentes: int, insertadas: int, omitidas: int, detalle_urls: array<int, array<string, mixed>>}
+     */
+    private function procesarCsvOfertasCoincidentesPorCodigos(
+        Producto $producto,
+        $todasLasTiendas,
+        array &$contadores
+    ): array {
+        $insertadas = 0;
+        $omitidas = 0;
+        $detalleUrls = [];
+        $coincidentes = 0;
+
+        foreach ($this->obtenerFilasCsvOfertasCoincidentesPorCodigos($producto) as $fila) {
+            if ($this->limiteInsercionesNeoProductoAlcanzado($contadores)) {
+                break;
+            }
+
+            $coincidentes++;
+            $contadores['csv_filas_coincidentes']++;
+            $contadores['csv_filas_coincidentes_codigo']++;
+
+            $resultado = $this->procesarFilaCsvOfertaEnNeo($fila, $producto, $todasLasTiendas, $contadores);
+            $resultado['origen_busqueda'] = 'codigo';
+            $detalleUrls[] = $resultado;
+
+            if (($resultado['accion'] ?? '') === 'insertada') {
+                $insertadas++;
+                $contadores['csv_insertadas_neo_codigo']++;
+            } elseif (($resultado['accion'] ?? '') === 'omitida') {
+                $omitidas++;
+            }
+        }
+
+        return [
+            'coincidentes' => $coincidentes,
+            'insertadas'   => $insertadas,
+            'omitidas'     => $omitidas,
+            'detalle_urls' => $detalleUrls,
+        ];
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, CsvOferta>
+     */
+    private function obtenerFilasCsvOfertasCoincidentesPorCodigos(Producto $producto): \Illuminate\Support\Collection
+    {
+        $codigos = $this->listarCodigosPlanosProducto($producto);
+        if ($codigos === []) {
+            return collect();
+        }
+
+        $query = CsvOferta::query()
+            ->where('aniadida_neo', 'no')
+            ->where(function ($sub) use ($codigos) {
+                $sub->whereIn('ean', $codigos)
+                    ->orWhereIn('isbn', $codigos)
+                    ->orWhereIn('upc', $codigos)
+                    ->orWhereIn('mpn', $codigos)
+                    ->orWhereIn('gtin', $codigos);
+            });
+
+        return $query->get()->unique('id')->values();
+    }
+
+    /**
+     * Productos elegibles para buscar URLs desde el panel de categoría (incluye subcategorías).
+     */
+    public function contarProductosElegiblesBusquedaUrlsPorCategoria(int $categoriaId): int
+    {
+        $categoriaIds = $this->obtenerIdsCategoriasConHijas($categoriaId);
+
+        return (int) $this->queryProductosElegiblesBusquedaPorCategoria($categoriaIds)->count();
+    }
+
+    /**
+     * Panel: inicia búsqueda de URLs para todos los productos elegibles de una categoría.
+     */
+    private function panelCronIniciarPorCategoria(Request $request): JsonResponse
+    {
+        @set_time_limit(120);
+
+        $request->validate(['categoria_id' => 'required|integer|exists:categorias,id']);
+        $categoria = Categoria::query()->findOrFail((int) $request->input('categoria_id'));
+
+        $categoriaIds = $this->obtenerIdsCategoriasConHijas((int) $categoria->id);
+        $productos = $this->queryProductosElegiblesBusquedaPorCategoria($categoriaIds)
+            ->orderBy('id')
+            ->get(['id', 'nombre']);
+
+        $productoIds = $productos->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
+        $contadores = $this->crearContadoresInicialesBusquedaUrls();
+        $contadores['productos_en_query'] = count($productoIds);
+        $contadores['productos_elegibles_total'] = count($productoIds);
+
+        $ejecucion = EjecucionGlobal::create([
+            'inicio'         => now(),
+            'fin'            => null,
+            'nombre'         => self::NOMBRE_EJECUCION_GLOBAL,
+            'total'          => 0,
+            'total_guardado' => 0,
+            'total_errores'  => 0,
+            'log'            => [
+                'estado'           => 'running',
+                'paso_actual'      => 'inicio',
+                'origen'           => 'panel_categoria',
+                'pasos'            => [
+                    ['momento' => now()->toDateTimeString(), 'paso' => 'inicio', 'detalle' => 'Ejecución creada desde panel de categoría', 'contexto' => []],
+                ],
+                'categoria_id'     => (int) $categoria->id,
+                'categoria_nombre' => (string) $categoria->nombre,
+                'categoria_ids'    => $categoriaIds,
+                'producto_ids'     => $productoIds,
+                'contadores'       => $contadores,
+                'resultados'       => [],
+            ],
+        ]);
+
+        $this->actualizarEjecucionPaso($ejecucion, 'consulta', [
+            'detalle' => 'Productos elegibles en categoría #' . $categoria->id . ' (incluye subcategorías)',
+            'categoria_id' => (int) $categoria->id,
+            'categoria_nombre' => (string) $categoria->nombre,
+            'productos_en_lote' => count($productoIds),
+            'productos_elegibles_total' => count($productoIds),
+            'categoria_ids' => $categoriaIds,
+        ]);
+
+        if ($productoIds === []) {
+            $this->actualizarEjecucionPaso($ejecucion, 'finalizado', [
+                'detalle' => 'Sin productos elegibles en la categoría',
+                'categoria_id' => (int) $categoria->id,
+            ]);
+            $this->finalizarEjecucionBusqueda(
+                $ejecucion->fresh(),
+                $contadores,
+                [],
+                0,
+                'ok',
+                'sin_elegibles',
+                [
+                    'origen' => 'panel_categoria',
+                    'categoria_id' => (int) $categoria->id,
+                    'categoria_nombre' => (string) $categoria->nombre,
+                    'categoria_ids' => $categoriaIds,
+                    'producto_ids' => [],
+                ]
+            );
+        }
+
+        return response()->json([
+            'ok'            => true,
+            'accion'        => 'iniciar',
+            'ejecucion_id'  => (int) $ejecucion->id,
+            'total'         => count($productoIds),
+            'producto_ids'  => $productoIds,
+            'categoria_id'  => (int) $categoria->id,
+            'sin_productos' => $productoIds === [],
+            'mensaje'       => count($productoIds) > 0
+                ? count($productoIds) . ' productos cargados. Se procesarán uno a uno.'
+                : 'Sin productos elegibles.',
+        ]);
+    }
+
+    /**
+     * Panel: procesa un producto del lote (misma lógica que ejecutarCron).
+     */
+    private function panelCronProcesarProducto(Request $request): JsonResponse
+    {
+        @set_time_limit(0);
+        @ini_set('max_execution_time', '0');
+
+        $this->faseBusquedaUrlsActual = 'inicio';
+        $this->contextoDiagnosticoBusquedaUrls = [
+            'producto_id'  => (int) $request->input('producto_id', 0),
+            'ejecucion_id' => (int) $request->input('ejecucion_id', 0),
+            'categoria_id' => (int) $request->input('categoria_id', 0),
+            'indice'       => (int) $request->input('indice', 0),
+        ];
+
+        $faseRef = &$this->faseBusquedaUrlsActual;
+        $contextoRef = &$this->contextoDiagnosticoBusquedaUrls;
+        register_shutdown_function(static function () use ($request, &$faseRef, &$contextoRef): void {
+            $err = error_get_last();
+            if ($err === null || !in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR], true)) {
+                return;
+            }
+
+            Log::error('panelCronProcesarProducto: error fatal PHP', [
+                'producto_id'  => $request->input('producto_id'),
+                'ejecucion_id' => $request->input('ejecucion_id'),
+                'categoria_id' => $request->input('categoria_id'),
+                'indice'       => $request->input('indice'),
+                'fase'         => $faseRef ?? 'desconocida',
+                'contexto'     => $contextoRef,
+                'php_error'    => $err,
+            ]);
+        });
+
+        try {
+            return $this->panelCronProcesarProductoInterno($request);
+        } catch (\Throwable $e) {
+            Log::error('panelCronProcesarProducto: error procesando producto', [
+                'categoria_id' => $request->input('categoria_id'),
+                'ejecucion_id' => $request->input('ejecucion_id'),
+                'producto_id'  => $request->input('producto_id'),
+                'indice'       => $request->input('indice'),
+                'fase'         => $this->faseBusquedaUrlsActual,
+                'contexto'     => $this->contextoDiagnosticoBusquedaUrls,
+                'message'      => $e->getMessage(),
+                'exception'    => $e::class,
+                'file'         => $e->getFile(),
+                'line'         => $e->getLine(),
+            ]);
+
+            $payload = [
+                'ok'          => false,
+                'error'       => $e->getMessage(),
+                'exception'   => class_basename($e),
+                'accion'      => 'procesar',
+                'producto_id' => $request->input('producto_id'),
+                'indice'      => $request->input('indice'),
+                'fase'        => $this->faseBusquedaUrlsActual,
+                'diagnostico' => $this->contextoDiagnosticoBusquedaUrls,
+            ];
+
+            if (config('app.debug')) {
+                $payload['file'] = $e->getFile();
+                $payload['line'] = $e->getLine();
+            }
+
+            return response()->json($payload, 500);
+        } finally {
+            $this->faseBusquedaUrlsActual = null;
+            $this->contextoDiagnosticoBusquedaUrls = [];
+        }
+    }
+
+    private function panelCronProcesarProductoInterno(Request $request): JsonResponse
+    {
+        $request->validate([
+            'categoria_id' => 'required|integer|exists:categorias,id',
+            'ejecucion_id' => 'required|integer|min:1',
+            'producto_id'  => 'required|integer|min:1',
+            'indice'       => 'nullable|integer|min:1',
+        ]);
+
+        $this->faseBusquedaUrlsActual = 'validar_ejecucion';
+
+        $categoria = Categoria::query()->findOrFail((int) $request->input('categoria_id'));
+        $ejecucion = $this->buscarEjecucionPanelCron((int) $request->input('ejecucion_id'));
+
+        $log = is_array($ejecucion->log) ? $ejecucion->log : [];
+        if ((int) ($log['categoria_id'] ?? 0) !== (int) $categoria->id) {
+            return response()->json(['ok' => false, 'error' => 'La ejecución no pertenece a esta categoría.'], 403);
+        }
+
+        if ($ejecucion->fin !== null || in_array((string) ($log['estado'] ?? ''), ['ok', 'interrumpido', 'error'], true)) {
+            return response()->json(['ok' => false, 'error' => 'La ejecución ya está finalizada.'], 409);
+        }
+
+        $productoIds = is_array($log['producto_ids'] ?? null) ? $log['producto_ids'] : [];
+        $productoId = (int) $request->input('producto_id');
+        if (!in_array($productoId, array_map('intval', $productoIds), true)) {
+            return response()->json(['ok' => false, 'error' => 'El producto no pertenece a este lote.'], 422);
+        }
+
+        $this->faseBusquedaUrlsActual = 'cargar_producto';
+        $this->contextoDiagnosticoBusquedaUrls['producto_nombre'] = null;
+
+        $producto = Producto::query()
+            ->whereIn('categoria_id', $log['categoria_ids'] ?? [$categoria->id])
+            ->findOrFail($productoId);
+
+        $this->contextoDiagnosticoBusquedaUrls['producto_nombre'] = trim((string) $producto->nombre);
+        $this->contextoDiagnosticoBusquedaUrls['palabras_exigidas'] = trim((string) ($producto->palabras_exigidas ?? ''));
+
+        $contadores = is_array($log['contadores'] ?? null)
+            ? $log['contadores']
+            : $this->crearContadoresInicialesBusquedaUrls();
+        $resultados = is_array($log['resultados'] ?? null) ? $log['resultados'] : [];
+
+        $todasLasTiendas = Tienda::query()
+            ->select('id', 'nombre', 'url')
+            ->orderBy('nombre')
+            ->get();
+
+        $this->faseBusquedaUrlsActual = 'procesar_producto';
+
+        $resultadoProducto = $this->procesarProductoBusquedaUrlsIndividual(
+            $producto,
+            $todasLasTiendas,
+            $contadores
+        );
+
+        if ($resultadoProducto !== null) {
+            $resultados[] = $this->compactarResultadoProductoParaPersistencia($resultadoProducto);
+
+            if (($resultadoProducto['error_amazon'] ?? null) !== null) {
+                $this->actualizarEjecucionPaso($ejecucion, 'producto_error_amazon', [
+                    'detalle' => 'Error Amazon para producto #' . $producto->id,
+                    'producto_id' => $producto->id,
+                    'error' => $resultadoProducto['error_amazon'],
+                ]);
+            }
+
+            if (($resultadoProducto['error_aliexpress'] ?? null) !== null) {
+                $this->actualizarEjecucionPaso($ejecucion, 'producto_error_aliexpress', [
+                    'detalle' => 'Error AliExpress para producto #' . $producto->id,
+                    'producto_id' => $producto->id,
+                    'error' => $resultadoProducto['error_aliexpress'],
+                ]);
+            }
+
+            $this->actualizarEjecucionPaso($ejecucion, 'producto', [
+                'detalle' => 'Producto #' . $producto->id . ' procesado (códigos CSV + Amazon + AliExpress + CSV)',
+                'producto_id' => $producto->id,
+                'paginas_amazon' => $resultadoProducto['paginas_amazon'],
+                'urls_amazon' => $resultadoProducto['urls_amazon'],
+                'urls_aliexpress' => $resultadoProducto['urls_aliexpress'],
+                'csv_coincidentes' => $resultadoProducto['csv_coincidentes'],
+                'csv_insertadas' => $resultadoProducto['csv_insertadas'],
+                'urls_insertadas' => $resultadoProducto['urls_insertadas'],
+                'urls_omitidas' => $resultadoProducto['urls_omitidas'],
+                'error_amazon' => $resultadoProducto['error_amazon'],
+                'error_aliexpress' => $resultadoProducto['error_aliexpress'],
+            ]);
+        } else {
+            $this->actualizarEjecucionPaso($ejecucion, 'producto_omitido', [
+                'detalle' => 'Producto #' . $producto->id . ' omitido (sin nombre o sin palabras exigidas)',
+                'producto_id' => $producto->id,
+            ]);
+        }
+
+        $indice = (int) ($request->input('indice') ?? (count($resultados) + (int) ($contadores['omitido_sin_nombre'] ?? 0) + (int) ($contadores['omitido_sin_palabras'] ?? 0)));
+        $total = count($productoIds);
+        $terminado = $indice >= $total;
+
+        $logExtras = [
+            'origen' => 'panel_categoria',
+            'categoria_id' => (int) $categoria->id,
+            'categoria_nombre' => (string) $categoria->nombre,
+            'categoria_ids' => $log['categoria_ids'] ?? $this->obtenerIdsCategoriasConHijas((int) $categoria->id),
+            'producto_ids' => $productoIds,
+            'producto_actual' => [
+                'producto_id' => $productoId,
+                'nombre'      => trim((string) $producto->nombre),
+                'indice'      => $indice,
+                'total'       => $total,
+            ],
+        ];
+
+        $this->faseBusquedaUrlsActual = 'persistir_progreso';
+
+        if ($terminado) {
+            $this->actualizarEjecucionPaso($ejecucion, 'finalizado', [
+                'detalle' => 'Ejecución de categoría finalizada',
+                'categoria_id' => (int) $categoria->id,
+                'productos_procesados' => (int) ($contadores['productos_procesados'] ?? 0),
+            ]);
+            $this->finalizarEjecucionBusqueda(
+                $ejecucion->fresh(),
+                $contadores,
+                $resultados,
+                $productoId,
+                'ok',
+                null,
+                $logExtras
+            );
+        } else {
+            $this->persistirProgresoEjecucion($ejecucion, $contadores, $resultados, $productoId, $logExtras);
+        }
+
+        return response()->json($this->buildRespuestaProgresoPanelEjecucion(
+            $ejecucion->fresh(),
+            $resultadoProducto,
+            $terminado
+        ));
+    }
+
+    /**
+     * Panel: detiene la ejecución en curso.
+     */
+    private function panelCronDetener(Request $request): JsonResponse
+    {
+        $request->validate([
+            'categoria_id' => 'required|integer|exists:categorias,id',
+            'ejecucion_id' => 'required|integer|min:1',
+        ]);
+
+        $categoria = Categoria::query()->findOrFail((int) $request->input('categoria_id'));
+        $ejecucion = $this->buscarEjecucionPanelCron((int) $request->input('ejecucion_id'));
+
+        $log = is_array($ejecucion->log) ? $ejecucion->log : [];
+        if ((int) ($log['categoria_id'] ?? 0) !== (int) $categoria->id) {
+            return response()->json(['ok' => false, 'error' => 'La ejecución no pertenece a esta categoría.'], 403);
+        }
+
+        if ($ejecucion->fin !== null) {
+            return response()->json($this->buildRespuestaProgresoPanelEjecucion($ejecucion, null, true));
+        }
+
+        $contadores = is_array($log['contadores'] ?? null)
+            ? $log['contadores']
+            : $this->crearContadoresInicialesBusquedaUrls();
+        $resultados = is_array($log['resultados'] ?? null) ? $log['resultados'] : [];
+        $ultimoProductoId = (int) ($log['ultimo_producto_id'] ?? 0);
+
+        $logExtras = [
+            'origen' => 'panel_categoria',
+            'categoria_id' => (int) $categoria->id,
+            'categoria_nombre' => (string) $categoria->nombre,
+            'categoria_ids' => $log['categoria_ids'] ?? $this->obtenerIdsCategoriasConHijas((int) $categoria->id),
+            'producto_ids' => $log['producto_ids'] ?? [],
+            'producto_actual' => $log['producto_actual'] ?? null,
+            'error' => [
+                'mensaje' => 'La ejecución se detuvo manualmente desde el panel de categoría.',
+                'tipo'    => 'detenido_usuario',
+            ],
+        ];
+
+        $this->actualizarEjecucionPaso($ejecucion, 'interrumpido', [
+            'detalle' => 'Detenido por el usuario',
+            'categoria_id' => (int) $categoria->id,
+            'ultimo_producto_id' => $ultimoProductoId,
+        ]);
+
+        $this->finalizarEjecucionBusqueda(
+            $ejecucion->fresh(),
+            $contadores,
+            $resultados,
+            $ultimoProductoId,
+            'interrumpido',
+            'detenido_usuario',
+            $logExtras
+        );
+
+        return response()->json($this->buildRespuestaProgresoPanelEjecucion($ejecucion->fresh(), null, true));
+    }
+
+    /**
+     * Panel: estado de una ejecución (misma tabla que el historial del cron).
+     */
+    private function panelCronEstado(Request $request): JsonResponse
+    {
+        $request->validate([
+            'categoria_id' => 'required|integer|exists:categorias,id',
+            'ejecucion_id' => 'required|integer|min:1',
+        ]);
+
+        $categoria = Categoria::query()->findOrFail((int) $request->input('categoria_id'));
+        $ejecucion = $this->buscarEjecucionPanelCron((int) $request->input('ejecucion_id'));
+
+        $log = is_array($ejecucion->log) ? $ejecucion->log : [];
+        if ((int) ($log['categoria_id'] ?? 0) !== (int) $categoria->id) {
+            return response()->json(['ok' => false, 'error' => 'La ejecución no pertenece a esta categoría.'], 403);
+        }
+
+        return response()->json($this->buildRespuestaProgresoPanelEjecucion($ejecucion, null, $ejecucion->fin !== null));
+    }
+
+    private function buscarEjecucionPanelCron(int $ejecucionId): EjecucionGlobal
+    {
+        return EjecucionGlobal::query()
+            ->where('nombre', self::NOMBRE_EJECUCION_GLOBAL)
+            ->findOrFail($ejecucionId);
+    }
+
+    /**
+     * @param \Illuminate\Support\Collection<int, Tienda> $todasLasTiendas
+     * @param array<string, int> $contadores
+     * @return array<string, mixed>|null
+     */
+    private function procesarProductoBusquedaUrlsIndividual(
+        Producto $producto,
+        \Illuminate\Support\Collection $todasLasTiendas,
+        array &$contadores
+    ): ?array {
+        $nombre = trim((string) $producto->nombre);
+        $palabrasExigidas = trim((string) ($producto->palabras_exigidas ?? ''));
+
+        if ($nombre === '') {
+            $contadores['omitido_sin_nombre']++;
+
+            return null;
+        }
+
+        if ($palabrasExigidas === '') {
+            $contadores['omitido_sin_palabras']++;
+
+            return null;
+        }
+
+        $resultadoProducto = [
+            'producto_id'                 => $producto->id,
+            'nombre'                      => $nombre,
+            'palabras_exigidas'           => $palabrasExigidas,
+            'paginas_amazon'              => 0,
+            'urls_amazon'                 => 0,
+            'urls_aliexpress'             => 0,
+            'urls_insertadas'             => 0,
+            'urls_omitidas'               => 0,
+            'detalle_urls'                => [],
+            'error_amazon'                => null,
+            'error_aliexpress'            => null,
+            'csv_coincidentes'            => 0,
+            'csv_coincidentes_codigo'     => 0,
+            'csv_insertadas'              => 0,
+            'csv_insertadas_codigo'       => 0,
+            'csv_omitidas'                => 0,
+            'codigos_sincronizados'       => false,
+            'codigos_ofertas_consultadas' => 0,
+        ];
+
+        $contadores['neo_insertadas_en_producto'] = 0;
+
+        $this->marcarFaseBusquedaUrls('sync_codigos');
+        $statsSyncCodigos = $this->sincronizarCodigosProductoDesdeOfertasCsv($producto, $contadores);
+        $resultadoProducto['codigos_sincronizados'] = $statsSyncCodigos['actualizado'];
+        $resultadoProducto['codigos_ofertas_consultadas'] = $statsSyncCodigos['ofertas_consultadas'];
+        if ($statsSyncCodigos['actualizado']) {
+            $producto->refresh();
+        }
+
+        $this->marcarFaseBusquedaUrls('amazon');
+        $statsAmazon = $this->procesarBusquedaAmazonEnCron($producto, $nombre, $palabrasExigidas, $contadores);
+        $resultadoProducto['paginas_amazon'] = $statsAmazon['paginas'];
+        $resultadoProducto['urls_amazon'] = $statsAmazon['urls_filtradas'];
+        if ($statsAmazon['error'] !== null) {
+            $resultadoProducto['error_amazon'] = $statsAmazon['error'];
+        } else {
+            $resultadoProducto['urls_insertadas'] += $statsAmazon['insertadas'];
+            $resultadoProducto['urls_omitidas'] += $statsAmazon['omitidas'];
+            $resultadoProducto['detalle_urls'] = array_merge(
+                $resultadoProducto['detalle_urls'],
+                $statsAmazon['detalle_urls']
+            );
+        }
+
+        if (!$this->limiteInsercionesNeoProductoAlcanzado($contadores)) {
+            sleep(self::ESPERA_ENTRE_TIENDAS_SEGUNDOS);
+
+            $this->marcarFaseBusquedaUrls('aliexpress');
+            $statsAli = $this->procesarBusquedaAliexpressEnCron($producto, $nombre, $palabrasExigidas, $contadores);
+            $resultadoProducto['urls_aliexpress'] = $statsAli['urls_filtradas'];
+            if ($statsAli['error'] !== null) {
+                $resultadoProducto['error_aliexpress'] = $statsAli['error'];
+            } else {
+                $resultadoProducto['urls_insertadas'] += $statsAli['insertadas'];
+                $resultadoProducto['urls_omitidas'] += $statsAli['omitidas'];
+                $resultadoProducto['detalle_urls'] = array_merge(
+                    $resultadoProducto['detalle_urls'],
+                    $statsAli['detalle_urls']
+                );
+            }
+        }
+
+        if (!$this->limiteInsercionesNeoProductoAlcanzado($contadores)) {
+            $this->marcarFaseBusquedaUrls('csv_codigos');
+            $statsCsvCodigos = $this->procesarCsvOfertasCoincidentesPorCodigos(
+                $producto,
+                $todasLasTiendas,
+                $contadores
+            );
+            $resultadoProducto['csv_coincidentes_codigo'] = $statsCsvCodigos['coincidentes'];
+            $resultadoProducto['csv_insertadas_codigo'] = $statsCsvCodigos['insertadas'];
+            $resultadoProducto['csv_coincidentes'] += $statsCsvCodigos['coincidentes'];
+            $resultadoProducto['csv_insertadas'] += $statsCsvCodigos['insertadas'];
+            $resultadoProducto['csv_omitidas'] += $statsCsvCodigos['omitidas'];
+            $resultadoProducto['urls_insertadas'] += $statsCsvCodigos['insertadas'];
+            $resultadoProducto['urls_omitidas'] += $statsCsvCodigos['omitidas'];
+            $resultadoProducto['detalle_urls'] = array_merge(
+                $resultadoProducto['detalle_urls'],
+                $statsCsvCodigos['detalle_urls']
+            );
+        }
+
+        if (!$this->limiteInsercionesNeoProductoAlcanzado($contadores)) {
+            $this->marcarFaseBusquedaUrls('csv_palabras_inicio');
+            $statsCsv = $this->procesarCsvOfertasCoincidentes(
+                $producto,
+                $palabrasExigidas,
+                $todasLasTiendas,
+                $contadores
+            );
+            $resultadoProducto['csv_coincidentes'] += $statsCsv['coincidentes'];
+            $resultadoProducto['csv_insertadas'] += $statsCsv['insertadas'];
+            $resultadoProducto['csv_omitidas'] += $statsCsv['omitidas'];
+            $resultadoProducto['urls_insertadas'] += $statsCsv['insertadas'];
+            $resultadoProducto['urls_omitidas'] += $statsCsv['omitidas'];
+            $resultadoProducto['detalle_urls'] = array_merge(
+                $resultadoProducto['detalle_urls'],
+                $statsCsv['detalle_urls']
+            );
+        }
+
+        $resultadoProducto['limite_neo_alcanzado'] = $this->limiteInsercionesNeoProductoAlcanzado($contadores);
+        $resultadoProducto['neo_insertadas_en_producto'] = (int) ($contadores['neo_insertadas_en_producto'] ?? 0);
+        $resultadoProducto['neo_insertadas_max'] = self::LIMITE_INSERCIONES_NEO_POR_PRODUCTO;
+        $resultadoProducto['diagnostico'] = $this->contextoDiagnosticoBusquedaUrls;
+
+        $contadores['productos_procesados']++;
+
+        return $resultadoProducto;
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function crearContadoresInicialesBusquedaUrls(): array
+    {
+        return [
+            'productos_en_query'              => 0,
+            'productos_elegibles_total'       => 0,
+            'omitido_sin_nombre'              => 0,
+            'omitido_sin_palabras'            => 0,
+            'productos_procesados'            => 0,
+            'productos_error_amazon'          => 0,
+            'productos_error_aliexpress'      => 0,
+            'urls_amazon_filtradas'           => 0,
+            'urls_aliexpress_filtradas'       => 0,
+            'urls_omitida_oferta'             => 0,
+            'urls_omitida_descartada'         => 0,
+            'urls_omitida_neo'                => 0,
+            'urls_omitida_limite_neo'         => 0,
+            'urls_insertadas_neo'             => 0,
+            'neo_insertadas_en_producto'      => 0,
+            'csv_filas_coincidentes'          => 0,
+            'csv_filas_coincidentes_codigo'   => 0,
+            'csv_ofertas_consultadas_codigos' => 0,
+            'csv_codigos_nuevos_en_producto'  => 0,
+            'csv_omitida_oferta'              => 0,
+            'csv_ya_en_neo'                   => 0,
+            'csv_insertadas_neo'              => 0,
+            'csv_insertadas_neo_codigo'       => 0,
+            'csv_aniadida_neo_si'             => 0,
+        ];
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    private function obtenerIdsCategoriasConHijas(int $categoriaId): array
+    {
+        $ids = [$categoriaId];
+
+        $hijas = Categoria::query()
+            ->where('parent_id', $categoriaId)
+            ->get(['id']);
+
+        foreach ($hijas as $hija) {
+            $ids = array_merge($ids, $this->obtenerIdsCategoriasConHijas((int) $hija->id));
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    /**
+     * @param array<int, int> $categoriaIds
+     */
+    private function queryProductosElegiblesBusquedaPorCategoria(array $categoriaIds): \Illuminate\Database\Eloquent\Builder
+    {
+        return $this->queryProductosElegiblesBusqueda()
+            ->whereIn('categoria_id', $categoriaIds);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildRespuestaProgresoPanelEjecucion(
+        EjecucionGlobal $ejecucion,
+        ?array $resultadoProducto,
+        bool $terminado
+    ): array {
+        $log = is_array($ejecucion->log) ? $ejecucion->log : [];
+        $contadores = is_array($log['contadores'] ?? null) ? $log['contadores'] : [];
+        $productoIds = is_array($log['producto_ids'] ?? null) ? $log['producto_ids'] : [];
+        $total = count($productoIds);
+        $procesados = (int) ($contadores['productos_procesados'] ?? 0)
+            + (int) ($contadores['omitido_sin_nombre'] ?? 0)
+            + (int) ($contadores['omitido_sin_palabras'] ?? 0);
+
+        return [
+            'ok'                 => true,
+            'ejecucion_id'       => (int) $ejecucion->id,
+            'estado'             => $log['estado'] ?? ($terminado ? 'ok' : 'running'),
+            'terminado'          => $terminado,
+            'indice'             => min($procesados, $total),
+            'total'              => $total,
+            'producto_actual'    => $log['producto_actual'] ?? null,
+            'resultado_producto' => $resultadoProducto,
+            'contadores'         => $contadores,
+            'resumen_urls'       => $this->resumirUrlsDesdeContadores($contadores),
+        ];
+    }
+
+    /**
+     * @param  array<string, int>  $contadores
+     * @return array{todas: int, existentes: int, insertadas_neo: int}
+     */
+    private function resumirUrlsDesdeContadores(array $contadores): array
+    {
+        $insertadasNeo = (int) ($contadores['urls_insertadas_neo'] ?? 0);
+        $existentes = (int) ($contadores['urls_omitida_oferta'] ?? 0)
+            + (int) ($contadores['urls_omitida_descartada'] ?? 0)
+            + (int) ($contadores['urls_omitida_neo'] ?? 0)
+            + (int) ($contadores['urls_omitida_limite_neo'] ?? 0)
+            + (int) ($contadores['csv_omitida_oferta'] ?? 0)
+            + (int) ($contadores['csv_ya_en_neo'] ?? 0);
+
+        return [
+            'todas'          => $insertadasNeo + $existentes,
+            'existentes'     => $existentes,
+            'insertadas_neo' => $insertadasNeo,
+        ];
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $resultados
+     * @return array{todas: int, existentes: int, insertadas_neo: int}
+     */
+    private function resumirUrlsResultadosBusqueda(array $resultados): array
+    {
+        $todas = 0;
+        $existentes = 0;
+        $insertadasNeo = 0;
+
+        foreach ($resultados as $resultado) {
+            foreach ($resultado['detalle_urls'] ?? [] as $detalle) {
+                if (!is_array($detalle)) {
+                    continue;
+                }
+                $todas++;
+                if (($detalle['accion'] ?? '') === 'insertada') {
+                    $insertadasNeo++;
+                } else {
+                    $existentes++;
+                }
+            }
+        }
+
+        return [
+            'todas'          => $todas,
+            'existentes'     => $existentes,
+            'insertadas_neo' => $insertadasNeo,
+        ];
+    }
+
+    private function normalizarClaveTiendaDetectar(string $texto): string
+    {
+        $s = Str::ascii(mb_strtolower(trim($texto)));
+
+        return preg_replace('/[^a-z0-9]/', '', $s) ?? '';
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function clavesHostTiendaDetectar(Tienda $tienda): array
+    {
+        $claves = [];
+        $nombre = $this->normalizarClaveTiendaDetectar((string) ($tienda->nombre ?? ''));
+        if ($nombre !== '') {
+            $claves[] = $nombre;
+        }
+        $urlCampo = trim((string) ($tienda->url ?? ''));
+        if ($urlCampo !== '' && !str_contains($urlCampo, '.')) {
+            $slug = $this->normalizarClaveTiendaDetectar($urlCampo);
+            if ($slug !== '') {
+                $claves[] = $slug;
+            }
+        }
+
+        return array_values(array_unique(array_filter($claves)));
     }
 }

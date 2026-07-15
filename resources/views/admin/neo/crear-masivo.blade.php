@@ -45,7 +45,11 @@
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7l1.664 9.152A2 2 0 006.632 18h10.736a2 2 0 001.968-1.848L21 7M8 11h8M12 7v8"></path></svg>
                     Tienda ({{ $totalTiendasNeoAniadidaNo ?? 0 }})
                 </button>
-                <span class="text-sm text-gray-500 dark:text-gray-400">Cargar URLs desde neo (añadida=no): por producto, por categoría o por tienda</span>
+                <button type="button" id="btnCsvOfertasNeo" class="inline-flex items-center bg-cyan-600 hover:bg-cyan-700 text-white font-semibold px-4 py-2.5 rounded shadow transition">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    CSV
+                </button>
+                <span class="text-sm text-gray-500 dark:text-gray-400">Cargar URLs desde neo (añadida=no) o desde csv_ofertas (CSV)</span>
             </div>
             <form id="formAnalizar" class="space-y-6">
                 @csrf
@@ -451,6 +455,121 @@
             <div class="p-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
                 <button type="button" id="modal-tienda-neo-atras" class="hidden px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600">Atrás</button>
                 <button type="button" id="modal-tienda-neo-cerrar-btn" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    {{-- Modal buscar URLs en csv_ofertas (CSV-Awin) --}}
+    <div id="modal-csv-ofertas-neo" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-6xl w-full max-h-[90vh] flex flex-col border border-gray-200 dark:border-gray-700">
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-start gap-3">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Buscar URLs en csv_ofertas (CSV-Awin)</h3>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Mismos filtros que en <a href="{{ route('admin.ofertas.todas_csv') }}" target="_blank" rel="noopener" class="text-cyan-600 hover:underline dark:text-cyan-400">CSV-Awin</a>. Las URLs coincidentes se pegan en el textarea al buscar.</p>
+                </div>
+                <button type="button" id="modal-csv-ofertas-neo-cerrar" class="text-2xl leading-none text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 shrink-0">&times;</button>
+            </div>
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+                <form id="form-buscar-csv-ofertas-neo" class="flex flex-wrap items-end gap-3">
+                    <div class="flex-1 min-w-[240px]">
+                        <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">Buscar por URL (completa o parte)</label>
+                        <input type="text" id="modal-csv-ofertas-busqueda" name="busqueda"
+                            placeholder="https://... o fragmento de la URL"
+                            class="w-full px-4 py-2 border rounded bg-white dark:bg-gray-700 text-sm text-gray-800 dark:text-white border-gray-300 dark:border-gray-600" />
+                    </div>
+                    <div class="flex-1 min-w-[200px]">
+                        <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">Buscar por código (EAN, ISBN, UPC, MPN, GTIN)</label>
+                        <input type="text" id="modal-csv-ofertas-busqueda-codigo" name="busqueda_codigo"
+                            placeholder="Código completo o fragmento"
+                            class="w-full px-4 py-2 border rounded bg-white dark:bg-gray-700 text-sm text-gray-800 dark:text-white border-gray-300 dark:border-gray-600" />
+                    </div>
+                    <div class="min-w-[180px]">
+                        <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">Tienda</label>
+                        <select id="modal-csv-ofertas-tienda-id" name="tienda_id"
+                            class="w-full px-3 py-2 border rounded bg-white dark:bg-gray-700 text-sm text-gray-800 dark:text-white border-gray-300 dark:border-gray-600">
+                            <option value="">Todas</option>
+                            @foreach($tiendasConCsv ?? [] as $tienda)
+                                <option value="{{ $tienda->id }}">{{ $tienda->nombre }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="min-w-[120px]">
+                        <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">Stock</label>
+                        <select id="modal-csv-ofertas-stock" name="stock"
+                            class="w-full px-3 py-2 border rounded bg-white dark:bg-gray-700 text-sm text-gray-800 dark:text-white border-gray-300 dark:border-gray-600">
+                            <option value="">Todos</option>
+                            <option value="1">Con stock</option>
+                            <option value="0">Sin stock</option>
+                        </select>
+                    </div>
+                    <button type="submit" id="modal-csv-ofertas-btn-buscar"
+                        class="px-4 py-2 bg-cyan-600 text-white rounded hover:bg-cyan-700 text-sm disabled:opacity-50">
+                        Buscar
+                    </button>
+                    <button type="button" id="modal-csv-ofertas-btn-limpiar"
+                        class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm hidden">
+                        Limpiar
+                    </button>
+                </form>
+                <p id="modal-csv-ofertas-estado" class="mt-3 text-sm text-gray-600 dark:text-gray-400"></p>
+            </div>
+            <div class="flex-1 overflow-y-auto min-h-0">
+                <div class="p-4 flex flex-wrap justify-between items-center gap-3">
+                    <p id="modal-csv-ofertas-total" class="text-sm text-gray-600 dark:text-gray-400"></p>
+                    <div class="flex items-center gap-2">
+                        <label for="modal-csv-ofertas-per-page" class="text-sm text-gray-700 dark:text-gray-300">Mostrar:</label>
+                        <select id="modal-csv-ofertas-per-page"
+                            class="px-2 py-1 pr-8 rounded border bg-white dark:bg-gray-700 text-sm text-gray-800 dark:text-white border-gray-300 dark:border-gray-600">
+                            @foreach ([20, 50, 100, 200] as $cantidad)
+                                <option value="{{ $cantidad }}" {{ $cantidad === 50 ? 'selected' : '' }}>{{ $cantidad }}</option>
+                            @endforeach
+                        </select>
+                        <span class="text-sm text-gray-700 dark:text-gray-300">por página</span>
+                    </div>
+                </div>
+                <div class="px-4 pb-4 overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
+                        <thead class="bg-gray-50 dark:bg-gray-900">
+                            <tr>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tienda</th>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Nombre</th>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">URL</th>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Precio</th>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Envío</th>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Stock</th>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actualizado</th>
+                                <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modal-csv-ofertas-tbody" class="divide-y divide-gray-200 dark:divide-gray-700">
+                            <tr>
+                                <td colspan="8" class="px-4 py-8 text-center text-gray-500">Usa los filtros y pulsa Buscar.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div id="modal-csv-ofertas-paginacion" class="px-4 pb-4 flex flex-wrap items-center justify-center gap-2"></div>
+            </div>
+            <div class="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-end">
+                <button type="button" id="modal-csv-ofertas-neo-cerrar-btn" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    {{-- Modal códigos CSV (EAN / ISBN / etc.) --}}
+    <div id="modal-codigos-csv-crear-masivo" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full border border-gray-200 dark:border-gray-700">
+            <div class="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Códigos del producto</h3>
+                <button type="button" id="modal-codigos-csv-crear-masivo-cerrar"
+                    class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none" aria-label="Cerrar">&times;</button>
+            </div>
+            <div id="modal-codigos-csv-crear-masivo-contenido" class="px-5 py-4 space-y-3 text-sm"></div>
+            <div class="px-5 py-3 border-t border-gray-200 dark:border-gray-700 text-right">
+                <button type="button" id="modal-codigos-csv-crear-masivo-cerrar-btn"
+                    class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm">
+                    Cerrar
+                </button>
             </div>
         </div>
     </div>
@@ -1214,6 +1333,7 @@
 
 <script>
     const NEO_PANEL_PRODUCTOS_BASE = @json(rtrim(url('/panel-privado/productos'), '/'));
+    const API_BUSCAR_PRODUCTOS_URL = @json(route('api.buscar.productos'));
     window.__modalProductoNeoMainReady = false;
     window.__crearMasivoImagenesSublinea = {};
 
@@ -1445,18 +1565,31 @@
         console.groupEnd();
     }
 
-    /** Normalización básica para deduplicar URLs (alineada con analizarUrls: sin query/hash, sin /p final). */
-    function normalizarUrlBasicaCrearMasivo(url) {
+    /** Canonicaliza URL para el textarea: path con caracteres legibles (á, ñ…), sin %C3%A1. */
+    function canonicalizarUrlTextoCrearMasivo(url) {
         let u = String(url || '').trim();
         if (!u) return '';
         if (!/^https?:\/\//i.test(u)) u = 'https://' + u;
         try {
             const parsed = new URL(u);
-            u = parsed.protocol + '//' + parsed.hostname + (parsed.pathname || '');
+            let path = parsed.pathname || '';
+            for (let i = 0; i < 2; i++) {
+                if (!/%[0-9A-Fa-f]{2}/.test(path)) break;
+                try {
+                    const dec = decodeURIComponent(path);
+                    if (dec === path) break;
+                    path = dec;
+                } catch (e) { break; }
+            }
+            return parsed.origin + path;
         } catch (e) {
-            u = u.replace(/[?#].*$/, '');
+            return u;
         }
-        return u;
+    }
+
+    /** Normalización básica para deduplicar URLs (alineada con analizarUrls: sin query/hash, sin /p final). */
+    function normalizarUrlBasicaCrearMasivo(url) {
+        return canonicalizarUrlTextoCrearMasivo(url);
     }
 
     function claveDedupeUrlCrearMasivo(url) {
@@ -1474,7 +1607,7 @@
         const unicas = [];
         let omitidas = 0;
         (Array.isArray(urls) ? urls : []).forEach(function(raw) {
-            const trimmed = String(raw || '').trim();
+            const trimmed = canonicalizarUrlTextoCrearMasivo(String(raw || '').trim());
             if (!trimmed) return;
             const clave = claveDedupeUrlCrearMasivo(trimmed);
             if (!clave) return;
@@ -1494,8 +1627,9 @@
         if (!ta) return { urls: [], omitidas: 0 };
         const lineas = ta.value.split('\n').map(function(u) { return u.trim(); }).filter(Boolean);
         const dedupe = deduplicarListaUrlsCrearMasivo(lineas);
-        if (dedupe.omitidas > 0 && opciones.reescribir !== false) {
-            ta.value = dedupe.urls.join('\n');
+        const nuevoValor = dedupe.urls.join('\n');
+        if (nuevoValor !== lineas.join('\n') || (dedupe.omitidas > 0 && opciones.reescribir !== false)) {
+            ta.value = nuevoValor;
         }
         return dedupe;
     }
@@ -1503,10 +1637,9 @@
     function obtenerUrlsLimpiasTextarea() {
         const ta = document.getElementById('urls');
         if (!ta) return [];
-        return ta.value
-            .split('\n')
-            .map(function(u) { return u.trim(); })
-            .filter(Boolean);
+        return deduplicarListaUrlsCrearMasivo(
+            ta.value.split('\n').map(function(u) { return u.trim(); }).filter(Boolean)
+        ).urls;
     }
 
     function actualizarEstadoLotesDesdeTextarea() {
@@ -2553,6 +2686,20 @@
         return parts.length ? '&' + parts.join('&') : '';
     }
 
+    function parseRespuestaTiendasPorCategoriaNeoApi(raw) {
+        if (Array.isArray(raw)) {
+            return { tiendas: raw, filas_neo_tienda_id_null: 0 };
+        }
+        return {
+            tiendas: Array.isArray(raw.tiendas) ? raw.tiendas : [],
+            filas_neo_tienda_id_null: parseInt(String(raw.filas_neo_tienda_id_null ?? 0), 10) || 0,
+        };
+    }
+
+    function queryFiltrosUrlsSinTiendaModalCategoriaNeo() {
+        return queryMostrarCategoriaModalCategoriaNeo() + '&mostrar_si=0&mostrar_no=0&mostrar_null=1';
+    }
+
     function queryFiltrosListadoCategoriasModalCategoriaNeo() {
         return queryMostrarCategoriaModalCategoriaNeo();
     }
@@ -2775,21 +2922,23 @@
         try {
             const fq = queryFiltrosTiendasModalCategoriaNeo();
             const res = await fetch('{{ route("admin.neo.crear-masivo.tiendas-por-categoria", ["categoriaId" => "__ID__"]) }}'.replace('__ID__', item.categoria_id) + '?' + fq + '&_=' + Date.now(), { cache: 'no-store', headers: { 'Accept': 'application/json' } });
-            const tiendas = await res.json();
-            estadoModalCategoriaNeo.tiendasDeCategoria = Array.isArray(tiendas) ? tiendas : [];
-            if (estadoModalCategoriaNeo.tiendasDeCategoria.length === 0) {
-                lista.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-sm">No hay tiendas pendientes para esta categoría.</p>';
+            const parsed = parseRespuestaTiendasPorCategoriaNeoApi(await res.json());
+            estadoModalCategoriaNeo.tiendasDeCategoria = parsed.tiendas;
+            const sinTiendaCount = parsed.filas_neo_tienda_id_null;
+            const sumaTiendas = sumarConteosListaNeo(estadoModalCategoriaNeo.tiendasDeCategoria, 'count');
+            const totalCategoria = sumaTiendas + sinTiendaCount;
+            if (totalCategoria === 0) {
+                lista.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-sm">No hay URLs pendientes para esta categoría.</p>';
                 setTotalUrlsDisponiblesNeo('modal-categoria-neo-total-urls', 0);
                 return;
             }
-            const sumaTiendas = sumarConteosListaNeo(estadoModalCategoriaNeo.tiendasDeCategoria, 'count');
-            setTotalUrlsDisponiblesNeo('modal-categoria-neo-total-urls', sumaTiendas);
+            setTotalUrlsDisponiblesNeo('modal-categoria-neo-total-urls', totalCategoria);
             lista.innerHTML = '';
             const btnTodas = document.createElement('button');
             btnTodas.type = 'button';
             btnTodas.setAttribute('data-busqueda-texto', 'todas');
             btnTodas.className = 'w-full text-left p-3 rounded-lg border-2 border-pink-500 bg-pink-50 dark:bg-pink-900/30 dark:border-pink-400 hover:bg-pink-100 dark:hover:bg-pink-900/50 transition mb-2';
-            btnTodas.innerHTML = '<span class="font-semibold text-pink-800 dark:text-pink-200">Todas</span> <span class="text-pink-700 dark:text-pink-300 text-sm">(' + sumaTiendas + ' URL' + (sumaTiendas !== 1 ? 's' : '') + ')</span>';
+            btnTodas.innerHTML = '<span class="font-semibold text-pink-800 dark:text-pink-200">Todas</span> <span class="text-pink-700 dark:text-pink-300 text-sm">(' + totalCategoria + ' URL' + (totalCategoria !== 1 ? 's' : '') + ')</span>';
             btnTodas.addEventListener('click', async function() {
                 try {
                     const resUrl = await fetch('{{ route("admin.neo.crear-masivo.urls-por-categoria", ["categoriaId" => "__CID__"]) }}'.replace('__CID__', item.categoria_id) + '?' + fq + '&_=' + Date.now(), { cache: 'no-store', headers: { 'Accept': 'application/json' } });
@@ -2829,6 +2978,29 @@
                 });
                 lista.appendChild(div);
             });
+            if (sinTiendaCount > 0) {
+                const divSinTienda = document.createElement('div');
+                divSinTienda.className = 'p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition';
+                divSinTienda.setAttribute('data-busqueda-texto', 'sin tienda detectada');
+                divSinTienda.innerHTML = '<span class="font-medium text-gray-900 dark:text-white">Sin tienda detectada</span> <span class="text-gray-500 dark:text-gray-400 text-sm">(' + sinTiendaCount + ' URL' + (sinTiendaCount !== 1 ? 's' : '') + ')</span>';
+                divSinTienda.addEventListener('click', async function() {
+                    try {
+                        const fqSinTienda = queryFiltrosUrlsSinTiendaModalCategoriaNeo();
+                        const resUrl = await fetch('{{ route("admin.neo.crear-masivo.urls-por-categoria", ["categoriaId" => "__CID__"]) }}'.replace('__CID__', item.categoria_id) + '?' + fqSinTienda + '&_=' + Date.now(), { cache: 'no-store', headers: { 'Accept': 'application/json' } });
+                        const dataUrl = await resUrl.json();
+                        window.__neoCategoriaFiltro = { id: item.categoria_id, nombre: item.nombre || ('Categoría #' + item.categoria_id) };
+                        actualizarIndicadorCategoriaFiltroNeo();
+                        pegarUrlsEnTextareaCrearMasivo(dataUrl.urls || []);
+                        window.__crearMasivoOrigenNeo = null;
+                        actualizarVisibilidadFooterSiguienteNeo();
+                        modal.classList.add('hidden');
+                    } catch (err) {
+                        console.error(err);
+                        alert('Error al cargar URLs: ' + err.message);
+                    }
+                });
+                lista.appendChild(divSinTienda);
+            }
             refrescarFiltroBuscadorModalNeo('modal-categoria-neo');
         } catch (err) {
             console.error(err);
@@ -3400,6 +3572,292 @@
         }
         btn.disabled = false;
     });
+
+    const urlBuscarCsvOfertasNeo = '{{ route("admin.neo.crear-masivo.buscar-csv-ofertas") }}';
+    const estadoModalCsvOfertasNeo = { page: 1, ultimaBusqueda: null };
+
+    function cerrarModalCsvOfertasNeo() {
+        const modal = document.getElementById('modal-csv-ofertas-neo');
+        if (modal) modal.classList.add('hidden');
+    }
+
+    function abrirModalCsvOfertasNeo() {
+        const modal = document.getElementById('modal-csv-ofertas-neo');
+        if (modal) modal.classList.remove('hidden');
+    }
+
+    function hayFiltrosActivosModalCsvOfertasNeo() {
+        const busqueda = (document.getElementById('modal-csv-ofertas-busqueda')?.value || '').trim();
+        const codigo = (document.getElementById('modal-csv-ofertas-busqueda-codigo')?.value || '').trim();
+        const tienda = document.getElementById('modal-csv-ofertas-tienda-id')?.value || '';
+        const stock = document.getElementById('modal-csv-ofertas-stock')?.value || '';
+        return !!(busqueda || codigo || tienda || stock);
+    }
+
+    function actualizarBotonLimpiarModalCsvOfertasNeo() {
+        const btn = document.getElementById('modal-csv-ofertas-btn-limpiar');
+        if (!btn) return;
+        btn.classList.toggle('hidden', !hayFiltrosActivosModalCsvOfertasNeo());
+    }
+
+    function formatearPrecioCsvOfertasNeo(valor) {
+        if (valor === null || valor === undefined || valor === '') return '<span class="text-gray-400">—</span>';
+        const num = Number(valor);
+        if (Number.isNaN(num)) return '<span class="text-gray-400">—</span>';
+        return num.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+    }
+
+    function formatearStockCsvOfertasNeo(stock) {
+        if (stock === null || stock === undefined || stock === '') return '<span class="text-gray-400">—</span>';
+        if (Number(stock) === 1) return '<span class="text-green-600 dark:text-green-400">Sí</span>';
+        return '<span class="text-red-600 dark:text-red-400">No</span>';
+    }
+
+    function abrirModalCodigosCsvCrearMasivo(btn) {
+        const codigos = {
+            EAN: btn.dataset.ean || '',
+            ISBN: btn.dataset.isbn || '',
+            UPC: btn.dataset.upc || '',
+            MPN: btn.dataset.mpn || '',
+            GTIN: btn.dataset.gtin || '',
+        };
+        const contenedor = document.getElementById('modal-codigos-csv-crear-masivo-contenido');
+        if (!contenedor) return;
+        const filas = Object.entries(codigos).map(function([tipo, valor]) {
+            const tieneValor = valor !== null && valor !== undefined && String(valor).trim() !== '';
+            const valorHtml = tieneValor
+                ? '<span class="font-mono text-gray-900 dark:text-gray-100 break-all">' + escapeHtmlCrearMasivo(String(valor)) + '</span>'
+                : '<span class="text-gray-400">—</span>';
+            return '<div class="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3">'
+                + '<span class="shrink-0 w-14 font-medium text-gray-500 dark:text-gray-400 uppercase text-xs">' + escapeHtmlCrearMasivo(tipo) + '</span>'
+                + valorHtml
+                + '</div>';
+        });
+        contenedor.innerHTML = filas.join('');
+        const modal = document.getElementById('modal-codigos-csv-crear-masivo');
+        if (modal) modal.classList.remove('hidden');
+    }
+
+    function cerrarModalCodigosCsvCrearMasivo() {
+        const modal = document.getElementById('modal-codigos-csv-crear-masivo');
+        if (modal) modal.classList.add('hidden');
+    }
+
+    function renderTablaModalCsvOfertasNeo(filas) {
+        const tbody = document.getElementById('modal-csv-ofertas-tbody');
+        if (!tbody) return;
+        if (!Array.isArray(filas) || filas.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-gray-500">No hay filas que coincidan con los filtros.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = filas.map(function(fila) {
+            const nombre = fila.nombre
+                ? '<span class="line-clamp-2" title="' + escapeHtmlCrearMasivo(fila.nombre) + '">' + escapeHtmlCrearMasivo(fila.nombre) + '</span>'
+                : '<span class="text-gray-400">—</span>';
+            const url = fila.url || '';
+            const opacidad = Number(fila.stock) === 0 ? ' opacity-70 bg-gray-50 dark:bg-gray-900/40' : '';
+            return '<tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50' + opacidad + '">'
+                + '<td class="px-3 py-2 text-gray-800 dark:text-gray-200 whitespace-nowrap">' + escapeHtmlCrearMasivo(fila.tienda || '—') + '</td>'
+                + '<td class="px-3 py-2 text-gray-800 dark:text-gray-200 max-w-xs">' + nombre + '</td>'
+                + '<td class="px-3 py-2 max-w-md"><a href="' + escapeHtmlCrearMasivo(url) + '" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 break-all">' + escapeHtmlCrearMasivo(url) + '</a></td>'
+                + '<td class="px-3 py-2 whitespace-nowrap">' + formatearPrecioCsvOfertasNeo(fila.precio) + '</td>'
+                + '<td class="px-3 py-2 whitespace-nowrap">' + formatearPrecioCsvOfertasNeo(fila.envio) + '</td>'
+                + '<td class="px-3 py-2 whitespace-nowrap">' + formatearStockCsvOfertasNeo(fila.stock) + '</td>'
+                + '<td class="px-3 py-2 whitespace-nowrap text-gray-600 dark:text-gray-400">' + escapeHtmlCrearMasivo(fila.updated_at || '—') + '</td>'
+                + '<td class="px-3 py-2 text-right whitespace-nowrap">'
+                + '<div class="inline-flex items-center gap-2">'
+                + '<a href="' + escapeHtmlCrearMasivo(url) + '" target="_blank" rel="noopener" class="text-green-600 hover:text-green-800 dark:text-green-400" title="Abrir URL">'
+                + '<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 3h7m0 0v7m0-7L10 14" /></svg>'
+                + '</a>'
+                + '<button type="button" class="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 text-xs font-medium px-2 py-1 rounded border border-indigo-300 dark:border-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30"'
+                + ' data-ean="' + escapeHtmlCrearMasivo(fila.ean || '') + '"'
+                + ' data-isbn="' + escapeHtmlCrearMasivo(fila.isbn || '') + '"'
+                + ' data-upc="' + escapeHtmlCrearMasivo(fila.upc || '') + '"'
+                + ' data-mpn="' + escapeHtmlCrearMasivo(fila.mpn || '') + '"'
+                + ' data-gtin="' + escapeHtmlCrearMasivo(fila.gtin || '') + '"'
+                + ' onclick="abrirModalCodigosCsvCrearMasivo(this)">Códigos</button>'
+                + '</div></td></tr>';
+        }).join('');
+    }
+
+    function renderPaginacionModalCsvOfertasNeo(pagination) {
+        const cont = document.getElementById('modal-csv-ofertas-paginacion');
+        if (!cont) return;
+        if (!pagination || pagination.last_page <= 1) {
+            cont.innerHTML = '';
+            return;
+        }
+        const actual = pagination.current_page;
+        const ultima = pagination.last_page;
+        const botones = [];
+        if (actual > 1) {
+            botones.push('<button type="button" class="modal-csv-ofertas-pagina px-3 py-1 text-sm rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700" data-page="' + (actual - 1) + '">Anterior</button>');
+        }
+        botones.push('<span class="text-sm text-gray-600 dark:text-gray-400">Página ' + actual + ' de ' + ultima + '</span>');
+        if (actual < ultima) {
+            botones.push('<button type="button" class="modal-csv-ofertas-pagina px-3 py-1 text-sm rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700" data-page="' + (actual + 1) + '">Siguiente</button>');
+        }
+        cont.innerHTML = botones.join('');
+        cont.querySelectorAll('.modal-csv-ofertas-pagina').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                const page = parseInt(btn.dataset.page, 10);
+                if (!Number.isNaN(page)) {
+                    buscarCsvOfertasModalNeo(page, { pegarUrls: false });
+                }
+            });
+        });
+    }
+
+    async function buscarCsvOfertasModalNeo(page, opciones) {
+        opciones = opciones || {};
+        const pegarUrls = opciones.pegarUrls !== false;
+        const btnBuscar = document.getElementById('modal-csv-ofertas-btn-buscar');
+        const estado = document.getElementById('modal-csv-ofertas-estado');
+        const totalEl = document.getElementById('modal-csv-ofertas-total');
+        const perPage = document.getElementById('modal-csv-ofertas-per-page')?.value || '50';
+        const params = new URLSearchParams();
+        const busqueda = (document.getElementById('modal-csv-ofertas-busqueda')?.value || '').trim();
+        const busquedaCodigo = (document.getElementById('modal-csv-ofertas-busqueda-codigo')?.value || '').trim();
+        const tiendaId = document.getElementById('modal-csv-ofertas-tienda-id')?.value || '';
+        const stock = document.getElementById('modal-csv-ofertas-stock')?.value || '';
+        if (busqueda) params.set('busqueda', busqueda);
+        if (busquedaCodigo) params.set('busqueda_codigo', busquedaCodigo);
+        if (tiendaId) params.set('tienda_id', tiendaId);
+        if (stock !== '') params.set('stock', stock);
+        params.set('perPage', perPage);
+        params.set('page', String(page || 1));
+        estadoModalCsvOfertasNeo.page = page || 1;
+        if (btnBuscar) btnBuscar.disabled = true;
+        if (estado) estado.textContent = 'Buscando…';
+        try {
+            const res = await fetch(urlBuscarCsvOfertasNeo + '?' + params.toString(), {
+                cache: 'no-store',
+                headers: { 'Accept': 'application/json' },
+            });
+            if (!res.ok) throw new Error('Error HTTP ' + res.status);
+            const data = await res.json();
+            renderTablaModalCsvOfertasNeo(data.filas || []);
+            renderPaginacionModalCsvOfertasNeo(data.pagination || null);
+            if (totalEl) {
+                const total = data.total || 0;
+                totalEl.textContent = total > 0
+                    ? total.toLocaleString('es-ES') + ' fila(s) encontrada(s)'
+                    : 'No hay filas que coincidan con los filtros.';
+            }
+            if (pegarUrls) {
+                const urls = Array.isArray(data.urls) ? data.urls : [];
+                pegarUrlsEnTextareaCrearMasivo(urls);
+                let msg = urls.length > 0
+                    ? urls.length.toLocaleString('es-ES') + ' URL' + (urls.length !== 1 ? 's' : '') + ' pegada' + (urls.length !== 1 ? 's' : '') + ' en el textarea.'
+                    : 'No se han pegado URLs (sin coincidencias).';
+                if (data.truncado) {
+                    msg += ' Solo las primeras ' + (data.limite_urls || 0).toLocaleString('es-ES') + ' de ' + (data.total || 0).toLocaleString('es-ES') + ' coincidencias.';
+                }
+                if (estado) estado.textContent = msg;
+            } else if (estado) {
+                estado.textContent = '';
+            }
+            actualizarBotonLimpiarModalCsvOfertasNeo();
+        } catch (err) {
+            console.error(err);
+            if (estado) estado.textContent = 'Error al buscar: ' + (err.message || 'desconocido');
+            renderTablaModalCsvOfertasNeo([]);
+            renderPaginacionModalCsvOfertasNeo(null);
+            if (totalEl) totalEl.textContent = '';
+        } finally {
+            if (btnBuscar) btnBuscar.disabled = false;
+        }
+    }
+
+    const btnCsvOfertasNeo = document.getElementById('btnCsvOfertasNeo');
+    if (btnCsvOfertasNeo) {
+        btnCsvOfertasNeo.addEventListener('click', function() {
+            abrirModalCsvOfertasNeo();
+        });
+    }
+
+    ['modal-csv-ofertas-neo-cerrar', 'modal-csv-ofertas-neo-cerrar-btn'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('click', cerrarModalCsvOfertasNeo);
+    });
+
+    const modalCsvOfertasNeo = document.getElementById('modal-csv-ofertas-neo');
+    if (modalCsvOfertasNeo) {
+        modalCsvOfertasNeo.addEventListener('click', function(e) {
+            if (e.target === modalCsvOfertasNeo) cerrarModalCsvOfertasNeo();
+        });
+    }
+
+    const formBuscarCsvOfertasNeo = document.getElementById('form-buscar-csv-ofertas-neo');
+    if (formBuscarCsvOfertasNeo) {
+        formBuscarCsvOfertasNeo.addEventListener('submit', function(e) {
+            e.preventDefault();
+            buscarCsvOfertasModalNeo(1, { pegarUrls: true });
+        });
+    }
+
+    const btnLimpiarCsvOfertasNeo = document.getElementById('modal-csv-ofertas-btn-limpiar');
+    if (btnLimpiarCsvOfertasNeo) {
+        btnLimpiarCsvOfertasNeo.addEventListener('click', function() {
+            const busqueda = document.getElementById('modal-csv-ofertas-busqueda');
+            const codigo = document.getElementById('modal-csv-ofertas-busqueda-codigo');
+            const tienda = document.getElementById('modal-csv-ofertas-tienda-id');
+            const stock = document.getElementById('modal-csv-ofertas-stock');
+            if (busqueda) busqueda.value = '';
+            if (codigo) codigo.value = '';
+            if (tienda) tienda.value = '';
+            if (stock) stock.value = '';
+            const estado = document.getElementById('modal-csv-ofertas-estado');
+            const totalEl = document.getElementById('modal-csv-ofertas-total');
+            if (estado) estado.textContent = '';
+            if (totalEl) totalEl.textContent = '';
+            renderTablaModalCsvOfertasNeo([]);
+            renderPaginacionModalCsvOfertasNeo(null);
+            btnLimpiarCsvOfertasNeo.classList.add('hidden');
+        });
+    }
+
+    ['modal-csv-ofertas-busqueda', 'modal-csv-ofertas-busqueda-codigo', 'modal-csv-ofertas-tienda-id', 'modal-csv-ofertas-stock'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('input', actualizarBotonLimpiarModalCsvOfertasNeo);
+        el.addEventListener('change', actualizarBotonLimpiarModalCsvOfertasNeo);
+    });
+
+    const perPageCsvOfertasNeo = document.getElementById('modal-csv-ofertas-per-page');
+    if (perPageCsvOfertasNeo) {
+        perPageCsvOfertasNeo.addEventListener('change', function() {
+            if (hayFiltrosActivosModalCsvOfertasNeo()) {
+                buscarCsvOfertasModalNeo(1, { pegarUrls: false });
+            }
+        });
+    }
+
+    ['modal-codigos-csv-crear-masivo-cerrar', 'modal-codigos-csv-crear-masivo-cerrar-btn'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('click', cerrarModalCodigosCsvCrearMasivo);
+    });
+
+    const modalCodigosCsvCrearMasivo = document.getElementById('modal-codigos-csv-crear-masivo');
+    if (modalCodigosCsvCrearMasivo) {
+        modalCodigosCsvCrearMasivo.addEventListener('click', function(e) {
+            if (e.target === modalCodigosCsvCrearMasivo) cerrarModalCodigosCsvCrearMasivo();
+        });
+    }
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key !== 'Escape') return;
+        if (modalCodigosCsvCrearMasivo && !modalCodigosCsvCrearMasivo.classList.contains('hidden')) {
+            cerrarModalCodigosCsvCrearMasivo();
+            return;
+        }
+        if (modalCsvOfertasNeo && !modalCsvOfertasNeo.classList.contains('hidden')) {
+            cerrarModalCsvOfertasNeo();
+        }
+    });
+
     ['modal-tienda-neo-chk-mostrar-si', 'modal-tienda-neo-chk-mostrar-no', 'modal-tienda-neo-chk-tienda-null'].forEach(function(id) {
         const el = document.getElementById(id);
         if (!el) return;
@@ -3487,6 +3945,9 @@
         }
     });
     document.getElementById('urls').addEventListener('input', actualizarEstadoLotesDesdeTextarea);
+    document.getElementById('urls').addEventListener('paste', function() {
+        setTimeout(actualizarEstadoLotesDesdeTextarea, 0);
+    });
     document.getElementById('btnRepetirMismoLote').addEventListener('click', function() {
         ejecutarAnalisisLote(true);
     });
@@ -3558,6 +4019,34 @@
             }).join('') + '</div>';
     }
 
+    function htmlAvisoNeoAniadidaSiCrearMasivo(data) {
+        if (!data || !data.neo_marcada_aniadida_si) return '';
+        const n = parseInt(data.neo_filas_actualizadas, 10);
+        const textoFilas = (!Number.isNaN(n) && n > 1) ? (n + ' filas neo') : '1 fila neo';
+        return '<div class="neo-aniadida-si-aviso mt-1.5 text-sm text-green-700 dark:text-green-300">' +
+            '<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded border border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/30 font-medium">' +
+            '<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>' +
+            'Neo marcada como <strong>añadida=sí</strong> (' + escapeHtmlCrearMasivo(textoFilas) + ')' +
+            '</span></div>';
+    }
+
+    function actualizarAvisoNeoAniadidaSiEnFilaCrearMasivo(fila, data) {
+        if (!fila) return;
+        const previo = fila.querySelector('.neo-aniadida-si-aviso');
+        if (previo) previo.remove();
+        const html = htmlAvisoNeoAniadidaSiCrearMasivo(data);
+        if (!html) return;
+        const descartarWrap = fila.querySelector('.descartar-toggle-wrap')?.closest('.mt-1');
+        if (descartarWrap) {
+            descartarWrap.insertAdjacentHTML('afterend', html);
+            return;
+        }
+        const bloqueFlex = fila.querySelector('.flex-1');
+        if (bloqueFlex) {
+            bloqueFlex.insertAdjacentHTML('beforeend', html);
+        }
+    }
+
     function marcarFilaUrlExistenteCrearMasivo(fila, dataVerificacion) {
         if (!fila) return;
         if (!fila.__rowData) fila.__rowData = {};
@@ -3566,6 +4055,10 @@
         fila.__rowData.descartada = tipo === 'descartada' || !!(dataVerificacion && dataVerificacion.descartada);
         fila.__rowData.existe_otros_productos = tipo === 'otros_productos' || !!(dataVerificacion && dataVerificacion.existe_otros_productos);
         fila.__rowData.ofertas_existentes = (dataVerificacion && dataVerificacion.ofertas_existentes) || [];
+        if (dataVerificacion && dataVerificacion.neo_marcada_aniadida_si) {
+            fila.__rowData.neo_marcada_aniadida_si = true;
+            fila.__rowData.neo_filas_actualizadas = dataVerificacion.neo_filas_actualizadas || 1;
+        }
 
         fila.classList.remove('bg-green-50', 'dark:bg-green-900/20', 'border-green-200', 'dark:border-green-700');
         fila.classList.add('bg-amber-50', 'dark:bg-amber-900/20', 'border', 'border-amber-200', 'dark:border-amber-700');
@@ -3598,6 +4091,8 @@
             if (extraHtml) container.insertAdjacentHTML('beforeend', extraHtml);
         }
 
+        actualizarAvisoNeoAniadidaSiEnFilaCrearMasivo(fila, fila.__rowData);
+
         const msgEl = fila.querySelector('.generado-msg');
         if (msgEl) {
             msgEl.classList.remove('hidden');
@@ -3608,36 +4103,118 @@
         actualizarEstadoBotonGenerar(fila);
     }
 
-    /** Misma verificación que el formulario de ofertas (admin.ofertas.verificar.url). */
-    async function verificarUrlExistenteRemotoCrearMasivo(url, productoId) {
-        if (!url) return { success: false };
+    /** Clave de comparación de URLs (misma lógica que el backend: sin barra final). */
+    function claveUrlComparacionCrearMasivo(url) {
+        return String(url || '').trim().replace(/\/$/, '');
+    }
+
+    /** Limpieza de URL vía LimpiarUrlDeTiendas (mismo servicio que formulario de ofertas). */
+    async function limpiarUrlViaApiCrearMasivo(url) {
+        if (!url || !String(url).trim()) {
+            return { url_limpia: url || '', es_pccomponentes_precio_cero: false };
+        }
         try {
-            const res = await fetch('{{ route("admin.ofertas.verificar.url") }}', {
+            const res = await fetch('{{ route("admin.ofertas.limpiar.url") }}', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
                     'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
                 },
-                body: JSON.stringify({
-                    url: url,
-                    producto_id: productoId || null,
-                }),
+                body: JSON.stringify({ url: String(url).trim() }),
             });
+            if (!res.ok) return { url_limpia: String(url).trim(), es_pccomponentes_precio_cero: false };
             const data = await res.json();
-            const bloquea = ['mismo_producto', 'otros_productos', 'descartada'].includes(data.tipo);
             return {
-                success: true,
-                existe: bloquea,
-                tipo: data.tipo,
-                mensaje: data.mensaje,
-                descartada: data.tipo === 'descartada',
-                existe_otros_productos: data.tipo === 'otros_productos',
-                productos: data.productos || [],
+                url_limpia: data.url_limpia || String(url).trim(),
+                es_pccomponentes_precio_cero: !!data.es_pccomponentes_precio_cero,
             };
         } catch (e) {
-            console.error('[Crear-masivo] Error verificando URL:', e);
-            return { success: false };
+            return { url_limpia: String(url).trim(), es_pccomponentes_precio_cero: false };
+        }
+    }
+
+    /** Compara una URL (tras limpiar.url) con una lista de ofertas ya cargadas en el modal. */
+    async function compararUrlConOfertasListaCrearMasivo(url, ofertas) {
+        const { url_limpia } = await limpiarUrlViaApiCrearMasivo(url);
+        const urlFinal = url_limpia || url;
+        const claveNueva = claveUrlComparacionCrearMasivo(urlFinal);
+        const lista = Array.isArray(ofertas) ? ofertas : [];
+        const cacheLimpieza = new Map();
+        async function urlLimpiaCached(u) {
+            const raw = String(u || '').trim();
+            if (!raw) return '';
+            if (cacheLimpieza.has(raw)) return cacheLimpieza.get(raw);
+            const { url_limpia: limpia } = await limpiarUrlViaApiCrearMasivo(raw);
+            const final = limpia || raw;
+            cacheLimpieza.set(raw, final);
+            return final;
+        }
+        for (let i = 0; i < lista.length; i++) {
+            const o = lista[i];
+            if (!o || !o.url) continue;
+            const claveExistente = claveUrlComparacionCrearMasivo(await urlLimpiaCached(o.url));
+            if (claveExistente && claveExistente === claveNueva) {
+                return {
+                    duplicada: true,
+                    mensaje: 'Esta URL ya existe en ofertas.',
+                    oferta_edit_url: o.oferta_edit_url,
+                    url_normalizada: urlFinal,
+                };
+            }
+        }
+        return { duplicada: false, url_normalizada: urlFinal };
+    }
+
+    function quitarAvisoUrlDuplicadaOfertasCrearMasivo(div) {
+        if (!div) return;
+        const el = div.querySelector('.url-duplicada-ofertas-cargadas');
+        if (el) el.remove();
+    }
+
+    function mostrarAvisoUrlDuplicadaOfertasCrearMasivo(div, mensaje) {
+        quitarAvisoUrlDuplicadaOfertasCrearMasivo(div);
+        const container = div.querySelector('.spec-and-ofertas-container');
+        if (!container) return;
+        container.insertAdjacentHTML('beforeend',
+            '<div class="mt-2 url-duplicada-ofertas-cargadas text-sm font-medium text-red-600 dark:text-red-400">' +
+            escapeHtmlCrearMasivo(mensaje || 'Esta URL ya existe en ofertas.') +
+            '</div>');
+    }
+
+    function limpiarEstadoOfertasCargadasFilaCrearMasivo(div) {
+        if (!div) return;
+        if (div.__rowData) {
+            delete div.__rowData.ofertas_producto_tienda;
+            div.__rowData.url_duplicada_ofertas_visible = false;
+            div.__rowData.url_normalizada_limpia = null;
+        }
+        const container = div.querySelector('.spec-and-ofertas-container');
+        if (container) {
+            const old = container.querySelector('.ofertas-mismas-especs');
+            if (old) old.remove();
+        }
+        quitarAvisoUrlDuplicadaOfertasCrearMasivo(div);
+    }
+
+    /** Tras cargar ofertas visibles en el modal: guarda URL limpia y avisa si hay duplicado global. */
+    async function aplicarComprobacionUrlDuplicadaOfertasCargadasCrearMasivo(div) {
+        if (!div) return;
+        if (!div.__rowData) div.__rowData = {};
+        const urlNueva = div.__rowData.url_normalizada || div.__rowData.url ||
+            (div.querySelector('.btn-generar') && div.querySelector('.btn-generar').dataset.url) || '';
+        const ofertasGlobales = Array.isArray(div.__rowData.ofertas_existentes) ? div.__rowData.ofertas_existentes : [];
+        const ofertasContexto = Array.isArray(div.__rowData.ofertas_producto_tienda) ? div.__rowData.ofertas_producto_tienda : [];
+        div.__rowData.url_duplicada_ofertas_visible = false;
+        quitarAvisoUrlDuplicadaOfertasCrearMasivo(div);
+        let check = await compararUrlConOfertasListaCrearMasivo(urlNueva, ofertasGlobales);
+        if (!check.duplicada && ofertasContexto.length) {
+            check = await compararUrlConOfertasListaCrearMasivo(urlNueva, ofertasContexto);
+        }
+        div.__rowData.url_normalizada_limpia = check.url_normalizada || urlNueva;
+        if (check.duplicada) {
+            div.__rowData.url_duplicada_ofertas_visible = true;
+            mostrarAvisoUrlDuplicadaOfertasCrearMasivo(div, check.mensaje);
         }
     }
 
@@ -4000,6 +4577,160 @@
             '</label>';
     }
 
+    function permitirTextoCantidadAlternativoDesdeFuentesCrearMasivo(fuentes) {
+        const f = fuentes || {};
+        if (f.permitir_texto_cantidad_alternativo === 'si') return true;
+        if (f.producto && f.producto.permitir_texto_cantidad_alternativo === 'si') return true;
+        if (f.especificaciones && f.especificaciones.permitir_texto_cantidad_alternativo === 'si') return true;
+        return false;
+    }
+
+    const URL_PRODUCTO_OBTENER_CREAR_MASIVO = '{{ route('admin.productos.obtener', ['producto' => '__PID__']) }}';
+
+    async function resolverPermitirTextoCantidadAlternativoCrearMasivo(productoId, valorPreferido) {
+        if (valorPreferido === 'si') return 'si';
+        if (!productoId) return 'no';
+        try {
+            const url = URL_PRODUCTO_OBTENER_CREAR_MASIVO.replace('__PID__', String(productoId));
+            const res = await fetch(url, { headers: { Accept: 'application/json' } });
+            if (!res.ok) return valorPreferido === 'si' ? 'si' : 'no';
+            const data = await res.json();
+            return data.permitir_texto_cantidad_alternativo === 'si' ? 'si' : 'no';
+        } catch (e) {
+            return valorPreferido === 'si' ? 'si' : 'no';
+        }
+    }
+
+    function htmlCampoTextoCantidadAlternativoCrearMasivo() {
+        return '<div class="cm-texto-cantidad-alt-wrap mt-3 mb-2 w-full">' +
+            '<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Texto cantidad alternativo <span class="text-red-500">*</span></label>' +
+            '<div class="cm-texto-cantidad-alt-botones flex flex-wrap gap-1.5 mb-1.5 min-h-0" aria-live="polite"></div>' +
+            '<textarea class="cm-texto-cantidad-alt-input w-full h-[2.375rem] min-h-0 px-3 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm resize-none leading-normal overflow-hidden" rows="1" maxlength="255" autocomplete="off" placeholder="Ej: 6 botellines"></textarea>' +
+            '</div>';
+    }
+
+    const URL_TEXTOS_CANTIDAD_ALT_CREAR_MASIVO = '{{ route('admin.ofertas.textos-cantidad-alternativo', ['productoId' => '__PID__']) }}';
+
+    function tokensTextoCantidadAltCrearMasivo(valor) {
+        return String(valor || '').trim().split(/\s+/).filter(Boolean);
+    }
+
+    function posicionarTextoCantidadAltEnContainerCrearMasivo(container, wrap) {
+        if (!container || !wrap) return;
+        const specSelector = container.querySelector('.spec-selector-container');
+        if (specSelector) {
+            if (wrap.parentElement !== container || wrap.nextElementSibling !== specSelector) {
+                container.insertBefore(wrap, specSelector);
+            }
+            return;
+        }
+        if (wrap.parentElement !== container || container.firstElementChild !== wrap) {
+            container.insertBefore(wrap, container.firstElementChild || null);
+        }
+    }
+
+    function marcarBotonTextoCantidadAltCrearMasivo(btn, activo) {
+        if (!btn) return;
+        const clasesActivo = [
+            'ring-2',
+            'ring-green-500',
+            'border-green-500',
+            'bg-green-100',
+            'dark:bg-green-900',
+            'dark:border-green-400',
+            'font-semibold',
+            'text-green-800',
+            'dark:text-green-200',
+        ];
+        if (activo) {
+            btn.classList.add(...clasesActivo);
+            btn.setAttribute('aria-pressed', 'true');
+        } else {
+            btn.classList.remove(...clasesActivo);
+            btn.setAttribute('aria-pressed', 'false');
+        }
+    }
+
+    function sincronizarBotonesTextoCantidadAltEnFila(div) {
+        if (!div) return;
+        const wrap = div.querySelector('.cm-texto-cantidad-alt-wrap');
+        const input = div.querySelector('.cm-texto-cantidad-alt-input');
+        if (!wrap || !input) return;
+        const tokens = tokensTextoCantidadAltCrearMasivo(input.value).map(function(t) { return t.toLowerCase(); });
+        wrap.querySelectorAll('.cm-texto-cantidad-alt-btn').forEach(function(btn) {
+            const palabra = String(btn.dataset.palabra || btn.textContent || '').trim().toLowerCase();
+            marcarBotonTextoCantidadAltCrearMasivo(btn, palabra !== '' && tokens.includes(palabra));
+        });
+    }
+
+    async function cargarBotonesTextoCantidadAlternativoCrearMasivo(div, productoId) {
+        const wrap = div && div.querySelector('.cm-texto-cantidad-alt-wrap');
+        const botonesWrap = wrap && wrap.querySelector('.cm-texto-cantidad-alt-botones');
+        if (!botonesWrap || !productoId) {
+            if (botonesWrap) botonesWrap.innerHTML = '';
+            return;
+        }
+
+        botonesWrap.innerHTML = '<span class="text-xs text-gray-400 dark:text-gray-500">Cargando…</span>';
+
+        try {
+            const url = URL_TEXTOS_CANTIDAD_ALT_CREAR_MASIVO.replace('__PID__', String(productoId));
+            const response = await fetch(url, { headers: { Accept: 'application/json' } });
+            const data = await response.json();
+            const palabras = Array.isArray(data.palabras) ? data.palabras : [];
+
+            if (!palabras.length) {
+                botonesWrap.innerHTML = '';
+                return;
+            }
+
+            botonesWrap.innerHTML = palabras.map(function(palabra) {
+                const segura = String(palabra)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/"/g, '&quot;');
+                return '<button type="button" class="cm-texto-cantidad-alt-btn text-xs px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-blue-100 dark:hover:bg-blue-900 hover:border-blue-400 dark:hover:border-blue-500 transition-colors" data-palabra="' + segura + '" aria-pressed="false" title="Añadir o quitar «' + segura + '»">' + segura + '</button>';
+            }).join('');
+
+            sincronizarBotonesTextoCantidadAltEnFila(div);
+        } catch (e) {
+            botonesWrap.innerHTML = '';
+        }
+    }
+
+    function togglePalabraTextoCantidadAltCrearMasivo(btn, input) {
+        if (!btn || !input) return;
+        const palabra = String(btn.dataset.palabra || btn.textContent || '').trim();
+        if (!palabra) return;
+
+        let tokens = tokensTextoCantidadAltCrearMasivo(input.value);
+        const indice = tokens.findIndex(function(t) { return t.toLowerCase() === palabra.toLowerCase(); });
+        if (indice >= 0) {
+            tokens.splice(indice, 1);
+        } else {
+            tokens.push(palabra);
+        }
+        input.value = tokens.join(' ');
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    if (!window.__cmTextoCantidadAltClickInit) {
+        window.__cmTextoCantidadAltClickInit = true;
+        document.addEventListener('click', function(e) {
+            const btn = e.target.closest('.cm-texto-cantidad-alt-btn');
+            if (!btn) return;
+            const filaWrap = btn.closest('.cm-texto-cantidad-alt-wrap');
+            const div = btn.closest('.crear-masivo-fila');
+            const input = filaWrap ? filaWrap.querySelector('.cm-texto-cantidad-alt-input') : null;
+            if (!input) return;
+            togglePalabraTextoCantidadAltCrearMasivo(btn, input);
+            if (div) {
+                sincronizarBotonesTextoCantidadAltEnFila(div);
+                actualizarEstadoBotonGenerar(div);
+            }
+        });
+    }
+
     function htmlBloqueGenerarOfertaWrapCrearMasivo(opts) {
         const url = opts.url || '';
         const productoId = opts.productoId || '';
@@ -4051,6 +4782,60 @@
         return parsearUnidadesTextoCrearMasivo(inp.value) !== null;
     }
 
+    function textoCantidadAlternativoValidoEnFila(div) {
+        if (!permitirTextoCantidadAlternativoDesdeFuentesCrearMasivo(div.__rowData || {})) return true;
+        const inp = div.querySelector('.cm-texto-cantidad-alt-input');
+        return !!(inp && String(inp.value || '').trim());
+    }
+
+    function enlazarInputTextoCantidadAlternativoEnFila(div) {
+        const inp = div.querySelector('.cm-texto-cantidad-alt-input');
+        if (!inp || inp.__cmTextoAltBound) return;
+        inp.__cmTextoAltBound = true;
+        inp.addEventListener('input', function() {
+            sincronizarBotonesTextoCantidadAltEnFila(div);
+            actualizarEstadoBotonGenerar(div);
+        });
+    }
+
+    function actualizarCampoTextoCantidadAlternativoEnFila(div) {
+        if (!div) return;
+        const container = div.querySelector('.spec-and-ofertas-container');
+        if (!container) return;
+
+        const permite = permitirTextoCantidadAlternativoDesdeFuentesCrearMasivo(div.__rowData || {});
+        let wrap = div.querySelector('.cm-texto-cantidad-alt-wrap');
+        const valorPrevio = wrap ? String(wrap.querySelector('.cm-texto-cantidad-alt-input')?.value || '') : '';
+
+        const wrapEnGenerar = div.querySelector('.generar-oferta-wrap .cm-texto-cantidad-alt-wrap');
+        if (wrapEnGenerar) wrapEnGenerar.remove();
+
+        if (!permite) {
+            if (wrap) wrap.remove();
+            return;
+        }
+
+        if (!wrap) {
+            container.insertAdjacentHTML('afterbegin', htmlCampoTextoCantidadAlternativoCrearMasivo());
+            wrap = div.querySelector('.cm-texto-cantidad-alt-wrap');
+            enlazarInputTextoCantidadAlternativoEnFila(div);
+        } else {
+            posicionarTextoCantidadAltEnContainerCrearMasivo(container, wrap);
+        }
+
+        const input = wrap && wrap.querySelector('.cm-texto-cantidad-alt-input');
+        if (input && valorPrevio && !String(input.value || '').trim()) {
+            input.value = valorPrevio;
+        }
+
+        const productoId = div.__rowData && div.__rowData.producto && div.__rowData.producto.id;
+        if (productoId) {
+            cargarBotonesTextoCantidadAlternativoCrearMasivo(div, productoId);
+        }
+        sincronizarBotonesTextoCantidadAltEnFila(div);
+        actualizarEstadoBotonGenerar(div);
+    }
+
     function enlazarInputUnidadesOfertaEnFila(div) {
         const ta = div.querySelector('.cm-unidades-oferta-input');
         if (!ta || ta.__cmUnidadesBound) return;
@@ -4081,6 +4866,7 @@
         let unidadesWrap = fila.querySelector('.cm-unidades-oferta-wrap');
         if (esUnica) {
             if (unidadesWrap) unidadesWrap.remove();
+            actualizarCampoTextoCantidadAlternativoEnFila(div);
             actualizarEstadoBotonGenerar(div);
             return;
         }
@@ -4093,18 +4879,84 @@
             if (lbl) lbl.textContent = etiquetaUnidadMedidaCrearMasivo(unidadMedida) + ' *';
         }
         asegurarOpcionesStockGenerarEnFilaCrearMasivo(div);
+        actualizarCampoTextoCantidadAlternativoEnFila(div);
         actualizarEstadoBotonGenerar(div);
     }
 
     function esErrorPrecioCrearOfertaCrearMasivo(errTxt) {
         const t = String(errTxt || '').toLowerCase();
-        return t.includes('precio') || t.includes('price') || t.includes('no disponible') || t.includes('not available') || t.includes('unavailable') || t.includes('sin stock') || t.includes('agotado') || t.includes('out of stock') || t.includes('no se pudo obtener') || t.includes('could not get');
+        return t.includes('precio') || t.includes('price') || t.includes('no disponible') || t.includes('not available') || t.includes('unavailable') || t.includes('sin stock') || t.includes('agotado') || t.includes('out of stock') || t.includes('no se pudo obtener') || t.includes('could not get') || t.includes('csv-awin') || t.includes('csv awin') || t.includes('aliexpress') || t.includes('api access') || t.includes('frequency') || t.includes('scraping') || t.includes('_open:') || t.includes('fallo al llamar') || t.includes('respuesta inválida');
+    }
+
+    function debeReintentarSinPrecioCrearOfertaCrearMasivo(data, body) {
+        if (body && (body.generar_sin_precio || body.generar_segunda_mano)) return false;
+        if (data && data.codigo === 'url_ya_existe') return false;
+        const err = String((data && data.error) || '').toLowerCase();
+        if (err.includes('unidades')) return false;
+        if (err.includes('texto cantidad') || err.includes('texto_cantidad')) return false;
+        if (err.includes('descartada')) return false;
+        if (err.includes('ya existe en ofertas')) return false;
+        return true;
+    }
+
+    async function reintentarCrearOfertaSinPrecioCrearMasivo(body) {
+        const bodyRetry = Object.assign({}, body, { generar_sin_precio: true });
+        const res3 = await fetch('{{ route("admin.ofertas.crear-masivo.crear") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content, 'Accept': 'application/json' },
+            body: JSON.stringify(bodyRetry),
+        });
+        const res3Text = await res3.text();
+        let data3;
+        try { data3 = JSON.parse(res3Text); } catch (e) { data3 = {}; }
+        if (!data3.success || res3.status >= 400) {
+            logCrearOfertaBulkDiagnostico('[CrearOfertaBulk] reintento sin precio', res3, res3Text, data3);
+        }
+        if (data3.success) {
+            return { success: true, data: data3, esPrecioCero: true };
+        }
+        return { success: false, error: data3.error || 'Error al crear con precio 0' };
     }
 
     function textoEnvioPrecioResumenOfertaCrearMasivo(data) {
         const envioVal = (data && data.envio != null && data.envio !== '') ? parseFloat(data.envio).toFixed(2).replace('.', ',') + ' € env.' : 'gratis';
         const precioVal = (data && data.precio_unidad != null) ? parseFloat(data.precio_unidad).toFixed(2).replace('.', ',') + ' €/ud' : '';
         return { envioVal: envioVal, precioVal: precioVal };
+    }
+
+    function formatearNumeroUnidadesCrearMasivo(unidades, unidadMedida) {
+        const n = parseFloat(unidades);
+        if (!Number.isFinite(n)) return '';
+        const um = String(unidadMedida || 'unidad').toLowerCase();
+        if (um === 'unidad' || um === 'unidades' || um === 'total') {
+            return String(Math.trunc(n));
+        }
+        if (um === 'kilos' || um === 'litros') {
+            let s = n.toFixed(3).replace('.', ',');
+            s = s.replace(/0+$/, '').replace(/,$/, '');
+            return s;
+        }
+        return n.toFixed(2).replace('.', ',');
+    }
+
+    function textoUnidadesOfertaExistenteCrearMasivo(oferta, unidadMedida) {
+        if (!oferta || oferta.unidades == null) return '';
+        const num = formatearNumeroUnidadesCrearMasivo(oferta.unidades, unidadMedida);
+        if (!num) return '';
+        return num + ' ' + etiquetaUnidadMedidaCrearMasivo(unidadMedida || 'unidad').toLowerCase();
+    }
+
+    function textoInfoOfertaExistenteTiendaCrearMasivo(oferta, div) {
+        const envioTxt = oferta.envio != null ? (parseFloat(oferta.envio).toFixed(2).replace('.', ',') + ' € env.') : 'envío gratis';
+        const precioTxt = oferta.precio_unidad != null ? (parseFloat(oferta.precio_unidad).toFixed(2).replace('.', ',') + ' €/ud') : '';
+        const partes = [];
+        if (!esFilaUnidadUnicaCrearMasivo(div)) {
+            const unidadesTxt = textoUnidadesOfertaExistenteCrearMasivo(oferta, unidadDeMedidaDesdeFuentesCrearMasivo(div && div.__rowData));
+            if (unidadesTxt) partes.push(unidadesTxt);
+        }
+        if (precioTxt) partes.push(precioTxt);
+        partes.push(envioTxt);
+        return partes.join(' · ');
     }
 
     function infoResumenDesdeRespuestaOfertaCrearMasivo(url, data, esPrecioCero) {
@@ -4156,23 +5008,8 @@
                 tipo: 'mismo_producto',
             };
         }
-        if (esErrorPrecioCrearOfertaCrearMasivo(data.error)) {
-            const bodyRetry = Object.assign({}, body, { generar_sin_precio: true });
-            const res3 = await fetch('{{ route("admin.ofertas.crear-masivo.crear") }}', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content, 'Accept': 'application/json' },
-                body: JSON.stringify(bodyRetry),
-            });
-            const res3Text = await res3.text();
-            let data3;
-            try { data3 = JSON.parse(res3Text); } catch (e) { data3 = {}; }
-            if (!data3.success || res3.status >= 400) {
-                logCrearOfertaBulkDiagnostico('[CrearOfertaBulk] reintento sin precio', res3, res3Text, data3);
-            }
-            if (data3.success) {
-                return { success: true, data: data3, esPrecioCero: true };
-            }
-            return { success: false, error: data3.error || 'Error al crear con precio 0' };
+        if (debeReintentarSinPrecioCrearOfertaCrearMasivo(data, body)) {
+            return await reintentarCrearOfertaSinPrecioCrearMasivo(body);
         }
         return { success: false, error: (data && data.error) || 'Error al crear' };
     }
@@ -4180,14 +5017,15 @@
     async function prepararBodyGeneracionOfertaCrearMasivo(div, btnGen) {
         const msgEl = div.querySelector('.generado-msg');
         const urlGenerar = btnGen && btnGen.dataset.url;
-        const productoIdGenerar = btnGen && btnGen.dataset.productoId;
-        if (urlGenerar) {
-            const checkUrl = await verificarUrlExistenteRemotoCrearMasivo(urlGenerar, productoIdGenerar);
-            if (checkUrl.success && checkUrl.existe) {
-                marcarFilaUrlExistenteCrearMasivo(div, checkUrl);
-                return { ok: false };
+        if (div && div.__rowData && (div.__rowData.url_duplicada_ofertas_visible || div.__rowData.existe)) {
+            if (msgEl) {
+                msgEl.classList.remove('hidden');
+                msgEl.className = 'mt-2 generado-msg text-sm font-medium text-red-600 dark:text-red-400';
+                msgEl.textContent = 'Esta URL ya existe en ofertas.';
             }
+            return { ok: false };
         }
+        const urlNormalizadaGenerar = (div && div.__rowData && div.__rowData.url_normalizada_limpia) || urlGenerar;
         const specLines = div.querySelectorAll('.spec-line');
         if (specLines.length) {
             let gruposSinSeleccion = 0;
@@ -4204,51 +5042,8 @@
             }
         }
         const especs = buildEspecificacionesFromRow(div);
-        const confirmoNoEsMisma = div.querySelector('.confirmo-no-es-misma:checked');
-        const tieneBloqueOfertasDup = !!div.querySelector('.ofertas-mismas-especs');
-        if (!confirmoNoEsMisma && tieneBloqueOfertasDup && div.__rowData && div.__rowData.producto && div.__rowData.tienda) {
-            try {
-                const dupBody = { producto_id: div.__rowData.producto.id, tienda_id: div.__rowData.tienda.id };
-                if (especs) dupBody.especificaciones_internas = JSON.stringify(especs);
-                const dupRes = await fetch('{{ route("admin.ofertas.crear-masivo.buscar-mismas-especificaciones") }}', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                        'Accept': 'application/json',
-                    },
-                    body: JSON.stringify(dupBody),
-                });
-                const dupData = await dupRes.json().catch(function() { return {}; });
-                const container = div.querySelector('.spec-and-ofertas-container');
-                if (container) {
-                    const old = container.querySelector('.ofertas-mismas-especs');
-                    if (old) { old.remove(); quitarCheckboxNoEsMisma(div); }
-                    actualizarEstadoBotonGenerar(div);
-                }
-                if (container && dupData.success && Array.isArray(dupData.ofertas) && dupData.ofertas.length) {
-                    const html = '<div class="mt-3 ofertas-mismas-especs text-sm text-amber-700 dark:text-amber-300"><span class="font-medium">Ya existen ofertas con estas especificaciones en esta tienda:</span>' +
-                        dupData.ofertas.map(function(o) {
-                            const envioTxt = o.envio != null ? (parseFloat(o.envio).toFixed(2).replace('.', ',') + ' € env.') : 'envío gratis';
-                            const precioTxt = o.precio_unidad != null ? (parseFloat(o.precio_unidad).toFixed(2).replace('.', ',') + ' €/ud') : '';
-                            const info = (precioTxt ? precioTxt + ' · ' : '') + envioTxt;
-                            const ver = o.url ? ' <a href="' + o.url + '" target="_blank" class="inline-flex items-center px-2 py-0.5 bg-gray-600 hover:bg-gray-700 text-white text-xs font-medium rounded">Ver</a>' : '';
-                            const editar = o.oferta_edit_url ? ' <a href="' + o.oferta_edit_url + '" target="_blank" class="inline-flex items-center px-2 py-0.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded">Editar oferta</a>' : '';
-                            return '<div class="mt-1">' + info + ver + editar + '</div>';
-                        }).join('') + '</div>';
-                    container.insertAdjacentHTML('beforeend', html);
-                    agregarCheckboxNoEsMisma(div);
-                    actualizarEstadoBotonGenerar(div);
-                    if (btnGen) btnGen.innerHTML = HTML_BTN_GENERAR_OFERTA_CREAR_MASIVO;
-                    ponerMensajeGeneradoPendienteCrearMasivo(div);
-                    return { ok: false };
-                }
-            } catch (e) {
-                console.error('[CrearOfertaBulk] Error buscando duplicados:', e);
-            }
-        }
         const body = {
-            url: btnGen.dataset.url,
+            url: urlNormalizadaGenerar || btnGen.dataset.url,
             producto_id: btnGen.dataset.productoId,
             tienda_id: btnGen.dataset.tiendaId,
             especificaciones_internas: especs ? JSON.stringify(especs) : null,
@@ -4272,6 +5067,18 @@
                 return { ok: false };
             }
             body.unidades = unidades;
+        }
+        if (permitirTextoCantidadAlternativoDesdeFuentesCrearMasivo(div.__rowData || {})) {
+            const textoAlt = String(div.querySelector('.cm-texto-cantidad-alt-input')?.value || '').trim();
+            if (!textoAlt) {
+                if (msgEl) {
+                    msgEl.classList.remove('hidden');
+                    msgEl.className = 'mt-2 generado-msg text-sm font-medium text-red-600 dark:text-red-400';
+                    msgEl.textContent = 'Debes indicar el texto de cantidad alternativo (ej: 6 botellines).';
+                }
+                return { ok: false };
+            }
+            body.texto_cantidad_alternativo = textoAlt;
         }
         return { ok: true, body: body };
     }
@@ -4386,20 +5193,49 @@
             .split('/')
             .filter(Boolean);
         if (!segs.length) return [];
-        // VTEX / Appinformatica: …/slug-real/p — el último segmento es "p", no el slug.
-        let slug = segs[segs.length - 1];
-        const ultimo = slug;
-        if (segs.length >= 2 && /^(p|html?)$/i.test(ultimo)) {
-            slug = segs[segs.length - 2];
+        const partes = [];
+        const visto = new Set();
+        function pushParte(t) {
+            const s = String(t || '').trim();
+            if (!s) return;
+            const clave = s.toLowerCase();
+            if (visto.has(clave)) return;
+            visto.add(clave);
+            partes.push(s);
+        }
+        function partirSegmentoSlug(seg) {
+            if (!seg) return;
+            // Carrefour: R-fprod1460163 — no partir por guión
+            if (/^R-/i.test(seg)) {
+                pushParte(seg);
+                return;
+            }
+            seg.split('|').forEach(function(bloque) {
+                bloque.split('-').forEach(function(p) {
+                    pushParte(p);
+                });
+            });
+        }
+        const n = segs.length;
+        const ultimo = segs[n - 1];
+        // Carrefour sin /p: …/slug-descriptivo/R-fprod123
+        if (/^R-/i.test(ultimo)) {
+            if (n >= 2) partirSegmentoSlug(segs[n - 2]);
+            pushParte(ultimo);
+            return partes;
+        }
+        // VTEX / Appinformatica / Carrefour con /p: …/slug-real/p o …/slug/R-fprod123/p
+        let slug = ultimo;
+        if (n >= 2 && /^(p|html?)$/i.test(ultimo)) {
+            slug = segs[n - 2];
+            if (/^R-/i.test(slug)) {
+                if (n >= 3) partirSegmentoSlug(segs[n - 3]);
+                pushParte(slug);
+                return partes;
+            }
         }
         if (!slug) return [];
-        const partes = [];
-        slug.split('|').forEach(function(bloque) {
-            bloque.split('-').forEach(function(p) {
-                const t = String(p || '').trim();
-                if (t) partes.push(t);
-            });
-        });
+        partirSegmentoSlug(slug);
         return partes;
     }
 
@@ -5344,16 +6180,27 @@
         flujo.filaActualEnModal = fila;
         contenido.appendChild(fila);
         actualizarCampoUnidadesOfertaEnFila(fila);
+        actualizarCampoTextoCantidadAlternativoEnFila(fila);
         asegurarOpcionesStockGenerarEnFilaCrearMasivo(fila);
-        if (fila.querySelector('.ofertas-mismas-especs') && !fila.querySelector('.confirmo-no-es-misma-wrap')) {
-            agregarCheckboxNoEsMisma(fila);
-        } else {
-            enlazarCheckboxNoEsMismaEnFilaCrearMasivo(fila);
-        }
         actualizarEstadoBotonGenerar(fila);
         adjuntarListenerGenerarOfertaCrearMasivo(fila);
         enlazarBotonesVerImagenesSpecCrearMasivo(fila);
         renderUrlResaltadaFilaCrearMasivo(fila);
+
+        if (fila.__rowData && fila.__rowData.producto && fila.__rowData.tienda && !fila.__rowData.ofertaGenerada) {
+            const tieneEspecsModal = fila.__rowData.tiene_especificaciones;
+            const specLinesModal = fila.querySelectorAll('.spec-line');
+            let puedeCargarOfertasModal = !tieneEspecsModal || specLinesModal.length === 0;
+            if (!puedeCargarOfertasModal) {
+                puedeCargarOfertasModal = true;
+                specLinesModal.forEach(function(line) {
+                    if (!line.querySelector('.spec-checkbox:checked')) puedeCargarOfertasModal = false;
+                });
+            }
+            if (puedeCargarOfertasModal) {
+                setTimeout(function() { buscarOfertasMismasEspecsYMostrar(fila); }, 100);
+            }
+        }
 
         inicializarBannerParaModalActualCrearMasivo(flujo);
         renderPrevGuardadoModalCrearMasivo(flujo);
@@ -5645,9 +6492,10 @@
             const tiendaNoMostrar = String((r.tienda && r.tienda.mostrar_tienda) || '').toLowerCase() === 'no';
             const tiendaNoScraping = String((r.tienda && r.tienda.scrapear) || '').toLowerCase() === 'no';
             const permitirOpcionesStock = permitirOpcionesStockGenerarCrearMasivo(r.tienda);
-            const neoIdTagHtml = (puedeCrear && r.neo_id)
+            const neoIdTagHtml = (r.neo_id)
                 ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-xs font-medium">Neo ID: ' + r.neo_id + '</span>'
                 : '';
+            const neoAniadidaSiHtml = htmlAvisoNeoAniadidaSiCrearMasivo(r);
             const htmlGenerarOfertaWrap = puedeCrear ? htmlBloqueGenerarOfertaWrapCrearMasivo({
                 url: r.url_normalizada || r.url,
                 productoId: r.producto.id,
@@ -5668,6 +6516,7 @@
                         <div class="mt-1">
                             ${descartarToggleHtml}
                         </div>
+                        ${neoAniadidaSiHtml}
                         ${r.contenido_pagina_extraido ? '<div class="mt-1.5 text-xs text-gray-500 dark:text-gray-400 border-l-2 border-gray-300 dark:border-gray-600 pl-2 space-y-0.5">' + String(r.contenido_pagina_extraido).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>') + '</div>' : ''}
                         ${r.tienda ? '<div class="mt-1 text-sm text-gray-600 dark:text-gray-400">Tienda: <strong>' + r.tienda.nombre + '</strong>' + (tiendaFlagsHtml ? '<span class="ml-2 inline-flex items-center gap-1">' + tiendaFlagsHtml + '</span>' : '') + '</div>' : ''}
                         ${r.producto ? htmlBloqueProductoDisplayFilaCrearMasivo(r.producto) : ''}
@@ -5713,6 +6562,7 @@
             renderUrlResaltadaFilaCrearMasivo(div);
             if (puedeCrear) {
                 enlazarInputUnidadesOfertaEnFila(div);
+                actualizarCampoTextoCantidadAlternativoEnFila(div);
                 asegurarOpcionesStockGenerarEnFilaCrearMasivo(div);
                 actualizarEstadoBotonGenerar(div);
             }
@@ -5768,10 +6618,6 @@
                         const otro = div.querySelector('.generar-sin-precio-cb');
                         if (otro) otro.checked = false;
                     }
-                    actualizarEstadoBotonGenerar(div);
-                    return;
-                }
-                if (e.target.classList.contains('confirmo-no-es-misma') || (e.target.closest && e.target.closest('.confirmo-no-es-misma'))) {
                     actualizarEstadoBotonGenerar(div);
                     return;
                 }
@@ -5979,19 +6825,72 @@
         cont.style.zIndex = '';
     }
 
+    function normalizarItemBusquedaWebCrearMasivo(item) {
+        if (!item || item.tipo === 'categoria') return null;
+        const nombre = item.nombre || '';
+        const marca = item.marca || '';
+        const modelo = item.modelo || '';
+        const talla = item.talla || '';
+        const textoCompleto = [nombre, marca, modelo, talla].filter(function(p) { return p && String(p).trim(); }).join(' - ');
+        return {
+            id: item.id,
+            nombre: nombre,
+            marca: marca,
+            modelo: modelo,
+            talla: talla,
+            texto_completo: textoCompleto,
+            variante: item.variante || null,
+            imagen_pequena: item.imagen_pequena || null,
+            precio: item.precio || null,
+            unidadDeMedida: item.unidadDeMedida || null,
+            url: item.url || null,
+        };
+    }
+
+    function htmlUnidadMedidaSugerenciaCrearMasivo(unidadMedida) {
+        const map = {
+            unidad: '<span class="text-xs text-gray-500 dark:text-gray-400">/Und.</span>',
+            kilos: '<span class="text-xs text-gray-500 dark:text-gray-400">/Kg.</span>',
+            litros: '<span class="text-xs text-gray-500 dark:text-gray-400">/L.</span>',
+            unidadMilesima: '<span class="text-xs text-gray-500 dark:text-gray-400">/Und.</span>',
+            '800gramos': '<span class="text-xs text-gray-500 dark:text-gray-400">/800gr.</span>',
+            '100ml': '<span class="text-xs text-gray-500 dark:text-gray-400">/100ml.</span>',
+        };
+        return map[unidadMedida] || '';
+    }
+
+    function htmlPrecioSugerenciaCrearMasivo(precio, unidadMedida) {
+        const uh = htmlUnidadMedidaSugerenciaCrearMasivo(unidadMedida);
+        const precioStr = String(precio || '0');
+        const precioNum = parseFloat(precioStr.replace(/\./g, '').replace(',', '.'));
+        if (precioNum > 0) {
+            return '<p class="text-sm font-bold text-green-600 dark:text-green-400">' + escapeHtmlCrearMasivo(precioStr) + '€' + uh + '</p>';
+        }
+        return '<p class="text-xs font-semibold text-gray-500 dark:text-gray-400">Sin Ofertas Disponibles</p>';
+    }
+
+    function htmlSugerenciaProductoWebCrearMasivo(p, seleccionado) {
+        const nombre = escapeHtmlCrearMasivo(p.nombre || p.texto_completo || '');
+        const imagen = escapeHtmlCrearMasivo(p.imagen_pequena || 'placeholder.jpg');
+        const clases = 'producto-sugerencia-item-crear-masivo px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-600 last:border-b-0' + (seleccionado ? ' bg-blue-100 dark:bg-blue-700' : '');
+        return '<div class="' + clases + '">' +
+            '<div class="flex items-center gap-3">' +
+            '<img src="/images/' + imagen + '" alt="' + nombre + '" class="w-12 h-12 object-cover rounded shrink-0">' +
+            '<div class="flex-1 min-w-0">' +
+            '<p class="text-sm font-medium truncate">' + nombre + '</p>' +
+            htmlPrecioSugerenciaCrearMasivo(p.precio, p.unidadDeMedida) +
+            '</div></div></div>';
+    }
+
     async function buscarProductosCrearMasivo(div, query) {
         try {
-            const row = div.__rowData || {};
-            let urlBus = `{{ route('admin.ofertas.buscar.productos') }}?q=${encodeURIComponent(query)}`;
-            if (productoBusquedaAplicaFiltroCategoriaCrearMasivo(div)) {
-                const catIdFiltro = obtenerCategoriaIdFiltroBusquedaProductoCrearMasivo(row);
-                if (catIdFiltro) {
-                    urlBus += '&categoria_id=' + encodeURIComponent(String(catIdFiltro));
-                }
-            }
-            const res = await fetch(urlBus);
-            const productos = await res.json();
-            div.__productosBusqueda = Array.isArray(productos) ? productos : [];
+            const res = await fetch(API_BUSCAR_PRODUCTOS_URL + '?q=' + encodeURIComponent(query));
+            const data = await res.json();
+            const items = Array.isArray(data) ? data : [];
+            div.__productosBusqueda = items
+                .map(normalizarItemBusquedaWebCrearMasivo)
+                .filter(Boolean)
+                .slice(0, 7);
             mostrarSugerenciasProductoCrearMasivo(div);
         } catch (err) {
             console.error(err);
@@ -6004,19 +6903,19 @@
         const cont = div.querySelector('.producto-sugerencias-crear-masivo');
         if (!cont) return;
         const productos = div.__productosBusqueda || [];
-        div.__indiceSeleccionadoProducto = 0;
+        div.__indiceSeleccionadoProducto = productos.length ? 0 : -1;
         cont.innerHTML = '';
         if (productos.length === 0) {
             cont.innerHTML = '<div class="px-4 py-2 text-gray-500 dark:text-gray-400 text-sm">No se encontraron productos</div>';
-            div.__indiceSeleccionadoProducto = -1;
         } else {
-            productos.forEach((p, i) => {
+            productos.forEach(function(p, i) {
                 const el = document.createElement('div');
-                el.className = 'producto-sugerencia-item-crear-masivo px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-600 last:border-b-0 text-sm' + (i === 0 ? ' bg-blue-100 dark:bg-blue-700' : '');
-                el.textContent = p.texto_completo;
-                el.dataset.producto = JSON.stringify(p);
-                el.dataset.index = String(i);
-                cont.appendChild(el);
+                el.innerHTML = htmlSugerenciaProductoWebCrearMasivo(p, i === 0);
+                const item = el.firstElementChild;
+                if (!item) return;
+                item.dataset.producto = JSON.stringify(p);
+                item.dataset.index = String(i);
+                cont.appendChild(item);
             });
         }
         cont.classList.remove('hidden');
@@ -6028,7 +6927,7 @@
         if (!cont) return;
         const idx = div.__indiceSeleccionadoProducto ?? -1;
         const items = cont.querySelectorAll('.producto-sugerencia-item-crear-masivo');
-        items.forEach((el, i) => {
+        items.forEach(function(el, i) {
             el.classList.toggle('bg-blue-100', i === idx);
             el.classList.toggle('dark:bg-blue-700', i === idx);
         });
@@ -6091,6 +6990,7 @@
         if (selectorEmpate) selectorEmpate.remove();
         const generadoMsg = div.querySelector('.generado-msg');
         if (generadoMsg) { generadoMsg.classList.add('hidden'); generadoMsg.textContent = ''; }
+        actualizarCampoTextoCantidadAlternativoEnFila(div);
         const searchInput = div.querySelector('.producto-search-input');
         let timeoutBusqueda = null;
         if (searchInput) {
@@ -6153,16 +7053,22 @@
             const tieneEspecs = data.success && (data.tiene_especificaciones || false);
             const urlProducto = data.url_producto || null;
             const imagenesProducto = Array.isArray(data.imagenes_producto) ? data.imagenes_producto : [];
+            const textoCompleto = producto.texto_completo || [producto.nombre, producto.marca, producto.modelo, producto.talla].filter(function(p) { return p && String(p).trim(); }).join(' - ');
+            const permitirTextoAlt = await resolverPermitirTextoCantidadAlternativoCrearMasivo(
+                producto.id,
+                data.success ? data.permitir_texto_cantidad_alternativo : null
+            );
             const productoCompleto = {
                 id: producto.id,
                 nombre: producto.nombre,
                 marca: producto.marca,
                 modelo: producto.modelo,
                 talla: producto.talla,
-                texto_completo: producto.texto_completo,
+                texto_completo: textoCompleto,
                 url_producto: urlProducto,
                 imagenes_producto: imagenesProducto,
                 unidad_de_medida: data.unidad_de_medida || (especs && especs.unidad_de_medida) || null,
+                permitir_texto_cantidad_alternativo: permitirTextoAlt,
             };
             const especsEfectivas = especificacionesEfectivasResultadoCrearMasivo({
                 especificaciones: especs,
@@ -6225,6 +7131,7 @@
             div.querySelector('.flex.justify-between').appendChild(btnWrap);
             const btnGen = div.querySelector('.btn-generar');
             enlazarInputUnidadesOfertaEnFila(div);
+            actualizarCampoTextoCantidadAlternativoEnFila(div);
             asegurarOpcionesStockGenerarEnFilaCrearMasivo(div);
             actualizarEstadoBotonGenerar(div);
             ponerMensajeGeneradoPendienteCrearMasivo(div);
@@ -6242,6 +7149,10 @@
             adjuntarListenerGenerarOfertaCrearMasivo(div);
         } catch (err) {
             alert('Error al cargar: ' + err.message);
+        } finally {
+            if (div.__rowData && div.__rowData.producto && div.__rowData.producto.id) {
+                actualizarCampoTextoCantidadAlternativoEnFila(div);
+            }
         }
     }
 
@@ -6289,11 +7200,35 @@
         });
     }
 
+    function normalizarColumnasIdsCrearMasivo(raw) {
+        if (raw == null) return [];
+        let arr = raw;
+        if (typeof raw === 'string') {
+            try { arr = JSON.parse(raw); } catch (e) { return []; }
+        }
+        const out = [];
+        if (Array.isArray(arr)) {
+            arr.forEach(function(v) {
+                if (v && typeof v === 'object' && v.id != null) {
+                    out.push(String(v.id));
+                } else if (v != null && v !== '') {
+                    out.push(String(v));
+                }
+            });
+        } else if (arr && typeof arr === 'object') {
+            Object.keys(arr).forEach(function(k) {
+                if (k && !String(k).startsWith('_')) out.push(String(k));
+            });
+        }
+        return out.filter(function(id) { return id && !id.startsWith('_'); });
+    }
+
     function buildEspecsHtml(producto, especificaciones, tieneEspecificaciones) {
         if (!producto) return '';
         const filtros = (especificaciones && especificaciones.filtros) ? especificaciones.filtros : [];
-        const esUnidadUnica = especificaciones && especificaciones.unidad_de_medida === 'unidadUnica';
-        const columnasIds = (especificaciones && especificaciones.columnas_ids) ? especificaciones.columnas_ids : [];
+        const columnasIds = normalizarColumnasIdsCrearMasivo(
+            (especificaciones && especificaciones.columnas_ids) ? especificaciones.columnas_ids : []
+        );
         if (tieneEspecificaciones && filtros.length) {
             const productoId = producto && producto.id ? producto.id : null;
             if (productoId) limpiarCacheImagenesSublineaProductoCrearMasivo(productoId);
@@ -6305,7 +7240,7 @@
                 : {};
             filtros.forEach((f) => {
                 const subprincipales = f.subprincipales || [];
-                const esColumna = esUnidadUnica && columnasIds.includes(f.id);
+                const esColumna = columnasIds.includes(String(f.id));
                 const esGrupoProducto = !!f.es_producto;
                 const permiteNuevaOpcion = esGrupoProducto;
                 const grupoRequiereImagen = grupoSpecRequiereImagenCrearMasivo(f, formatosGrupo);
@@ -6394,6 +7329,9 @@
                 if (div.__rowData && div.__rowData.producto) {
                     if (Array.isArray(data.imagenes_producto)) div.__rowData.producto.imagenes_producto = data.imagenes_producto;
                     if (data.url_producto) div.__rowData.producto.url_producto = data.url_producto;
+                    if (data.permitir_texto_cantidad_alternativo) {
+                        div.__rowData.producto.permitir_texto_cantidad_alternativo = data.permitir_texto_cantidad_alternativo;
+                    }
                 }
 
                 function actualizarSpecsEnFila(fila, producto) {
@@ -6404,9 +7342,18 @@
                     const specBlock = cont.querySelector('.spec-selector-container') || Array.from(cont.children).find(function(c) { return c.textContent.trim().indexOf('Sin especificaciones') !== -1; });
                     if (!specBlock) return;
                     const prod = producto || Object.assign({}, r.producto);
+                    if (data.permitir_texto_cantidad_alternativo) {
+                        prod.permitir_texto_cantidad_alternativo = data.permitir_texto_cantidad_alternativo;
+                    }
                     const newHtml = buildEspecsHtml(prod, especs, tieneEspecs);
                     specBlock.outerHTML = newHtml;
-                    fila.__rowData = Object.assign({}, r, { especificaciones: especs, tiene_especificaciones: tieneEspecs });
+                    fila.__rowData = Object.assign({}, r, {
+                        especificaciones: especs,
+                        tiene_especificaciones: tieneEspecs,
+                        producto: Object.assign({}, r.producto, prod, {
+                            permitir_texto_cantidad_alternativo: data.permitir_texto_cantidad_alternativo || r.producto.permitir_texto_cantidad_alternativo || 'no',
+                        }),
+                    });
                     aplicarDatasetUnidadMedidaFilaCrearMasivo(fila, {
                         especificaciones: especs,
                         producto: prod,
@@ -6414,6 +7361,7 @@
                     });
                     fila.dataset.columnasIds = (especs && especs.columnas_ids) ? JSON.stringify(especs.columnas_ids) : '[]';
                     actualizarCampoUnidadesOfertaEnFila(fila);
+                    actualizarCampoTextoCantidadAlternativoEnFila(fila);
                     actualizarEstadoBotonGenerar(fila);
                     renderUrlResaltadaFilaCrearMasivo(fila);
                     actualizarConteosOpcionesEspecsFila(fila);
@@ -6453,6 +7401,10 @@
             const tieneEspecs = data.success ? (data.tiene_especificaciones || false) : (candidato.tiene_especificaciones || false);
             const urlProducto = data.url_producto ?? candidato.url_producto ?? null;
             const imagenesProducto = Array.isArray(data.imagenes_producto) ? data.imagenes_producto : [];
+            const permitirTextoAlt = await resolverPermitirTextoCantidadAlternativoCrearMasivo(
+                candidato.id,
+                data.success ? data.permitir_texto_cantidad_alternativo : candidato.permitir_texto_cantidad_alternativo
+            );
             const productoCompleto = {
                 id: candidato.id,
                 nombre: candidato.nombre,
@@ -6463,6 +7415,7 @@
                 url_producto: urlProducto,
                 imagenes_producto: imagenesProducto,
                 unidad_de_medida: data.unidad_de_medida || (especs && especs.unidad_de_medida) || null,
+                permitir_texto_cantidad_alternativo: permitirTextoAlt,
             };
             const especsEfectivas = especificacionesEfectivasResultadoCrearMasivo({
                 especificaciones: especs,
@@ -6505,6 +7458,7 @@
             const btnGen = div.querySelector('.btn-generar');
             if (btnGen) btnGen.dataset.productoId = candidato.id;
             actualizarCampoUnidadesOfertaEnFila(div);
+            actualizarCampoTextoCantidadAlternativoEnFila(div);
             actualizarValorEnvioInputEnFilaCrearMasivo(div);
             const selectorEmpate = div.querySelector('.btn-elegir-producto')?.closest('.p-3');
             if (selectorEmpate) selectorEmpate.remove();
@@ -6524,46 +7478,11 @@
         } catch (err) {
             console.error(err);
             alert('Error al cargar: ' + err.message);
+        } finally {
+            if (div.__rowData && div.__rowData.producto && div.__rowData.producto.id) {
+                actualizarCampoTextoCantidadAlternativoEnFila(div);
+            }
         }
-    }
-
-    function quitarCheckboxNoEsMisma(div) {
-        const wrap = div.querySelector('.confirmo-no-es-misma-wrap');
-        if (wrap) wrap.remove();
-    }
-
-    function enlazarCheckboxNoEsMismaEnFilaCrearMasivo(div) {
-        const cb = div.querySelector('.confirmo-no-es-misma');
-        if (!cb || cb.__listenerConfirmoNoEsMisma) return;
-        cb.__listenerConfirmoNoEsMisma = true;
-        cb.addEventListener('change', function() {
-            actualizarEstadoBotonGenerar(div);
-        });
-    }
-
-    function agregarCheckboxNoEsMisma(div) {
-        const btnGen = div.querySelector('.btn-generar');
-        const wrap = div.querySelector('.confirmo-no-es-misma-wrap');
-        if (!btnGen || wrap) return;
-        const parent = btnGen.closest('.flex-shrink-0');
-        if (!parent) return;
-        parent.classList.add('flex', 'items-center', 'gap-3');
-        const goWrap = btnGen.closest('.generar-oferta-wrap');
-        if (!goWrap) return;
-        const label = document.createElement('label');
-        label.className = 'confirmo-no-es-misma-wrap flex items-center gap-2 cursor-pointer text-sm text-amber-700 dark:text-amber-300';
-        label.innerHTML = '<input type="checkbox" class="confirmo-no-es-misma rounded border-gray-300 text-amber-600 focus:ring-amber-500"> <span>No es la misma oferta</span>';
-        const metaWrap = goWrap.querySelector('.generar-oferta-meta-wrap') || goWrap;
-        const anchor = metaWrap.querySelector('.generar-opciones-stock-wrap')
-            || metaWrap.querySelector('.generar-sin-precio-wrap')
-            || metaWrap.querySelector('.generar-segunda-mano-wrap');
-        if (anchor && anchor.parentNode) {
-            anchor.parentNode.insertBefore(label, anchor);
-        } else {
-            metaWrap.appendChild(label);
-        }
-        enlazarCheckboxNoEsMismaEnFilaCrearMasivo(div);
-        actualizarEstadoBotonGenerar(div);
     }
 
     function actualizarEstadoBotonGenerar(div) {
@@ -6574,10 +7493,10 @@
         if (specLines.length) {
             specsIncomplete = Array.from(specLines).some(line => !line.querySelector('.spec-checkbox:checked'));
         }
-        const hasOfertasBlock = !!div.querySelector('.ofertas-mismas-especs');
-        const checkboxChecked = !!div.querySelector('.confirmo-no-es-misma:checked');
         const unidadesInvalidas = !unidadesOfertaValidasEnFila(div);
-        const shouldDisable = specsIncomplete || (hasOfertasBlock && !checkboxChecked) || unidadesInvalidas;
+        const textoAltInvalido = !textoCantidadAlternativoValidoEnFila(div);
+        const urlDuplicadaEnOfertas = !!(div.__rowData && (div.__rowData.url_duplicada_ofertas_visible || div.__rowData.existe));
+        const shouldDisable = specsIncomplete || unidadesInvalidas || textoAltInvalido || urlDuplicadaEnOfertas;
         btn.disabled = shouldDisable;
         btn.classList.toggle('opacity-50', shouldDisable);
         btn.classList.toggle('cursor-not-allowed', shouldDisable);
@@ -6689,10 +7608,7 @@
             let todosConSeleccion = true;
             specLines.forEach(line => { if (!line.querySelector('.spec-checkbox:checked')) todosConSeleccion = false; });
             if (!todosConSeleccion) {
-                const container = div.querySelector('.spec-and-ofertas-container');
-                const old = container?.querySelector('.ofertas-mismas-especs');
-                if (old) old.remove();
-                quitarCheckboxNoEsMisma(div);
+                limpiarEstadoOfertasCargadasFilaCrearMasivo(div);
                 actualizarEstadoBotonGenerar(div);
                 return;
             }
@@ -6714,21 +7630,22 @@
             const container = div.querySelector('.spec-and-ofertas-container');
             if (!container) return;
             const old = container.querySelector('.ofertas-mismas-especs');
-            if (old) { old.remove(); quitarCheckboxNoEsMisma(div); }
-            if (data.success && Array.isArray(data.ofertas) && data.ofertas.length) {
+            if (old) old.remove();
+            quitarAvisoUrlDuplicadaOfertasCrearMasivo(div);
+            if (!div.__rowData) div.__rowData = {};
+            div.__rowData.ofertas_producto_tienda = (data.success && Array.isArray(data.ofertas)) ? data.ofertas : [];
+            if (div.__rowData.ofertas_producto_tienda.length) {
                 const titulo = tieneEspecs ? 'Ya existen ofertas con estas especificaciones en esta tienda:' : 'Ofertas existentes de este producto en esta tienda:';
                 const html = '<div class="mt-3 ofertas-mismas-especs text-sm text-amber-700 dark:text-amber-300"><span class="font-medium">' + titulo + '</span>' +
-                    data.ofertas.map(o => {
-                        const envioTxt = o.envio != null ? (parseFloat(o.envio).toFixed(2).replace('.', ',') + ' € env.') : 'envío gratis';
-                        const precioTxt = o.precio_unidad != null ? (parseFloat(o.precio_unidad).toFixed(2).replace('.', ',') + ' €/ud') : '';
-                        const info = (precioTxt ? precioTxt + ' · ' : '') + envioTxt;
+                    div.__rowData.ofertas_producto_tienda.map(o => {
+                        const info = textoInfoOfertaExistenteTiendaCrearMasivo(o, div);
                         const ver = o.url ? ' <a href="' + o.url + '" target="_blank" class="inline-flex items-center px-2 py-0.5 bg-gray-600 hover:bg-gray-700 text-white text-xs font-medium rounded">Ver</a>' : '';
                         const editar = o.oferta_edit_url ? ' <a href="' + o.oferta_edit_url + '" target="_blank" class="inline-flex items-center px-2 py-0.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded">Editar oferta</a>' : '';
                         return '<div class="mt-1">' + info + ver + editar + '</div>';
                     }).join('') + '</div>';
                 container.insertAdjacentHTML('beforeend', html);
-                agregarCheckboxNoEsMisma(div);
             }
+            await aplicarComprobacionUrlDuplicadaOfertasCargadasCrearMasivo(div);
             actualizarEstadoBotonGenerar(div);
         } catch (e) { console.error('[MismasEspecs] Error:', e); actualizarEstadoBotonGenerar(div); }
     }
@@ -6737,8 +7654,7 @@
         const checkboxes = rowEl.querySelectorAll('.spec-checkbox:checked');
         if (!checkboxes.length) return null;
         const especs = {};
-        const columnasIds = JSON.parse(rowEl.dataset.columnasIds || '[]');
-        const esUnidadUnica = rowEl.dataset.esUnidadUnica === '1';
+        const columnasIds = normalizarColumnasIdsCrearMasivo(rowEl.dataset.columnasIds || '[]');
         checkboxes.forEach(cb => {
             const pid = cb.dataset.principalId;
             const subId = cb.dataset.sublineaId;
@@ -6746,12 +7662,13 @@
             if (!especs[pid]) especs[pid] = [];
             especs[pid].push(subId);
         });
-        if (esUnidadUnica && columnasIds.length) {
+        if (columnasIds.length) {
             especs._columnas = {};
             columnasIds.forEach(pid => {
-                const subIds = especs[pid];
+                const pidStr = String(pid);
+                const subIds = especs[pidStr] || especs[pid];
                 if (subIds && subIds.length) {
-                    especs._columnas[pid] = subIds[0];
+                    especs._columnas[pidStr] = subIds.slice();
                 }
             });
         }
@@ -7709,17 +8626,8 @@
     }
 
     async function limpiarUrlAmazonViaCm(url) {
-        if (!url || !String(url).trim()) return url || '';
-        try {
-            const res = await fetch(@json(route('admin.ofertas.limpiar.url')), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
-                body: JSON.stringify({ url: String(url).trim() })
-            });
-            if (!res.ok) return String(url).trim();
-            const data = await res.json();
-            return data.url_limpia || String(url).trim();
-        } catch (e) { return String(url).trim(); }
+        const r = await limpiarUrlViaApiCrearMasivo(url);
+        return r.url_limpia || url || '';
     }
 
     async function procesarImagenRecortadaSublineaCm() {

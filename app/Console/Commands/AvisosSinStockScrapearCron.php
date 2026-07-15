@@ -21,7 +21,7 @@ class AvisosSinStockScrapearCron extends Command
 
         $this->info('Procesando avisos sin stock (scrapeo automático)...');
 
-        $controller = new AvisosSinStockScrapearCronController();
+        $controller = app(AvisosSinStockScrapearCronController::class);
         $exitCode = $controller();
 
         if ($exitCode === 0) {

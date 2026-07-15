@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Aviso;
 use App\Models\CsvOferta;
 use App\Models\OfertaProducto;
+use App\Models\Producto;
 use App\Models\Tienda;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +18,17 @@ class CsvAwinOfertaService
 
     public const VEZ_MAXIMA_PROCESAR = 9.9;
 
+    public const TEXTO_AVISO_URL_CSV_NO_ENCONTRADA = 'No encontrada URL CSV 1a vez - Generado automaticamente';
+
+    public const TEXTO_AVISO_SIN_STOCK = 'Sin stock 1a vez - Generado automaticamente';
+
+    public const PREFIJO_AVISO_URL_CSV_NO_ENCONTRADA = 'No encontrada URL CSV';
+
+    public const PREFIJO_AVISO_SIN_STOCK = 'Sin stock';
+
+    /** @var list<string> */
+    public const CAMPOS_CODIGOS_IDENTIFICADOR = ['ean', 'isbn', 'upc', 'mpn', 'gtin'];
+
     public function __construct(
         private readonly LimpiarUrlDeTiendas $limpiarUrlDeTiendas,
         private readonly ConsultarNeoCifrado $consultarNeoCifrado,
@@ -27,6 +39,10 @@ class CsvAwinOfertaService
         $fila = $this->buscarFila($tienda, $url);
 
         if ($fila === null) {
+            if ($oferta instanceof OfertaProducto) {
+                $this->marcarOfertaUrlCsvNoEncontrada($oferta);
+            }
+
             return response()->json([
                 'success' => false,
                 'error' => 'Producto no encontrado en CSV-Awin.',
@@ -124,6 +140,121 @@ class CsvAwinOfertaService
         return $this->buscarFila($tienda, $url);
     }
 
+    /**
+     * Tras un scraping normal: si hay fila CSV con otro precio, actualiza solo precio_total y precio_unidad.
+     * Sin avisos, sin ocultar, sin tocar envío ni updated_at.
+     */
+    public function actualizarPrecioOfertaDesdeCsvSilencioso(OfertaProducto $oferta): bool
+    {
+        $fila = $this->buscarFilaPorOferta($oferta);
+        if ($fila === null || $fila->precio === null) {
+            return false;
+        }
+
+        $precioCsv = round((float) $fila->precio, 2);
+        $precioActual = round((float) $oferta->precio_total, 2);
+        if ($precioCsv === $precioActual) {
+            return false;
+        }
+
+        $oferta->loadMissing('producto');
+        $unidades = (float) $oferta->unidades;
+        if ($unidades <= 0) {
+            return false;
+        }
+
+        $calcularPrecioUnidad = new CalcularPrecioUnidad();
+        $precioUnidadNuevo = $calcularPrecioUnidad->calcular(
+            $oferta->producto->unidadDeMedida ?? 'unidad',
+            $precioCsv,
+            $unidades
+        );
+        if ($precioUnidadNuevo === null) {
+            $precioUnidadNuevo = round($precioCsv / $unidades, 2);
+        }
+
+        DB::table('ofertas_producto')
+            ->where('id', $oferta->id)
+            ->update([
+                'precio_total'  => $precioCsv,
+                'precio_unidad' => $precioUnidadNuevo,
+            ]);
+
+        $oferta->precio_total = $precioCsv;
+        $oferta->precio_unidad = $precioUnidadNuevo;
+
+        return true;
+    }
+
+    /**
+     * Añade al producto los códigos (ean, isbn, etc.) de una fila CSV si no estaban ya.
+     */
+    public function fusionarCodigosCsvEnProducto(Producto $producto, CsvOferta $fila): bool
+    {
+        $estructura = $this->normalizarEstructuraCodigosProducto($producto->ean_isbn_etc);
+        if (! $this->fusionarCodigosCsvEnEstructura($estructura, $fila)) {
+            return false;
+        }
+
+        $producto->ean_isbn_etc = $estructura;
+        $producto->save();
+
+        return true;
+    }
+
+    /**
+     * @return array{ean: list<string>, isbn: list<string>, upc: list<string>, mpn: list<string>, gtin: list<string>}
+     */
+    public function normalizarEstructuraCodigosProducto(mixed $datos): array
+    {
+        $estructura = [];
+        foreach (self::CAMPOS_CODIGOS_IDENTIFICADOR as $campo) {
+            $estructura[$campo] = [];
+        }
+
+        if (! is_array($datos)) {
+            return $estructura;
+        }
+
+        foreach (self::CAMPOS_CODIGOS_IDENTIFICADOR as $campo) {
+            $valores = $datos[$campo] ?? [];
+            if (! is_array($valores)) {
+                $valores = $valores !== null && $valores !== '' ? [(string) $valores] : [];
+            }
+            foreach ($valores as $valor) {
+                $valor = trim((string) $valor);
+                if ($valor !== '' && ! in_array($valor, $estructura[$campo], true)) {
+                    $estructura[$campo][] = $valor;
+                }
+            }
+        }
+
+        return $estructura;
+    }
+
+    /**
+     * @param  array{ean: list<string>, isbn: list<string>, upc: list<string>, mpn: list<string>, gtin: list<string>}  $estructura
+     */
+    public function fusionarCodigosCsvEnEstructura(array &$estructura, CsvOferta $fila): bool
+    {
+        $antes = json_encode($estructura, JSON_UNESCAPED_UNICODE);
+
+        foreach (self::CAMPOS_CODIGOS_IDENTIFICADOR as $campo) {
+            $valor = trim((string) ($fila->{$campo} ?? ''));
+            if ($valor === '') {
+                continue;
+            }
+            if (strlen($valor) > 255) {
+                $valor = substr($valor, 0, 255);
+            }
+            if (! in_array($valor, $estructura[$campo], true)) {
+                $estructura[$campo][] = $valor;
+            }
+        }
+
+        return json_encode($estructura, JSON_UNESCAPED_UNICODE) !== $antes;
+    }
+
     public function tieneSinStock(CsvOferta $fila): bool
     {
         return (int) $fila->stock === 0;
@@ -134,22 +265,86 @@ class CsvAwinOfertaService
         return (int) $fila->stock === 1;
     }
 
+    public function esAvisoUrlCsvNoEncontrada(string $textoAviso): bool
+    {
+        return stripos($textoAviso, self::PREFIJO_AVISO_URL_CSV_NO_ENCONTRADA) !== false;
+    }
+
+    public function esAvisoSinStock(string $textoAviso): bool
+    {
+        return stripos($textoAviso, self::PREFIJO_AVISO_SIN_STOCK) !== false;
+    }
+
+    public function marcarOfertaUrlCsvNoEncontrada(OfertaProducto $oferta): void
+    {
+        if ($this->tieneAvisoSinStock($oferta) || $this->tieneAvisoUrlCsvNoEncontrada($oferta)) {
+            return;
+        }
+
+        $oferta->update(['mostrar' => 'no']);
+
+        $this->insertarAvisoOferta($oferta, self::TEXTO_AVISO_URL_CSV_NO_ENCONTRADA);
+    }
+
     public function marcarOfertaSinStock(OfertaProducto $oferta): void
     {
         $oferta->update(['mostrar' => 'no']);
 
-        $yaExiste = Aviso::query()
-            ->where('avisoable_type', OfertaProducto::class)
-            ->where('avisoable_id', $oferta->id)
-            ->where('texto_aviso', 'like', 'Sin stock%')
-            ->exists();
+        $avisoUrlCsv = $this->buscarAvisoUrlCsvNoEncontrada($oferta);
+        if ($avisoUrlCsv !== null) {
+            $this->convertirAvisoUrlCsvASinStock($avisoUrlCsv, $oferta);
 
-        if ($yaExiste) {
             return;
         }
 
+        if ($this->tieneAvisoSinStock($oferta)) {
+            return;
+        }
+
+        $this->insertarAvisoOferta($oferta, self::TEXTO_AVISO_SIN_STOCK);
+    }
+
+    public function convertirAvisoUrlCsvASinStock(Aviso $aviso, OfertaProducto $oferta): void
+    {
+        $oferta->update(['mostrar' => 'no']);
+        $aviso->update([
+            'texto_aviso' => self::TEXTO_AVISO_SIN_STOCK,
+            'fecha_aviso' => now()->addDays(self::DIAS_AVISO_SIN_STOCK),
+        ]);
+    }
+
+    private function tieneAvisoSinStock(OfertaProducto $oferta): bool
+    {
+        return Aviso::query()
+            ->where('avisoable_type', OfertaProducto::class)
+            ->where('avisoable_id', $oferta->id)
+            ->where('texto_aviso', 'like', self::PREFIJO_AVISO_SIN_STOCK . '%')
+            ->exists();
+    }
+
+    private function tieneAvisoUrlCsvNoEncontrada(OfertaProducto $oferta): bool
+    {
+        return Aviso::query()
+            ->where('avisoable_type', OfertaProducto::class)
+            ->where('avisoable_id', $oferta->id)
+            ->where('texto_aviso', 'like', self::PREFIJO_AVISO_URL_CSV_NO_ENCONTRADA . '%')
+            ->exists();
+    }
+
+    private function buscarAvisoUrlCsvNoEncontrada(OfertaProducto $oferta): ?Aviso
+    {
+        return Aviso::query()
+            ->where('avisoable_type', OfertaProducto::class)
+            ->where('avisoable_id', $oferta->id)
+            ->where('texto_aviso', 'like', self::PREFIJO_AVISO_URL_CSV_NO_ENCONTRADA . '%')
+            ->orderByDesc('id')
+            ->first();
+    }
+
+    private function insertarAvisoOferta(OfertaProducto $oferta, string $textoAviso): void
+    {
         DB::table('avisos')->insert([
-            'texto_aviso' => 'Sin stock 1a vez - Generado automaticamente',
+            'texto_aviso' => $textoAviso,
             'fecha_aviso' => now()->addDays(self::DIAS_AVISO_SIN_STOCK),
             'user_id' => 1,
             'avisoable_type' => OfertaProducto::class,

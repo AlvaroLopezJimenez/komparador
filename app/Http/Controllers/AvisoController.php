@@ -873,8 +873,8 @@ class AvisoController extends Controller
     /**
      * Gestiona avisos ligados a una oferta o producto:
      * - Oculta la oferta (mostrar=no)
-     * - Cambia texto del aviso según motivo (1a vez)
-     * - Mueve la fecha del aviso 4 días hacia adelante
+     * - Crea o actualiza el aviso de la oferta según motivo (1a vez)
+     * - En avisos de producto: mantiene el aviso de producto y recalcula la oferta más barata
      */
     public function gestionarOfertaResucitada(Request $request, Aviso $aviso)
     {
@@ -929,16 +929,36 @@ class AvisoController extends Controller
             ], 422);
         }
 
+        $esAvisoProducto = $aviso->avisoable_type === Producto::class;
+        $productoId = $esAvisoProducto ? (int) $aviso->avisoable_id : null;
+
         try {
             $etiquetaBoton = $etiquetasPorMotivo[$validated['motivo']];
             $avisoExistenteMotivo = $this->buscarAvisoOfertaConEtiquetaBoton($ofertaId, $etiquetaBoton);
+            $avisoOfertaCreado = null;
 
-            DB::transaction(function () use ($aviso, $validated, $textosPorMotivo, $ofertaId, $avisoExistenteMotivo) {
+            DB::transaction(function () use ($aviso, $validated, $textosPorMotivo, $ofertaId, $avisoExistenteMotivo, $esAvisoProducto, &$avisoOfertaCreado) {
                 $oferta = OfertaProducto::findOrFail($ofertaId);
 
                 // Ocultar oferta para que deje de mostrarse
                 $oferta->mostrar = 'no';
                 $oferta->save();
+
+                if ($esAvisoProducto) {
+                    // Crear aviso en la oferta afectada sin tocar el aviso de producto
+                    if (!$avisoExistenteMotivo) {
+                        $avisoOfertaCreado = Aviso::create([
+                            'texto_aviso' => $textosPorMotivo[$validated['motivo']],
+                            'fecha_aviso' => now()->addDays(4),
+                            'user_id' => $aviso->user_id ?? auth()->id(),
+                            'avisoable_type' => OfertaProducto::class,
+                            'avisoable_id' => $ofertaId,
+                            'oculto' => false,
+                        ]);
+                    }
+
+                    return;
+                }
 
                 // Ya hay un aviso de esta oferta con el mismo motivo (otro registro)
                 if ($avisoExistenteMotivo && $avisoExistenteMotivo->id !== $aviso->id) {
@@ -947,19 +967,24 @@ class AvisoController extends Controller
                     return;
                 }
 
-                // Reprogramar aviso con nuevo texto y +4 días
+                // Reprogramar aviso de oferta con nuevo texto y +4 días
                 $aviso->texto_aviso = $textosPorMotivo[$validated['motivo']];
                 $aviso->fecha_aviso = now()->addDays(4);
-
-                // Si el aviso era de producto, pasarlo a tipo oferta (misma oferta afectada)
-                // para que coincida con el flujo de avisos ligados a OfertaProducto.
-                if ($aviso->avisoable_type === Producto::class) {
-                    $aviso->avisoable_type = OfertaProducto::class;
-                    $aviso->avisoable_id = $ofertaId;
-                }
-
                 $aviso->save();
             });
+
+            if ($esAvisoProducto && $productoId) {
+                $this->recalcularOfertaMasBarataPorProductoId($productoId);
+
+                if ($avisoOfertaCreado) {
+                    $this->eliminarAvisosDuplicados($avisoOfertaCreado);
+                }
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Oferta ocultada. El aviso de producto se mantiene con la siguiente oferta más barata.',
+                ]);
+            }
 
             if (! Aviso::whereKey($aviso->id)->exists()) {
                 return response()->json([
@@ -1134,6 +1159,58 @@ class AvisoController extends Controller
                 'success' => false,
                 'message' => 'Error al obtener la oferta más barata'
             ], 500);
+        }
+    }
+
+    /**
+     * Recalcula la oferta más barata de un producto y actualiza la tabla intermedia.
+     */
+    private function recalcularOfertaMasBarataPorProductoId(int $productoId): void
+    {
+        try {
+            $producto = Producto::find($productoId);
+            if (!$producto) {
+                return;
+            }
+
+            $servicioOfertas = new SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos();
+            $ofertaMasBarata = $servicioOfertas->obtener($producto);
+
+            if ($ofertaMasBarata) {
+                $ofertaOriginal = OfertaProducto::find($ofertaMasBarata->id);
+
+                if ($ofertaOriginal) {
+                    ProductoOfertaMasBarataPorProducto::updateOrCreate(
+                        ['producto_id' => $producto->id],
+                        [
+                            'oferta_id' => $ofertaOriginal->id,
+                            'tienda_id' => $ofertaOriginal->tienda_id,
+                            'precio_total' => $ofertaMasBarata->precio_total,
+                            'precio_unidad' => $ofertaMasBarata->precio_unidad,
+                            'unidades' => $ofertaOriginal->unidades,
+                            'url' => $ofertaOriginal->url,
+                        ]
+                    );
+
+                    $precioRealMasBajo = $ofertaMasBarata->precio_unidad;
+                    if ($precioRealMasBajo > 0) {
+                        $precioNuevo = $producto->unidadDeMedida === 'unidadMilesima'
+                            ? round($precioRealMasBajo, 3)
+                            : $precioRealMasBajo;
+
+                        if ($producto->precio != $precioNuevo) {
+                            $producto->precio = $precioNuevo;
+                            $producto->save();
+                        }
+                    }
+                }
+            } else {
+                ProductoOfertaMasBarataPorProducto::where('producto_id', $producto->id)->delete();
+            }
+        } catch (\Exception $e) {
+            \Log::error('Error al recalcular oferta más barata desde aviso de producto: ' . $e->getMessage(), [
+                'producto_id' => $productoId,
+            ]);
         }
     }
 

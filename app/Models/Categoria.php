@@ -14,6 +14,7 @@ class Categoria extends Model
         'slug',
         'parent_id',
         'mostrar',
+        'permitir_texto_cantidad_alternativo',
         'especificaciones_internas',
         'info_adicional_chatgpt',
         'unidad_de_medida',

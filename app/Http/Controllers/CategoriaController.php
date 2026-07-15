@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Categoria;
+use App\Models\Producto;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use App\Helpers\CategoriaHelper;
@@ -68,11 +69,13 @@ class CategoriaController extends Controller
 
         // Calcular conteos de productos por sublínea
         $conteosProductos = $this->calcularConteosProductos($categoria);
+        $totalProductosBuscarUrls = $this->contarProductosElegiblesBusquedaUrls($categoria);
 
         return view('admin.categorias.formulario', [
             'categoria' => $categoria,
             'categoriasRaiz' => $categoriasRaiz,
-            'conteosProductos' => $conteosProductos
+            'conteosProductos' => $conteosProductos,
+            'totalProductosBuscarUrls' => $totalProductosBuscarUrls,
         ]);
     }
 
@@ -91,6 +94,7 @@ class CategoriaController extends Controller
             'parent_id' => 'nullable|exists:categorias,id',
             'imagen' => 'nullable|string|max:255',
             'mostrar' => 'required|in:si,no',
+            'permitir_texto_cantidad_alternativo' => 'required|in:si,no',
             'especificaciones_internas' => 'nullable|string',
             'info_adicional_chatgpt' => 'nullable|string',
             'unidad_de_medida' => 'nullable|string|in:unidad,kilos,litros,unidadMilesima,unidadUnica,800gramos,100ml',
@@ -118,6 +122,7 @@ class CategoriaController extends Controller
             'parent_id' => $request->parent_id,
             'imagen' => $request->imagen,
             'mostrar' => $request->mostrar,
+            'permitir_texto_cantidad_alternativo' => $request->input('permitir_texto_cantidad_alternativo', 'no'),
             'especificaciones_internas' => $especificacionesInternas,
             'info_adicional_chatgpt' => $request->info_adicional_chatgpt,
             'unidad_de_medida' => $request->filled('unidad_de_medida') ? $request->unidad_de_medida : null,
@@ -141,6 +146,7 @@ class CategoriaController extends Controller
             'parent_id' => 'nullable|exists:categorias,id',
             'imagen' => 'nullable|string|max:255',
             'mostrar' => 'required|in:si,no',
+            'permitir_texto_cantidad_alternativo' => 'required|in:si,no',
             'especificaciones_internas' => 'nullable|string',
             'info_adicional_chatgpt' => 'nullable|string',
             'unidad_de_medida' => 'nullable|string|in:unidad,kilos,litros,unidadMilesima,unidadUnica,800gramos,100ml',
@@ -168,6 +174,7 @@ class CategoriaController extends Controller
             'parent_id' => $request->parent_id,
             'imagen' => $request->imagen,
             'mostrar' => $request->mostrar,
+            'permitir_texto_cantidad_alternativo' => $request->input('permitir_texto_cantidad_alternativo', 'no'),
             'especificaciones_internas' => $especificacionesInternas,
             'info_adicional_chatgpt' => $request->info_adicional_chatgpt,
             'unidad_de_medida' => $request->filled('unidad_de_medida') ? $request->unidad_de_medida : null,
@@ -384,5 +391,41 @@ class CategoriaController extends Controller
         }
         
         return $conteos;
+    }
+
+    /**
+     * Productos elegibles para buscar URLs (misma query que el cron; incluye subcategorías).
+     */
+    private function contarProductosElegiblesBusquedaUrls(Categoria $categoria): int
+    {
+        $categoriaIds = $this->obtenerIdsCategoriaConHijas((int) $categoria->id);
+
+        return (int) Producto::query()
+            ->where('mostrar', 'si')
+            ->where('obsoleto', 'no')
+            ->whereNotNull('palabras_exigidas')
+            ->where('palabras_exigidas', '!=', '')
+            ->whereNotNull('nombre')
+            ->where('nombre', '!=', '')
+            ->whereIn('categoria_id', $categoriaIds)
+            ->count();
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    private function obtenerIdsCategoriaConHijas(int $categoriaId): array
+    {
+        $ids = [$categoriaId];
+
+        $hijas = Categoria::query()
+            ->where('parent_id', $categoriaId)
+            ->get(['id']);
+
+        foreach ($hijas as $hija) {
+            $ids = array_merge($ids, $this->obtenerIdsCategoriaConHijas((int) $hija->id));
+        }
+
+        return array_values(array_unique($ids));
     }
 }

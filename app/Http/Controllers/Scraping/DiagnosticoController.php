@@ -61,39 +61,36 @@ class DiagnosticoController extends Controller
         // Calcular limitaciones de API
         $limitacionesAPI = $this->calcularLimitacionesAPI();
 
-        $resolverScraping = new TiendaScrapingConfigResolver();
-
-        $todasLasTiendas = Tienda::all();
-        $resumenesPorId = $resolverScraping->resumenIndexPorTiendas($todasLasTiendas);
-        $resumenScrapingPorTienda = [];
-        $tiendasScrapingSuperaMostrar = [];
-        foreach ($todasLasTiendas as $tienda) {
-            $resumen = $resumenesPorId[$tienda->id] ?? [
-                'cat_mos'      => ['si' => 0, 'total' => 0],
-                'cat_scraping' => ['si' => 0, 'total' => 0],
-                'cat_api'      => [],
-                'cat_sin_api'  => 0,
-            ];
-            $resumenScrapingPorTienda[$tienda->nombre] = $resumen;
-
-            if ($resumen['cat_scraping']['si'] > $resumen['cat_mos']['si']) {
-                $tiendasScrapingSuperaMostrar[] = [
-                    'tienda'       => $tienda,
-                    'cat_mos'      => $resumen['cat_mos'],
-                    'cat_scraping' => $resumen['cat_scraping'],
-                ];
-            }
-        }
-        
+        $todasLasTiendas = Tienda::orderBy('nombre')->get();
         $tiendasPorNombre = $todasLasTiendas->keyBy('nombre');
         $tiendasMostrandoSinScraping = $todasLasTiendas
             ->filter(fn ($tienda) => $tienda->mostrar_tienda === 'si' && $tienda->scrapear === 'no')
             ->sortBy('nombre')
             ->values();
-        
+
+        $tiendasBrightDataFrecuenciaMenor24h = [];
+        foreach ($limitacionesAPI['por_tienda'] as $tiendaNombre => $datos) {
+            $ofertasBrightData = (int) ($datos['ofertas_brightdata'] ?? 0);
+            $peticionesBrightData = (float) ($datos['peticiones_brightdata'] ?? 0);
+
+            if ($ofertasBrightData > 0 && $ofertasBrightData < $peticionesBrightData) {
+                $tienda = $tiendasPorNombre->get($tiendaNombre);
+                if ($tienda !== null) {
+                    $tiendasBrightDataFrecuenciaMenor24h[] = [
+                        'tienda'             => $tienda,
+                        'ofertas_activas'    => $ofertasBrightData,
+                        'peticiones_por_dia' => $peticionesBrightData,
+                        'api'                => 'brightData',
+                    ];
+                }
+            }
+        }
+
+        $totalTiendasResumen = $todasLasTiendas->count();
+
         return view('admin.scraping.diagnostico', compact(
             'totalOfertas',
-            'ofertasMostrar', 
+            'ofertasMostrar',
             'ofertasOcultas',
             'ofertasElegibles',
             'tiendas',
@@ -101,11 +98,62 @@ class DiagnosticoController extends Controller
             'ejecucionesPorDia',
             'ofertasScrapeando',
             'limitacionesAPI',
-            'resumenScrapingPorTienda',
-            'tiendasScrapingSuperaMostrar',
             'tiendasPorNombre',
-            'tiendasMostrandoSinScraping'
+            'tiendasMostrandoSinScraping',
+            'tiendasBrightDataFrecuenciaMenor24h',
+            'totalTiendasResumen',
         ));
+    }
+
+    /**
+     * Resumen por categorías (cat.mos, cat.scraping, cat API) en lotes para carga progresiva.
+     */
+    public function resumenTiendas(Request $request)
+    {
+        $offset = max(0, (int) $request->input('offset', 0));
+        $limit = min(50, max(1, (int) $request->input('limit', 10)));
+
+        $todasLasTiendas = Tienda::orderBy('nombre')->get();
+        $total = $todasLasTiendas->count();
+        $lote = $todasLasTiendas->slice($offset, $limit)->values();
+
+        $resolver = new TiendaScrapingConfigResolver();
+        $resumenesPorId = $resolver->resumenIndexPorTiendas($lote);
+
+        $resumenes = [];
+        $avisosScrapingSuperaMostrar = [];
+
+        foreach ($lote as $tienda) {
+            $resumen = $resumenesPorId[$tienda->id] ?? [
+                'cat_mos'      => ['si' => 0, 'total' => 0],
+                'cat_scraping' => ['si' => 0, 'total' => 0],
+                'cat_api'      => [],
+                'cat_sin_api'  => 0,
+            ];
+
+            $resumenes[$tienda->nombre] = $resolver->serializarResumenParaCliente($resumen);
+
+            if ($resumen['cat_scraping']['si'] > $resumen['cat_mos']['si']) {
+                $avisosScrapingSuperaMostrar[] = [
+                    'tienda_id'     => $tienda->id,
+                    'tienda_nombre' => $tienda->nombre,
+                    'edit_url'      => route('admin.tiendas.edit', $tienda),
+                    'cat_mos'       => $resumen['cat_mos'],
+                    'cat_scraping'  => $resumen['cat_scraping'],
+                ];
+            }
+        }
+
+        $nextOffset = $offset + $lote->count();
+
+        return response()->json([
+            'resumenes' => $resumenes,
+            'avisos_scraping_supera_mostrar' => $avisosScrapingSuperaMostrar,
+            'offset' => $offset,
+            'next_offset' => $nextOffset,
+            'total' => $total,
+            'done' => $nextOffset >= $total,
+        ]);
     }
     
     /**
@@ -457,9 +505,11 @@ class DiagnosticoController extends Controller
                     'ofertas_totales' => 0,
                     'peticiones_por_dia' => 0,
                     'peticiones_por_mes' => 0,
-                    'api' => $apiTienda,
+                    'api' => $oferta->tienda->api,
                     'scrapear' => $oferta->tienda->scrapear,
-                    'mostrar_tienda' => $oferta->tienda->mostrar_tienda
+                    'mostrar_tienda' => $oferta->tienda->mostrar_tienda,
+                    'ofertas_brightdata' => 0,
+                    'peticiones_brightdata' => 0,
                 ];
             }
             
@@ -469,6 +519,12 @@ class DiagnosticoController extends Controller
             if ($oferta->tienda->scrapear === 'si') {
                 $peticionesPorTienda[$tiendaNombre]['peticiones_por_dia'] += $peticionesPorDia;
                 $peticionesPorTienda[$tiendaNombre]['peticiones_por_mes'] += $peticionesPorMes;
+
+                $apiBaseEfectiva = TiendaScrapingConfigResolver::apiBase($apiTienda);
+                if ($apiBaseEfectiva === 'brightData') {
+                    $peticionesPorTienda[$tiendaNombre]['ofertas_brightdata']++;
+                    $peticionesPorTienda[$tiendaNombre]['peticiones_brightdata'] += $peticionesPorDia;
+                }
                 
                 // Clasificar por API solo si scrapear = 'si'
                 if ($apiTienda) {
@@ -505,7 +561,9 @@ class DiagnosticoController extends Controller
                     'peticiones_por_mes' => 0,
                     'api' => $tienda->api,
                     'scrapear' => $tienda->scrapear,
-                    'mostrar_tienda' => $tienda->mostrar_tienda
+                    'mostrar_tienda' => $tienda->mostrar_tienda,
+                    'ofertas_brightdata' => 0,
+                    'peticiones_brightdata' => 0,
                 ];
             }
             

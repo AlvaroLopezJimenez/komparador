@@ -38,14 +38,14 @@ if (!function_exists('_f1')) {
                     <input type="text" name="q" placeholder="Busca un producto, marca, modelo" id="si1" required>
                     <button type="submit">Buscar</button>
                 </form>
-                <div id="sgd1" class="kk-suggest hidden"></div>
+                <div id="sgd1" class="kk-suggest hidden" role="listbox" aria-label="Sugerencias de búsqueda"></div>
             </div>
             <div class="relative lg:hidden">
                 <form action="{{ _f1(route('buscar')) }}" method="GET" class="kk-search" id="form-search-mobile">
                     <input type="text" name="q" placeholder="Busca un producto, marca, modelo" id="sim1" required>
                     <button type="submit">Buscar</button>
                 </form>
-                <div id="sgm1" class="kk-suggest hidden"></div>
+                <div id="sgm1" class="kk-suggest hidden" role="listbox" aria-label="Sugerencias de búsqueda"></div>
             </div>
         </div>
 
@@ -147,6 +147,19 @@ if (!function_exists('_f1')) {
         border-radius: 0 0 12px 12px;
         box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
         z-index: 150;
+    }
+    .kk-suggest-item {
+        cursor: pointer;
+    }
+    .kk-suggest-item.kk-suggest-active,
+    .kk-suggest-item.kk-suggest-active:hover {
+        background: #fef3e7;
+    }
+    button.kk-suggest-item.kk-suggest-active,
+    button.kk-suggest-item.kk-suggest-active:hover {
+        background-color: #4d7a1a;
+        outline: 2px solid #e97b11;
+        outline-offset: -2px;
     }
     .kk-nav-desktop { display: none; align-items: center; gap: .25rem; }
     .kk-nav-desktop a {
@@ -335,11 +348,55 @@ if (!function_exists('_f1')) {
 
         if (!_s1) return;
 
-        {{-- timeoutId -> _t1, query -> _q1, data -> _d1, html -> _h1, item -> _it --}}
+        {{-- timeoutId -> _t1, activeIdx -> _a1 --}}
         let _t1;
+        let _a1 = -1;
+
+        function _g1() {
+            return Array.from(_s1.querySelectorAll('.kk-suggest-item'));
+        }
+
+        function _r1() {
+            _a1 = -1;
+            _u1();
+        }
+
+        function _u1() {
+            const _items = _g1();
+            _items.forEach(function(el, i) {
+                el.classList.toggle('kk-suggest-active', i === _a1);
+                el.setAttribute('aria-selected', i === _a1 ? 'true' : 'false');
+            });
+            if (_a1 >= 0 && _items[_a1]) {
+                _items[_a1].scrollIntoView({ block: 'nearest' });
+            }
+        }
+
+        function _n1(delta) {
+            const _items = _g1();
+            if (!_items.length) return;
+            if (_a1 === -1) {
+                _a1 = delta > 0 ? 0 : _items.length - 1;
+            } else {
+                _a1 = (_a1 + delta + _items.length) % _items.length;
+            }
+            _u1();
+        }
+
+        function _go1() {
+            const _items = _g1();
+            if (_a1 < 0 || !_items[_a1]) return false;
+            const _url = _items[_a1].dataset.url;
+            if (_url) {
+                window.location.href = _url;
+                return true;
+            }
+            return false;
+        }
 
         input.addEventListener('input', function() {
             clearTimeout(_t1);
+            _r1();
             const _q1 = this.value.trim();
 
             if (_q1.length < 2) {
@@ -351,104 +408,141 @@ if (!function_exists('_f1')) {
                 fetch(`/api/buscar-productos?q=${encodeURIComponent(_q1)}`)
                     .then(response => response.json())
                     .then(_d1 => {
-    if (_d1.length > 0) {
-        {{-- nombreEscapado -> _n1, imagenEscapada -> _img1, urlEscapada -> _u1 --}}
-        let _h1 = _d1.slice(0, 6).map((_it, index) => {
-            if (_it.tipo === 'categoria') {
-                const _n1 = _e1(_it.nombre || '');
-                const _img1 = _e1(_it.imagen || 'placeholder.jpg');
-                const _u1 = _e1(_f2(_it.url || '#'));
-                return `
-                    <a href="${_u1}" 
-                       class="block px-4 py-3 hover:bg-gray-100 border-b border-gray-200 last:border-b-0">
-                        <div class="flex items-center space-x-3">
-                            <img src="/images/${_img1}" 
-                                 alt="${_n1}" 
-                                 class="w-12 h-12 object-cover rounded">
-                            <div class="flex-1 min-w-0">
-                                <p class="text-sm font-medium text-gray-900 truncate">${_n1}</p>
-                                <p class="text-xs font-medium" style="color: #e97b11;">Categoría</p>
-                            </div>
-                        </div>
-                    </a>
-                `;
-            } else {
-                {{-- precioEscapado -> _p1, unidadMedida -> _um, unidadHtml -> _uh --}}
-                const _n2 = _e1(_it.nombre || '');
-                const _img2 = _e1(_it.imagen_pequena || 'placeholder.jpg');
-                const _u2 = _e1(_f2(_it.url || '#'));
-                const _p1 = _e1(_it.precio || '0');
-                const _um = _it.unidadDeMedida || '';
-                let _uh = '';
-                if (_um === 'unidad') {
-                    _uh = '<span class="text-xs text-gray-500">/Und.</span>';
-                } else if (_um === 'kilos') {
-                    _uh = '<span class="text-xs text-gray-500">/Kg.</span>';
-                } else if (_um === 'litros') {
-                    _uh = '<span class="text-xs text-gray-500">/L.</span>';
-                } else if (_um === 'unidadMilesima') {
-                    _uh = '<span class="text-xs text-gray-500">/Und.</span>';
-                } else if (_um === '800gramos') {
-                    _uh = '<span class="text-xs text-gray-500">/800gr.</span>';
-                } else if (_um === '100ml') {
-                    _uh = '<span class="text-xs text-gray-500">/100ml.</span>';
-                }
-                // Convertir el precio de formato europeo (coma) a formato numérico válido
-                // Reemplazar punto (separador de miles) y coma (decimal) por formato estándar
-                const _p1Num = parseFloat(_p1.replace(/\./g, '').replace(',', '.'));
-                const precioHtml = _p1Num > 0 
-                    ? `<p class="text-lg font-bold" style="color: #73b112;">${_p1}€${_uh}</p>`
-                    : `<p class="text-sm font-semibold text-gray-500">Sin Ofertas Disponibles</p>`;
-                return `
-                    <a href="${_u2}" 
-                       class="block px-4 py-3 hover:bg-gray-100 border-b border-gray-200 last:border-b-0">
-                        <div class="flex items-center space-x-3">
-                            <img src="/images/${_img2}" 
-                                 alt="${_n2}" 
-                                 class="w-12 h-12 object-cover rounded">
-                            <div class="flex-1 min-w-0">
-                                <p class="text-sm font-medium text-gray-900 truncate">${_n2}</p>
-                                ${precioHtml}
-                            </div>
-                        </div>
-                    </a>
-                `;
-            }
-        }).join('');
+                        if (_d1.length > 0) {
+                            let _h1 = _d1.slice(0, 6).map(_it => {
+                                if (_it.tipo === 'categoria') {
+                                    const _nc = _e1(_it.nombre || '');
+                                    const _img1 = _e1(_it.imagen || 'placeholder.jpg');
+                                    const _uc = _e1(_f2(_it.url || '#'));
+                                    return `
+                                        <a href="${_uc}"
+                                           data-url="${_uc}"
+                                           role="option"
+                                           class="kk-suggest-item block px-4 py-3 hover:bg-gray-100 border-b border-gray-200 last:border-b-0">
+                                            <div class="flex items-center space-x-3">
+                                                <img src="/images/${_img1}"
+                                                     alt="${_nc}"
+                                                     class="w-12 h-12 object-cover rounded">
+                                                <div class="flex-1 min-w-0">
+                                                    <p class="text-sm font-medium text-gray-900 truncate">${_nc}</p>
+                                                    <p class="text-xs font-medium" style="color: #e97b11;">Categoría</p>
+                                                </div>
+                                            </div>
+                                        </a>
+                                    `;
+                                }
 
-        if (_d1.length === 7) {
-            {{-- buscarUrlEscapada -> _bu1 --}}
-            const _bu1 = _e1(_f2('/buscar?q=' + encodeURIComponent(input.value)));
-            _h1 += `
-                <div class="px-4">
-                    <button style="background-color: #5f8c21;" class="w-full text-white font-semibold py-2 rounded-md transition"
-                            onmouseover="this.style.backgroundColor='#4d7a1a'"
-                            onmouseout="this.style.backgroundColor='#5f8c21'"
-                            onclick="window.location.href='${_bu1}'">
-                        Mostrar más productos
-                    </button>
-                </div>
-            `;
-        }
+                                const _n2 = _e1(_it.nombre || '');
+                                const _img2 = _e1(_it.imagen_pequena || 'placeholder.jpg');
+                                const _u2 = _e1(_f2(_it.url || '#'));
+                                const _p1 = _e1(_it.precio || '0');
+                                const _um = _it.unidadDeMedida || '';
+                                let _uh = '';
+                                if (_um === 'unidad') {
+                                    _uh = '<span class="text-xs text-gray-500">/Und.</span>';
+                                } else if (_um === 'kilos') {
+                                    _uh = '<span class="text-xs text-gray-500">/Kg.</span>';
+                                } else if (_um === 'litros') {
+                                    _uh = '<span class="text-xs text-gray-500">/L.</span>';
+                                } else if (_um === 'unidadMilesima') {
+                                    _uh = '<span class="text-xs text-gray-500">/Und.</span>';
+                                } else if (_um === '800gramos') {
+                                    _uh = '<span class="text-xs text-gray-500">/800gr.</span>';
+                                } else if (_um === '100ml') {
+                                    _uh = '<span class="text-xs text-gray-500">/100ml.</span>';
+                                }
+                                const _p1Num = parseFloat(_p1.replace(/\./g, '').replace(',', '.'));
+                                const precioHtml = _p1Num > 0
+                                    ? `<p class="text-lg font-bold" style="color: #73b112;">${_p1}€${_uh}</p>`
+                                    : `<p class="text-sm font-semibold text-gray-500">Sin Ofertas Disponibles</p>`;
+                                return `
+                                    <a href="${_u2}"
+                                       data-url="${_u2}"
+                                       role="option"
+                                       class="kk-suggest-item block px-4 py-3 hover:bg-gray-100 border-b border-gray-200 last:border-b-0">
+                                        <div class="flex items-center space-x-3">
+                                            <img src="/images/${_img2}"
+                                                 alt="${_n2}"
+                                                 class="w-12 h-12 object-cover rounded">
+                                            <div class="flex-1 min-w-0">
+                                                <p class="text-sm font-medium text-gray-900 truncate">${_n2}</p>
+                                                ${precioHtml}
+                                            </div>
+                                        </div>
+                                    </a>
+                                `;
+                            }).join('');
 
-        _s1.innerHTML = _h1;
-        _s1.classList.remove('hidden');
-    } else {
-        _s1.classList.add('hidden');
-    }
-})
+                            if (_d1.length === 7) {
+                                const _bu1 = _e1(_f2('/buscar?q=' + encodeURIComponent(input.value)));
+                                _h1 += `
+                                    <div class="px-4 py-2 border-t border-gray-200">
+                                        <button type="button"
+                                                data-url="${_bu1}"
+                                                role="option"
+                                                class="kk-suggest-item w-full text-white font-semibold py-2 rounded-md transition"
+                                                style="background-color: #5f8c21;"
+                                                onmouseover="this.style.backgroundColor='#4d7a1a'"
+                                                onmouseout="this.style.backgroundColor='#5f8c21'">
+                                            Mostrar más productos
+                                        </button>
+                                    </div>
+                                `;
+                            }
 
+                            _s1.innerHTML = _h1;
+                            _s1.classList.remove('hidden');
+                            _r1();
+                        } else {
+                            _s1.classList.add('hidden');
+                            _r1();
+                        }
+                    })
                     .catch(_err => {
-                        console.error('Error:', _err);
+                        console.error('[Komparador] Error API buscar-productos:', _err);
                         _s1.classList.add('hidden');
+                        _r1();
                     });
             }, 300);
+        });
+
+        input.addEventListener('keydown', function(e) {
+            if (_s1.classList.contains('hidden') || !_g1().length) {
+                return;
+            }
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                _n1(1);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                _n1(-1);
+            } else if (e.key === 'Enter') {
+                if (_go1()) {
+                    e.preventDefault();
+                }
+            } else if (e.key === 'Escape') {
+                _s1.classList.add('hidden');
+                _r1();
+            }
+        });
+
+        _s1.addEventListener('mouseover', function(e) {
+            const _item = e.target.closest('.kk-suggest-item');
+            if (!_item) return;
+            const _items = _g1();
+            const _idx = _items.indexOf(_item);
+            if (_idx >= 0) {
+                _a1 = _idx;
+                _u1();
+            }
         });
 
         {{-- Ocultar sugerencias al hacer clic fuera --}}
         document.addEventListener('click', function(e) {
             if (!input.contains(e.target) && !_s1.contains(e.target)) {
                 _s1.classList.add('hidden');
+                _r1();
             }
         });
     });

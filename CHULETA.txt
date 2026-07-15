@@ -27,49 +27,13 @@ search_price
 merchant_deep_link
 delivery_cost
 in_stock
+y todas las de identificador
 
 /////////ACTUALIZAR TAILWIND - HAY QUE METERLO EN AMBAS CARPETAS PUBLIC/BUILD
 
 npm run build
 
 En Docker ---- docker compose run --rm node npm run build
-
-
-////////OFERTAS CON AVISOS CON MENSAJE "GENERADO AUTOMATICAMENTE"
-
-    ////para ver las ofertas
-
-
-        SELECT
-            op.*
-        FROM
-            ofertas_producto AS op
-        INNER JOIN
-            avisos AS a ON op.id = a.avisoable_id
-        WHERE
-            a.texto_aviso LIKE '%GENERADO%';
-
-    /////para cambiar las ofertas a monstrar->si que tienen un aviso con la palabra GENERADO
-
-        UPDATE
-            ofertas_producto AS op
-        INNER JOIN
-            avisos AS a ON op.id = a.avisoable_id
-        SET
-            op.mostrar = 'si'
-        WHERE
-            a.texto_aviso LIKE '%GENERADO%';
-
-    //eliminar los avisos con la palabra GENERADO
-
-    DELETE FROM avisos WHERE texto_aviso LIKE '%GENERADO%';
-
-
-////////////////////ELIMINAR IP ESPECIFICAS DE CLICKS
-DELETE FROM clicks WHERE ip = 'IP_AQUI';
-
-
-
 
 //////PARA DESPLEGAR DOCKER EN EL SERVIDOR
 

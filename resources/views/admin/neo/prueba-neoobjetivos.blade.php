@@ -66,7 +66,7 @@
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border-l-4 border-indigo-500">
             <h3 class="font-semibold text-lg mb-2">Comprobar filas pendientes por visitar</h3>
             <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                Lista filas de <code class="text-xs">neoobjetivo</code> con <code class="text-xs">visitada &lt; ahora - 7 días</code>, mostrando la URL cifrada (valor real en BD) y la URL descifrada.
+                Lista filas de <code class="text-xs">neoobjetivo</code> con <code class="text-xs">visitada &lt; ahora - {{ \App\Models\Neoobjetivo::DIAS_SIN_REVISAR }} días</code>, mostrando la URL cifrada (valor real en BD) y la URL descifrada.
             </p>
             <form action="{{ route('admin.neo.prueba-neoobjetivos') }}" method="GET" class="flex flex-wrap items-end gap-3">
                 <input type="hidden" name="ver_pendientes" value="1">

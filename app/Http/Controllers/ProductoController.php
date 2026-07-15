@@ -13,6 +13,7 @@ use Illuminate\Http\JsonResponse;
 use App\Models\Categoria;
 use App\Models\ProductoOfertaMasBarataPorProducto;
 use App\Services\SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos;
+use App\Support\UrlOfertaValidacion;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\RateLimiter;
 use App\Models\Click;
@@ -130,6 +131,7 @@ class ProductoController extends Controller
             'categoria_especificaciones_internas_elegidas' => 'nullable|string',
             'obsoleto' => 'required|in:si,no',
             'mostrar' => 'required|in:si,no',
+            'ean_isbn_etc' => 'nullable|string',
             'anotaciones_internas' => 'nullable|string',
             'aviso' => 'nullable|date',
         ]);
@@ -172,6 +174,8 @@ class ProductoController extends Controller
             $especificacionesElegidas = null;
         }
 
+        $eanIsbnEtc = $this->normalizarEanIsbnEtcDesdeRequest($request);
+
         $producto = Producto::create([
             'nombre' => $validated['nombre'],
             'slug' => $validated['slug'],
@@ -196,6 +200,7 @@ class ProductoController extends Controller
             'categoria_id' => $validated['categoria_id'],
             'categoria_id_especificaciones_internas' => $validated['categoria_id_especificaciones_internas'] ?? null,
             'categoria_especificaciones_internas_elegidas' => $especificacionesElegidas,
+            'ean_isbn_etc' => $eanIsbnEtc,
             'meta_titulo' => $validated['meta_titulo'],
             'meta_description' => $validated['meta_description'],
             'obsoleto' => $validated['obsoleto'],
@@ -204,18 +209,18 @@ class ProductoController extends Controller
             'aviso' => $avisoFecha,
         ]);
 
-        // Guardar Neo (URLs objetivo): solo las que tengan URL válida, visitada = hace 2 semanas
+        // Guardar Neo (URLs objetivo): solo las que tengan URL válida, visitada = hace DIAS_SIN_REVISAR días
         $neoItems = $request->input('neoobjetivo', []);
-        $dosSemanas = now()->subWeeks(2);
+        $visitadaPorDefecto = Neoobjetivo::fechaVisitadaPorDefectoAlCrear();
         foreach ($neoItems as $item) {
             $url = is_array($item) ? trim($item['url'] ?? '') : '';
-            if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
+            if ($url === '' || !UrlOfertaValidacion::pasa($url)) {
                 continue;
             }
             Neoobjetivo::create([
                 'producto_id' => $producto->id,
                 'url' => $url,
-                'visitada' => $dosSemanas,
+                'visitada' => $visitadaPorDefecto,
             ]);
         }
 
@@ -322,6 +327,7 @@ class ProductoController extends Controller
             'categoria_especificaciones_internas_elegidas' => 'nullable|string',
             'obsoleto' => 'required|in:si,no',
             'mostrar' => 'required|in:si,no',
+            'ean_isbn_etc' => 'nullable|string',
             'anotaciones_internas' => 'nullable|string',
             'aviso' => 'nullable|date',
         ]);
@@ -385,6 +391,8 @@ class ProductoController extends Controller
             $especificacionesElegidas = null;
         }
 
+        $eanIsbnEtc = $this->normalizarEanIsbnEtcDesdeRequest($request);
+
         // Debug: verificar datos antes de guardar
         \Log::info('Actualizando producto', [
             'producto_id' => $producto->id,
@@ -416,6 +424,7 @@ class ProductoController extends Controller
             'categoria_id' => $validated['categoria_id'],
             'categoria_id_especificaciones_internas' => $validated['categoria_id_especificaciones_internas'] ?? null,
             'categoria_especificaciones_internas_elegidas' => $especificacionesElegidas,
+            'ean_isbn_etc' => $eanIsbnEtc,
             'meta_titulo' => $validated['meta_titulo'],
             'meta_description' => $validated['meta_description'],
             'obsoleto' => $validated['obsoleto'],
@@ -426,7 +435,7 @@ class ProductoController extends Controller
 
         // Sincronizar Neo (URLs objetivo): cada item debe ser URL válida o exactamente "No encontrado" (case-insensitive)
         $neoItems = $request->input('neoobjetivo', []);
-        $dosSemanas = now()->subWeeks(2);
+        $visitadaPorDefecto = Neoobjetivo::fechaVisitadaPorDefectoAlCrear();
         $keptIds = [];
         foreach ($neoItems as $item) {
             $url = is_array($item) ? trim($item['url'] ?? '') : '';
@@ -434,7 +443,7 @@ class ProductoController extends Controller
                 continue;
             }
             $esNoEncontrado = strtolower($url) === 'no encontrado';
-            $esUrlValida = filter_var($url, FILTER_VALIDATE_URL);
+            $esUrlValida = UrlOfertaValidacion::pasa($url);
             if (!$esUrlValida && !$esNoEncontrado) {
                 continue;
             }
@@ -446,14 +455,14 @@ class ProductoController extends Controller
             $existente = $neoId ? Neoobjetivo::where('id', $neoId)->where('producto_id', $producto->id)->first() : null;
             if ($existente) {
                 $urlCambiada = $existente->url !== $url;
-                $visitada = $urlCambiada ? $dosSemanas : ($visitadaSubmitted ?? $existente->visitada);
+                $visitada = $urlCambiada ? $visitadaPorDefecto : ($visitadaSubmitted ?? $existente->visitada);
                 $existente->update(['url' => $url, 'visitada' => $visitada]);
                 $keptIds[] = $existente->id;
             } else {
                 $nuevo = Neoobjetivo::create([
                     'producto_id' => $producto->id,
                     'url' => $url,
-                    'visitada' => $dosSemanas,
+                    'visitada' => $visitadaPorDefecto,
                 ]);
                 $keptIds[] = $nuevo->id;
             }
@@ -2210,12 +2219,47 @@ public function generarContenido(Request $request)
             return response()->json([]);
         }
 
-        $categorias = Categoria::where('nombre', 'like', '%' . $query . '%')
+        $palabras = $this->palabrasSignificativasBusquedaCategorias($query);
+
+        $categorias = Categoria::query()
+            ->where(function ($q) use ($query, $palabras) {
+                $q->where('nombre', 'like', '%' . $query . '%');
+
+                if (count($palabras) > 0) {
+                    $q->orWhere(function ($q2) use ($palabras) {
+                        foreach ($palabras as $palabra) {
+                            $q2->where('nombre', 'like', '%' . $palabra . '%');
+                        }
+                    });
+                }
+            })
             ->orderBy('nombre')
             ->limit(10)
             ->get(['id', 'nombre']);
 
         return response()->json($categorias);
+    }
+
+    /**
+     * Tokens de búsqueda ignorando artículos y preposiciones frecuentes.
+     *
+     * @return array<int, string>
+     */
+    private function palabrasSignificativasBusquedaCategorias(string $query): array
+    {
+        $stopWords = ['de', 'la', 'el', 'los', 'las', 'y', 'en', 'del', 'al', 'un', 'una', 'con', 'por', 'para', 'a', 'e', 'o', 'u'];
+
+        $palabras = array_values(array_filter(
+            preg_split('/\s+/u', mb_strtolower(trim($query), 'UTF-8')) ?: [],
+            fn ($palabra) => mb_strlen($palabra) >= 2 || (mb_strlen($palabra) === 1 && ctype_digit($palabra))
+        ));
+
+        $significativas = array_values(array_filter(
+            $palabras,
+            fn ($palabra) => !in_array($palabra, $stopWords, true)
+        ));
+
+        return $significativas !== [] ? $significativas : $palabras;
     }
 
     public function obtenerEspecificacionesInternas($categoriaId)
@@ -2505,6 +2549,7 @@ public function generarContenido(Request $request)
             'categoria_especificaciones_internas_elegidas' => $producto->categoria_especificaciones_internas_elegidas,
             'grupos_de_ofertas' => $producto->grupos_de_ofertas,
             'url_publica' => $urlPublica,
+            'permitir_texto_cantidad_alternativo' => ($producto->categoria?->permitir_texto_cantidad_alternativo ?? 'no'),
         ]);
     }
 
@@ -3288,5 +3333,50 @@ public function generarContenido(Request $request)
         }
 
         return $imagenesUnicas;
+    }
+
+    /**
+     * @return array{ean: list<string>, isbn: list<string>, upc: list<string>, mpn: list<string>, gtin: list<string>}|null
+     */
+    private function normalizarEanIsbnEtcDesdeRequest(Request $request): ?array
+    {
+        $raw = $request->input('ean_isbn_etc');
+        if ($raw === null || $raw === '') {
+            return null;
+        }
+
+        $decoded = is_string($raw) ? json_decode($raw, true) : $raw;
+        if (!is_array($decoded)) {
+            return null;
+        }
+
+        $resultado = [];
+        foreach (['ean', 'isbn', 'upc', 'mpn', 'gtin'] as $campo) {
+            $resultado[$campo] = [];
+            $valores = $decoded[$campo] ?? [];
+            if (!is_array($valores)) {
+                $valores = ($valores !== null && $valores !== '') ? [(string) $valores] : [];
+            }
+            foreach ($valores as $valor) {
+                $valor = trim((string) $valor);
+                if ($valor === '') {
+                    continue;
+                }
+                if (strlen($valor) > 255) {
+                    $valor = substr($valor, 0, 255);
+                }
+                if (!in_array($valor, $resultado[$campo], true)) {
+                    $resultado[$campo][] = $valor;
+                }
+            }
+        }
+
+        foreach ($resultado as $valores) {
+            if ($valores !== []) {
+                return $resultado;
+            }
+        }
+
+        return null;
     }
 }

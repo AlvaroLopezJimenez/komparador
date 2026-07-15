@@ -12,34 +12,6 @@
 
     <div class="py-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="mb-4 flex justify-end gap-2">
-            <a href="{{ route('admin.neo.prueba-neoobjetivos') }}"
-                class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">
-                prueba neo
-            </a>
-            <a href="{{ route('admin.neo.eliminar-por-urls') }}"
-                class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">
-                eliminar neo
-            </a>
-            <a href="{{ route('admin.neo.crear-masivo') }}"
-                class="bg-pink-500 text-white px-4 py-2 rounded hover:bg-pink-600">
-                Crear masivo Neo
-            </a>
-            <a href="{{ route('admin.neo.crear-masivo-ia') }}"
-                class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">
-                IA
-            </a>
-            <a href="{{ route('admin.neo.index') }}"
-                class="bg-pink-500 text-white px-4 py-2 rounded hover:bg-pink-600">
-                Listado Neo
-            </a>
-            <a href="{{ route('admin.neo.productos-sin-neo') }}"
-                class="bg-pink-500 text-white px-4 py-2 rounded hover:bg-pink-600">
-                Productos sin Neo
-            </a>
-            <a href="{{ route('admin.neo.sin-url-completar') }}"
-                class="bg-pink-500 text-white px-4 py-2 rounded hover:bg-pink-600">
-                Sin URL
-            </a>
             <a href="{{ route('admin.ofertas.create.formularioGeneral') }}"
                 class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
                 + Añadir oferta

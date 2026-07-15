@@ -32,13 +32,19 @@
                         <label for="tienda" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Tienda
                         </label>
-                        <select id="tienda" name="tienda" required
-                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
-                            <option value="">Seleccionar tienda...</option>
-                            @foreach($tiendas as $tienda)
-                                <option value="{{ $tienda }}">{{ $tienda }}</option>
-                            @endforeach
-                        </select>
+                        <div class="flex items-center gap-3">
+                            <select id="tienda" name="tienda" required
+                                class="flex-1 min-w-0 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
+                                <option value="">Seleccionar tienda...</option>
+                                @foreach($tiendas as $tienda)
+                                    <option value="{{ $tienda }}">{{ $tienda }}</option>
+                                @endforeach
+                            </select>
+                            <div id="tiendaControladorIndicador" class="hidden shrink-0 flex flex-col items-center justify-center text-center min-w-[4.5rem]">
+                                <span class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Controlador</span>
+                                <span id="tiendaControladorIcono" class="text-xl font-semibold leading-none mt-1" aria-hidden="true"></span>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 
@@ -81,9 +87,267 @@
     </div>
 
     <script>
+        const urlInput = document.getElementById('url');
+        const tiendaSelect = document.getElementById('tienda');
+        const tiendaControladorIndicador = document.getElementById('tiendaControladorIndicador');
+        const tiendaControladorIcono = document.getElementById('tiendaControladorIcono');
+        const controladoresTiendas = @json($controladoresTiendas);
+        let urlTiendaDetectionTimeout = null;
+
         document.getElementById('formTestPrecio').addEventListener('submit', function(e) {
             e.preventDefault();
             procesarUrl();
+        });
+
+        function normalizarNombreTienda(nombreTienda) {
+            return String(nombreTienda || '')
+                .toLowerCase()
+                .replace(/[^a-z0-9]/g, '');
+        }
+
+        function verificarControladorTienda(nombreTienda) {
+            const nombreNormalizado = normalizarNombreTienda(nombreTienda);
+            if (!nombreNormalizado) return false;
+
+            return controladoresTiendas.some(function(controlador) {
+                return nombreNormalizado === normalizarNombreTienda(controlador);
+            });
+        }
+
+        function actualizarIndicadorControlador(nombreTienda) {
+            if (!nombreTienda || !nombreTienda.trim()) {
+                ocultarIndicadorControlador();
+                return;
+            }
+
+            const tieneControlador = verificarControladorTienda(nombreTienda);
+            tiendaControladorIndicador.classList.remove('hidden');
+            tiendaControladorIcono.textContent = tieneControlador ? '✅' : '❌';
+            tiendaControladorIcono.classList.remove('text-green-600', 'dark:text-green-400', 'text-red-600', 'dark:text-red-400');
+            tiendaControladorIcono.classList.add(
+                tieneControlador ? 'text-green-600' : 'text-red-600',
+                tieneControlador ? 'dark:text-green-400' : 'dark:text-red-400'
+            );
+            tiendaControladorIndicador.title = tieneControlador
+                ? 'Existe controlador de scraping para esta tienda'
+                : 'No existe controlador de scraping para esta tienda';
+        }
+
+        function ocultarIndicadorControlador() {
+            tiendaControladorIndicador.classList.add('hidden');
+            tiendaControladorIcono.textContent = '';
+            tiendaControladorIndicador.removeAttribute('title');
+        }
+
+        async function limpiarUrlViaApi(url) {
+            if (!url || !url.trim()) {
+                return { url_limpia: url || '' };
+            }
+            try {
+                const res = await fetch('{{ route("admin.ofertas.limpiar.url") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({ url: url.trim() })
+                });
+                if (!res.ok) return { url_limpia: url.trim() };
+                const data = await res.json();
+                return { url_limpia: data.url_limpia ?? url.trim() };
+            } catch (e) {
+                return { url_limpia: url.trim() };
+            }
+        }
+
+        function extraerDominioNormalizado(url) {
+            try {
+                if (!url || !url.trim()) {
+                    return null;
+                }
+
+                let urlCompleta = url.trim();
+                if (!/^https?:\/\//i.test(urlCompleta)) {
+                    urlCompleta = 'https://' + urlCompleta;
+                }
+
+                let hostname;
+                try {
+                    hostname = new URL(urlCompleta).hostname;
+                } catch (e) {
+                    const match = urlCompleta.match(/^(?:https?:\/\/)?(?:www\.)?([^\/\s]+)/i);
+                    if (match && match[1]) {
+                        hostname = match[1];
+                    } else {
+                        return null;
+                    }
+                }
+
+                if (!hostname) {
+                    return null;
+                }
+
+                hostname = hostname.toLowerCase();
+                hostname = hostname.replace(/^www\./, '');
+
+                return hostname;
+            } catch (error) {
+                return null;
+            }
+        }
+
+        function normalizarUrlTienda(urlTienda) {
+            if (!urlTienda || !urlTienda.trim()) {
+                return null;
+            }
+
+            let normalizada = urlTienda.trim().toLowerCase();
+            normalizada = normalizada.replace(/^https?:\/\//, '');
+            normalizada = normalizada.replace(/^www\./, '');
+            normalizada = normalizada.replace(/\/.*$/, '');
+            normalizada = normalizada.replace(/\/$/, '');
+
+            if (!normalizada || !normalizada.includes('.')) {
+                return null;
+            }
+
+            return normalizada;
+        }
+
+        function normalizarClaveTiendaDetectar(texto) {
+            return String(texto || '')
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase()
+                .replace(/[^a-z0-9]/g, '');
+        }
+
+        function clavesHostTiendaDetectar(tienda) {
+            const claves = [];
+            const nombre = normalizarClaveTiendaDetectar(tienda && tienda.nombre);
+            if (nombre) claves.push(nombre);
+            const urlCampo = tienda && tienda.url ? String(tienda.url).trim() : '';
+            if (urlCampo && !urlCampo.includes('.')) {
+                const slug = normalizarClaveTiendaDetectar(urlCampo);
+                if (slug) claves.push(slug);
+            }
+            return [...new Set(claves)];
+        }
+
+        function buscarTiendaEnListaPorUrl(host, todasLasTiendas) {
+            if (!host || !Array.isArray(todasLasTiendas)) return null;
+
+            for (let i = 0; i < todasLasTiendas.length; i++) {
+                const tienda = todasLasTiendas[i];
+                const dominioTienda = normalizarUrlTienda(tienda && tienda.url);
+                if (!dominioTienda) continue;
+                if (host === dominioTienda || host.endsWith('.' + dominioTienda) || dominioTienda.endsWith('.' + host)) {
+                    return tienda;
+                }
+            }
+
+            let mejor = null;
+            let mejorLongitud = 0;
+            for (let i = 0; i < todasLasTiendas.length; i++) {
+                const claves = clavesHostTiendaDetectar(todasLasTiendas[i]);
+                for (let j = 0; j < claves.length; j++) {
+                    const clave = claves[j];
+                    if (clave.length < 4) continue;
+                    if (host.includes(clave) && clave.length > mejorLongitud) {
+                        mejor = todasLasTiendas[i];
+                        mejorLongitud = clave.length;
+                    }
+                }
+            }
+            return mejor;
+        }
+
+        function seleccionarTiendaEnSelect(tienda) {
+            if (!tienda || !tienda.nombre) return;
+            const existe = Array.from(tiendaSelect.options).some(opt => opt.value === tienda.nombre);
+            if (existe) {
+                tiendaSelect.value = tienda.nombre;
+                tiendaSelect.classList.add('border-green-500');
+                actualizarIndicadorControlador(tienda.nombre);
+            }
+        }
+
+        async function detectarTiendaPorUrl(url) {
+            if (!url || !url.trim()) {
+                return;
+            }
+
+            const tiendaActual = tiendaSelect.value;
+            if (tiendaActual && tiendaActual.trim() !== '') {
+                return;
+            }
+
+            const dominioUrl = extraerDominioNormalizado(url);
+            if (!dominioUrl) {
+                return;
+            }
+
+            try {
+                const response = await fetch('{{ route("admin.ofertas.tiendas.disponibles") }}');
+                if (!response.ok) {
+                    return;
+                }
+
+                const todasLasTiendas = await response.json();
+                if (!Array.isArray(todasLasTiendas) || todasLasTiendas.length === 0) {
+                    return;
+                }
+
+                const tiendaEncontrada = buscarTiendaEnListaPorUrl(dominioUrl, todasLasTiendas);
+                if (tiendaEncontrada) {
+                    seleccionarTiendaEnSelect(tiendaEncontrada);
+                }
+            } catch (error) {
+                // Silenciar errores
+            }
+        }
+
+        urlInput.addEventListener('paste', function() {
+            setTimeout(async () => {
+                const urlPegada = urlInput.value.trim();
+                if (!urlPegada) return;
+                const { url_limpia } = await limpiarUrlViaApi(urlPegada);
+                if (url_limpia !== urlPegada) {
+                    urlInput.value = url_limpia;
+                }
+                setTimeout(() => detectarTiendaPorUrl(url_limpia || urlPegada), 50);
+            }, 50);
+        });
+
+        urlInput.addEventListener('input', function() {
+            const url = urlInput.value.trim();
+
+            if (urlTiendaDetectionTimeout) clearTimeout(urlTiendaDetectionTimeout);
+
+            if (!url) {
+                return;
+            }
+
+            const tiendaActual = tiendaSelect.value;
+            if (!tiendaActual || tiendaActual.trim() === '') {
+                urlTiendaDetectionTimeout = setTimeout(async () => {
+                    const urlActual = urlInput.value.trim();
+                    if (!urlActual) return;
+                    const { url_limpia } = await limpiarUrlViaApi(urlActual);
+                    detectarTiendaPorUrl(url_limpia || urlActual);
+                }, 500);
+            }
+        });
+
+        tiendaSelect.addEventListener('change', function() {
+            if (tiendaSelect.value) {
+                tiendaSelect.classList.add('border-green-500');
+                actualizarIndicadorControlador(tiendaSelect.value);
+            } else {
+                tiendaSelect.classList.remove('border-green-500');
+                ocultarIndicadorControlador();
+            }
         });
 
         function procesarUrl() {
@@ -133,6 +397,23 @@
             });
         }
 
+        function formatearDescuentoDetectado(descuento) {
+            const item = String(descuento || '').trim();
+            const match2aCupon = item.match(/^2a al (\d+) - cupon;(.+)$/i);
+            if (match2aCupon) {
+                return `-${match2aCupon[1]}% en 2ª ud (cupón ${match2aCupon[2]})`;
+            }
+            const matchCuponPct = item.match(/^cupon;([^;]+);%(\d+)$/i);
+            if (matchCuponPct) {
+                return `Cupón ${matchCuponPct[1]} (-${matchCuponPct[2]}%)`;
+            }
+            const matchCuponEur = item.match(/^cupon;([^;]+);([\d.,]+)$/i);
+            if (matchCuponEur) {
+                return `Cupón ${matchCuponEur[1]} (-${matchCuponEur[2]}€)`;
+            }
+            return item;
+        }
+
         function mostrarResultados(data, url, tienda, variante) {
             const resultadosDiv = document.getElementById('resultados');
             
@@ -177,6 +458,27 @@
                                 <span class="ml-2 text-gray-600 dark:text-gray-400">${data.tiempo_respuesta}ms</span>
                             </div>
                             ` : ''}
+                            ${(data.descuentos_detectados && data.descuentos_detectados.length) || data.descuentos ? `
+                            <div>
+                                <strong class="text-gray-700 dark:text-gray-300">Descuentos detectados:</strong>
+                                <ul class="mt-1 ml-4 list-disc text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                                    ${(data.descuentos_detectados && data.descuentos_detectados.length
+                                        ? data.descuentos_detectados
+                                        : String(data.descuentos || '').split('||').filter(Boolean)
+                                    ).map(descuento => `<li><code class="text-xs bg-gray-100 dark:bg-gray-800 px-1 rounded">${descuento}</code> — ${formatearDescuentoDetectado(descuento)}</li>`).join('')}
+                                </ul>
+                                ${data.descuentos ? `
+                                <p class="mt-2 text-xs text-gray-500 dark:text-gray-400 break-all">
+                                    <strong>Valor serializado:</strong> <code>${data.descuentos}</code>
+                                </p>
+                                ` : ''}
+                            </div>
+                            ` : `
+                            <div>
+                                <strong class="text-gray-700 dark:text-gray-300">Descuentos detectados:</strong>
+                                <span class="ml-2 text-gray-500 dark:text-gray-400">Ninguno</span>
+                            </div>
+                            `}
                         </div>
                     </div>
                 </div>
@@ -209,6 +511,8 @@
 
         function limpiarResultados() {
             document.getElementById('formTestPrecio').reset();
+            tiendaSelect.classList.remove('border-green-500');
+            ocultarIndicadorControlador();
             document.getElementById('resultadosContainer').classList.add('hidden');
             document.getElementById('resultados').innerHTML = '';
         }

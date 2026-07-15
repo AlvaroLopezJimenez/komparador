@@ -209,7 +209,7 @@ if (!function_exists('_f1')) {
                     <div class="{{ $idx >= 4 ? 'hidden sm:block' : '' }} bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 p-2 md:p-4 flex flex-col items-center text-center">
                         {{-- añadirCam() -> _f1() --}}
                         <a href="{{ _f1(route('categoria.show', $ct1->slug)) }}" class="block">
-                            <div class="h-20 w-20 md:h-24 md:w-24 mb-3 md:mb-4 mx-auto">
+                            <div class="h-28 w-28 md:h-36 md:w-36 mb-3 md:mb-4 mx-auto overflow-hidden flex items-center justify-center">
                                 @if($ct1->imagen)
                                     <img loading="lazy" src="{{ asset('images/'.$ct1->imagen) }}" alt="{{ $ct1->nombre }}" class="w-full h-full object-contain">
                                 @else
@@ -240,10 +240,10 @@ if (!function_exists('_f1')) {
                             <div class="w-full">
                                 <div class="grid grid-cols-1 gap-1">
                                     @foreach($hj1 as $hj2)
-                                    <div class="bg-gray-100 hover:bg-pink-50 rounded-md px-2 md:px-3 py-1.5 md:py-2 transition-all duration-200 border-l-2 border-transparent hover:border-pink-300 hover:shadow-md hover:scale-105">
+                                    <div class="bg-gray-100 hover:bg-orange-50 rounded-md px-2 md:px-3 py-1.5 md:py-2 transition-all duration-200 border-l-2 border-transparent hover:border-orange-300 hover:shadow-md hover:scale-105">
                                         {{-- añadirCam() -> _f1() --}}
                                         <a href="{{ _f1(route('categoria.show', $hj2->slug)) }}" 
-                                           class="text-xs md:text-base text-gray-700 hover:text-pink-600 transition-colors duration-200 block">
+                                           class="text-xs md:text-base text-gray-700 hover:text-[#e97b11] transition-colors duration-200 block">
                                             <div class="flex items-center justify-between">
                                                 <span class="flex-1 min-w-0 text-left">{{ $hj2->nombre }}</span>
                                                 <svg class="w-3 h-3 text-gray-400 ml-2 flex-shrink-0 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -267,7 +267,7 @@ if (!function_exists('_f1')) {
                     @endphp
                         <div class="categoria-adicional bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 p-2 md:p-4 flex flex-col items-center text-center" style="display: none;">
                             <a href="{{ $urlCategoria }}" class="block">
-                                <div class="h-20 w-20 md:h-24 md:w-24 mb-3 md:mb-4 mx-auto">
+                                <div class="h-28 w-28 md:h-36 md:w-36 mb-3 md:mb-4 mx-auto overflow-hidden flex items-center justify-center">
                                     @if($ct2->imagen)
                                         <img loading="lazy" src="{{ asset('images/'.$ct2->imagen) }}" alt="{{ $ct2->nombre }}" class="w-full h-full object-contain">
                                     @else
@@ -292,9 +292,9 @@ if (!function_exists('_f1')) {
                                 <div class="w-full">
                                     <div class="grid grid-cols-1 gap-1">
                                         @foreach($hj3->take(8) as $hj4)
-                                        <div class="bg-gray-100 hover:bg-pink-50 rounded-md px-2 md:px-3 py-1.5 md:py-2 transition-all duration-200 border-l-2 border-transparent hover:border-pink-300 hover:shadow-md hover:scale-105">
+                                        <div class="bg-gray-100 hover:bg-orange-50 rounded-md px-2 md:px-3 py-1.5 md:py-2 transition-all duration-200 border-l-2 border-transparent hover:border-orange-300 hover:shadow-md hover:scale-105">
                                             {{-- añadirCam() -> _f1() --}}
-                                            <a href="{{ _f1(route('categoria.show', $hj4->slug)) }}" class="text-xs md:text-base text-gray-700 hover:text-pink-600 transition-colors duration-200 block">
+                                            <a href="{{ _f1(route('categoria.show', $hj4->slug)) }}" class="text-xs md:text-base text-gray-700 hover:text-[#e97b11] transition-colors duration-200 block">
                                                 <div class="flex items-center justify-between">
                                                     <span class="flex-1 min-w-0 text-left">{{ $hj4->nombre }}</span>
                                                     <svg class="w-3 h-3 text-gray-400 ml-2 flex-shrink-0 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">

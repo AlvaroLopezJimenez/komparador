@@ -7,6 +7,7 @@ class LimpiarUrlDeTiendas
     /**
      * Limpia una URL con una normalización base común y reglas por tienda.
      * Único punto de verdad: actualizar aquí para que se aplique en formularios y backend.
+     * Reglas específicas: Amazon, Pccomponentes, Coolmod, Bitiba/Zooplus (activeVariant).
      *
      * @param string $url URL a limpiar
      * @return string URL limpia
@@ -18,10 +19,13 @@ class LimpiarUrlDeTiendas
             return $url;
         }
 
+        $urlOriginal = $url;
         $url = $this->limpiarGenerica($url);
         $url = $this->limpiarAmazon($url);
         $url = $this->limpiarPccomponentes($url);
         $url = $this->limpiarCoolmod($url);
+        $url = $this->limpiarBitiba($url, $urlOriginal);
+        $url = $this->limpiarZooplus($url, $urlOriginal);
 
         return $url;
     }
@@ -136,5 +140,45 @@ class LimpiarUrlDeTiendas
             return substr($url, 0, -1);
         }
         return $url;
+    }
+
+    /**
+     * Limpia URL de Bitiba: conserva activeVariant (variante de producto en listado/ficha).
+     */
+    protected function limpiarBitiba(string $url, string $urlOriginal): string
+    {
+        if ($url === '' || !str_contains(mb_strtolower($url), 'bitiba')) {
+            return $url;
+        }
+
+        return $this->conservarActiveVariant($url, $urlOriginal);
+    }
+
+    /**
+     * Limpia URL de Zooplus: conserva activeVariant (variante de producto en listado/ficha).
+     */
+    protected function limpiarZooplus(string $url, string $urlOriginal): string
+    {
+        if ($url === '' || !str_contains(mb_strtolower($url), 'zooplus')) {
+            return $url;
+        }
+
+        return $this->conservarActiveVariant($url, $urlOriginal);
+    }
+
+    private function conservarActiveVariant(string $url, string $urlOriginal): string
+    {
+        $query = parse_url($urlOriginal, PHP_URL_QUERY);
+        if (!is_string($query) || $query === '') {
+            return $url;
+        }
+
+        parse_str($query, $params);
+        $activeVariant = trim((string) ($params['activeVariant'] ?? ''));
+        if ($activeVariant === '') {
+            return $url;
+        }
+
+        return $url . '?activeVariant=' . rawurlencode($activeVariant);
     }
 }

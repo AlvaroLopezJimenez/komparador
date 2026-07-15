@@ -29,7 +29,7 @@ class EspecificacionesController extends Controller
             $columnasData = null;
             $esUnidadUnica = ($producto->unidadDeMedida === 'unidadUnica');
             
-            if ($esUnidadUnica && $producto->categoria_id_especificaciones_internas && $producto->categoria_especificaciones_internas_elegidas) {
+            if ($producto->categoria_id_especificaciones_internas && $producto->categoria_especificaciones_internas_elegidas) {
                 $categoriaEspecificaciones = \App\Models\Categoria::find($producto->categoria_id_especificaciones_internas);
                 $especificacionesElegidas = $producto->categoria_especificaciones_internas_elegidas;
                 
@@ -50,12 +50,19 @@ class EspecificacionesController extends Controller
                 
                 if (count($filtrosCombinados) > 0 && isset($especificacionesElegidas['_columnas'])) {
                     $columnasIds = $especificacionesElegidas['_columnas'] ?? [];
+                    if (is_array($columnasIds) && $columnasIds !== [] && !array_is_list($columnasIds)) {
+                        $columnasIds = array_keys($columnasIds);
+                    }
+                    $columnasIds = array_map('strval', (array) $columnasIds);
+                    if (!$esUnidadUnica) {
+                        $columnasIds = array_slice($columnasIds, 0, 1);
+                    }
                     $filtros = $filtrosCombinados;
                     
                     // Crear mapa de líneas principales con sus datos
                     $columnasData = [];
                     foreach ($filtros as $filtro) {
-                        if (in_array($filtro['id'], $columnasIds)) {
+                        if (in_array((string) ($filtro['id'] ?? ''), $columnasIds, true)) {
                             // Procesar sublíneas para añadir texto alternativo si existe
                             $subprincipales = [];
                             foreach ($filtro['subprincipales'] ?? [] as $sub) {
