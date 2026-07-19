@@ -128,13 +128,3 @@ class SignedUrlService
         return base64_decode($base64);
     }
 }
-
-
-
-
-
-
-
-
-
-

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Crons;
 
+use App\Console\Commands\CronDescargaCSVTiendas;
 use App\Http\Controllers\Controller;
 use App\Models\EjecucionGlobal;
 use App\Models\Tienda;
@@ -24,7 +25,7 @@ class CronDescargaCSVTiendasController extends Controller
 
     public function __invoke(Request $request): JsonResponse
     {
-        $token = $request->query('token');
+        $token = $request->query('token') ?: $request->input('token');
         if (!$token || $token !== env('TOKEN_ACTUALIZAR_PRECIOS')) {
             return response()->json([
                 'status' => 'error',
@@ -32,7 +33,31 @@ class CronDescargaCSVTiendasController extends Controller
             ], 403);
         }
 
+        // Via HTTP (navegador, wget del hosting, AJAX del panel): el proxy suele cortar a ~300s.
+        // Lanzamos un proceso CLI detached que no depende de esa petición HTTP.
+        // ?sync=1 fuerza el trabajo en esta petición (solo para depurar).
+        if (!app()->runningInConsole() && !$request->boolean('sync')) {
+            $bloqueo = $this->comprobarEjecucionEnCurso();
+            if ($bloqueo !== null) {
+                return $bloqueo;
+            }
+
+            if (!CronDescargaCSVTiendas::lanzarDetached((string) $token)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'No se pudo lanzar el proceso en segundo plano (exec/nohup). Prueba ?sync=1 o revisa logs.',
+                ], 500);
+            }
+
+            return response()->json([
+                'status' => 'ok',
+                'message' => 'Cron descarga CSV lanzado en segundo plano. El proceso sigue aunque esta respuesta HTTP ya haya terminado.',
+            ]);
+        }
+
+        @ignore_user_abort(true);
         @set_time_limit(0);
+        @ini_set('max_execution_time', '0');
 
         $resumenLimpieza = $this->descargaCsvAwinTiendaService->limpiarDirectoriosCsvAwinAntiguos(
             DescargaCsvAwinTiendaService::HORAS_ANTIGUEDAD_LIMPIEZA_DEFECTO

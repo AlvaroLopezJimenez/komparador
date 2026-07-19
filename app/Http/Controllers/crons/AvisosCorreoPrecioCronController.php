@@ -8,121 +8,170 @@ use App\Models\Categoria;
 use App\Models\CorreoAvisoPrecio;
 use App\Models\OfertaProducto;
 use App\Models\Producto;
+use App\Models\EjecucionGlobal;
 use App\Services\SacarPrimeraOfertaDeUnProductoAplicadoDescuentosYChollos;
 
 class AvisosCorreoPrecioCronController extends Controller
 {
     public function __invoke(): int
     {
-        // Limpiar suscripciones no confirmadas caducadas (más de 1 hora).
-        CorreoAvisoPrecio::query()
-            ->where('confirmado', 'no')
-            ->where('updated_at', '<=', now()->subHour())
-            ->delete();
+        $ejecucion = EjecucionGlobal::create([
+            'inicio' => now(),
+            'fin' => null,
+            'nombre' => 'cron_avisos_generar_correo_precio',
+            'total' => 0,
+            'total_guardado' => 0,
+            'total_errores' => 0,
+            'log' => [
+                'estado' => 'running',
+                'paso_actual' => 'procesamiento',
+                'pasos' => [
+                    [
+                        'momento' => now()->toDateTimeString(),
+                        'paso' => 'inicio',
+                        'detalle' => 'Ejecución iniciada'
+                    ]
+                ]
+            ]
+        ]);
 
-        $suscripciones = CorreoAvisoPrecio::query()
-            ->with(['producto'])
-            ->where('confirmado', 'si')
-            ->where(function ($query) {
-                $query->whereNull('ultimo_envio_correo')
-                    ->orWhere('ultimo_envio_correo', '<=', now()->subDays(7));
-            })
-            ->get();
+        try {
+            // Limpiar suscripciones no confirmadas caducadas (más de 1 hora).
+            CorreoAvisoPrecio::query()
+                ->where('confirmado', 'no')
+                ->where('updated_at', '<=', now()->subHour())
+                ->delete();
 
-        foreach ($suscripciones as $suscripcion) {
-            $precioMinimo = null;
-            $tipoTexto = null;
+            $suscripciones = CorreoAvisoPrecio::query()
+                ->with(['producto'])
+                ->where('confirmado', 'si')
+                ->where(function ($query) {
+                    $query->whereNull('ultimo_envio_correo')
+                        ->orWhere('ultimo_envio_correo', '<=', now()->subDays(7));
+                })
+                ->get();
 
-            if ($this->esSuscripcionCategoria($suscripcion)) {
-                $meta = $this->metaSuscripcionCategoria($suscripcion);
-                $categoria = isset($meta['categoria_id']) ? Categoria::query()->find((int) $meta['categoria_id']) : null;
-                if (!$categoria) {
-                    continue;
-                }
+            $avisosCreados = 0;
 
-                $productosCoincidentes = $this->buscarProductosCategoriaPorEspecificaciones($suscripcion, $categoria);
-                if ($productosCoincidentes === []) {
-                    continue;
-                }
+            foreach ($suscripciones as $suscripcion) {
+                $precioMinimo = null;
+                $tipoTexto = null;
 
-                $seleccionCategoria = $this->normalizarSeleccion($suscripcion->especificaciones_internas_seleccionadas ?? []);
-                $productosConPrecioFiltrado = array_values(array_filter(array_map(function (Producto $producto) use ($seleccionCategoria) {
-                    $precioFiltrado = $this->resolverPrecioProductoCategoriaSegunSeleccion($producto, $seleccionCategoria);
-                    if ($precioFiltrado === null) {
-                        return null;
+                if ($this->esSuscripcionCategoria($suscripcion)) {
+                    $meta = $this->metaSuscripcionCategoria($suscripcion);
+                    $categoria = isset($meta['categoria_id']) ? Categoria::query()->find((int) $meta['categoria_id']) : null;
+                    if (!$categoria) {
+                        continue;
                     }
-                    $producto->precio_alerta = $precioFiltrado;
-                    return $producto;
-                }, $productosCoincidentes)));
-                if ($productosConPrecioFiltrado === []) {
+
+                    $productosCoincidentes = $this->buscarProductosCategoriaPorEspecificaciones($suscripcion, $categoria);
+                    if ($productosCoincidentes === []) {
+                        continue;
+                    }
+
+                    $seleccionCategoria = $this->normalizarSeleccion($suscripcion->especificaciones_internas_seleccionadas ?? []);
+                    $productosConPrecioFiltrado = array_values(array_filter(array_map(function (Producto $producto) use ($seleccionCategoria) {
+                        $precioFiltrado = $this->resolverPrecioProductoCategoriaSegunSeleccion($producto, $seleccionCategoria);
+                        if ($precioFiltrado === null) {
+                            return null;
+                        }
+                        $producto->precio_alerta = $precioFiltrado;
+                        return $producto;
+                    }, $productosCoincidentes)));
+                    if ($productosConPrecioFiltrado === []) {
+                        continue;
+                    }
+
+                    $precioMinimo = collect($productosConPrecioFiltrado)->min(fn (Producto $producto) => (float) ($producto->precio_alerta ?? $producto->precio ?? 0));
+                    $tipoTexto = 'categoria';
+                } elseif ($suscripcion->producto_id) {
+                    $producto = $suscripcion->producto;
+                    if (!$producto) {
+                        continue;
+                    }
+
+                    $ofertas = OfertaProducto::query()
+                        ->where('producto_id', $producto->id)
+                        ->where('mostrar', 'si')
+                        ->whereNotNull('precio_unidad')
+                        ->get();
+
+                    $ofertasFiltradas = $this->filtrarOfertasPorEspecificaciones(
+                        $ofertas->all(),
+                        is_array($suscripcion->especificaciones_internas_seleccionadas)
+                            ? $suscripcion->especificaciones_internas_seleccionadas
+                            : []
+                    );
+
+                    if (empty($ofertasFiltradas)) {
+                        continue;
+                    }
+
+                    $precioMinimo = collect($ofertasFiltradas)
+                        ->map(fn (OfertaProducto $oferta) => (float) $oferta->precio_unidad)
+                        ->min();
+                    $tipoTexto = 'producto';
+                } else {
                     continue;
                 }
 
-                $precioMinimo = collect($productosConPrecioFiltrado)->min(fn (Producto $producto) => (float) ($producto->precio_alerta ?? $producto->precio ?? 0));
-                $tipoTexto = 'categoria';
-            } elseif ($suscripcion->producto_id) {
-                $producto = $suscripcion->producto;
-                if (!$producto) {
+                if ($precioMinimo === null || $precioMinimo > (float) $suscripcion->precio_limite) {
                     continue;
                 }
 
-                $ofertas = OfertaProducto::query()
-                    ->where('producto_id', $producto->id)
-                    ->where('mostrar', 'si')
-                    ->whereNotNull('precio_unidad')
-                    ->get();
+                $existeAviso = Aviso::query()
+                    ->where('avisoable_type', CorreoAvisoPrecio::class)
+                    ->where('avisoable_id', $suscripcion->id)
+                    ->where('oculto', false)
+                    ->exists();
 
-                $ofertasFiltradas = $this->filtrarOfertasPorEspecificaciones(
-                    $ofertas->all(),
-                    is_array($suscripcion->especificaciones_internas_seleccionadas)
-                        ? $suscripcion->especificaciones_internas_seleccionadas
-                        : []
-                );
-
-                if (empty($ofertasFiltradas)) {
+                if ($existeAviso) {
                     continue;
                 }
 
-                $precioMinimo = collect($ofertasFiltradas)
-                    ->map(fn (OfertaProducto $oferta) => (float) $oferta->precio_unidad)
-                    ->min();
-                $tipoTexto = 'producto';
-            } else {
-                continue;
+                $texto = 'Aviso de correo pendiente (' . $tipoTexto . ') - '
+                    . $suscripcion->correo
+                    . ' - limite: '
+                    . number_format((float) $suscripcion->precio_limite, 2, '.', '')
+                    . ' - precio actual: '
+                    . number_format((float) $precioMinimo, 2, '.', '');
+
+                Aviso::create([
+                    'texto_aviso' => $texto,
+                    'fecha_aviso' => now(),
+                    'user_id' => 1,
+                    'avisoable_type' => CorreoAvisoPrecio::class,
+                    'avisoable_id' => $suscripcion->id,
+                    'oculto' => false,
+                ]);
+
+                $avisosCreados++;
             }
 
-            if ($precioMinimo === null || $precioMinimo > (float) $suscripcion->precio_limite) {
-                continue;
-            }
-
-            $existeAviso = Aviso::query()
-                ->where('avisoable_type', CorreoAvisoPrecio::class)
-                ->where('avisoable_id', $suscripcion->id)
-                ->where('oculto', false)
-                ->exists();
-
-            if ($existeAviso) {
-                continue;
-            }
-
-            $texto = 'Aviso de correo pendiente (' . $tipoTexto . ') - '
-                . $suscripcion->correo
-                . ' - limite: '
-                . number_format((float) $suscripcion->precio_limite, 2, '.', '')
-                . ' - precio actual: '
-                . number_format((float) $precioMinimo, 2, '.', '');
-
-            Aviso::create([
-                'texto_aviso' => $texto,
-                'fecha_aviso' => now(),
-                'user_id' => 1,
-                'avisoable_type' => CorreoAvisoPrecio::class,
-                'avisoable_id' => $suscripcion->id,
-                'oculto' => false,
+            $ejecucion->update([
+                'fin' => now(),
+                'total' => $suscripciones->count(),
+                'total_guardado' => $avisosCreados,
+                'log' => [
+                    'estado' => 'ok',
+                    'paso_actual' => 'finalizado',
+                    'resumen' => $suscripciones->count() . ' suscripciones procesadas, ' . $avisosCreados . ' avisos generados.'
+                ]
             ]);
-        }
 
-        return 0;
+            return 0;
+        } catch (\Throwable $e) {
+            $ejecucion->update([
+                'fin' => now(),
+                'total_errores' => 1,
+                'log' => [
+                    'estado' => 'error',
+                    'paso_actual' => 'error',
+                    'error' => $e->getMessage()
+                ]
+            ]);
+            throw $e;
+        }
     }
 
     /**

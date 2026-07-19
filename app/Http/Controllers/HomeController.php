@@ -266,6 +266,13 @@ public function todasCategorias()
                                      count($ca1->especificaciones_internas['filtros']) > 0;
 
     if ($tieneEspecificacionesInternas) {
+        // Máximo 3 páginas de paginación; page > 3 → página 1
+        $maxPaginas = 3;
+        $porPagina = 36;
+        if ((int) $request->input('page', 1) > $maxPaginas) {
+            return redirect()->to($request->fullUrlWithoutQuery(['page']));
+        }
+
         // Parsear filtros de la URL (ignorar los que no existen)
         // $filtrosAplicados -> $fa1, $precioMin -> $pm1, $precioMax -> $pm2, $orden -> $o1, $rebajado -> $r1
         $fa1 = [];
@@ -313,7 +320,6 @@ public function todasCategorias()
         if ($ordenGlobalPorPrecioConFiltros) {
             $query->orderBy('id');
             $todosLosProductos = $query->get();
-            $porPagina = 36;
             $paginaActual = LengthAwarePaginator::resolveCurrentPage();
 
             if ($todosLosProductos->isEmpty()) {
@@ -339,7 +345,7 @@ public function todasCategorias()
                         return (float) ($producto->precio ?? 999999);
                     })
                     ->values();
-                $total = $ordenados->count();
+                $total = min($ordenados->count(), $porPagina * $maxPaginas);
                 $slice = $ordenados->forPage($paginaActual, $porPagina);
                 $pr1 = new LengthAwarePaginator(
                     $slice,
@@ -384,8 +390,19 @@ public function todasCategorias()
                 ->orderBy('nombre', 'asc');
             }
 
-            // Paginación (36 productos por página)
-            $pr1 = $query->paginate(36)->withQueryString();
+            // Paginación (36 productos por página, máximo 3 páginas)
+            $pr1 = $query->paginate($porPagina)->withQueryString();
+            $totalCapped = min($pr1->total(), $porPagina * $maxPaginas);
+            if ($pr1->total() > $totalCapped) {
+                $pr1 = new LengthAwarePaginator(
+                    $pr1->items(),
+                    $totalCapped,
+                    $porPagina,
+                    $pr1->currentPage(),
+                    ['path' => LengthAwarePaginator::resolveCurrentPath()]
+                );
+                $pr1->withQueryString();
+            }
 
             // Recalcular precios de productos basándose en ofertas que coinciden con los filtros
             if (!empty($fa1)) {

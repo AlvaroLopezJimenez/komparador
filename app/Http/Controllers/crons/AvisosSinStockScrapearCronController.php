@@ -175,12 +175,15 @@ class AvisosSinStockScrapearCronController extends Controller
             $logBase['paso_actual'] = 'finalizado';
             $logBase['contadores'] = $contadores;
             $logBase['resultados'] = $resultados;
+            $logBase['aplazados'] = $aplazados;
+            $logBase['precio_aplicados'] = $precioAplicados;
 
             $ejecucion->update([
                 'fin'            => now(),
                 'total'          => $contadores['procesados'],
                 'total_guardado' => $precioAplicados,
-                'total_errores'  => $aplazados,
+                // Aplazados = funcionamiento normal (sin stock / reintento), no son errores
+                'total_errores'  => 0,
                 'log'            => $logBase,
             ]);
 
@@ -629,7 +632,7 @@ class AvisosSinStockScrapearCronController extends Controller
             $numeroActual = (int) $matches[1];
         }
 
-        $fechaActual = Carbon::parse($aviso->fecha_aviso);
+        $fechaActual = now();
 
         switch ($numeroActual) {
             case 0:

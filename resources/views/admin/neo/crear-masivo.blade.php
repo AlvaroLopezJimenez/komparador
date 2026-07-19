@@ -120,6 +120,10 @@
                     <label for="cantidad_urls_analizar" class="text-sm text-gray-700 dark:text-gray-300">Cantidad a ejecutar:</label>
                     <input type="number" id="cantidad_urls_analizar" min="1" step="1" value="0"
                         class="w-24 px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm">
+                    <label for="desde_url_analizar" class="text-sm text-gray-700 dark:text-gray-300" title="Posición 1-based en el textarea (1 = primera URL)">Empezar desde:</label>
+                    <input type="number" id="desde_url_analizar" min="1" step="1" value="1"
+                        class="w-24 px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                        title="Número de URL en la lista desde la que empezar (1 = primera)">
                     <span id="info_total_urls_textarea" class="text-sm text-gray-600 dark:text-gray-400">Total URLs: 0</span>
                     <span id="info_progreso_lote" class="text-sm text-gray-500 dark:text-gray-400"></span>
                     <button type="button" id="btnRepetirMismoLote"
@@ -1642,7 +1646,62 @@
         ).urls;
     }
 
-    function actualizarEstadoLotesDesdeTextarea() {
+    function clampDesdeUrlAnalizar(n, total) {
+        if (!Number.isFinite(n) || n < 1) n = 1;
+        if (total > 0 && n > total) n = total;
+        if (total <= 0) n = 1;
+        return n;
+    }
+
+    /** Aplica el input «Empezar desde» (1-based) al cursor de lotes. */
+    function aplicarDesdeUrlAnalizarDesdeInput() {
+        const inputDesde = document.getElementById('desde_url_analizar');
+        const total = estadoLotesAnalisis.urls.length;
+        if (!inputDesde) return;
+        const n = clampDesdeUrlAnalizar(parseInt(inputDesde.value, 10), total);
+        inputDesde.value = n;
+        inputDesde.max = total > 0 ? total : 1;
+        estadoLotesAnalisis.cursor = total > 0 ? (n - 1) : 0;
+    }
+
+    function sincronizarInputDesdeUrlAnalizar() {
+        const inputDesde = document.getElementById('desde_url_analizar');
+        const total = estadoLotesAnalisis.urls.length;
+        if (!inputDesde) return;
+        inputDesde.max = total > 0 ? total : 1;
+        if (total <= 0) {
+            inputDesde.value = 1;
+            return;
+        }
+        inputDesde.value = clampDesdeUrlAnalizar(estadoLotesAnalisis.cursor + 1, total);
+    }
+
+    function refrescarInfoProgresoLoteCrearMasivo(dedupeOmitidas) {
+        const totalActual = estadoLotesAnalisis.urls.length;
+        const infoTotal = document.getElementById('info_total_urls_textarea');
+        const infoProgreso = document.getElementById('info_progreso_lote');
+        const btnRepetir = document.getElementById('btnRepetirMismoLote');
+        const btnAnalizarTexto = document.getElementById('btnAnalizarTexto');
+        sincronizarInputDesdeUrlAnalizar();
+        if (infoTotal) {
+            let txtTotal = 'Total URLs: ' + totalActual;
+            if (dedupeOmitidas > 0) {
+                txtTotal += ' (' + dedupeOmitidas + ' duplicada' + (dedupeOmitidas !== 1 ? 's' : '') + ' omitida' + (dedupeOmitidas !== 1 ? 's' : '') + ')';
+            }
+            infoTotal.textContent = txtTotal;
+        }
+        const pendientes = Math.max(totalActual - estadoLotesAnalisis.cursor, 0);
+        if (infoProgreso) infoProgreso.textContent = 'Pendientes: ' + pendientes;
+        if (btnAnalizarTexto) btnAnalizarTexto.textContent = estadoLotesAnalisis.cursor > 0 && pendientes > 0 ? 'Analizar siguientes URLs' : 'Analizar URLs';
+        if (btnRepetir) btnRepetir.classList.toggle('hidden', !(estadoLotesAnalisis.lastStart !== null && estadoLotesAnalisis.lastEnd !== null));
+    }
+
+    /**
+     * opciones.respetarDesdeInput: lee «Empezar desde» al cursor (p. ej. al pulsar Analizar).
+     * Sin flag: el cursor manda (p. ej. tras avanzar un lote) y se refleja en el input.
+     */
+    function actualizarEstadoLotesDesdeTextarea(opciones) {
+        opciones = opciones || {};
         const dedupe = aplicarDeduplicacionTextareaCrearMasivo({ reescribir: true });
         const urls = dedupe.urls.length ? dedupe.urls : obtenerUrlsLimpiasTextarea();
         const signature = urls.join('\n');
@@ -1657,26 +1716,17 @@
             if (inputCantidad) inputCantidad.value = total > 0 ? CANTIDAD_LOTE_DEFECTO_CREAR_MASIVO : 0;
         } else {
             estadoLotesAnalisis.urls = urls;
-        }
-        const totalActual = estadoLotesAnalisis.urls.length;
-        const infoTotal = document.getElementById('info_total_urls_textarea');
-        const infoProgreso = document.getElementById('info_progreso_lote');
-        const btnRepetir = document.getElementById('btnRepetirMismoLote');
-        const btnAnalizarTexto = document.getElementById('btnAnalizarTexto');
-        if (inputCantidad && (!inputCantidad.value || parseInt(inputCantidad.value, 10) <= 0)) {
-            inputCantidad.value = totalActual > 0 ? CANTIDAD_LOTE_DEFECTO_CREAR_MASIVO : 0;
-        }
-        if (infoTotal) {
-            let txtTotal = 'Total URLs: ' + totalActual;
-            if (dedupe.omitidas > 0) {
-                txtTotal += ' (' + dedupe.omitidas + ' duplicada' + (dedupe.omitidas !== 1 ? 's' : '') + ' omitida' + (dedupe.omitidas !== 1 ? 's' : '') + ')';
+            if (estadoLotesAnalisis.cursor > total) {
+                estadoLotesAnalisis.cursor = Math.max(0, total);
             }
-            infoTotal.textContent = txtTotal;
+            if (opciones.respetarDesdeInput) {
+                aplicarDesdeUrlAnalizarDesdeInput();
+            }
         }
-        const pendientes = Math.max(totalActual - estadoLotesAnalisis.cursor, 0);
-        if (infoProgreso) infoProgreso.textContent = 'Pendientes: ' + pendientes;
-        if (btnAnalizarTexto) btnAnalizarTexto.textContent = estadoLotesAnalisis.cursor > 0 && pendientes > 0 ? 'Analizar siguientes URLs' : 'Analizar URLs';
-        if (btnRepetir) btnRepetir.classList.toggle('hidden', !(estadoLotesAnalisis.lastStart !== null && estadoLotesAnalisis.lastEnd !== null));
+        if (inputCantidad && (!inputCantidad.value || parseInt(inputCantidad.value, 10) <= 0)) {
+            inputCantidad.value = total > 0 ? CANTIDAD_LOTE_DEFECTO_CREAR_MASIVO : 0;
+        }
+        refrescarInfoProgresoLoteCrearMasivo(dedupe.omitidas || 0);
     }
 
     function obtenerLoteSegunCantidad(repetirUltimo) {
@@ -3948,6 +3998,15 @@
     document.getElementById('urls').addEventListener('paste', function() {
         setTimeout(actualizarEstadoLotesDesdeTextarea, 0);
     });
+    (function() {
+        const inputDesde = document.getElementById('desde_url_analizar');
+        if (!inputDesde) return;
+        function onDesdeChange() {
+            actualizarEstadoLotesDesdeTextarea({ respetarDesdeInput: true });
+        }
+        inputDesde.addEventListener('change', onDesdeChange);
+        inputDesde.addEventListener('input', onDesdeChange);
+    })();
     document.getElementById('btnRepetirMismoLote').addEventListener('click', function() {
         ejecutarAnalisisLote(true);
     });
@@ -4092,6 +4151,25 @@
         }
 
         actualizarAvisoNeoAniadidaSiEnFilaCrearMasivo(fila, fila.__rowData);
+
+        if (fila.__rowData.descartada) {
+            const toggle = fila.querySelector('.descartar-toggle-wrap');
+            if (toggle) toggle.remove();
+            const urlFila = (fila.__rowData.url_normalizada || fila.__rowData.url) || '';
+            let actionWrap = fila.querySelector('.acciones-url-wrap');
+            if (!actionWrap) {
+                const topRow = fila.querySelector('.flex.justify-between');
+                if (topRow) {
+                    actionWrap = document.createElement('div');
+                    actionWrap.className = 'acciones-url-wrap flex-shrink-0 flex items-start gap-3';
+                    topRow.appendChild(actionWrap);
+                }
+            }
+            if (actionWrap) {
+                actionWrap.innerHTML = htmlBtnEliminarDeDescartadasCrearMasivo(urlFila);
+            }
+            fila.__rowData.ofertaGenerada = true;
+        }
 
         const msgEl = fila.querySelector('.generado-msg');
         if (msgEl) {
@@ -4256,7 +4334,8 @@
     }
 
     async function ejecutarAnalisisLote(repetirUltimo) {
-        actualizarEstadoLotesDesdeTextarea();
+        // Al analizar (no al repetir), respeta «Empezar desde» del input
+        actualizarEstadoLotesDesdeTextarea({ respetarDesdeInput: !repetirUltimo });
         const lote = obtenerLoteSegunCantidad(repetirUltimo);
         if (!lote || !Array.isArray(lote.urls) || lote.urls.length === 0) {
             alert(repetirUltimo ? 'No hay un lote previo para repetir.' : 'No quedan URLs pendientes por analizar.');
@@ -4605,14 +4684,58 @@
         return '<div class="cm-texto-cantidad-alt-wrap mt-3 mb-2 w-full">' +
             '<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Texto cantidad alternativo <span class="text-red-500">*</span></label>' +
             '<div class="cm-texto-cantidad-alt-botones flex flex-wrap gap-1.5 mb-1.5 min-h-0" aria-live="polite"></div>' +
-            '<textarea class="cm-texto-cantidad-alt-input w-full h-[2.375rem] min-h-0 px-3 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm resize-none leading-normal overflow-hidden" rows="1" maxlength="255" autocomplete="off" placeholder="Ej: 6 botellines"></textarea>' +
+            '<div class="flex gap-2 w-full">' +
+                '<input type="number" step="any" class="cm-texto-cantidad-alt-num w-24 px-3 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm" placeholder="Cant.">' +
+                '<input type="text" class="cm-texto-cantidad-alt-txt flex-1 px-3 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm" placeholder="Ej: Botellines 33 cl">' +
+            '</div>' +
+            '<input type="hidden" class="cm-texto-cantidad-alt-input">' +
             '</div>';
     }
 
     const URL_TEXTOS_CANTIDAD_ALT_CREAR_MASIVO = '{{ route('admin.ofertas.textos-cantidad-alternativo', ['productoId' => '__PID__']) }}';
 
-    function tokensTextoCantidadAltCrearMasivo(valor) {
-        return String(valor || '').trim().split(/\s+/).filter(Boolean);
+    function parseTextoCantidadAlternativoCrearMasivo(valor) {
+        if (!valor) return { num: '', txt: '' };
+        try {
+            const decoded = JSON.parse(valor);
+            if (decoded && typeof decoded === 'object') {
+                return {
+                    num: decoded.num !== null && decoded.num !== undefined ? decoded.num : '',
+                    txt: decoded.txt || ''
+                };
+            }
+        } catch (e) {
+            // Fallback for old format
+            const match = String(valor).trim().match(/^(\d+(?:[.,]\d+)?)\s*(.*)$/);
+            if (match) {
+                return {
+                    num: match[1].replace(',', '.'),
+                    txt: match[2].trim()
+                };
+            }
+        }
+        return { num: '', txt: String(valor).trim() };
+    }
+
+    function actualizarTextoCantidadAlternativoHiddenCrearMasivo(wrap) {
+        if (!wrap) return;
+        const numInput = wrap.querySelector('.cm-texto-cantidad-alt-num');
+        const txtInput = wrap.querySelector('.cm-texto-cantidad-alt-txt');
+        const hiddenInput = wrap.querySelector('.cm-texto-cantidad-alt-input');
+        if (!numInput || !txtInput || !hiddenInput) return;
+
+        const numVal = numInput.value.trim();
+        const txtVal = txtInput.value.trim();
+
+        if (numVal === '' && txtVal === '') {
+            hiddenInput.value = '';
+        } else {
+            hiddenInput.value = JSON.stringify({
+                num: numVal !== '' ? Number(numVal) : null,
+                txt: txtVal
+            });
+        }
+        hiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
     }
 
     function posicionarTextoCantidadAltEnContainerCrearMasivo(container, wrap) {
@@ -4654,13 +4777,41 @@
     function sincronizarBotonesTextoCantidadAltEnFila(div) {
         if (!div) return;
         const wrap = div.querySelector('.cm-texto-cantidad-alt-wrap');
-        const input = div.querySelector('.cm-texto-cantidad-alt-input');
-        if (!wrap || !input) return;
-        const tokens = tokensTextoCantidadAltCrearMasivo(input.value).map(function(t) { return t.toLowerCase(); });
+        const txtInput = div.querySelector('.cm-texto-cantidad-alt-txt');
+        if (!wrap || !txtInput) return;
+        const val = txtInput.value.trim().toLowerCase();
         wrap.querySelectorAll('.cm-texto-cantidad-alt-btn').forEach(function(btn) {
             const palabra = String(btn.dataset.palabra || btn.textContent || '').trim().toLowerCase();
-            marcarBotonTextoCantidadAltCrearMasivo(btn, palabra !== '' && tokens.includes(palabra));
+            marcarBotonTextoCantidadAltCrearMasivo(btn, palabra !== '' && val === palabra);
         });
+    }
+
+    /**
+     * Si se marca una especificación cuyo texto coincide con un botón de
+     * «Texto cantidad alternativo», copia ese texto al segundo campo (txt).
+     */
+    function autocompletarTextoCantidadAltDesdeSpecMarcadaCrearMasivo(div, textoSpec) {
+        if (!div) return;
+        const wrap = div.querySelector('.cm-texto-cantidad-alt-wrap');
+        const txtInput = wrap && wrap.querySelector('.cm-texto-cantidad-alt-txt');
+        if (!wrap || !txtInput) return;
+        const objetivo = String(textoSpec || '').trim().toLowerCase();
+        if (!objetivo) return;
+        let textoMatch = null;
+        wrap.querySelectorAll('.cm-texto-cantidad-alt-btn').forEach(function(btn) {
+            if (textoMatch) return;
+            const palabra = String(btn.dataset.palabra || btn.textContent || '').trim();
+            if (palabra && palabra.toLowerCase() === objetivo) {
+                textoMatch = palabra;
+            }
+        });
+        if (!textoMatch) return;
+        if (txtInput.value.trim() === textoMatch) {
+            sincronizarBotonesTextoCantidadAltEnFila(div);
+            return;
+        }
+        txtInput.value = textoMatch;
+        txtInput.dispatchEvent(new Event('input', { bubbles: true }));
     }
 
     async function cargarBotonesTextoCantidadAlternativoCrearMasivo(div, productoId) {
@@ -4677,41 +4828,47 @@
             const url = URL_TEXTOS_CANTIDAD_ALT_CREAR_MASIVO.replace('__PID__', String(productoId));
             const response = await fetch(url, { headers: { Accept: 'application/json' } });
             const data = await response.json();
-            const palabras = Array.isArray(data.palabras) ? data.palabras : [];
+            const textos = Array.isArray(data.textos) ? data.textos : [];
 
-            if (!palabras.length) {
+            const sugerencias = [];
+            textos.forEach(function(t) {
+                let txtPart = '';
+                try {
+                    const decoded = JSON.parse(t);
+                    if (decoded && typeof decoded === 'object') {
+                        txtPart = (decoded.txt || '').trim();
+                    }
+                } catch (e) {
+                    // Fallback to old text parsing
+                    const match = String(t).trim().match(/^(\d+(?:[.,]\d+)?)\s*(.*)$/);
+                    if (match) {
+                        txtPart = match[2].trim();
+                    } else {
+                        txtPart = String(t).trim();
+                    }
+                }
+                if (txtPart && !sugerencias.includes(txtPart)) {
+                    sugerencias.push(txtPart);
+                }
+            });
+
+            if (!sugerencias.length) {
                 botonesWrap.innerHTML = '';
                 return;
             }
 
-            botonesWrap.innerHTML = palabras.map(function(palabra) {
+            botonesWrap.innerHTML = sugerencias.map(function(palabra) {
                 const segura = String(palabra)
                     .replace(/&/g, '&amp;')
                     .replace(/</g, '&lt;')
                     .replace(/"/g, '&quot;');
-                return '<button type="button" class="cm-texto-cantidad-alt-btn text-xs px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-blue-100 dark:hover:bg-blue-900 hover:border-blue-400 dark:hover:border-blue-500 transition-colors" data-palabra="' + segura + '" aria-pressed="false" title="Añadir o quitar «' + segura + '»">' + segura + '</button>';
+                return '<button type="button" class="cm-texto-cantidad-alt-btn text-xs px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-blue-100 dark:hover:bg-blue-900 hover:border-blue-400 dark:hover:border-blue-500 transition-colors" data-palabra="' + segura + '" aria-pressed="false" title="Seleccionar «' + segura + '»">' + segura + '</button>';
             }).join('');
 
             sincronizarBotonesTextoCantidadAltEnFila(div);
         } catch (e) {
             botonesWrap.innerHTML = '';
         }
-    }
-
-    function togglePalabraTextoCantidadAltCrearMasivo(btn, input) {
-        if (!btn || !input) return;
-        const palabra = String(btn.dataset.palabra || btn.textContent || '').trim();
-        if (!palabra) return;
-
-        let tokens = tokensTextoCantidadAltCrearMasivo(input.value);
-        const indice = tokens.findIndex(function(t) { return t.toLowerCase() === palabra.toLowerCase(); });
-        if (indice >= 0) {
-            tokens.splice(indice, 1);
-        } else {
-            tokens.push(palabra);
-        }
-        input.value = tokens.join(' ');
-        input.dispatchEvent(new Event('input', { bubbles: true }));
     }
 
     if (!window.__cmTextoCantidadAltClickInit) {
@@ -4721,13 +4878,15 @@
             if (!btn) return;
             const filaWrap = btn.closest('.cm-texto-cantidad-alt-wrap');
             const div = btn.closest('.crear-masivo-fila');
-            const input = filaWrap ? filaWrap.querySelector('.cm-texto-cantidad-alt-input') : null;
-            if (!input) return;
-            togglePalabraTextoCantidadAltCrearMasivo(btn, input);
-            if (div) {
-                sincronizarBotonesTextoCantidadAltEnFila(div);
-                actualizarEstadoBotonGenerar(div);
+            const txtField = filaWrap ? filaWrap.querySelector('.cm-texto-cantidad-alt-txt') : null;
+            if (!txtField) return;
+            const btnVal = (btn.dataset.palabra || btn.textContent || '').trim();
+            if (txtField.value.trim() === btnVal) {
+                txtField.value = '';
+            } else {
+                txtField.value = btnVal;
             }
+            txtField.dispatchEvent(new Event('input', { bubbles: true }));
         });
     }
 
@@ -4788,14 +4947,112 @@
         return !!(inp && String(inp.value || '').trim());
     }
 
+    function autocompletarUnidadesDesdeAlternativoCrearMasivo(div) {
+        if (!div) return;
+        const wrap = div.querySelector('.cm-texto-cantidad-alt-wrap');
+        const unidadesInput = div.querySelector('.cm-unidades-oferta-input');
+        if (!wrap || !unidadesInput) return;
+
+        const numInput = wrap.querySelector('.cm-texto-cantidad-alt-num');
+        const txtInput = wrap.querySelector('.cm-texto-cantidad-alt-txt');
+        if (!numInput || !txtInput) return;
+
+        const numVal = parseFloat(numInput.value);
+        if (isNaN(numVal) || numVal <= 0) return;
+
+        const txtVal = txtInput.value.trim();
+        if (!txtVal) return;
+
+        const regex = /(\d+(?:[.,]\d+)?)\s*(l|litro|litros|cl|centilitro|centilitros|ml|mililitro|mililitros|g|gramo|gramos|kg|kilo|kilos|gr)\b/i;
+        const match = txtVal.match(regex);
+
+        let subValue = null;
+        let subUnit = null;
+
+        if (match) {
+            subValue = parseFloat(match[1].replace(',', '.'));
+            subUnit = match[2].toLowerCase();
+        } else {
+            const simpleNumRegex = /(\d+(?:[.,]\d+)?)/;
+            const simpleMatch = txtVal.match(simpleNumRegex);
+            if (simpleMatch) {
+                subValue = parseFloat(simpleMatch[1].replace(',', '.'));
+            }
+        }
+
+        if (subValue === null || isNaN(subValue)) return;
+
+        let baseValue = subValue;
+        const unidadMedida = unidadDeMedidaDesdeFuentesCrearMasivo(div.__rowData || {});
+
+        if (unidadMedida === 'litros' || unidadMedida === '100ml') {
+            if (subUnit === 'cl' || subUnit === 'centilitro' || subUnit === 'centilitros') {
+                baseValue = subValue * 0.01;
+            } else if (subUnit === 'ml' || subUnit === 'mililitro' || subUnit === 'mililitros') {
+                baseValue = subValue * 0.001;
+            } else if (subUnit === 'l' || subUnit === 'litro' || subUnit === 'litros') {
+                baseValue = subValue;
+            } else {
+                if (subUnit === null) {
+                    if (subValue >= 5) {
+                        baseValue = subValue * 0.01;
+                    } else {
+                        baseValue = subValue;
+                    }
+                }
+            }
+        } else if (unidadMedida === 'kilos' || unidadMedida === '800gramos') {
+            if (subUnit === 'g' || subUnit === 'gr' || subUnit === 'gramo' || subUnit === 'gramos') {
+                baseValue = subValue * 0.001;
+            } else if (subUnit === 'kg' || subUnit === 'kilo' || subUnit === 'kilos') {
+                baseValue = subValue;
+            } else {
+                if (subUnit === null) {
+                    if (subValue >= 5) {
+                        baseValue = subValue * 0.001;
+                    } else {
+                        baseValue = subValue;
+                    }
+                }
+            }
+        }
+
+        const totalUnidades = numVal * baseValue;
+        const rounded = Math.round(totalUnidades * 100) / 100;
+        unidadesInput.value = rounded;
+        unidadesInput.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
     function enlazarInputTextoCantidadAlternativoEnFila(div) {
-        const inp = div.querySelector('.cm-texto-cantidad-alt-input');
-        if (!inp || inp.__cmTextoAltBound) return;
-        inp.__cmTextoAltBound = true;
-        inp.addEventListener('input', function() {
-            sincronizarBotonesTextoCantidadAltEnFila(div);
-            actualizarEstadoBotonGenerar(div);
-        });
+        const wrap = div.querySelector('.cm-texto-cantidad-alt-wrap');
+        if (!wrap) return;
+        const numInput = wrap.querySelector('.cm-texto-cantidad-alt-num');
+        const txtInput = wrap.querySelector('.cm-texto-cantidad-alt-txt');
+        const hiddenInput = wrap.querySelector('.cm-texto-cantidad-alt-input');
+
+        if (hiddenInput && !hiddenInput.__cmTextoAltBound) {
+            hiddenInput.__cmTextoAltBound = true;
+            hiddenInput.addEventListener('input', function() {
+                sincronizarBotonesTextoCantidadAltEnFila(div);
+                actualizarEstadoBotonGenerar(div);
+            });
+        }
+
+        if (numInput && !numInput.__cmTextoAltBound) {
+            numInput.__cmTextoAltBound = true;
+            numInput.addEventListener('input', function() {
+                actualizarTextoCantidadAlternativoHiddenCrearMasivo(wrap);
+                autocompletarUnidadesDesdeAlternativoCrearMasivo(div);
+            });
+        }
+
+        if (txtInput && !txtInput.__cmTextoAltBound) {
+            txtInput.__cmTextoAltBound = true;
+            txtInput.addEventListener('input', function() {
+                actualizarTextoCantidadAlternativoHiddenCrearMasivo(wrap);
+                autocompletarUnidadesDesdeAlternativoCrearMasivo(div);
+            });
+        }
     }
 
     function actualizarCampoTextoCantidadAlternativoEnFila(div) {
@@ -4826,6 +5083,14 @@
         const input = wrap && wrap.querySelector('.cm-texto-cantidad-alt-input');
         if (input && valorPrevio && !String(input.value || '').trim()) {
             input.value = valorPrevio;
+        }
+
+        if (input) {
+            const parsed = parseTextoCantidadAlternativoCrearMasivo(input.value);
+            const numInput = wrap.querySelector('.cm-texto-cantidad-alt-num');
+            const txtInput = wrap.querySelector('.cm-texto-cantidad-alt-txt');
+            if (numInput) numInput.value = parsed.num;
+            if (txtInput) txtInput.value = parsed.txt;
         }
 
         const productoId = div.__rowData && div.__rowData.producto && div.__rowData.producto.id;
@@ -6479,6 +6744,9 @@
             const btnDescartarHtml = puedeDescartar
                 ? '<button type="button" class="btn-descartar-url hidden inline-flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded transition" data-url="' + String(urlFila).replace(/"/g, '&quot;') + '"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 7h12M9 7V5h6v2m-7 4v6m4-6v6"></path></svg>Descartar URL</button>'
                 : '';
+            const btnEliminarDeDescartadasHtml = r.descartada
+                ? htmlBtnEliminarDeDescartadasCrearMasivo(urlFila)
+                : '';
             const tiendaFlagsHtml = r.tienda
                 ? [
                     (String(r.tienda.mostrar_tienda || '').toLowerCase() === 'no'
@@ -6524,8 +6792,9 @@
                         <div class="spec-and-ofertas-container">${buscadorProductoHtml}${especsHtml}
                         ${ofertasExistentesHtml}</div>
                     </div>
-                    ${puedeCrear || necesitaProducto || noEntreOpciones || puedeDescartar ? `
+                    ${puedeCrear || necesitaProducto || noEntreOpciones || puedeDescartar || r.descartada ? `
                     <div class="acciones-url-wrap flex-shrink-0 flex items-start gap-3">
+                        ${btnEliminarDeDescartadasHtml}
                         ${btnDescartarHtml}
                         ${necesitaProducto || noEntreOpciones ? '<div class="flex flex-col items-stretch gap-2">' + btnAgregarProductoHtml + btnCategoriaFilaHtml + '</div>' : ''}
                         ${puedeCrear ? htmlGenerarOfertaWrap : ''}
@@ -6622,6 +6891,12 @@
                     return;
                 }
                 if (!e.target.classList.contains('spec-checkbox')) return;
+                if (e.target.checked) {
+                    autocompletarTextoCantidadAltDesdeSpecMarcadaCrearMasivo(
+                        div,
+                        obtenerTextoLabelSpecCheckboxCrearMasivo(e.target)
+                    );
+                }
                 actualizarEstadoBotonGenerar(div);
                 renderUrlResaltadaFilaCrearMasivo(div);
                 actualizarConteosOpcionesEspecsFila(div);
@@ -6673,6 +6948,15 @@
                 if (btnDescartar && btnDescartar.dataset.url) {
                     e.preventDefault();
                     abrirModalDescartarUrlCrearMasivo(btnDescartar.dataset.url, div);
+                    return;
+                }
+                const btnEliminarDescartadas = e.target.closest('.btn-eliminar-de-descartadas');
+                if (btnEliminarDescartadas) {
+                    e.preventDefault();
+                    const urlElim = btnEliminarDescartadas.dataset.url
+                        || (div.__rowData && (div.__rowData.url_normalizada || div.__rowData.url))
+                        || '';
+                    eliminarDeDescartadasCrearMasivo(div, urlElim, btnEliminarDescartadas);
                     return;
                 }
                 const btnCatFila = e.target.closest('.btn-elegir-categoria-fila-crear-masivo');
@@ -6884,7 +7168,7 @@
 
     async function buscarProductosCrearMasivo(div, query) {
         try {
-            const res = await fetch(API_BUSCAR_PRODUCTOS_URL + '?q=' + encodeURIComponent(query));
+            const res = await fetch(API_BUSCAR_PRODUCTOS_URL + '?q=' + encodeURIComponent(query) + '&sin_variantes=1');
             const data = await res.json();
             const items = Array.isArray(data) ? data : [];
             div.__productosBusqueda = items
@@ -7884,6 +8168,13 @@
         mostrarModalCapaCrearMasivo(modal, Z_INDEX_MODAL_SOBRE_URL_CREAR_MASIVO);
     }
 
+    function htmlBtnEliminarDeDescartadasCrearMasivo(url) {
+        const urlAttr = String(url || '').replace(/"/g, '&quot;');
+        return '<button type="button" class="btn-eliminar-de-descartadas inline-flex items-center px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium rounded transition" data-url="' + urlAttr + '">' +
+            '<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>' +
+            'Eliminar de descartadas</button>';
+    }
+
     function abrirModalDescartarUrlCrearMasivo(url, div) {
         const modal = document.getElementById('modal-descartar-url-crear-masivo');
         const texto = document.getElementById('modal-descartar-url-texto');
@@ -7914,15 +8205,32 @@
         );
         div.classList.add('bg-amber-50', 'dark:bg-amber-900/20', 'border', 'border-amber-200', 'dark:border-amber-700');
         const estadoEl = div.querySelector('.font-medium');
-        if (estadoEl) estadoEl.textContent = 'URL descartada';
+        if (estadoEl) {
+            if (estadoEl.childNodes.length && estadoEl.childNodes[0].nodeType === Node.TEXT_NODE) {
+                estadoEl.childNodes[0].textContent = 'URL descartada ';
+            } else {
+                estadoEl.textContent = 'URL descartada';
+            }
+        }
         const toggle = div.querySelector('.descartar-toggle-wrap');
         if (toggle) toggle.remove();
-        const actionWrap = div.querySelector('.acciones-url-wrap');
-        if (actionWrap) actionWrap.remove();
         const btnQuitar = div.querySelector('.btn-quitar-producto');
         if (btnQuitar) btnQuitar.remove();
         const btnImgProd = div.querySelector('.btn-ver-imagenes-producto-crear-masivo');
         if (btnImgProd) btnImgProd.remove();
+        const urlFila = (div.__rowData && (div.__rowData.url_normalizada || div.__rowData.url)) || '';
+        let actionWrap = div.querySelector('.acciones-url-wrap');
+        if (!actionWrap) {
+            const topRow = div.querySelector('.flex.justify-between');
+            if (topRow) {
+                actionWrap = document.createElement('div');
+                actionWrap.className = 'acciones-url-wrap flex-shrink-0 flex items-start gap-3';
+                topRow.appendChild(actionWrap);
+            }
+        }
+        if (actionWrap) {
+            actionWrap.innerHTML = htmlBtnEliminarDeDescartadasCrearMasivo(urlFila);
+        }
         const msgEl = div.querySelector('.generado-msg');
         if (msgEl) {
             msgEl.classList.remove('hidden');
@@ -7932,6 +8240,187 @@
         if (div.__rowData) {
             div.__rowData.descartada = true;
             div.__rowData.ofertaGenerada = true;
+        }
+        const flujo = window.__flujoModalUrlsCrearMasivo;
+        if (flujo && !flujo.modoFinal && div === flujo.filaActualEnModal) {
+            actualizarPieModalUrlsCrearMasivo({
+                mostrarAnterior: flujo.indice > 0,
+                mostrarSiguiente: true,
+                mostrarSaltar: false,
+            });
+        }
+    }
+
+    async function eliminarDeDescartadasCrearMasivo(div, url, btn) {
+        const urlLimpia = String(url || '').trim();
+        if (!urlLimpia) {
+            alert('No hay URL para eliminar de descartadas.');
+            return;
+        }
+        if (!confirm('¿Eliminar esta URL de descartadas?\n\n' + urlLimpia)) return;
+        if (btn) {
+            btn.disabled = true;
+            btn.classList.add('opacity-70', 'cursor-not-allowed');
+            btn.textContent = 'Eliminando...';
+        }
+        try {
+            const res = await fetch('{{ route("admin.ofertas.url_descartadas.destroy-por-url") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({ url: urlLimpia }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.success) {
+                throw new Error(data.message || data.error || 'No se pudo eliminar de descartadas');
+            }
+            restaurarFilaTrasEliminarDeDescartadasCrearMasivo(div, data.resultado || {});
+        } catch (err) {
+            alert(err.message || 'Error al eliminar de descartadas');
+            if (btn && div) {
+                const urlFila = (div.__rowData && (div.__rowData.url_normalizada || div.__rowData.url)) || urlLimpia;
+                const wrap = div.querySelector('.acciones-url-wrap');
+                if (wrap) wrap.innerHTML = htmlBtnEliminarDeDescartadasCrearMasivo(urlFila);
+            }
+        }
+    }
+
+    function restaurarFilaTrasEliminarDeDescartadasCrearMasivo(div, resultado) {
+        if (!div || !div.__rowData) return;
+        const r = div.__rowData;
+        const existiaEnOferta = !!(resultado && resultado.existia_en_oferta);
+        r.descartada = false;
+        r.ofertaGenerada = false;
+        if (!existiaEnOferta) {
+            r.existe = false;
+        }
+
+        const avisoNeo = div.querySelector('.neo-aniadida-si-aviso');
+        if (avisoNeo && resultado && (resultado.neo_actualizadas > 0 || !existiaEnOferta)) {
+            avisoNeo.remove();
+            delete r.neo_marcada_aniadida_si;
+            delete r.neo_filas_actualizadas;
+        }
+
+        const urlFila = r.url_normalizada || r.url || '';
+        const urlAttr = String(urlFila).replace(/"/g, '&quot;');
+        const flex1 = div.querySelector('.flex-1');
+        if (flex1 && !div.querySelector('.descartar-toggle-wrap')) {
+            const linkWrap = flex1.querySelector('.url-fila-link')?.closest('.mt-1') || flex1.querySelector('a.url-fila-link')?.parentElement;
+            const toggleHtml = '<div class="mt-1"><label class="descartar-toggle-wrap inline-flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400 cursor-pointer"><input type="checkbox" class="cb-descartar-url rounded border-gray-300 text-red-600 focus:ring-red-500"><span>Descartar</span></label></div>';
+            if (linkWrap) {
+                linkWrap.insertAdjacentHTML('afterend', toggleHtml);
+            } else {
+                flex1.insertAdjacentHTML('afterbegin', toggleHtml);
+            }
+        }
+
+        const msgEl = div.querySelector('.generado-msg');
+        if (msgEl) {
+            msgEl.classList.remove('hidden');
+            msgEl.className = 'mt-2 generado-msg text-sm font-medium text-green-600 dark:text-green-400';
+            msgEl.textContent = 'URL eliminada de descartadas.';
+        }
+
+        const estadoEl = div.querySelector('.flex-1 .font-medium') || div.querySelector('.font-medium');
+        let actionWrap = div.querySelector('.acciones-url-wrap');
+        if (!actionWrap) {
+            const topRow = div.querySelector('.flex.justify-between');
+            if (topRow) {
+                actionWrap = document.createElement('div');
+                actionWrap.className = 'acciones-url-wrap flex-shrink-0 flex items-start gap-3';
+                topRow.appendChild(actionWrap);
+            }
+        }
+
+        if (existiaEnOferta) {
+            div.classList.remove('bg-green-50', 'dark:bg-green-900/20', 'border-green-200', 'dark:border-green-700');
+            div.classList.add('bg-amber-50', 'dark:bg-amber-900/20', 'border', 'border-amber-200', 'dark:border-amber-700');
+            if (estadoEl) {
+                if (estadoEl.childNodes.length && estadoEl.childNodes[0].nodeType === Node.TEXT_NODE) {
+                    estadoEl.childNodes[0].textContent = 'URL ya existe ';
+                } else {
+                    estadoEl.textContent = 'URL ya existe';
+                }
+            }
+            if (actionWrap) {
+                actionWrap.innerHTML = '<button type="button" class="btn-descartar-url hidden inline-flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded transition" data-url="' + urlAttr + '"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 7h12M9 7V5h6v2m-7 4v6m4-6v6"></path></svg>Descartar URL</button>';
+            }
+        } else if (r.tienda && r.producto && r.producto.id) {
+            div.classList.remove('bg-amber-50', 'dark:bg-amber-900/20', 'border-amber-200', 'dark:border-amber-700', 'bg-red-50', 'dark:bg-red-900/20');
+            div.classList.add('bg-green-50', 'dark:bg-green-900/20', 'border', 'border-green-200', 'dark:border-green-700');
+            if (estadoEl) {
+                if (estadoEl.childNodes.length && estadoEl.childNodes[0].nodeType === Node.TEXT_NODE) {
+                    estadoEl.childNodes[0].textContent = 'Lista para crear ';
+                } else {
+                    estadoEl.textContent = 'Lista para crear';
+                }
+            }
+            const especsEfectivas = especificacionesEfectivasResultadoCrearMasivo(r);
+            const permitirOpcionesStock = permitirOpcionesStockGenerarCrearMasivo(r.tienda);
+            if (actionWrap) {
+                actionWrap.innerHTML = '<button type="button" class="btn-descartar-url hidden inline-flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded transition" data-url="' + urlAttr + '"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 7h12M9 7V5h6v2m-7 4v6m4-6v6"></path></svg>Descartar URL</button>' +
+                    htmlBloqueGenerarOfertaWrapCrearMasivo({
+                        url: urlFila,
+                        productoId: r.producto.id,
+                        tiendaId: r.tienda.id,
+                        tienda: r.tienda,
+                        especificaciones: especsEfectivas,
+                        producto: r.producto,
+                        envioVal: textoEnvioInputDesdeRowCrearMasivo(r),
+                        permitirOpcionesStock: permitirOpcionesStock,
+                    });
+            }
+            if (typeof actualizarCampoTextoCantidadAlternativoEnFila === 'function') {
+                actualizarCampoTextoCantidadAlternativoEnFila(div);
+            }
+        } else if (r.tienda && !r.producto) {
+            div.classList.remove('bg-green-50', 'dark:bg-green-900/20', 'border-green-200', 'dark:border-green-700');
+            div.classList.add('bg-amber-50', 'dark:bg-amber-900/20', 'border', 'border-amber-200', 'dark:border-amber-700');
+            if (estadoEl) {
+                if (estadoEl.childNodes.length && estadoEl.childNodes[0].nodeType === Node.TEXT_NODE) {
+                    estadoEl.childNodes[0].textContent = 'Producto no encontrado. Busca uno manualmente: ';
+                } else {
+                    estadoEl.textContent = 'Producto no encontrado. Busca uno manualmente:';
+                }
+            }
+            if (actionWrap) {
+                actionWrap.innerHTML = '<button type="button" class="btn-descartar-url hidden inline-flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded transition" data-url="' + urlAttr + '"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 7h12M9 7V5h6v2m-7 4v6m4-6v6"></path></svg>Descartar URL</button>' +
+                    '<div class="flex flex-col items-stretch gap-2"><a href="{{ route("admin.productos.create") }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded transition"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>Añadir producto</a><button type="button" class="btn-elegir-categoria-fila-crear-masivo inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded border border-indigo-300 dark:border-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-200 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition">Cambiar Categoría</button></div>';
+            }
+            const specParent = div.querySelector('.spec-and-ofertas-container');
+            if (specParent && !div.querySelector('.producto-search-input')) {
+                specParent.insertAdjacentHTML('afterbegin', buildBuscadorProductoHtmlCrearMasivo(urlFila, r.categoria_fila || null));
+                if (typeof actualizarToolbarCategoriaFila === 'function') actualizarToolbarCategoriaFila(div);
+            }
+        } else {
+            div.classList.remove('bg-green-50', 'dark:bg-green-900/20');
+            div.classList.add('bg-amber-50', 'dark:bg-amber-900/20', 'border', 'border-amber-200', 'dark:border-amber-700');
+            if (estadoEl) {
+                if (estadoEl.childNodes.length && estadoEl.childNodes[0].nodeType === Node.TEXT_NODE) {
+                    estadoEl.childNodes[0].textContent = 'URL disponible ';
+                } else {
+                    estadoEl.textContent = 'URL disponible';
+                }
+            }
+            if (actionWrap) {
+                actionWrap.innerHTML = '<button type="button" class="btn-descartar-url hidden inline-flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded transition" data-url="' + urlAttr + '"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 7h12M9 7V5h6v2m-7 4v6m4-6v6"></path></svg>Descartar URL</button>';
+            }
+        }
+
+        const flujo = window.__flujoModalUrlsCrearMasivo;
+        if (flujo && !flujo.modoFinal && div === flujo.filaActualEnModal) {
+            const tieneGenerar = !!div.querySelector('.btn-generar');
+            const yaGenerada = !!(div.__rowData && div.__rowData.ofertaGenerada);
+            const descartada = !!(div.__rowData && div.__rowData.descartada);
+            actualizarPieModalUrlsCrearMasivo({
+                mostrarAnterior: flujo.indice > 0,
+                mostrarSiguiente: !tieneGenerar || yaGenerada || descartada,
+                mostrarSaltar: !yaGenerada && !descartada,
+            });
         }
     }
 

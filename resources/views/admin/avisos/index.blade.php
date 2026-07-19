@@ -645,7 +645,7 @@
                         <tr class="hover:bg-gray-700 dark:hover:bg-gray-700 transition-colors subtab-row aviso-borde-{{ $claseTipo }}" data-tipo="{{ $tipoAviso }}" data-aviso-id="{{ $aviso->id }}">
                             <td class="px-6 py-1">
                                 <div class="aviso-cell-elemento">
-                                    @if($aviso->avisoable_type !== 'App\Models\OfertaProducto')
+                                    @if($aviso->avisoable_type !== 'App\Models\OfertaProducto' || $aviso->texto_aviso === 'Oferta Resucitada')
                                         <label class="aviso-check-wrap hover:opacity-80" for="aviso-cb-{{ $aviso->id }}-vencidos">
                                             <input type="checkbox" id="aviso-cb-{{ $aviso->id }}-vencidos" class="checkbox-aviso rounded border-gray-300 text-red-600 focus:ring-red-500 pointer-events-none" 
                                                    data-aviso-id="{{ $aviso->id }}" 
@@ -1064,7 +1064,7 @@
                         <tr class="hover:bg-gray-700 dark:hover:bg-gray-700 transition-colors subtab-row aviso-borde-{{ $claseTipo }}" data-tipo="{{ $tipoAviso }}" data-aviso-id="{{ $aviso->id }}">
                             <td class="px-6 py-1">
                                 <div class="aviso-cell-elemento">
-                                    @if($aviso->avisoable_type !== 'App\Models\OfertaProducto')
+                                    @if($aviso->avisoable_type !== 'App\Models\OfertaProducto' || $aviso->texto_aviso === 'Oferta Resucitada')
                                         <label class="aviso-check-wrap hover:opacity-80" for="aviso-cb-{{ $aviso->id }}-pendientes">
                                             <input type="checkbox" id="aviso-cb-{{ $aviso->id }}-pendientes" class="checkbox-aviso rounded border-gray-300 text-red-600 focus:ring-red-500 pointer-events-none" 
                                                    data-aviso-id="{{ $aviso->id }}" 
@@ -1409,7 +1409,7 @@
                         <tr class="hover:bg-gray-700 dark:hover:bg-gray-700 transition-colors subtab-row aviso-borde-{{ $claseTipo }}" data-tipo="{{ $tipoAviso }}" data-aviso-id="{{ $aviso->id }}">
                             <td class="px-6 py-1">
                                 <div class="aviso-cell-elemento">
-                                    @if($aviso->avisoable_type !== 'App\Models\OfertaProducto')
+                                    @if($aviso->avisoable_type !== 'App\Models\OfertaProducto' || $aviso->texto_aviso === 'Oferta Resucitada')
                                         <label class="aviso-check-wrap hover:opacity-80" for="aviso-cb-{{ $aviso->id }}-ocultos">
                                             <input type="checkbox" id="aviso-cb-{{ $aviso->id }}-ocultos" class="checkbox-aviso rounded border-gray-300 text-red-600 focus:ring-red-500 pointer-events-none" 
                                                    data-aviso-id="{{ $aviso->id }}" 

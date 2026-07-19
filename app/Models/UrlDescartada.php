@@ -12,6 +12,9 @@ class UrlDescartada extends Model
 
     protected $fillable = [
         'url',
+        'categoria_id',
+        'producto_id',
+        'tienda_id',
         'created_at',
         'updated_at',
     ];
@@ -20,4 +23,19 @@ class UrlDescartada extends Model
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
+
+    public function categoria()
+    {
+        return $this->belongsTo(Categoria::class);
+    }
+
+    public function producto()
+    {
+        return $this->belongsTo(Producto::class);
+    }
+
+    public function tienda()
+    {
+        return $this->belongsTo(Tienda::class);
+    }
 }

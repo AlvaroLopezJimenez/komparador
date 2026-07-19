@@ -36,11 +36,15 @@ class BuscadorController extends Controller
         }
 
         try {
-            // Buscar categorías (mejorado)
-            $categorias = $this->buscarCategorias($palabras, $queryNorm, 3);
+            $sinVariantes = $request->boolean('sin_variantes');
 
-            // Buscar productos (mejorado)
-            $productos = $this->buscarProductos($palabras, $queryNorm, 7);
+            // Buscar categorías (mejorado) — en admin sin variantes no hacen falta
+            $categorias = $sinVariantes
+                ? collect()
+                : $this->buscarCategorias($palabras, $queryNorm, 3);
+
+            // Buscar productos (mejorado); sin_variantes=1 = solo producto base (p. ej. crear-masivo)
+            $productos = $this->buscarProductos($palabras, $queryNorm, 7, $sinVariantes);
 
             // Combinar resultados: categorías primero, luego productos
             $resultados = $categorias->concat($productos);
@@ -406,8 +410,12 @@ class BuscadorController extends Controller
             }
         }
 
-        if (count($palabrasNorm) > 1) {
-            foreach ($palabrasNorm as $palabra) {
+        // Definir stopwords en español a excluir de la búsqueda de categorías
+        $stopWords = ['de', 'la', 'el', 'en', 'y', 'para', 'con', 'del', 'los', 'las', 'un', 'una', 'unos', 'unas', 'al', 'o', 'por', 'sobre'];
+        $palabrasFiltradas = array_values(array_filter($palabrasNorm, fn($p) => !in_array($p, $stopWords)));
+
+        if (count($palabrasFiltradas) >= 1) {
+            foreach ($palabrasFiltradas as $palabra) {
                 $categorias = Categoria::visibles()
                     ->whereRaw('LOWER(nombre) LIKE ?', ['%' . $palabra . '%'])
                     ->get();
@@ -422,7 +430,7 @@ class BuscadorController extends Controller
                         collect($jerarquia)->pluck('nombre')->implode(' ')
                     );
 
-                    $todasLasPalabrasCoinciden = collect($palabrasNorm)->every(
+                    $todasLasPalabrasCoinciden = collect($palabrasFiltradas)->every(
                         fn($pal) => str_contains($textoJerarquia, $pal)
                     );
 
@@ -441,6 +449,17 @@ class BuscadorController extends Controller
 
         if ($candidatas->isEmpty()) {
             return null;
+        }
+
+        // Si tras filtrar las stopwords la consulta queda con una sola palabra significativa
+        // y no hay coincidencia exacta de prioridad 100, solo redirigimos si hay una
+        // única categoría candidata de prioridad 80.
+        // Esto evita redirecciones incorrectas para palabras genéricas como "cafe" o "tela".
+        if (count($palabrasFiltradas) === 1) {
+            $tieneCoincidenciaExacta = $candidatas->contains('prioridad', 100);
+            if (!$tieneCoincidenciaExacta && $candidatas->count() > 1) {
+                return null;
+            }
         }
 
         return $candidatas
@@ -691,7 +710,7 @@ class BuscadorController extends Controller
      * Método común que obtiene productos ordenados por relevancia
      * Usado tanto por buscar() como por productos() para garantizar resultados idénticos
      */
-    private function obtenerProductosOrdenadosPorRelevancia(array $palabras, string $queryCompleta, int $limiteProductos = null)
+    private function obtenerProductosOrdenadosPorRelevancia(array $palabras, string $queryCompleta, int $limiteProductos = null, bool $sinVariantes = false)
     {
         $query = Producto::where('obsoleto', 'no')
             ->where('mostrar', 'si')
@@ -732,7 +751,19 @@ class BuscadorController extends Controller
                 ->with('categoria.parent.parent')
                 ->get();
 
-            $productosConVariantes = $this->generarVariantesProductosParaBuscar($productos, $palabras, $queryCompleta);
+            if ($sinVariantes) {
+                // Misma búsqueda, sin expandir sublíneas/especificaciones como resultados distintos
+                $productosConVariantes = $productos->map(function ($producto) {
+                    return [
+                        'producto' => $producto,
+                        'variante' => null,
+                        'precio_variante' => null,
+                        'es_variante' => false,
+                    ];
+                });
+            } else {
+                $productosConVariantes = $this->generarVariantesProductosParaBuscar($productos, $palabras, $queryCompleta);
+            }
         } catch (\Exception $e) {
             \Log::error('Error en obtenerProductosOrdenadosPorRelevancia (consulta): ' . $e->getMessage());
             return collect();
@@ -823,14 +854,16 @@ class BuscadorController extends Controller
     /**
      * Busca productos para las sugerencias del header (API)
      * Usa el mismo método que buscar() pero convierte el formato
+     *
+     * @param bool $sinVariantes Si true, no expande sublíneas como resultados (admin crear-masivo, etc.)
      */
-    private function buscarProductos(array $palabras, string $queryCompleta, int $limite)
+    private function buscarProductos(array $palabras, string $queryCompleta, int $limite, bool $sinVariantes = false)
     {
         try {
             // Usar el mismo método que buscar() para obtener productos ordenados por relevancia
             // IMPORTANTE: Obtener el mismo número de productos que la vista de búsqueda (200) 
             // para garantizar que el ordenamiento por relevancia sea idéntico
-            $productosConVariantes = $this->obtenerProductosOrdenadosPorRelevancia($palabras, $queryCompleta, 200);
+            $productosConVariantes = $this->obtenerProductosOrdenadosPorRelevancia($palabras, $queryCompleta, 200, $sinVariantes);
             
             // Limitar resultados y convertir al formato de sugerencias
             $resultados = $productosConVariantes->take($limite)->map(function($item) {
@@ -1163,5 +1196,114 @@ class BuscadorController extends Controller
         }
 
         return $categoriaIds->unique()->toArray();
+    }
+
+    /**
+     * Búsqueda unificada de productos para administración (sin variantes/especificaciones)
+     *
+     * @param string $query
+     * @param int|string|null $categoriaId
+     * @param int $limite
+     * @return \Illuminate\Support\Collection
+     */
+    public function buscarProductosParaAdmin(string $query, $categoriaId = null, int $limite = 20)
+    {
+        $queryNorm = $this->normalizarTextoBusqueda($query);
+        $palabras = $this->tokenizarConsultaBusqueda($queryNorm);
+
+        if (empty($palabras)) {
+            return collect();
+        }
+
+        $idsCategorias = null;
+        if ($categoriaId !== null && $categoriaId !== '' && is_numeric($categoriaId)) {
+            $idsCategorias = \App\Models\Categoria::idsSelfAndDescendants((int) $categoriaId);
+        }
+
+        $dbQuery = Producto::where('obsoleto', 'no')
+            ->when($idsCategorias !== null, function ($q) use ($idsCategorias) {
+                $q->whereIn('categoria_id', $idsCategorias);
+            })
+            ->where(function($q) use ($palabras, $queryNorm) {
+                foreach ($palabras as $palabra) {
+                    $q->where(function($wordQ) use ($palabra) {
+                        $this->agregarCoincidenciaTerminoEnCamposProducto($wordQ, $palabra, 'where');
+
+                        $categoriaIds = $this->obtenerCategoriaIdsPorPalabraIndividual($palabra);
+                        if (!empty($categoriaIds)) {
+                            $wordQ->orWhereIn('categoria_id', $categoriaIds);
+                        }
+
+                        $wordQ->orWhere(function($specQ) use ($palabra) {
+                            $specQ->whereNotNull('especificaciones_busqueda_texto');
+                            $like = '%' . $this->normalizarTextoBusqueda($palabra) . '%';
+                            $specQ->whereRaw(
+                                $this->expresionCampoTextoBusqueda('especificaciones_busqueda_texto') . ' LIKE ?',
+                                [$like]
+                            );
+                        });
+                    });
+                }
+
+                if (count($palabras) > 1) {
+                    $q->orWhere(function($fullQ) use ($queryNorm) {
+                        $this->agregarCoincidenciaTerminoEnCamposProducto($fullQ, $queryNorm, 'where');
+                    });
+                }
+            });
+
+        try {
+            $productos = $this->aplicarOrdenRelevanciaBusquedaSql($dbQuery, $queryNorm, $palabras)
+                ->limit($limite)
+                ->with('categoria.parent.parent')
+                ->get();
+
+            // Ordenamos por relevancia exactamente igual que en el front pero sin variantes
+            $productosOrdenados = $productos->sortByDesc(function($producto) use ($queryNorm, $palabras) {
+                $relevancia = 0;
+                
+                $nombreCompleto = $this->normalizarTextoBusqueda($producto->nombre . ' ' . $producto->marca . ' ' . $producto->modelo);
+                $marcaCompleta = $this->normalizarTextoBusqueda($producto->marca ?? '');
+                
+                if ($nombreCompleto === $queryNorm) {
+                    $relevancia += 10000;
+                }
+                elseif ($marcaCompleta === $queryNorm) {
+                    $relevancia += 9000;
+                }
+                elseif (str_contains($nombreCompleto, $queryNorm)) {
+                    $relevancia += 5000;
+                }
+                elseif (str_contains($marcaCompleta, $queryNorm)) {
+                    $relevancia += 4500;
+                }
+                elseif (str_contains($queryNorm, $nombreCompleto)) {
+                    $relevancia += 4000;
+                }
+                
+                $palabrasCoincidentes = 0;
+                $textoProducto = $nombreCompleto . ' ' . $marcaCompleta . ' ' . $this->normalizarTextoBusqueda($producto->talla ?? '')
+                    . ' ' . $this->obtenerTextoJerarquiaProducto($producto);
+                foreach ($palabras as $palabra) {
+                    if ($this->coincidePalabraEnTexto($textoProducto, $palabra)) {
+                        $palabrasCoincidentes++;
+                    }
+                }
+                $relevancia += $palabrasCoincidentes * 1000;
+
+                if (count($palabras) > 1 && $palabrasCoincidentes === count($palabras)) {
+                    $relevancia += 3000;
+                }
+                
+                $relevancia += ($producto->clicks ?? 0) / 1000;
+                
+                return $relevancia;
+            })->values();
+
+            return $productosOrdenados;
+        } catch (\Exception $e) {
+            \Log::error('Error en buscarProductosParaAdmin: ' . $e->getMessage());
+            return collect();
+        }
     }
 }

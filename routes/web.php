@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Artisan;
 use App\Http\Controllers\ProductoController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\OfertaProductoController;
+use App\Http\Controllers\UrlDescartadasController;
 use App\Http\Controllers\ImportarOfertasCholloController;
 use App\Http\Controllers\BuscadorController;
 use App\Http\Controllers\TiendaController;
@@ -501,7 +502,7 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
             ->where('nombre', $nombreEjecucion)
             ->whereDate('inicio', $fechaSeleccionada->toDateString())
             ->orderByDesc('id')
-            ->get(['id', 'inicio', 'fin', 'total', 'total_guardado', 'total_errores']);
+            ->get(['id', 'inicio', 'fin', 'total', 'total_guardado', 'total_errores', 'log']);
 
         return view('admin.crons.cron_avisos_sin_stock_resultado', [
             'ejecucion_id' => $ejecucion?->id,
@@ -654,6 +655,12 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
 
     // Filas importadas desde feeds CSV-Awin (tabla csv_ofertas)
     Route::get('ofertas/todas-csv', [OfertaProductoController::class, 'csvOfertas'])->name('ofertas.todas_csv');
+
+    // URLs descartadas (no se pueden usar para crear ofertas)
+    Route::get('ofertas/urls-descartadas', [UrlDescartadasController::class, 'index'])->name('ofertas.url_descartadas');
+    Route::post('ofertas/urls-descartadas/eliminar-bulk', [UrlDescartadasController::class, 'destroyBulk'])->name('ofertas.url_descartadas.destroy-bulk');
+    Route::post('ofertas/urls-descartadas/eliminar-por-url', [UrlDescartadasController::class, 'destroyPorUrl'])->name('ofertas.url_descartadas.destroy-por-url');
+    Route::delete('ofertas/urls-descartadas/{urlDescartada}', [UrlDescartadasController::class, 'destroy'])->name('ofertas.url_descartadas.destroy');
 
     // Ruta para crear una oferta sin producto
     Route::get('ofertas/create', [OfertaProductoController::class, 'createGeneral'])->name('ofertas.create.formularioGeneral');
@@ -1096,6 +1103,11 @@ Route::get('productos/oferta-mas-barata/ejecutar-segundo-plano', [ProductoContro
 
         return response()->json(['status' => 'ok']);
     })->name('productos.historico.finalizar');
+
+    // Admin Ajustes (Gestión de crons y configuraciones)
+    Route::get('ajustes', [\App\Http\Controllers\Crons\CronJefeController::class, 'index'])->name('ajustes.index');
+    Route::post('ajustes/actualizar', [\App\Http\Controllers\Crons\CronJefeController::class, 'actualizarAjuste'])->name('ajustes.actualizar');
+    Route::post('ajustes/ejecutar/{key}', [\App\Http\Controllers\Crons\CronJefeController::class, 'ejecutarCronManual'])->name('ajustes.ejecutar');
 });
 
 // Ruta de redirección para mantener compatibilidad - COMENTADA PARA EVITAR CONFLICTOS

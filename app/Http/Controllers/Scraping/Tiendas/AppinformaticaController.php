@@ -27,7 +27,7 @@ class AppinformaticaController extends PlantillaTiendaController
 
         $html = html_entity_decode((string) $resultado['html'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
-        if (strpos($html, 'Este producto no está disponible actualmente</div>') !== false) {
+        if (strpos($html, 'Producto no disponible actualmente') !== false) {
             if ($oferta && $oferta instanceof OfertaProducto) {
                 $oferta->update(['mostrar' => 'no']);
 

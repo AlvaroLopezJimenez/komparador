@@ -857,6 +857,7 @@ class NeoController extends Controller
 
     /**
      * Descarta una URL en crear masivo: la guarda en urls_descartadas
+     * (copiando categoria_id, producto_id, tienda_id del neo si existen)
      * y marca como aniadida=si en neo para esa URL.
      */
     public function descartarUrlCrearMasivo(Request $request)
@@ -876,9 +877,40 @@ class NeoController extends Controller
             ], 422);
         }
 
-        UrlDescartada::firstOrCreate(['url' => $url]);
-
         $urlLookup = app(ConsultarNeoCifrado::class)->hashLookup($url);
+
+        $neo = Neo::where('url_lookup', $urlLookup)
+            ->orderByDesc('updated_at')
+            ->first();
+
+        $datosDescartada = [
+            'categoria_id' => $neo?->categoria_id,
+            'producto_id' => $neo?->producto_id,
+            'tienda_id' => $neo?->tienda_id,
+        ];
+
+        $urlDescartada = UrlDescartada::firstOrCreate(
+            ['url' => $url],
+            $datosDescartada
+        );
+
+        // Si ya existía, rellenar IDs que falten con los del neo actual
+        if (!$urlDescartada->wasRecentlyCreated && $neo) {
+            $cambios = [];
+            if (!$urlDescartada->categoria_id && $neo->categoria_id) {
+                $cambios['categoria_id'] = $neo->categoria_id;
+            }
+            if (!$urlDescartada->producto_id && $neo->producto_id) {
+                $cambios['producto_id'] = $neo->producto_id;
+            }
+            if (!$urlDescartada->tienda_id && $neo->tienda_id) {
+                $cambios['tienda_id'] = $neo->tienda_id;
+            }
+            if ($cambios !== []) {
+                $urlDescartada->update($cambios);
+            }
+        }
+
         $filasActualizadas = Neo::where('url_lookup', $urlLookup)
             ->where('aniadida', 'no')
             ->update([

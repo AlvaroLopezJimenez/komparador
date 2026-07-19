@@ -16,9 +16,11 @@ class DescuentosController extends Controller
         '2a al 70',
         '2a al 50 - cheque - SoloCarrefour',
         '-20%',
+        '-20% Cupon - Solo Carrefour',
     ];
 
     public const DESCUENTO_20_PORCIENTO = '-20%';
+    public const DESCUENTO_20_CUPON_CARREFOUR = '-20% Cupon - Solo Carrefour';
 
     /**
      * @return array<int, string>
@@ -71,6 +73,10 @@ class DescuentosController extends Controller
 
         if ($descuento === '2a al 50% - cheque - Solo Carrefour') {
             return '2a al 50 - cheque - SoloCarrefour';
+        }
+
+        if ($descuento === '-20% Cupón - Solo Carrefour' || $descuento === '-20% Cupon - Solo Carrefour') {
+            return self::DESCUENTO_20_CUPON_CARREFOUR;
         }
 
         if (preg_match('/^-20\s*%$/i', $descuento)) {
@@ -134,24 +140,44 @@ class DescuentosController extends Controller
      */
     public function aplicarDescuento(OfertaProducto $oferta): OfertaProducto
     {
-        if (!is_null($oferta->chollo_id)) {
-            return $oferta;
-        }
-
-        if (empty($oferta->descuentos)) {
-            return $oferta;
-        }
-
-        $descuentos = self::parseDescuentos($oferta->descuentos);
-
-        if ($descuentos === []) {
-            return $oferta;
-        }
-
         $ofertaConDescuento = $this->clonarOferta($oferta);
 
-        foreach ($descuentos as $descuento) {
-            $ofertaConDescuento = $this->aplicarUnDescuento($ofertaConDescuento, $descuento);
+        // Parse alternative quantity text
+        $parsed = $this->parseTextoCantidadAlternativo($ofertaConDescuento->texto_cantidad_alternativo);
+
+        if (is_null($ofertaConDescuento->chollo_id) && !empty($ofertaConDescuento->descuentos)) {
+            $descuentos = self::parseDescuentos($ofertaConDescuento->descuentos);
+            if ($descuentos !== []) {
+                $tieneCuponCarrefour = in_array(self::DESCUENTO_20_CUPON_CARREFOUR, $descuentos, true);
+                $cuponCarrefourValor = 0;
+
+                if ($tieneCuponCarrefour) {
+                    $tiene2x1 = in_array('2x1 - SoloCarrefour', $descuentos, true);
+                    $tiene2a50Cheque = in_array('2a al 50 - cheque - SoloCarrefour', $descuentos, true);
+                    $multiplicador = ($tiene2x1 || $tiene2a50Cheque) ? 2 : 1;
+
+                    $cuponCarrefourValor = ($ofertaConDescuento->precio_total * $multiplicador) * 0.20;
+                    $descuentos = array_values(array_filter($descuentos, fn (string $d) => $d !== self::DESCUENTO_20_CUPON_CARREFOUR));
+                }
+
+                foreach ($descuentos as $descuento) {
+                    $ofertaConDescuento = $this->aplicarUnDescuento($ofertaConDescuento, $descuento, $parsed);
+                }
+
+                if ($tieneCuponCarrefour) {
+                    $ofertaConDescuento->precio_total = max(0, $ofertaConDescuento->precio_total - $cuponCarrefourValor);
+                    $ofertaConDescuento->precio_unidad = $ofertaConDescuento->unidades > 0
+                        ? round($ofertaConDescuento->precio_total / $ofertaConDescuento->unidades, 3)
+                        : 0;
+                }
+            }
+        }
+
+        // Format back to plain string for presentation
+        if ($parsed['num'] !== '' || $parsed['txt'] !== '') {
+            $ofertaConDescuento->texto_cantidad_alternativo = trim($parsed['num'] . ' ' . $parsed['txt']);
+        } else {
+            $ofertaConDescuento->texto_cantidad_alternativo = null;
         }
 
         return $ofertaConDescuento;
@@ -160,7 +186,7 @@ class DescuentosController extends Controller
     /**
      * Aplica un único descuento sobre el estado actual de la oferta
      */
-    private function aplicarUnDescuento(OfertaProducto $oferta, string $descuento): OfertaProducto
+    private function aplicarUnDescuento(OfertaProducto $oferta, string $descuento, array &$parsed): OfertaProducto
     {
         $ofertaConDescuento = $this->clonarOferta($oferta);
 
@@ -171,6 +197,9 @@ class DescuentosController extends Controller
                 ? $oferta->precio_total / $oferta->unidades
                 : 0;
             $ofertaConDescuento->unidades = $oferta->unidades * 2;
+            if ($parsed['num'] !== '' && is_numeric($parsed['num'])) {
+                $parsed['num'] = $parsed['num'] * 2;
+            }
             $ofertaConDescuento->precio_total = $oferta->precio_total
                 + ($precioUnidadOriginal * $oferta->unidades * $factorPagado);
             $ofertaConDescuento->precio_unidad = $ofertaConDescuento->unidades > 0
@@ -241,18 +270,27 @@ class DescuentosController extends Controller
         switch ($descuento) {
             case '3x2':
                 $ofertaConDescuento->unidades = $oferta->unidades * 3;
+                if ($parsed['num'] !== '' && is_numeric($parsed['num'])) {
+                    $parsed['num'] = $parsed['num'] * 3;
+                }
                 $ofertaConDescuento->precio_total = $oferta->precio_total * 2;
                 $ofertaConDescuento->precio_unidad = ($oferta->precio_total * 2) / ($oferta->unidades * 3);
                 break;
 
             case '2x1 - SoloCarrefour':
                 $ofertaConDescuento->unidades = $oferta->unidades * 2;
+                if ($parsed['num'] !== '' && is_numeric($parsed['num'])) {
+                    $parsed['num'] = $parsed['num'] * 2;
+                }
                 $ofertaConDescuento->precio_total = $oferta->precio_total;
                 $ofertaConDescuento->precio_unidad = $oferta->precio_total / ($oferta->unidades * 2);
                 break;
 
             case '2a al 50 - cheque - SoloCarrefour':
                 $ofertaConDescuento->unidades = $oferta->unidades * 2;
+                if ($parsed['num'] !== '' && is_numeric($parsed['num'])) {
+                    $parsed['num'] = $parsed['num'] * 2;
+                }
                 $ofertaConDescuento->precio_total = $oferta->precio_total * 1.5;
                 $ofertaConDescuento->precio_unidad = $ofertaConDescuento->precio_total / $ofertaConDescuento->unidades;
                 break;
@@ -260,6 +298,9 @@ class DescuentosController extends Controller
             case '2a al 70':
                 $precioUnidadOriginal = $oferta->precio_total / $oferta->unidades;
                 $ofertaConDescuento->unidades = $oferta->unidades * 2;
+                if ($parsed['num'] !== '' && is_numeric($parsed['num'])) {
+                    $parsed['num'] = $parsed['num'] * 2;
+                }
                 $ofertaConDescuento->precio_total = $oferta->precio_total + ($precioUnidadOriginal * $oferta->unidades * 0.30);
                 $ofertaConDescuento->precio_unidad = $ofertaConDescuento->precio_total / $ofertaConDescuento->unidades;
                 break;
@@ -267,6 +308,9 @@ class DescuentosController extends Controller
             case '2a al 50':
                 $precioUnidadOriginal = $oferta->precio_total / $oferta->unidades;
                 $ofertaConDescuento->unidades = $oferta->unidades * 2;
+                if ($parsed['num'] !== '' && is_numeric($parsed['num'])) {
+                    $parsed['num'] = $parsed['num'] * 2;
+                }
                 $ofertaConDescuento->precio_total = $oferta->precio_total + ($precioUnidadOriginal * $oferta->unidades * 0.50);
                 $ofertaConDescuento->precio_unidad = $ofertaConDescuento->precio_total / $ofertaConDescuento->unidades;
                 break;
@@ -297,6 +341,31 @@ class DescuentosController extends Controller
         return $ofertaConDescuento;
     }
 
+    private function parseTextoCantidadAlternativo(?string $texto): array
+    {
+        if ($texto === null || $texto === '') {
+            return ['num' => '', 'txt' => ''];
+        }
+
+        $decoded = json_decode($texto, true);
+        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+            return [
+                'num' => $decoded['num'] ?? '',
+                'txt' => $decoded['txt'] ?? '',
+            ];
+        }
+
+        // Fallback for old format (e.g., "6 Botellines 33 cl")
+        if (preg_match('/^(\d+(?:[.,]\d+)?)\s*(.*)$/u', $texto, $matches)) {
+            return [
+                'num' => (float) str_replace(',', '.', $matches[1]),
+                'txt' => trim($matches[2]),
+            ];
+        }
+
+        return ['num' => '', 'txt' => $texto];
+    }
+
     private function clonarOferta(OfertaProducto $oferta): OfertaProducto
     {
         $copia = clone $oferta;
@@ -311,18 +380,60 @@ class DescuentosController extends Controller
     }
 
     /**
-     * Aplica descuentos a una colección de ofertas y las ordena por precio_unidad
+     * Aplica descuentos a una colección de ofertas y las ordena por precio_unidad.
+     * Si un descuento modifica precio/unidades, se incluyen ambas versiones:
+     * la original sin descuentos y la modificada con descuentos.
      *
-     * @param \Illuminate\Database\Eloquent\Collection $ofertas Colección de ofertas
-     * @return \Illuminate\Database\Eloquent\Collection Ofertas con descuentos aplicados y ordenadas
+     * @param \Illuminate\Support\Collection|\Illuminate\Database\Eloquent\Collection $ofertas
+     * @return \Illuminate\Support\Collection
      */
     public function aplicarDescuentosYOrdenar($ofertas)
     {
-        $ofertasConDescuentos = $ofertas->map(function ($oferta) {
-            return $this->aplicarDescuento($oferta);
-        });
+        $resultado = collect();
 
-        return $ofertasConDescuentos->sortBy('precio_unidad')->values();
+        foreach ($ofertas as $oferta) {
+            $ofertaConDescuento = $this->aplicarDescuento($oferta);
+
+            if ($this->ofertaFueModificadaPorDescuento($oferta, $ofertaConDescuento)) {
+                $ofertaSinDescuento = $this->clonarOferta($oferta);
+                $ofertaSinDescuento->descuentos = '';
+                $ofertaSinDescuento->setAttribute('descuentos', '');
+                $ofertaSinDescuento->texto_cantidad_alternativo = $this->textoCantidadAlternativoAPlano(
+                    $ofertaSinDescuento->texto_cantidad_alternativo
+                );
+                $resultado->push($ofertaSinDescuento);
+                $resultado->push($ofertaConDescuento);
+            } else {
+                $resultado->push($ofertaConDescuento);
+            }
+        }
+
+        return $resultado->sortBy('precio_unidad')->values();
+    }
+
+    /**
+     * Convierte texto_cantidad_alternativo (JSON o texto) a cadena plana para la vista.
+     * Ej: {"num":12,"txt":"Latas 33cl."} → "12 Latas 33cl."
+     */
+    private function textoCantidadAlternativoAPlano(?string $texto): ?string
+    {
+        $parsed = $this->parseTextoCantidadAlternativo($texto);
+
+        if ($parsed['num'] !== '' || $parsed['txt'] !== '') {
+            return trim($parsed['num'] . ' ' . $parsed['txt']);
+        }
+
+        return null;
+    }
+
+    /**
+     * True si aplicar el descuento cambió precio o unidades respecto a la oferta original.
+     */
+    private function ofertaFueModificadaPorDescuento(OfertaProducto $original, OfertaProducto $conDescuento): bool
+    {
+        return round((float) $original->precio_total, 4) !== round((float) $conDescuento->precio_total, 4)
+            || round((float) $original->unidades, 4) !== round((float) $conDescuento->unidades, 4)
+            || round((float) $original->precio_unidad, 4) !== round((float) $conDescuento->precio_unidad, 4);
     }
 
     /**

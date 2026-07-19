@@ -20,6 +20,7 @@ class Neo extends Model
         'producto_id',
         'categoria_id',
         'tienda_id',
+        'url',
         'url_cipher',
         'url_lookup',
         'neo',

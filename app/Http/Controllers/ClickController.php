@@ -2119,6 +2119,14 @@ class ClickController extends Controller
             // Coolmod
             return 'https://www.awin1.com/cread.php?awinmid=124624&awinaffid=1302515&ued=' . $base;
         
+        } elseif ($oferta->tienda_id == 62) {
+            // La Drogería de Percón
+            return 'https://www.awin1.com/cread.php?awinmid=63006&awinaffid=1302515&ued=' . $base;
+        
+        }elseif ($oferta->tienda_id == 69) {
+            // Zooplus
+            return 'https://www.awin1.com/cread.php?awinmid=11122&awinaffid=1302515&ued=' . $base;
+        
         } else {
             // Otras tiendas - sin códigos de afiliación
             return $base;

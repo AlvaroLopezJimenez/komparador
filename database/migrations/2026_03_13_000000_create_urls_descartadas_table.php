@@ -14,7 +14,14 @@ return new class extends Migration
         Schema::create('urls_descartadas', function (Blueprint $table) {
             $table->id();
             $table->string('url');
+            $table->unsignedBigInteger('categoria_id')->nullable();
+            $table->unsignedBigInteger('producto_id')->nullable();
+            $table->unsignedBigInteger('tienda_id')->nullable();
             $table->timestamps();
+
+            $table->index('categoria_id');
+            $table->index('producto_id');
+            $table->index('tienda_id');
         });
     }
 

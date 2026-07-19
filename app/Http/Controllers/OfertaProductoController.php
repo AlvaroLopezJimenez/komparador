@@ -647,8 +647,8 @@ class OfertaProductoController extends Controller
             $serviceTiempos->registrarOActualizarActualizacion($oferta->id, $precioNuevo, 'manual');
         }
 
-        // Si el precio final es 0, crear aviso de "Sin stock - 1a vez" a 4 días (después de guardar)
-        if ($precioCero) {
+        // Si el precio final es 0 o se ha solicitado explícitamente, crear aviso de "Sin stock - 1a vez" a 4 días (después de guardar)
+        if ($precioCero || $request->input('crear_aviso_sin_stock_4_dias') == 1) {
             $this->crearAvisoSinStockSiNoExiste($oferta);
         }
 
@@ -721,6 +721,10 @@ class OfertaProductoController extends Controller
                 'action_type' => \App\Models\UserActivity::ACTION_OFERTA_MODIFICADA,
                 'oferta_id' => $oferta->id,
             ]);
+        }
+
+        if ($request->input('crear_aviso_sin_stock_4_dias') == 1) {
+            return redirect()->route('admin.ofertas.edit', $oferta)->with('success', 'Oferta actualizada y aviso de sin stock generado');
         }
 
         return redirect()->route('admin.ofertas.todas')->with('success', 'Oferta actualizada');
@@ -1270,8 +1274,8 @@ class OfertaProductoController extends Controller
             $oferta->timestamps = true;
         }
 
-        // Si el precio final es 0, crear aviso de "Sin stock - 1a vez" a 4 días
-        if ($precioCero) {
+        // Si el precio final es 0 o se ha solicitado explícitamente, crear aviso de "Sin stock - 1a vez" a 4 días
+        if ($precioCero || $request->input('crear_aviso_sin_stock_4_dias') == 1) {
             $this->crearAvisoSinStockSiNoExiste($oferta);
         }
 
@@ -1343,6 +1347,10 @@ class OfertaProductoController extends Controller
             ]);
         }
 
+        if ($request->input('crear_aviso_sin_stock_4_dias') == 1) {
+            return redirect()->route('admin.ofertas.edit', $oferta)->with('success', 'Oferta añadida y aviso de sin stock generado');
+        }
+
         return redirect()->route('admin.ofertas.todas')->with('success', 'Oferta añadida correctamente');
     }
 
@@ -1381,8 +1389,15 @@ class OfertaProductoController extends Controller
     {
         $excluirOfertaId = $request->query('excluir_oferta_id');
 
+        $producto = Producto::find($productoId);
+        if ($producto && $producto->categoria_id) {
+            $productoIds = Producto::where('categoria_id', $producto->categoria_id)->pluck('id')->toArray();
+        } else {
+            $productoIds = [$productoId];
+        }
+
         $textos = OfertaProducto::query()
-            ->where('producto_id', $productoId)
+            ->whereIn('producto_id', $productoIds)
             ->whereNotNull('texto_cantidad_alternativo')
             ->where('texto_cantidad_alternativo', '!=', '')
             ->when($excluirOfertaId, fn ($q) => $q->where('id', '!=', (int) $excluirOfertaId))
@@ -3061,52 +3076,27 @@ class OfertaProductoController extends Controller
     {
         $query = $request->get('q', '');
         
-        if (empty($query) || strlen($query) < 2) {
-            return response()->json([]);
-        }
-
-        // Dividir la consulta en palabras
-        $palabras = array_filter(explode(' ', strtolower(trim($query))));
-        
-        if (empty($palabras)) {
+        if (empty($query) || strlen(trim($query)) < 2) {
             return response()->json([]);
         }
 
         $categoriaId = $request->input('categoria_id');
-        $idsCategorias = null;
-        if ($categoriaId !== null && $categoriaId !== '' && is_numeric($categoriaId)) {
-            $idsCategorias = \App\Models\Categoria::idsSelfAndDescendants((int) $categoriaId);
-        }
+        
+        $buscadorController = app(\App\Http\Controllers\BuscadorController::class);
+        $productos = $buscadorController->buscarProductosParaAdmin($query, $categoriaId, 20);
 
-        $productos = \App\Models\Producto::where('obsoleto', 'no')
-            ->when($idsCategorias !== null, function ($q) use ($idsCategorias) {
-                $q->whereIn('categoria_id', $idsCategorias);
-            })
-            ->where(function($q) use ($palabras) {
-                foreach ($palabras as $palabra) {
-                    $q->where(function($subQ) use ($palabra) {
-                        $subQ->whereRaw('LOWER(nombre) LIKE ?', ['%' . $palabra . '%'])
-                             ->orWhereRaw('LOWER(marca) LIKE ?', ['%' . $palabra . '%'])
-                             ->orWhereRaw('LOWER(modelo) LIKE ?', ['%' . $palabra . '%'])
-                             ->orWhereRaw('LOWER(talla) LIKE ?', ['%' . $palabra . '%']);
-                    });
-                }
-            })
-            ->orderBy('clicks', 'desc')
-            ->limit(10)
-            ->get(['id', 'nombre', 'marca', 'modelo', 'talla'])
-            ->map(function ($producto) {
-                return [
-                    'id' => $producto->id,
-                    'nombre' => $producto->nombre,
-                    'marca' => $producto->marca,
-                    'modelo' => $producto->modelo,
-                    'talla' => $producto->talla,
-                    'texto_completo' => $producto->nombre . ' - ' . $producto->marca . ' - ' . $producto->modelo . ' - ' . $producto->talla
-                ];
-            });
+        $mappedProductos = $productos->map(function ($producto) {
+            return [
+                'id' => $producto->id,
+                'nombre' => $producto->nombre,
+                'marca' => $producto->marca,
+                'modelo' => $producto->modelo,
+                'talla' => $producto->talla,
+                'texto_completo' => $producto->nombre . ' - ' . $producto->marca . ' - ' . $producto->modelo . ' - ' . $producto->talla
+            ];
+        });
 
-        return response()->json($productos);
+        return response()->json($mappedProductos);
     }
 
     /**

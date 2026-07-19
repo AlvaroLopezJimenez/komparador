@@ -13,7 +13,7 @@
     <div class="py-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="max-w-7xl mx-auto space-y-6">
             <p class="text-sm text-gray-600 dark:text-gray-400">
-                Cada vez que se llama a <code class="text-xs">/admin/cron-descarga-csv-tiendas?token=…</code>, se guarda una fila aquí con el resumen de la descarga e importación a <code class="text-xs">csv_ofertas</code>.
+                Cada llamada (schedule, URL o botón del panel) lanza un proceso CLI en segundo plano para no morir al cortar el hosting a ~5&nbsp;min. El progreso de cada importación a <code class="text-xs">csv_ofertas</code> queda en estas filas.
             </p>
 
             @if (session('success'))

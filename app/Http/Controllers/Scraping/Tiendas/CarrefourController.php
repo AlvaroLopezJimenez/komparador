@@ -385,6 +385,13 @@ class CarrefourController extends PlantillaTiendaController
         return false;
     }
 
+    /** Detecta oferta 20% en Cupón (Solo Carrefour) en el HTML */
+    private function detectarOferta20CuponSoloCarrefour(string $html): bool
+    {
+        return (bool) preg_match('/title\s*=\s*(["\'])20%\s+en\s+Cup[oó]n\1/iu', $html)
+            || (bool) preg_match('/20%\s+en\s+Cup[oó]n/iu', $html);
+    }
+
     /** Detecta y guarda los descuentos en la oferta sin modificar precios */
     private function detectarYGuardarDescuentos(string $html, $oferta): void
     {
@@ -407,6 +414,9 @@ class CarrefourController extends PlantillaTiendaController
         }
         if ($this->detectarOferta20PorcientoDiasLocos($html)) {
             $descuentosDetectados[] = DescuentosController::DESCUENTO_20_PORCIENTO;
+        }
+        if ($this->detectarOferta20CuponSoloCarrefour($html)) {
+            $descuentosDetectados[] = DescuentosController::DESCUENTO_20_CUPON_CARREFOUR;
         }
 
         $descuentosAnteriores = DescuentosController::parseDescuentos($oferta->descuentos);
@@ -436,6 +446,7 @@ class CarrefourController extends PlantillaTiendaController
                 '2a al 70' => 'DETECTADO DESCUENTO 2ª UNIDAD AL 70% - GENERADO AUTOMÁTICAMENTE',
                 '2a al 50 - cheque - SoloCarrefour' => 'DETECTADO DESCUENTO 50% QUE VUELVE (2ª AL 50% - CHEQUE) - GENERADO AUTOMÁTICAMENTE',
                 DescuentosController::DESCUENTO_20_PORCIENTO => 'DETECTADO DESCUENTO -20% DÍAS LOCOS - GENERADO AUTOMÁTICAMENTE',
+                DescuentosController::DESCUENTO_20_CUPON_CARREFOUR => 'DETECTADO DESCUENTO -20% CUPÓN - GENERADO AUTOMÁTICAMENTE',
             ];
 
             foreach ($descuentosDetectados as $descuentoDetectado) {

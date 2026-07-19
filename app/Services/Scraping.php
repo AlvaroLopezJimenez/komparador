@@ -173,6 +173,10 @@ class Scraping
         return app(CsvAwinOfertaService::class)->actualizarPrecioOfertaDesdeCsvSilencioso($oferta);
     }
 
+    /**
+     * Aplica descuentos a una oferta cruda de BD (precio_unidad sin descuentos).
+     * No usar con ofertas ya pasadas por SacarPrimeraOferta...->obtener().
+     */
     public function calcularPrecioRealPorUnidad($oferta): ?float
     {
         $descuentosController = new DescuentosController();
@@ -513,11 +517,18 @@ class Scraping
         $ofertaAntes = $ofertasAntes->first();
         $ofertaDespues = $ofertasDespues->first();
 
-        $precioRealAntes = $ofertaAntes ? $this->calcularPrecioRealPorUnidad($ofertaAntes) : null;
-        $precioRealDespues = $ofertaDespues ? $this->calcularPrecioRealPorUnidad($ofertaDespues) : null;
+        // Las ofertas vienen de SacarPrimeraOferta...->obtener(): ya traen descuentos,
+        // envío y precio_unidad recalculado. NO volver a pasar por DescuentosController
+        // (calcularPrecioRealPorUnidad), porque reaplicaría 2x1/cupón y corrompería el precio.
+        $precioRealAntes = $ofertaAntes && $ofertaAntes->precio_unidad !== null
+            ? (float) $ofertaAntes->precio_unidad
+            : null;
+        $precioRealDespues = $ofertaDespues && $ofertaDespues->precio_unidad !== null
+            ? (float) $ofertaDespues->precio_unidad
+            : null;
 
-        $precioRealAntesNormalizado = $precioRealAntes !== null ? round((float) $precioRealAntes, 3) : null;
-        $precioRealDespuesNormalizado = $precioRealDespues !== null ? round((float) $precioRealDespues, 3) : null;
+        $precioRealAntesNormalizado = $precioRealAntes !== null ? round($precioRealAntes, 3) : null;
+        $precioRealDespuesNormalizado = $precioRealDespues !== null ? round($precioRealDespues, 3) : null;
 
         if (($ofertaAntes ? $ofertaAntes->id : null) === ($ofertaDespues ? $ofertaDespues->id : null)
             && $precioRealAntesNormalizado === $precioRealDespuesNormalizado) {
@@ -532,6 +543,32 @@ class Scraping
 
         $precioAntiguoProducto = Producto::where('id', $oferta->producto_id)->value('precio');
         $producto->update(['precio' => $precioMasBajo]);
+
+        // Sincronizar la tabla producto_oferta_mas_barata_por_producto sin borrar la fila
+        if ($ofertaDespues) {
+            $ofertaOriginal = OfertaProducto::find($ofertaDespues->id);
+            if ($ofertaOriginal) {
+                \App\Models\ProductoOfertaMasBarataPorProducto::updateOrCreate(
+                    ['producto_id' => $producto->id],
+                    [
+                        'oferta_id' => $ofertaOriginal->id,
+                        'tienda_id' => $ofertaOriginal->tienda_id,
+                        'precio_total' => $ofertaDespues->precio_total,
+                        'precio_unidad' => $ofertaDespues->precio_unidad,
+                        'unidades' => $ofertaOriginal->unidades,
+                        'url' => $ofertaOriginal->url,
+                    ]
+                );
+            }
+        } else {
+            $registroMasBarato = \App\Models\ProductoOfertaMasBarataPorProducto::where('producto_id', $producto->id)->first();
+            if ($registroMasBarato) {
+                $registroMasBarato->update([
+                    'precio_total' => 0.00,
+                    'precio_unidad' => 0.0000,
+                ]);
+            }
+        }
 
         $textoAviso = 'Precio actualizado producto ' . $producto->nombre . ' precio antiguo: ' . $precioAntiguoProducto . ', precio Nuevo: ' . $precioMasBajo;
 

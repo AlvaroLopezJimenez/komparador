@@ -191,7 +191,13 @@
                     </div>
 
                     <div>
-                        <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">Talla</label>
+                        <label class="flex items-center gap-1.5 mb-1 font-medium text-gray-700 dark:text-gray-200">
+                            <span>Palabras extra</span>
+                            <button type="button"
+                                class="tooltip-btn inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-gray-100 text-xs font-bold hover:bg-gray-400 dark:hover:bg-gray-500 focus:outline-none"
+                                aria-label="Ayuda sobre palabras extra"
+                                data-tooltip="estas palabras servirán para las búsquedas, pero no aparecerán en ninguna parte">?</button>
+                        </label>
                         <div class="kp-segmentacion-palabras-wrap hidden mb-1.5 flex flex-wrap gap-1.5" aria-live="polite"></div>
                         <input type="text" name="talla" id="input_talla" value="{{ old('talla', $producto->talla ?? '') }}"
                             class="kp-campo-segmentacion-nombre w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border @error('talla') border-red-500 @enderror">
@@ -534,8 +540,10 @@
                         }
                     @endphp
                     @foreach ($neoobjetivos as $index => $neo)
+                    @php $neoIdMostrar = is_object($neo) ? ($neo->id ?? null) : ($neo['id'] ?? null); @endphp
                     <div class="flex items-center gap-2 mb-2 neoobjetivo-item flex-wrap">
-                        <input type="hidden" name="neoobjetivo[{{ $index }}][id]" value="{{ is_object($neo) ? ($neo->id ?? '') : ($neo['id'] ?? '') }}">
+                        <input type="hidden" name="neoobjetivo[{{ $index }}][id]" value="{{ $neoIdMostrar ?? '' }}">
+                        <span class="neoobjetivo-id-label text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap font-mono {{ $neoIdMostrar ? '' : 'hidden' }}" title="ID neoobjetivo">#{{ $neoIdMostrar ?: '' }}</span>
                         <input type="text" name="neoobjetivo[{{ $index }}][url]" value="{{ is_object($neo) ? ($neo->url ?? '') : ($neo['url'] ?? '') }}"
                             class="neoobjetivo-url flex-1 min-w-[200px] px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border border-gray-300 dark:border-gray-600"
                             placeholder="https://...">
@@ -815,6 +823,7 @@
                                 <button type="button" class="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white text-xs md:text-sm rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition" data-dias="4">4 días</button>
                                 <button type="button" class="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white text-xs md:text-sm rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition" data-dias="7">7 días</button>
                                 <button type="button" class="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white text-xs md:text-sm rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition" data-dias="14">14 días</button>
+                                <button type="button" class="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white text-xs md:text-sm rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition" data-dias="90">3 meses</button>
                             </div>
                             <input type="datetime-local" id="fecha-aviso" name="fecha_aviso" 
                                 class="w-full px-3 py-2 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" 
@@ -822,10 +831,10 @@
                         </div>
                         
                         <div class="mb-4">
-                            <label class="flex items-center">
+                            <div class="flex items-center">
                                 <input type="checkbox" id="oculto" name="oculto" class="rounded border-gray-300 text-pink-600 focus:ring-pink-500">
                                 <span class="ml-2 text-sm text-gray-300 dark:text-gray-300">Ocultar aviso</span>
-                            </label>
+                            </div>
                             <p class="text-xs text-gray-400 dark:text-gray-400 mt-1">Los avisos ocultos no aparecen en las pestañas principales pero se mantienen para futuras comprobaciones</p>
                         </div>
                         
@@ -3092,36 +3101,38 @@
                 }
             }
             const fieldsetInfo = inputPalabrasExigidas?.closest('fieldset');
-            const btnAyudaPalabras = fieldsetInfo?.querySelector('.tooltip-btn[data-tooltip]');
-            if (btnAyudaPalabras) {
-                let tooltipPalabrasActual = null;
-                btnAyudaPalabras.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    const tooltipTexto = this.getAttribute('data-tooltip');
-                    if (tooltipPalabrasActual) {
-                        tooltipPalabrasActual.remove();
-                        tooltipPalabrasActual = null;
-                        return;
-                    }
-                    const tooltip = document.createElement('div');
-                    tooltip.className = 'fixed z-50 bg-gray-900 text-white text-xs rounded shadow-lg p-3 max-w-sm pointer-events-none leading-relaxed';
-                    tooltip.textContent = tooltipTexto;
-                    document.body.appendChild(tooltip);
-                    const rect = this.getBoundingClientRect();
-                    tooltip.style.left = Math.max(8, rect.left) + 'px';
-                    tooltip.style.top = (rect.top - tooltip.offsetHeight - 8) + 'px';
-                    if (tooltip.getBoundingClientRect().top < 8) {
-                        tooltip.style.top = (rect.bottom + 8) + 'px';
-                    }
-                    tooltipPalabrasActual = tooltip;
-                    const cerrar = (ev) => {
-                        if (tooltipPalabrasActual && ev.target !== btnAyudaPalabras && !tooltipPalabrasActual.contains(ev.target)) {
+            if (fieldsetInfo) {
+                const tooltipBtns = fieldsetInfo.querySelectorAll('.tooltip-btn[data-tooltip]');
+                tooltipBtns.forEach(btn => {
+                    let tooltipPalabrasActual = null;
+                    btn.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        const tooltipTexto = this.getAttribute('data-tooltip');
+                        if (tooltipPalabrasActual) {
                             tooltipPalabrasActual.remove();
                             tooltipPalabrasActual = null;
-                            document.removeEventListener('click', cerrar);
+                            return;
                         }
-                    };
-                    setTimeout(() => document.addEventListener('click', cerrar), 0);
+                        const tooltip = document.createElement('div');
+                        tooltip.className = 'fixed z-50 bg-gray-900 text-white text-xs rounded shadow-lg p-3 max-w-sm pointer-events-none leading-relaxed';
+                        tooltip.textContent = tooltipTexto;
+                        document.body.appendChild(tooltip);
+                        const rect = this.getBoundingClientRect();
+                        tooltip.style.left = Math.max(8, rect.left) + 'px';
+                        tooltip.style.top = (rect.top - tooltip.offsetHeight - 8) + 'px';
+                        if (tooltip.getBoundingClientRect().top < 8) {
+                            tooltip.style.top = (rect.bottom + 8) + 'px';
+                        }
+                        tooltipPalabrasActual = tooltip;
+                        const cerrar = (ev) => {
+                            if (tooltipPalabrasActual && ev.target !== btn && !tooltipPalabrasActual.contains(ev.target)) {
+                                tooltipPalabrasActual.remove();
+                                tooltipPalabrasActual = null;
+                                document.removeEventListener('click', cerrar);
+                            }
+                        };
+                        setTimeout(() => document.addEventListener('click', cerrar), 0);
+                    });
                 });
             }
         });
@@ -3566,8 +3577,12 @@
                 const div = document.createElement('div');
                 div.className = 'flex items-center gap-2 mb-2 neoobjetivo-item flex-wrap';
                 const urlClass = 'neoobjetivo-url flex-1 min-w-[200px] px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border border-gray-300 dark:border-gray-600';
+                const idLabelClass = id
+                    ? 'neoobjetivo-id-label text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap font-mono'
+                    : 'neoobjetivo-id-label text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap font-mono hidden';
                 div.innerHTML = `
                     <input type="hidden" name="neoobjetivo[${index}][id]" value="${id || ''}">
+                    <span class="${idLabelClass}" title="ID neoobjetivo">${id ? '#' + id : '#'}</span>
                     <input type="text" name="neoobjetivo[${index}][url]" value="${url}" class="${urlClass}" placeholder="https://...">
                     <input type="datetime-local" name="neoobjetivo[${index}][visitada]" value="${visitada}" class="neoobjetivo-visitada w-44 px-3 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border border-gray-300 dark:border-gray-600">
                     <button type="button" class="btn-eliminar-neoobjetivo px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm transition-colors" title="Eliminar esta URL">
@@ -3585,6 +3600,11 @@
                         urlInput.value = '';
                         div.querySelector('input[name*="[visitada]"]').value = '';
                         div.querySelector('input[name*="[id]"]').value = '';
+                        const idLabel = div.querySelector('.neoobjetivo-id-label');
+                        if (idLabel) {
+                            idLabel.textContent = '#';
+                            idLabel.classList.add('hidden');
+                        }
                         actualizarBordeUrl(urlInput);
                         return;
                     }
@@ -5508,6 +5528,22 @@
 
             const root = document.getElementById('especificaciones-internas-contenido');
             if (!root) return;
+
+            root.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    const target = event.target;
+                    if (target.matches('.editor-principal-texto') || target.matches('.editor-intermedia-texto')) {
+                        event.preventDefault();
+                        const fila = target.closest('.especificacion-grupo-editor-principal, .editor-linea-intermedia');
+                        if (fila) {
+                            const btnGuardar = fila.querySelector('.btn-guardar-fila-editor, .btn-guardar-fila-editor-principal');
+                            if (btnGuardar) {
+                                btnGuardar.click();
+                            }
+                        }
+                    }
+                }
+            });
 
             root.addEventListener('click', (event) => {
                 const btnEditar = event.target.closest('.btn-editar-grupo-especificaciones');

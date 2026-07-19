@@ -3371,6 +3371,7 @@
             '2a al 50 - cheque - SoloCarrefour': '2a-al-50-cheque',
             '2a al 50': '2a-al-50',
             '2a al 70': '2a-al-70',
+            '-20% Cupon - Solo Carrefour': '20-cupon-carrefour',
           };
 
           {{-- _odb1: obtenerDatosBadge - Configuración visual de un badge de descuento --}}
@@ -3397,6 +3398,7 @@
               '2a al 50': { label: '2a al 50%', gradient: 'linear-gradient(135deg, #f59e0b, #d97706)', fontWeight: 'normal' },
               '-20%': { label: '-20%', gradient: 'linear-gradient(135deg, #ef4444, #dc2626)', fontWeight: 'bold' },
               '+Juego': { label: '+Juego', gradient: 'linear-gradient(135deg, #0ea5e9, #6366f1)', fontWeight: '600' },
+              '-20% Cupon - Solo Carrefour': { label: '-20% Cupón', gradient: 'linear-gradient(135deg, #ef4444, #dc2626)', fontWeight: 'bold' },
             };
             return mapa[descuento] || null;
           };
@@ -3424,21 +3426,29 @@
 
             const listaBadges = window._nlb1(lista);
 
-            const badges = listaBadges.map(d => {
+            const badgesData = listaBadges.map(d => {
               const cfg = window._odb1(d);
-              if (!cfg) return '';
+              if (!cfg) return null;
+              return { d, cfg };
+            }).filter(Boolean);
+
+            // Ordenar por longitud de label descendente: el que tenga más texto arriba/primero
+            badgesData.sort((a, b) => b.cfg.label.length - a.cfg.label.length);
+
+            const badges = badgesData.map(item => {
+              const cfg = item.cfg;
               const estiloComun = `background: ${cfg.gradient}; font-size: 0.7rem; padding: 2px 6px; font-weight: ${cfg.fontWeight}; white-space: nowrap; pointer-events: none;`;
-              if (listaBadges.length === 1) {
+              if (badgesData.length === 1) {
                 return `<span class="cupon-badge" style="${estiloComun} top: 0px; right: 0px; bottom: auto; z-index: 10;">${cfg.label}</span>`;
               }
               return `<span class="cupon-badge descuento-badge-en-grupo" style="${estiloComun} position: relative; top: auto; right: auto; transform: none; box-shadow: none;">${cfg.label}</span>`;
-            }).filter(Boolean).join('');
+            }).join('');
 
             let badgeHtml = '';
-            if (listaBadges.length === 1) {
+            if (badgesData.length === 1) {
               badgeHtml = badges;
             } else if (badges) {
-              badgeHtml = `<div class="descuentos-badges-grupo absolute top-0 right-0 flex flex-row flex-wrap gap-1 justify-end z-10" style="pointer-events: none;">${badges}</div>`;
+              badgeHtml = `<div class="descuentos-badges-grupo absolute top-0 right-0 flex flex-col gap-1 items-end z-10" style="pointer-events: none;">${badges}</div>`;
             }
 
             const tieneModal = window._tieneDescuentoModal(descuentosStr);
@@ -5111,6 +5121,14 @@
                 }
               });
             }
+
+            {{-- Comparar por precio, no solo por id: al duplicar oferta base + descuento
+                 comparten id y un match solo por id englobaba ambas en "Mejor precio" --}}
+            const esOfertaConMejorPrecio = (oferta) => {
+              if (!oferta || !oferta.precio_unidad || mejorPrecio === Infinity) return false;
+              const precio = parseFloat(String(oferta.precio_unidad).replace(',', '.'));
+              return !isNaN(precio) && precio === mejorPrecio;
+            };
             
             {{-- Si ordenActual es null, respeta el orden original del backend --}}
             {{-- x6: Contenedor del listado de ofertas --}}
@@ -5167,7 +5185,7 @@
               if (itemOrdenado.tipo === 'grupo') {
                 const grupo = itemOrdenado.datos;
                 const primeraOferta = grupo.ofertas[0];
-                const esMejorOferta = mejoresOfertas.some(mejor => mejor.id === primeraOferta.id);
+                const esMejorOferta = esOfertaConMejorPrecio(primeraOferta);
                 
                 {{-- Crear contenedor para el grupo unificado --}}
                 const tieneDescuentosEnGrupo = grupo.ofertas.some(item => window._tieneAlgunDescuento(item.descuentos));
@@ -5344,7 +5362,7 @@
                 const item = itemOrdenado.datos;
                 
                 const estaEnGrupo = ofertasEnGrupos.includes(item.id);
-                const esMejorOferta = mejoresOfertas.some(mejor => mejor.id === item.id);
+                const esMejorOferta = esOfertaConMejorPrecio(item);
                 
                 {{-- Si está en un grupo unificado, saltarla (ya fue procesada como grupo) --}}
                 if (estaEnGrupo) {
@@ -5360,7 +5378,7 @@
                   while (j < itemsUnificados.length && 
                          itemsUnificados[j].tipo === 'oferta' &&
                          !ofertasEnGrupos.includes(itemsUnificados[j].datos.id) &&
-                         mejoresOfertas.some(mejor => mejor.id === itemsUnificados[j].datos.id)) {
+                         esOfertaConMejorPrecio(itemsUnificados[j].datos)) {
                     grupoMejoresOfertas.push(itemsUnificados[j].datos);
                     j++;
                   }
@@ -7968,7 +7986,9 @@ function _scctm1(url, descuentos, ofertaId) {
   
   if (!modal || !continueBtn || !title || !text || !cuponesList) return;
   
-  const urlRedireccion = `/redirigir/${ofertaId}${window.location.search}`;
+  // Usar la URL firmada de la oferta (no reconstruir con window.location.search:
+  // eso pierde el token y muestra "enlace caducado").
+  const urlRedireccion = url || (ofertaId ? `/redirigir/${ofertaId}` : '#');
   continueBtn.href = urlRedireccion;
   continueBtn.textContent = 'Ir a la tienda';
   continueBtn.onclick = function(e) {
@@ -8064,6 +8084,10 @@ const v12 = {
   '2a-al-70': {
     title: '¡Oferta 2ª al 70%!',
     text: 'Esta oferta tiene descuento 2ª al 70%. Para obtener este precio, debes comprar 2 unidades y en el carrito se te aplicará automáticamente el descuento o puede que tengas que marcar alguna casilla en la vista del producto.'
+  },
+  '20-cupon-carrefour': {
+    title: '¡-20% Cupón!',
+    text: '¡Recuerda! Con esta compra recibirás un cupón del 20% del total que vas a pagar, que podrás gastar en un rango de días determinado. ¡Apúntalo y que no se te pase!'
   }
 };
 
@@ -8085,7 +8109,8 @@ function _ssmm1(url, lista, ofertaId) {
   const cuponesList = document.getElementById('x24');
   if (!modal || !continueBtn || !title || !text || !cuponesList) return;
 
-  const urlFinal = ofertaId ? `/redirigir/${ofertaId}${window.location.search}` : url;
+  // Usar la URL firmada recibida; no reconstruir con location.search (pierde la firma).
+  const urlFinal = url || (ofertaId ? `/redirigir/${ofertaId}` : '#');
   continueBtn.href = urlFinal;
   continueBtn.textContent = 'Ir a la tienda';
   continueBtn.onclick = function(e) {

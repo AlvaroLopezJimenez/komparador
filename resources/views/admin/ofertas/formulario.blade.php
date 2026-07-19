@@ -45,6 +45,7 @@
             @if($oferta)
             @method('PUT')
             @endif
+            <input type="hidden" name="crear_aviso_sin_stock_4_dias" id="crear_aviso_sin_stock_4_dias" value="0">
 
             @php
                 $cholloSeleccionado = $oferta?->chollo;
@@ -237,16 +238,42 @@
                     </div>
 
                     {{-- TEXTO CANTIDAD ALTERNATIVO (solo si la categoría del producto lo exige) --}}
+                    @php
+                        $textoCantRaw = old('texto_cantidad_alternativo', $oferta->texto_cantidad_alternativo ?? '');
+                        $textoCantNum = '';
+                        $textoCantTxt = '';
+                        if (!empty($textoCantRaw)) {
+                            $decoded = json_decode($textoCantRaw, true);
+                            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                                $textoCantNum = $decoded['num'] ?? '';
+                                $textoCantTxt = $decoded['txt'] ?? '';
+                            } else {
+                                // Old format fallback
+                                if (preg_match('/^(\d+(?:[.,]\d+)?)\s*(.*)$/u', $textoCantRaw, $matches)) {
+                                    $textoCantNum = str_replace(',', '.', $matches[1]);
+                                    $textoCantTxt = trim($matches[2]);
+                                } else {
+                                    $textoCantTxt = $textoCantRaw;
+                                }
+                            }
+                        }
+                    @endphp
                     <div id="wrap_texto_cantidad_alternativo" class="col-span-1 md:col-span-2 hidden">
-                        <label for="texto_cantidad_alternativo_input" class="block mb-1 font-medium text-gray-700 dark:text-gray-200">
+                        <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">
                             Texto cantidad alternativo <span class="text-red-500">*</span>
                         </label>
                         <div id="texto_cantidad_alternativo_botones" class="flex flex-wrap gap-1.5 mb-1.5" aria-live="polite"></div>
-                        <input type="text" name="texto_cantidad_alternativo" id="texto_cantidad_alternativo_input"
-                            value="{{ old('texto_cantidad_alternativo', $oferta->texto_cantidad_alternativo ?? '') }}"
-                            maxlength="255"
-                            placeholder="Ej: 6 botellines"
-                            class="w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border @error('texto_cantidad_alternativo') border-red-500 @enderror">
+                        <div class="flex gap-2 w-full">
+                            <input type="number" step="any" id="texto_cantidad_alternativo_num"
+                                value="{{ $textoCantNum }}"
+                                placeholder="Ej: 6"
+                                class="w-32 px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border @error('texto_cantidad_alternativo') border-red-500 @enderror focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <input type="text" id="texto_cantidad_alternativo_txt"
+                                value="{{ $textoCantTxt }}"
+                                placeholder="Ej: Botellines 33 cl"
+                                class="flex-1 px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border @error('texto_cantidad_alternativo') border-red-500 @enderror focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <input type="hidden" name="texto_cantidad_alternativo" id="texto_cantidad_alternativo_input" value="{{ $textoCantRaw }}">
                         @error('texto_cantidad_alternativo')
                         <p class="text-sm text-red-500 mt-1">{{ $message }}</p>
                         @enderror
@@ -617,13 +644,19 @@
                 <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 space-y-4 border border-gray-200 dark:border-gray-700">
                     <div class="flex items-center justify-between">
                         <h3 class="text-lg font-medium text-gray-900 dark:text-white">Avisos</h3>
-                        <button type="button" onclick="mostrarModalNuevoAviso()" 
-                            class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-pink-600 hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500">
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                            </svg>
-                            Añadir Aviso
-                        </button>
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="marcarSinStock4Dias()" 
+                                class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500">
+                                Sin stock 4 días
+                            </button>
+                            <button type="button" onclick="mostrarModalNuevoAviso()" 
+                                class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-pink-600 hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                </svg>
+                                Añadir Aviso
+                            </button>
+                        </div>
                     </div>
 
                     {{-- Lista de avisos existentes --}}
@@ -687,13 +720,19 @@
                 <div class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 space-y-4 border border-gray-200 dark:border-gray-700">
                     <div class="flex items-center justify-between">
                         <h3 class="text-lg font-medium text-gray-900 dark:text-white">Avisos</h3>
-                        <button type="button" onclick="mostrarModalNuevoAviso()" 
-                            class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-pink-600 hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500">
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                            </svg>
-                            Añadir Aviso
-                        </button>
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="marcarSinStock4Dias()" 
+                                class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500">
+                                Sin stock 4 días
+                            </button>
+                            <button type="button" onclick="mostrarModalNuevoAviso()" 
+                                class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-pink-600 hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                </svg>
+                                Añadir Aviso
+                            </button>
+                        </div>
                     </div>
 
                     {{-- Lista de avisos existentes --}}
@@ -816,6 +855,7 @@
                                 <button type="button" class="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white text-xs md:text-sm rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition" data-dias="4">4 días</button>
                                 <button type="button" class="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white text-xs md:text-sm rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition" data-dias="7">7 días</button>
                                 <button type="button" class="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white text-xs md:text-sm rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition" data-dias="14">14 días</button>
+                                <button type="button" class="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white text-xs md:text-sm rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition" data-dias="90">3 meses</button>
                             </div>
                             <input type="datetime-local" id="fecha-aviso" name="fecha_aviso" 
                                 class="w-full px-3 py-2 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" 
@@ -823,10 +863,10 @@
                         </div>
                         
                         <div class="mb-4">
-                            <label class="flex items-center">
+                            <div class="flex items-center">
                                 <input type="checkbox" id="oculto" name="oculto" class="rounded border-gray-300 text-pink-600 focus:ring-pink-500">
                                 <span class="ml-2 text-sm text-gray-300 dark:text-gray-300">Ocultar aviso</span>
-                            </label>
+                            </div>
                             <p class="text-xs text-gray-400 dark:text-gray-400 mt-1">Los avisos ocultos no aparecen en las pestañas principales pero se mantienen para futuras comprobaciones</p>
                         </div>
                         
@@ -1206,7 +1246,36 @@
                 });
             }
 
+            document.addEventListener('DOMContentLoaded', function() {
+                const btnGuardar = document.getElementById('btn_guardar');
+                if (btnGuardar) {
+                    btnGuardar.addEventListener('click', () => {
+                        if (!btnGuardar._isSinStock4DiasClick) {
+                            const inputAviso = document.getElementById('crear_aviso_sin_stock_4_dias');
+                            if (inputAviso) {
+                                inputAviso.value = '0';
+                            }
+                        }
+                    });
+                }
+            });
 
+            function marcarSinStock4Dias() {
+                const inputAviso = document.getElementById('crear_aviso_sin_stock_4_dias');
+                if (inputAviso) {
+                    inputAviso.value = '1';
+                }
+                const radioNo = document.querySelector('input[name="mostrar"][value="no"]');
+                if (radioNo) {
+                    radioNo.checked = true;
+                }
+                const btnGuardar = document.getElementById('btn_guardar');
+                if (btnGuardar) {
+                    btnGuardar._isSinStock4DiasClick = true;
+                    btnGuardar.click();
+                    btnGuardar._isSinStock4DiasClick = false;
+                }
+            }
             </script>
 
 
@@ -1691,10 +1760,106 @@
 
          let unidadMedidaProductoActual = null;
 
+         function actualizarTextoCantidadAlternativoHidden() {
+             const numInput = document.getElementById('texto_cantidad_alternativo_num');
+             const txtInput = document.getElementById('texto_cantidad_alternativo_txt');
+             const hiddenInput = document.getElementById('texto_cantidad_alternativo_input');
+             if (!numInput || !txtInput || !hiddenInput) return;
+
+             const numVal = numInput.value.trim();
+             const txtVal = txtInput.value.trim();
+
+             if (numVal === '' && txtVal === '') {
+                 hiddenInput.value = '';
+             } else {
+                 hiddenInput.value = JSON.stringify({
+                     num: numVal !== '' ? Number(numVal) : null,
+                     txt: txtVal
+                 });
+             }
+             hiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
+             autocompletarUnidadesDesdeAlternativo();
+         }
+
+         function autocompletarUnidadesDesdeAlternativo() {
+             const numInput = document.getElementById('texto_cantidad_alternativo_num');
+             const txtInput = document.getElementById('texto_cantidad_alternativo_txt');
+             const unidadesInput = document.querySelector('[name="unidades"]');
+             
+             if (!numInput || !txtInput || !unidadesInput) return;
+             
+             const numVal = parseFloat(numInput.value);
+             if (isNaN(numVal) || numVal <= 0) return;
+             
+             const txtVal = txtInput.value.trim();
+             if (!txtVal) return;
+             
+             const regex = /(\d+(?:[.,]\d+)?)\s*(l|litro|litros|cl|centilitro|centilitros|ml|mililitro|mililitros|g|gramo|gramos|kg|kilo|kilos|gr)\b/i;
+             const match = txtVal.match(regex);
+             
+             let subValue = null;
+             let subUnit = null;
+             
+             if (match) {
+                 subValue = parseFloat(match[1].replace(',', '.'));
+                 subUnit = match[2].toLowerCase();
+             } else {
+                 const simpleNumRegex = /(\d+(?:[.,]\d+)?)/;
+                 const simpleMatch = txtVal.match(simpleNumRegex);
+                 if (simpleMatch) {
+                     subValue = parseFloat(simpleMatch[1].replace(',', '.'));
+                 }
+             }
+             
+             if (subValue === null || isNaN(subValue)) return;
+             
+             let baseValue = subValue;
+             const unidadMedida = unidadMedidaProductoActual || '';
+             
+             if (unidadMedida === 'litros' || unidadMedida === '100ml') {
+                 if (subUnit === 'cl' || subUnit === 'centilitro' || subUnit === 'centilitros') {
+                     baseValue = subValue * 0.01;
+                 } else if (subUnit === 'ml' || subUnit === 'mililitro' || subUnit === 'mililitros') {
+                     baseValue = subValue * 0.001;
+                 } else if (subUnit === 'l' || subUnit === 'litro' || subUnit === 'litros') {
+                     baseValue = subValue;
+                 } else {
+                     if (subUnit === null) {
+                         if (subValue >= 5) {
+                             baseValue = subValue * 0.01;
+                         } else {
+                             baseValue = subValue;
+                         }
+                     }
+                 }
+             } else if (unidadMedida === 'kilos' || unidadMedida === '800gramos') {
+                 if (subUnit === 'g' || subUnit === 'gr' || subUnit === 'gramo' || subUnit === 'gramos') {
+                     baseValue = subValue * 0.001;
+                 } else if (subUnit === 'kg' || subUnit === 'kilo' || subUnit === 'kilos') {
+                     baseValue = subValue;
+                 } else {
+                     if (subUnit === null) {
+                         if (subValue >= 5) {
+                             baseValue = subValue * 0.001;
+                         } else {
+                             baseValue = subValue;
+                         }
+                     }
+                 }
+             }
+             
+             const totalUnidades = numVal * baseValue;
+             const rounded = Math.round(totalUnidades * 100) / 100;
+             unidadesInput.value = rounded;
+             unidadesInput.dispatchEvent(new Event('input', { bubbles: true }));
+         }
+
          async function actualizarCampoTextoCantidadAlternativo(productoId, productoCompleto) {
              const wrap = document.getElementById('wrap_texto_cantidad_alternativo');
              const input = document.getElementById('texto_cantidad_alternativo_input');
              const botonesWrap = document.getElementById('texto_cantidad_alternativo_botones');
+             const numInput = document.getElementById('texto_cantidad_alternativo_num');
+             const txtInput = document.getElementById('texto_cantidad_alternativo_txt');
              if (!wrap || !input) return;
 
              let requiere = productoCompleto && productoCompleto.permitir_texto_cantidad_alternativo === 'si';
@@ -1711,17 +1876,17 @@
 
              if (requiere) {
                  wrap.classList.remove('hidden');
-                 input.required = true;
+                 if (numInput) numInput.required = true;
+                 if (txtInput) txtInput.required = true;
+                 input.required = false;
                  await cargarBotonesTextoCantidadAlternativo(productoId, botonesWrap);
              } else {
                  wrap.classList.add('hidden');
+                 if (numInput) numInput.required = false;
+                 if (txtInput) txtInput.required = false;
                  input.required = false;
                  if (botonesWrap) botonesWrap.innerHTML = '';
              }
-         }
-
-         function tokensTextoCantidadAltFormulario(valor) {
-             return String(valor || '').trim().split(/\s+/).filter(Boolean);
          }
 
          function marcarBotonTextoCantidadAltFormulario(btn, activo) {
@@ -1747,30 +1912,14 @@
          }
 
          function sincronizarBotonesTextoCantidadAltFormulario() {
-             const input = document.getElementById('texto_cantidad_alternativo_input');
+             const txtInput = document.getElementById('texto_cantidad_alternativo_txt');
              const botonesWrap = document.getElementById('texto_cantidad_alternativo_botones');
-             if (!input || !botonesWrap) return;
-             const tokens = tokensTextoCantidadAltFormulario(input.value).map((t) => t.toLowerCase());
+             if (!txtInput || !botonesWrap) return;
+             const val = txtInput.value.trim().toLowerCase();
              botonesWrap.querySelectorAll('.texto-cantidad-alt-btn').forEach((btn) => {
                  const palabra = String(btn.dataset.palabra || btn.textContent || '').trim().toLowerCase();
-                 marcarBotonTextoCantidadAltFormulario(btn, palabra !== '' && tokens.includes(palabra));
+                 marcarBotonTextoCantidadAltFormulario(btn, palabra !== '' && val === palabra);
              });
-         }
-
-         function togglePalabraTextoCantidadAltFormulario(btn, input) {
-             if (!btn || !input) return;
-             const palabra = String(btn.dataset.palabra || btn.textContent || '').trim();
-             if (!palabra) return;
-
-             let tokens = tokensTextoCantidadAltFormulario(input.value);
-             const indice = tokens.findIndex((t) => t.toLowerCase() === palabra.toLowerCase());
-             if (indice >= 0) {
-                 tokens.splice(indice, 1);
-             } else {
-                 tokens.push(palabra);
-             }
-             input.value = tokens.join(' ');
-             input.dispatchEvent(new Event('input', { bubbles: true }));
          }
 
          async function cargarBotonesTextoCantidadAlternativo(productoId, botonesWrap) {
@@ -1790,19 +1939,41 @@
              try {
                  const response = await fetch(url);
                  const data = await response.json();
-                 const palabras = Array.isArray(data.palabras) ? data.palabras : [];
+                 const textos = Array.isArray(data.textos) ? data.textos : [];
 
-                 if (!palabras.length) {
+                 const sugerencias = [];
+                 textos.forEach(t => {
+                     let txtPart = '';
+                     try {
+                         const decoded = JSON.parse(t);
+                         if (decoded && typeof decoded === 'object') {
+                             txtPart = (decoded.txt || '').trim();
+                         }
+                     } catch (e) {
+                         // Fallback to old text parsing: regex to strip leading number
+                         const match = String(t).trim().match(/^(\d+(?:[.,]\d+)?)\s*(.*)$/);
+                         if (match) {
+                             txtPart = match[2].trim();
+                         } else {
+                             txtPart = String(t).trim();
+                         }
+                     }
+                     if (txtPart && !sugerencias.includes(txtPart)) {
+                         sugerencias.push(txtPart);
+                     }
+                 });
+
+                 if (!sugerencias.length) {
                      botonesWrap.innerHTML = '';
                      return;
                  }
 
-                 botonesWrap.innerHTML = palabras.map((palabra) => {
+                 botonesWrap.innerHTML = sugerencias.map((palabra) => {
                      const seguro = String(palabra)
                          .replace(/&/g, '&amp;')
                          .replace(/</g, '&lt;')
                          .replace(/"/g, '&quot;');
-                     return `<button type="button" class="texto-cantidad-alt-btn text-xs px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-blue-100 dark:hover:bg-blue-900 hover:border-blue-400 dark:hover:border-blue-500 transition-colors" data-palabra="${seguro}" aria-pressed="false" title="Añadir o quitar «${seguro}»">${seguro}</button>`;
+                     return `<button type="button" class="texto-cantidad-alt-btn text-xs px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-blue-100 dark:hover:bg-blue-900 hover:border-blue-400 dark:hover:border-blue-500 transition-colors" data-palabra="${seguro}" aria-pressed="false" title="Seleccionar «${seguro}»">${seguro}</button>`;
                  }).join('');
 
                  sincronizarBotonesTextoCantidadAltFormulario();
@@ -2462,6 +2633,7 @@
             { value: '2a al 50', label: '2ª al 50%' },
             { value: '2a al 50 - cheque - SoloCarrefour', label: '2ª al 50% - Cheque - SoloCarrefour' },
             { value: '-20%', label: '-20% (Días Locos)' },
+            { value: '-20% Cupon - Solo Carrefour', label: '-20% Cupón - Solo Carrefour' },
         ];
 
         function crearOpcionesSelect(tipoSeleccionado) {
@@ -5918,19 +6090,36 @@ document.addEventListener('DOMContentLoaded', async function() {
     const productoId = document.getElementById('producto_id')?.value;
     const tiendaId = document.getElementById('tienda_id')?.value;
 
-    const textoAltInput = document.getElementById('texto_cantidad_alternativo_input');
-    if (textoAltInput && !textoAltInput.__textoAltBound) {
-        textoAltInput.__textoAltBound = true;
-        textoAltInput.addEventListener('input', sincronizarBotonesTextoCantidadAltFormulario);
+    const numInput = document.getElementById('texto_cantidad_alternativo_num');
+    const txtInput = document.getElementById('texto_cantidad_alternativo_txt');
+    if (numInput && !numInput.__textoAltBound) {
+        numInput.__textoAltBound = true;
+        numInput.addEventListener('input', function() {
+            actualizarTextoCantidadAlternativoHidden();
+            autocompletarUnidadesDesdeAlternativo();
+        });
+    }
+    if (txtInput && !txtInput.__textoAltBound) {
+        txtInput.__textoAltBound = true;
+        txtInput.addEventListener('input', function() {
+            actualizarTextoCantidadAlternativoHidden();
+            sincronizarBotonesTextoCantidadAltFormulario();
+            autocompletarUnidadesDesdeAlternativo();
+        });
     }
 
     document.addEventListener('click', function(e) {
         const btn = e.target.closest('.texto-cantidad-alt-btn');
         if (!btn) return;
-        const input = document.getElementById('texto_cantidad_alternativo_input');
-        if (input) {
-            togglePalabraTextoCantidadAltFormulario(btn, input);
-            sincronizarBotonesTextoCantidadAltFormulario();
+        const txtField = document.getElementById('texto_cantidad_alternativo_txt');
+        if (txtField) {
+            const btnVal = (btn.dataset.palabra || btn.textContent || '').trim();
+            if (txtField.value.trim() === btnVal) {
+                txtField.value = '';
+            } else {
+                txtField.value = btnVal;
+            }
+            txtField.dispatchEvent(new Event('input', { bubbles: true }));
         }
     });
 

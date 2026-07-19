@@ -387,7 +387,7 @@ class CsvAwinOfertaService
 
         return [
             'nuevo_texto' => $nuevoTexto,
-            'nueva_fecha' => \Carbon\Carbon::parse($aviso->fecha_aviso)->addDay(),
+            'nueva_fecha' => now()->addDay(),
         ];
     }
 

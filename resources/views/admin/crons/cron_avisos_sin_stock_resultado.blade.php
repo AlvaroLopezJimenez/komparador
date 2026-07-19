@@ -102,7 +102,7 @@
                                     <td class="py-2 pr-4">{{ $e->fin?->format('d/m/Y H:i') ?? '-' }}</td>
                                     <td class="py-2 pr-4">{{ $e->total }}</td>
                                     <td class="py-2 pr-4">{{ $e->total_guardado }}</td>
-                                    <td class="py-2 pr-4">{{ $e->total_errores }}</td>
+                                    <td class="py-2 pr-4">{{ is_array($e->log) ? ($e->log['aplazados'] ?? $e->total_errores) : $e->total_errores }}</td>
                                     <td class="py-2">
                                         <a href="{{ route('admin.ejecuciones.avisos-sin-stock-scrapear', ['ejecucion_id' => $e->id, 'fecha' => $fechaSeleccionada->toDateString(), 'mes' => $mesSeleccionado->format('Y-m')]) }}" class="text-blue-600 dark:text-blue-400 hover:underline">Ver log</a>
                                     </td>
@@ -129,7 +129,7 @@
                     <p class="mt-2 text-sm">
                         Procesados: <strong>{{ $ejecucion->total }}</strong> —
                         Con precio aplicado: <strong>{{ $ejecucion->total_guardado }}</strong> —
-                        Aplazados (sin precio): <strong>{{ $ejecucion->total_errores }}</strong>
+                        Aplazados (sin precio): <strong>{{ is_array($ejecucion->log) ? ($ejecucion->log['aplazados'] ?? $ejecucion->total_errores) : $ejecucion->total_errores }}</strong>
                     </p>
                     <p class="mt-2">
                         <a href="{{ route('admin.ejecuciones.avisos-sin-stock-scrapear', ['fecha' => $fechaSeleccionada->toDateString(), 'mes' => $mesSeleccionado->format('Y-m')]) }}" class="text-blue-600 dark:text-blue-400 hover:underline">Volver al listado</a>

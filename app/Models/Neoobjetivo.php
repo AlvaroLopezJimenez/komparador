@@ -9,7 +9,7 @@ use Throwable;
 class Neoobjetivo extends Model
 {
     /** Días sin revisar visitada para considerar un neoobjetivo pendiente (cron + API programa externo). */
-    public const DIAS_SIN_REVISAR = 30;
+    public const DIAS_SIN_REVISAR = 32;
 
     private const URL_ENCRYPTION_PREFIX = 'encv1:';
     private const URL_CIPHER = 'AES-256-CBC';
@@ -40,6 +40,7 @@ class Neoobjetivo extends Model
         'producto_id',
         'categoria_id',
         'tienda_id',
+        'url',
         'url_cipher',
         'url_lookup',
         'visitada',

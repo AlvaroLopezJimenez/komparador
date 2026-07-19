@@ -76,55 +76,74 @@
         @endif
 
         @if($tienda->exists && !empty($flujoScrapingTienda) && (($flujoScrapingTienda['stats']['scrapear']['total'] ?? 0) > 0))
-        <details id="mapa-neuronal-tienda-detalle" class="mb-6 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm group">
-            <summary class="cursor-pointer select-none list-none px-4 py-3 flex flex-wrap items-center justify-between gap-2">
-                <span class="font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
+        <details id="mapa-neuronal-tienda-detalle" class="mb-6 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm group">
+            <summary class="cursor-pointer select-none list-none px-4 py-3.5 flex flex-wrap items-center justify-between gap-2">
+                <span class="font-semibold text-gray-850 dark:text-gray-100 flex items-center gap-2">
                     <span class="text-lg" aria-hidden="true">🧠</span>
                     Mapa neuronal — flujo scraping / mostrar
                 </span>
-                <span class="text-xs text-gray-500 dark:text-gray-400 group-open:hidden">Pulsa para abrir el mapa 2D interactivo</span>
-                <span id="mapa-neuronal-resumen" class="hidden group-open:inline text-xs text-orange-600 dark:text-orange-400">
+                <span class="text-xs text-gray-400 dark:text-gray-500 group-open:hidden">Pulsa para abrir el mapa 2D interactivo</span>
+                <span id="mapa-neuronal-resumen" class="hidden group-open:inline text-xs font-semibold text-indigo-600 dark:text-indigo-400">
                     Scraping {{ $flujoScrapingTienda['stats']['scrapear']['activas'] }}/{{ $flujoScrapingTienda['stats']['scrapear']['total'] }}
                     · Mostrar {{ $flujoScrapingTienda['stats']['mostrar']['activas'] }}/{{ $flujoScrapingTienda['stats']['mostrar']['total'] }}
                 </span>
             </summary>
-            <div class="px-4 pb-4 pt-1 border-t border-gray-200 dark:border-gray-600 space-y-3">
-                <p class="text-sm text-gray-500 dark:text-gray-400">
-                    Cada categoría es una neurona; la tienda está en el centro. En modo <strong>Scraping</strong>, cada pulso lleva el color de su API.
-                    <span class="text-red-500">Rojo</span> si la señal está cortada o bloqueada en la tienda.
-                    Arrastra para desplazarte · rueda para zoom.
-                </p>
-                <div class="flex flex-wrap items-center gap-2">
-                    <span class="text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Ver señal de</span>
-                    <button type="button" id="mapa-neuronal-modo-scraping"
-                        class="mapa-neuronal-modo-btn px-3 py-1.5 text-sm rounded-lg border border-orange-500 bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 font-semibold">
-                        Scraping
-                    </button>
-                    <button type="button" id="mapa-neuronal-modo-mostrar"
-                        class="mapa-neuronal-modo-btn px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-orange-300">
-                        Mostrar
-                    </button>
+            <div class="px-4 pb-4 pt-1 border-t border-gray-100 dark:border-gray-700 space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-gray-50 dark:bg-gray-800/40 p-3 rounded-lg border border-gray-100 dark:border-gray-700/50">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 max-w-xl">
+                        Cada categoría es una neurona; la tienda está en el centro. En modo <strong>Scraping</strong>, cada pulso lleva el color de su API.
+                        La señal se mostrará en <strong class="text-rose-500 font-semibold">rojo</strong> si el flujo está bloqueado en la tienda.
+                        Arrastra para moverte · rueda para zoom · doble clic en categoría para centrar.
+                    </p>
+                    <div class="flex items-center gap-2 shrink-0 self-start sm:self-center">
+                        <span class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Ver señal:</span>
+                        <div class="inline-flex p-0.5 rounded-lg bg-gray-200/60 dark:bg-slate-900 border border-gray-300/40 dark:border-slate-800/80">
+                            <button type="button" id="mapa-neuronal-modo-scraping"
+                                class="mapa-neuronal-modo-btn px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150">
+                                Scraping
+                            </button>
+                            <button type="button" id="mapa-neuronal-modo-mostrar"
+                                class="mapa-neuronal-modo-btn px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-150">
+                                Mostrar
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <div id="mapa-neuronal-contenedor" class="relative w-full rounded-xl overflow-hidden border border-cyan-900/40 bg-[#030712] cursor-grab active:cursor-grabbing shadow-[inset_0_0_60px_rgba(56,189,248,0.06)]" style="height: min(70vh, 560px);">
-                    <div id="mapa-neuronal-cargando" class="absolute inset-0 z-20 flex items-center justify-center text-sm text-gray-400 pointer-events-none hidden">Cargando mapa…</div>
-                    <div id="mapa-neuronal-error" class="absolute inset-0 z-20 hidden flex items-center justify-center p-4 text-sm text-red-400 text-center"></div>
+                <div id="mapa-neuronal-contenedor" class="relative w-full rounded-xl overflow-hidden border border-gray-200 dark:border-slate-800 bg-[#090d16] cursor-grab active:cursor-grabbing focus:ring-1 focus:ring-indigo-500/30 focus:outline-none transition-all duration-300" style="height: min(70vh, 560px);">
+                    <div id="mapa-neuronal-cargando" class="absolute inset-0 z-20 flex items-center justify-center text-xs text-slate-400 bg-[#090d16]/40 backdrop-blur-sm pointer-events-none hidden">Cargando mapa…</div>
+                    <div id="mapa-neuronal-error" class="absolute inset-0 z-20 hidden flex items-center justify-center p-4 text-xs text-rose-450 bg-[#090d16]/80 text-center"></div>
                     <canvas id="mapa-neuronal-canvas" class="w-full h-full block touch-none"></canvas>
-                    <div id="mapa-neuronal-tooltip" class="hidden absolute z-10 pointer-events-none px-2 py-1 text-xs rounded-md bg-black/80 text-white border border-gray-600 max-w-[14rem] truncate"></div>
-                    <details id="mapa-neuronal-leyenda-apis" class="absolute top-2 right-2 z-10 pointer-events-auto max-w-[13rem] rounded-lg border border-cyan-800/50 bg-[#030712]/92 backdrop-blur-sm shadow-lg shadow-cyan-950/40 text-xs font-mono hidden">
-                        <summary class="cursor-pointer select-none px-3 py-2 text-cyan-300/90 hover:text-cyan-200 list-none flex items-center justify-between gap-2">
+                    <div id="mapa-neuronal-tooltip" class="hidden absolute z-10 pointer-events-none px-2.5 py-1.5 text-[11px] rounded-md bg-[#0b101d]/90 text-slate-100 border border-slate-700/50 shadow-xl max-w-[16rem] truncate backdrop-blur-sm"></div>
+                    
+                    <details id="mapa-neuronal-leyenda-apis" class="absolute top-3 right-3 z-10 pointer-events-auto max-w-[14rem] rounded-lg border border-slate-800 bg-slate-950/90 backdrop-blur-md shadow-xl text-xs font-sans hidden">
+                        <summary class="cursor-pointer select-none px-3 py-2 text-slate-350 hover:text-white list-none flex items-center justify-between gap-2">
                             <span class="flex items-center gap-1.5">
-                                <span class="inline-block w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_#22d3ee]"></span>
-                                <span id="mapa-neuronal-leyenda-titulo">APIs</span>
+                                <span class="inline-block w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]"></span>
+                                <span id="mapa-neuronal-leyenda-titulo" class="font-medium text-slate-200">APIs</span>
                             </span>
-                            <span class="text-[10px] text-cyan-500/70">▼</span>
+                            <span class="text-[9px] text-slate-500 transition-transform duration-200 group-open:rotate-180">▼</span>
                         </summary>
-                        <div id="mapa-neuronal-leyenda-lista" class="px-3 pb-2 pt-1 space-y-1.5 border-t border-cyan-900/40 max-h-48 overflow-y-auto"></div>
+                        <div id="mapa-neuronal-leyenda-lista" class="px-3 pb-2.5 pt-1.5 space-y-1.5 border-t border-slate-800 max-h-48 overflow-y-auto"></div>
                     </details>
-                    <div class="absolute bottom-2 left-2 right-2 flex flex-wrap gap-3 text-[10px] text-cyan-200/50 pointer-events-none font-mono">
-                        <span><span class="inline-block w-2 h-2 rounded-full bg-green-400 mr-1 shadow-[0_0_6px_#4ade80]"></span>Activo</span>
-                        <span><span class="inline-block w-2 h-2 rounded-full bg-slate-500 mr-1"></span>Inactivo</span>
-                        <span><span class="inline-block w-2 h-2 rounded-full bg-red-500 mr-1 shadow-[0_0_6px_#f87171]"></span>Cortado</span>
-                        <span><span class="inline-block w-2 h-2 rounded-full bg-cyan-300 mr-1 animate-pulse shadow-[0_0_8px_#7dd3fc]"></span>Señal</span>
+
+                    <div class="absolute bottom-3 left-3 flex flex-wrap gap-4 text-[10px] text-slate-400 pointer-events-none font-sans">
+                        <span class="flex items-center gap-1.5"><span class="inline-block w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]"></span>Activo</span>
+                        <span class="flex items-center gap-1.5"><span class="inline-block w-2 h-2 rounded-full bg-[#334155]"></span>Inactivo</span>
+                        <span class="flex items-center gap-1.5"><span class="inline-block w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.5)]"></span>Cortado</span>
+                        <span class="flex items-center gap-1.5"><span class="inline-block w-2 h-2 rounded-full bg-indigo-400 animate-pulse shadow-[0_0_8px_rgba(129,140,248,0.6)]"></span>Señal</span>
+                    </div>
+
+                    <!-- Controles flotantes de navegación (zoom, pan, centrar) -->
+                    <div class="absolute bottom-3 right-3 z-10 flex gap-1 bg-slate-950/80 backdrop-blur-md border border-slate-800 p-1 rounded-lg shadow-xl pointer-events-auto">
+                        <button type="button" id="mapa-neuronal-btn-zoom-in" class="w-8 h-8 flex items-center justify-center rounded text-slate-400 hover:bg-slate-800 hover:text-white transition active:scale-95" title="Acercar">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                        </button>
+                        <button type="button" id="mapa-neuronal-btn-zoom-out" class="w-8 h-8 flex items-center justify-center rounded text-slate-400 hover:bg-slate-800 hover:text-white transition active:scale-95" title="Alejar">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg>
+                        </button>
+                        <button type="button" id="mapa-neuronal-btn-reset" class="w-8 h-8 flex items-center justify-center rounded text-slate-400 hover:bg-slate-800 hover:text-white transition active:scale-95" title="Centrar vista">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H18.5"/></svg>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -1410,15 +1429,16 @@
                                 @php foreach ($lineasUrl as $idx => $linea): @endphp
                                 <div class="js-url-categoria-bloque space-y-1">
                                 <div class="js-url-categoria-linea url-categoria-linea-grid">
-                                    <div class="min-w-0">
+                                    <div class="min-w-0 flex items-center gap-2">
                                         <input type="hidden" name="urls_categoria[{{ $categoria->id }}][{{ $idx }}][id]" value="{{ $linea['id'] }}">
+                                        <span class="js-neoobjetivo-id-label text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap font-mono shrink-0 {{ !empty($linea['id']) ? '' : 'hidden' }}" title="ID neoobjetivo">#{{ $linea['id'] ?? '' }}</span>
                                         <input
                                             type="url"
                                             name="urls_categoria[{{ $categoria->id }}][{{ $idx }}][url]"
                                             data-id="{{ $categoria->id }}"
                                             placeholder="https://..."
                                             @if($idx === 0) x-ref="urlInput{{ $categoria->id }}" @endif
-                                            class="url-categoria-input js-url-categoria w-full px-2 py-1 bg-gray-100 dark:bg-gray-700 text-white border rounded {{ $sinNeo ? 'border-red-500' : '' }}"
+                                            class="url-categoria-input js-url-categoria flex-1 min-w-0 px-2 py-1 bg-gray-100 dark:bg-gray-700 text-white border rounded {{ $sinNeo ? 'border-red-500' : '' }}"
                                             value="{{ $linea['url'] }}"
                                         >
                                     </div>
@@ -1711,6 +1731,16 @@
 
                             if (datos.hiddenNeo) {
                                 datos.hiddenNeo.value = data.neo_id ? String(data.neo_id) : '';
+                            }
+                            const idLabel = bloque.querySelector('.js-neoobjetivo-id-label');
+                            if (idLabel) {
+                                if (data.neo_id) {
+                                    idLabel.textContent = '#' + data.neo_id;
+                                    idLabel.classList.remove('hidden');
+                                } else {
+                                    idLabel.textContent = '#';
+                                    idLabel.classList.add('hidden');
+                                }
                             }
                             if (data.visitada && datos.inputVisitada && !datos.inputVisitada.value) {
                                 datos.inputVisitada.value = data.visitada;
@@ -2594,11 +2624,15 @@
                         const borderUrl = sinNeo ? 'border-red-500' : '';
                         const urlEsc = url.replace(/"/g, '&quot;');
 
+                        const idLabelClass = neoId
+                            ? 'js-neoobjetivo-id-label text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap font-mono shrink-0'
+                            : 'js-neoobjetivo-id-label text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap font-mono shrink-0 hidden';
                         div.innerHTML = `
-                            <div class="min-w-0">
+                            <div class="min-w-0 flex items-center gap-2">
                                 <input type="hidden" name="urls_categoria[${categoriaId}][${idx}][id]" value="${neoId}">
+                                <span class="${idLabelClass}" title="ID neoobjetivo">${neoId ? '#' + neoId : '#'}</span>
                                 <input type="url" name="urls_categoria[${categoriaId}][${idx}][url]" data-id="${categoriaId}" placeholder="https://..."
-                                    class="url-categoria-input js-url-categoria w-full px-2 py-1 bg-gray-100 dark:bg-gray-700 text-white border rounded ${borderUrl}" value="${urlEsc}">
+                                    class="url-categoria-input js-url-categoria flex-1 min-w-0 px-2 py-1 bg-gray-100 dark:bg-gray-700 text-white border rounded ${borderUrl}" value="${urlEsc}">
                             </div>
                             <input type="datetime-local" name="urls_categoria[${categoriaId}][${idx}][visitada]"
                                 class="js-visitada-categoria w-full min-w-0 px-2 py-1 bg-gray-100 dark:bg-gray-700 text-white border rounded text-sm" value="${visitada}">
@@ -4087,6 +4121,7 @@
             let dpr = 1;
 
             const view = { panX: 0, panY: 0, scale: 1 };
+            const targetView = { panX: 0, panY: 0, scale: 1 };
             const drag = { activo: false, x: 0, y: 0, panX0: 0, panY0: 0 };
             let tiempoInicio = 0;
 
@@ -4096,28 +4131,28 @@
             let hojasIds = new Set();
 
             const COLORES = {
-                fondo: '#030712',
-                fondoGlow: 'rgba(56, 189, 248, 0.04)',
-                tienda: '#f97316',
-                tiendaGlow: '#fb923c',
-                tiendaInactiva: '#64748b',
-                activoScrapear: '#22c55e',
-                activoScrapearGlow: '#4ade80',
-                activoMostrar: '#38bdf8',
-                activoMostrarGlow: '#7dd3fc',
+                fondo: '#090d16',
+                fondoGlow: 'rgba(99, 102, 241, 0.02)',
+                tienda: '#6366f1',
+                tiendaGlow: 'rgba(99, 102, 241, 0.4)',
+                tiendaInactiva: '#475569',
+                activoScrapear: '#10b981',
+                activoScrapearGlow: 'rgba(16, 185, 129, 0.35)',
+                activoMostrar: '#0ea5e9',
+                activoMostrarGlow: 'rgba(14, 165, 233, 0.35)',
                 inactivo: '#334155',
                 estructural: '#1e293b',
-                cortada: '#ef4444',
-                cortadaGlow: '#f87171',
-                detenida: '#fbbf24',
-                pulsoScrapear: '#86efac',
-                pulsoMostrar: '#7dd3fc',
-                pulsoDetenido: '#fcd34d',
-                pulsoRojo: '#f87171',
+                cortada: '#f43f5e',
+                cortadaGlow: 'rgba(244, 63, 94, 0.35)',
+                detenida: '#eab308',
+                pulsoScrapear: '#10b981',
+                pulsoMostrar: '#0ea5e9',
+                pulsoDetenido: '#eab308',
+                pulsoRojo: '#f43f5e',
                 texto: '#e2e8f0',
-                textoTienda: '#ffedd5',
-                grid: 'rgba(56, 189, 248, 0.06)',
-                gridPunto: 'rgba(56, 189, 248, 0.12)',
+                textoTienda: '#ffffff',
+                grid: 'rgba(255, 255, 255, 0.02)',
+                gridPunto: 'rgba(255, 255, 255, 0.04)',
             };
 
             function truncarNombre(nombre, max) {
@@ -4559,14 +4594,21 @@
                     minY = Math.min(minY, p.y);
                     maxY = Math.max(maxY, p.y);
                 });
-                const margen = 80;
+                const margen = 85;
                 const bboxW = maxX - minX + margen * 2;
                 const bboxH = maxY - minY + margen * 2;
                 const cw = canvas.clientWidth;
                 const ch = canvas.clientHeight;
-                view.scale = Math.min(cw / bboxW, ch / bboxH, 1.8);
-                view.panX = 0;
-                view.panY = 0;
+                
+                targetView.scale = Math.min(cw / bboxW, ch / bboxH, 1.8);
+                targetView.panX = 0;
+                targetView.panY = 0;
+
+                if (!inicializado) {
+                    view.scale = targetView.scale;
+                    view.panX = targetView.panX;
+                    view.panY = targetView.panY;
+                }
             }
 
             function reconstruirNodos() {
@@ -4626,58 +4668,39 @@
             }
 
             function dibujarFondoPantalla(w, h, t) {
-                const grd = ctx.createRadialGradient(w * 0.5, h * 0.45, 0, w * 0.5, h * 0.5, Math.max(w, h) * 0.65);
-                grd.addColorStop(0, '#0a0f1e');
-                grd.addColorStop(0.45, COLORES.fondo);
-                grd.addColorStop(1, '#000000');
-                ctx.fillStyle = grd;
+                ctx.fillStyle = COLORES.fondo;
                 ctx.fillRect(0, 0, w, h);
-
-                ctx.fillStyle = COLORES.fondoGlow;
+                
+                // Draw a very subtle glowing aura in the center
+                const grd = ctx.createRadialGradient(w/2, h/2, 0, w/2, h/2, Math.min(w, h) * 0.45);
+                grd.addColorStop(0, 'rgba(99, 102, 241, 0.03)'); // Subtle indigo aura
+                grd.addColorStop(1, 'rgba(99, 102, 241, 0)');
+                ctx.fillStyle = grd;
                 ctx.beginPath();
-                ctx.arc(w * 0.5, h * 0.5, Math.min(w, h) * 0.22, 0, Math.PI * 2);
+                ctx.arc(w/2, h/2, Math.min(w, h) * 0.45, 0, Math.PI * 2);
                 ctx.fill();
             }
 
             function dibujarGrid() {
-                const paso = 40;
+                const paso = 35;
                 const w = canvas.clientWidth / view.scale;
                 const h = canvas.clientHeight / view.scale;
                 const ox = -view.panX / view.scale - w / 2;
                 const oy = -view.panY / view.scale - h / 2;
-                const t = (performance.now() - tiempoInicio) / 1000;
 
-                ctx.strokeStyle = COLORES.grid;
-                ctx.lineWidth = 0.5 / view.scale;
+                ctx.save();
+                ctx.fillStyle = COLORES.gridPunto; // Modern dot grid
                 const x0 = Math.floor(ox / paso) * paso;
                 const y0 = Math.floor(oy / paso) * paso;
-                for (let x = x0; x < ox + w; x += paso) {
-                    ctx.beginPath();
-                    ctx.moveTo(x, oy);
-                    ctx.lineTo(x, oy + h);
-                    ctx.stroke();
-                }
-                for (let y = y0; y < oy + h; y += paso) {
-                    ctx.beginPath();
-                    ctx.moveTo(ox, y);
-                    ctx.lineTo(ox + w, y);
-                    ctx.stroke();
-                }
 
-                const pasoPuntos = paso * 2;
-                const px0 = Math.floor(ox / pasoPuntos) * pasoPuntos;
-                const py0 = Math.floor(oy / pasoPuntos) * pasoPuntos;
-                for (let x = px0; x < ox + w; x += pasoPuntos) {
-                    for (let y = py0; y < oy + h; y += pasoPuntos) {
-                        const brillo = 0.35 + Math.sin(t * 0.8 + x * 0.01 + y * 0.01) * 0.15;
-                        ctx.globalAlpha = brillo;
-                        ctx.fillStyle = COLORES.gridPunto;
+                for (let x = x0; x < ox + w; x += paso) {
+                    for (let y = y0; y < oy + h; y += paso) {
                         ctx.beginPath();
-                        ctx.arc(x, y, 1.2 / view.scale, 0, Math.PI * 2);
+                        ctx.arc(x, y, 0.85 / view.scale, 0, Math.PI * 2);
                         ctx.fill();
                     }
                 }
-                ctx.globalAlpha = 1;
+                ctx.restore();
             }
 
             function trazarBezier(seg) {
@@ -4688,178 +4711,196 @@
 
             function dibujarConexionNeuronal(seg, color, glowColor, opacidad, t, animada) {
                 trazarBezier(seg);
-
                 ctx.save();
-                ctx.strokeStyle = glowColor || color;
-                ctx.globalAlpha = opacidad * 0.35;
-                ctx.lineWidth = 8 / view.scale;
-                ctx.shadowColor = glowColor || color;
-                ctx.shadowBlur = 14 / view.scale;
-                ctx.stroke();
-                ctx.restore();
-
-                trazarBezier(seg);
-                ctx.strokeStyle = color;
-                ctx.globalAlpha = opacidad * 0.55;
-                ctx.lineWidth = 1.2 / view.scale;
-                ctx.stroke();
 
                 if (animada) {
-                    trazarBezier(seg);
-                    ctx.setLineDash([6 / view.scale, 14 / view.scale]);
-                    ctx.lineDashOffset = -(t * 28) / view.scale;
+                    // Active line: subtle glow + solid line
                     ctx.strokeStyle = glowColor || color;
-                    ctx.globalAlpha = 0.85;
-                    ctx.lineWidth = 2 / view.scale;
+                    ctx.globalAlpha = opacidad * 0.08;
+                    ctx.lineWidth = 4 / view.scale;
                     ctx.stroke();
-                    ctx.setLineDash([]);
+
+                    trazarBezier(seg);
+                    ctx.strokeStyle = color;
+                    ctx.globalAlpha = opacidad * 0.45;
+                    ctx.lineWidth = 1.2 / view.scale;
+                    ctx.stroke();
+                } else {
+                    // Inactive line: very thin and faint
+                    ctx.strokeStyle = '#334155';
+                    ctx.globalAlpha = opacidad * 0.22;
+                    ctx.lineWidth = 0.8 / view.scale;
+                    ctx.stroke();
                 }
-                ctx.globalAlpha = 1;
+
+                ctx.restore();
             }
 
             function dibujarNodoTienda(t, tiendaOk) {
                 const colorT = tiendaOk ? COLORES.tienda : COLORES.tiendaInactiva;
                 const glowT = tiendaOk ? COLORES.tiendaGlow : COLORES.cortadaGlow;
-                const pulsoT = 0.92 + Math.sin(t * 1.4) * 0.06;
 
-                for (let i = 3; i >= 1; i--) {
-                    ctx.beginPath();
-                    ctx.arc(0, 0, (38 + i * 10) * pulsoT, 0, Math.PI * 2);
-                    ctx.strokeStyle = tiendaOk ? 'rgba(34,197,94,' + (0.08 + i * 0.04) + ')' : 'rgba(239,68,68,' + (0.08 + i * 0.04) + ')';
-                    ctx.lineWidth = 1 / view.scale;
-                    ctx.stroke();
-                }
+                // Outer breathing ring
+                ctx.beginPath();
+                ctx.arc(0, 0, 31 + Math.sin(t * 1.8) * 1.5, 0, Math.PI * 2);
+                ctx.strokeStyle = tiendaOk ? 'rgba(99, 102, 241, 0.22)' : 'rgba(244, 63, 94, 0.22)';
+                ctx.lineWidth = 1.2 / view.scale;
+                ctx.stroke();
 
+                // Main circle body
                 ctx.save();
                 ctx.beginPath();
-                ctx.arc(0, 0, 28 * pulsoT, 0, Math.PI * 2);
-                const grd = ctx.createRadialGradient(0, 0, 0, 0, 0, 28 * pulsoT);
-                grd.addColorStop(0, glowT);
-                grd.addColorStop(0.55, colorT);
-                grd.addColorStop(1, 'rgba(3,7,18,0.9)');
-                ctx.fillStyle = grd;
+                ctx.arc(0, 0, 21, 0, Math.PI * 2);
+                ctx.fillStyle = '#0f172a';
                 ctx.shadowColor = glowT;
-                ctx.shadowBlur = 22 / view.scale;
+                ctx.shadowBlur = 12 / view.scale;
                 ctx.fill();
                 ctx.restore();
 
+                // Main circle border
                 ctx.beginPath();
-                ctx.arc(0, 0, 28 * pulsoT, 0, Math.PI * 2);
-                ctx.strokeStyle = 'rgba(255,255,255,0.35)';
-                ctx.lineWidth = 1.5 / view.scale;
+                ctx.arc(0, 0, 21, 0, Math.PI * 2);
+                ctx.strokeStyle = colorT;
+                ctx.lineWidth = 2 / view.scale;
                 ctx.stroke();
 
-                ctx.save();
-                ctx.translate(0, 0);
-                ctx.rotate(t * 0.35);
+                // Inner core pulsing
                 ctx.beginPath();
-                ctx.arc(0, 0, 36 * pulsoT, 0, Math.PI * 1.2);
-                ctx.strokeStyle = tiendaOk ? 'rgba(74,222,128,0.5)' : 'rgba(248,113,113,0.5)';
-                ctx.lineWidth = 2 / view.scale;
-                ctx.setLineDash([4 / view.scale, 8 / view.scale]);
-                ctx.stroke();
-                ctx.setLineDash([]);
-                ctx.restore();
+                ctx.arc(0, 0, 5 + Math.sin(t * 2.5) * 0.8, 0, Math.PI * 2);
+                ctx.fillStyle = tiendaOk ? '#818cf8' : '#fda4af';
+                ctx.fill();
             }
 
             function dibujarNodoCategoria(x, y, radio, fill, glowColor, emite, t, fase) {
-                const pulsoN = emite ? 1 + Math.sin(t * 2.2 + fase * 10) * 0.05 : 1;
+                const pulsoN = emite ? 1 + Math.sin(t * 2.2 + fase * 10) * 0.045 : 1;
                 const r = radio * pulsoN;
 
-                if (emite && glowColor) {
-                    ctx.save();
-                    ctx.beginPath();
-                    ctx.arc(x, y, r + 6 / view.scale, 0, Math.PI * 2);
-                    ctx.fillStyle = glowColor;
-                    ctx.globalAlpha = 0.15;
-                    ctx.fill();
-                    ctx.restore();
-                }
-
                 ctx.save();
-                ctx.beginPath();
-                ctx.arc(x, y, r, 0, Math.PI * 2);
-                const grd = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, 0, x, y, r);
-                grd.addColorStop(0, emite ? (glowColor || fill) : '#475569');
-                grd.addColorStop(0.6, fill);
-                grd.addColorStop(1, '#0f172a');
-                ctx.fillStyle = grd;
-                if (emite) {
-                    ctx.shadowColor = glowColor || fill;
-                    ctx.shadowBlur = 10 / view.scale;
-                }
-                ctx.fill();
-                ctx.restore();
-
-                ctx.beginPath();
-                ctx.arc(x, y, r, 0, Math.PI * 2);
-                ctx.strokeStyle = emite ? 'rgba(255,255,255,0.28)' : 'rgba(255,255,255,0.1)';
-                ctx.lineWidth = 1 / view.scale;
-                ctx.stroke();
-
-                if (emite) {
+                
+                // Outer glow for active nodes
+                if (emite && glowColor) {
                     ctx.beginPath();
-                    ctx.arc(x, y, r * 0.35, 0, Math.PI * 2);
-                    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+                    ctx.arc(x, y, r + 4 / view.scale, 0, Math.PI * 2);
+                    ctx.fillStyle = glowColor;
+                    ctx.globalAlpha = 0.12;
                     ctx.fill();
+                    ctx.globalAlpha = 1.0;
                 }
+
+                // Node Body
+                ctx.beginPath();
+                ctx.arc(x, y, r, 0, Math.PI * 2);
+                if (emite) {
+                    // Modern transparent glass badge look
+                    ctx.fillStyle = fill + '20'; // Approx 12% alpha
+                    ctx.fill();
+                    
+                    ctx.strokeStyle = fill;
+                    ctx.lineWidth = 1.5 / view.scale;
+                    ctx.stroke();
+                    
+                    // Central nucleus
+                    ctx.beginPath();
+                    ctx.arc(x, y, Math.max(2, r * 0.28), 0, Math.PI * 2);
+                    ctx.fillStyle = fill;
+                    ctx.fill();
+                } else {
+                    // Inactive
+                    ctx.fillStyle = '#1e293b';
+                    ctx.fill();
+                    
+                    ctx.strokeStyle = '#334155';
+                    ctx.lineWidth = 1 / view.scale;
+                    ctx.stroke();
+                }
+                
+                ctx.restore();
             }
 
             function dibujarEtiqueta(texto, x, y, esTienda, colorAcento) {
-                const fontSize = (esTienda ? 10 : 8.5) / view.scale;
-                ctx.font = (esTienda ? '600 ' : '400 ') + fontSize + 'px ui-monospace, SFMono-Regular, Menlo, monospace';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'top';
-                const metrics = ctx.measureText(texto);
-                const padX = 6 / view.scale;
-                const padY = 3 / view.scale;
-                const tw = metrics.width + padX * 2;
-                const th = fontSize * 1.35 + padY * 2;
-                const tx = x - tw / 2;
-                const ty = y + (esTienda ? 34 : 12) / view.scale;
-                const acento = colorAcento || (esTienda ? COLORES.tienda : 'rgba(56,189,248,0.5)');
+                function roundRect(c, rx, ry, rw, rh, rr) {
+                    if (typeof c.roundRect === 'function') {
+                        c.roundRect(rx, ry, rw, rh, rr);
+                    } else {
+                        c.beginPath();
+                        c.moveTo(rx + rr, ry);
+                        c.lineTo(rx + rw - rr, ry);
+                        c.quadraticCurveTo(rx + rw, ry, rx + rw, ry + rr);
+                        c.lineTo(rx + rw, ry + rh - rr);
+                        c.quadraticCurveTo(rx + rw, ry + rh, rx + rw - rr, ry + rh);
+                        c.lineTo(rx + rr, ry + rh);
+                        c.quadraticCurveTo(rx, ry + rh, rx, ry + rh - rr);
+                        c.lineTo(rx, ry + rr);
+                        c.quadraticCurveTo(rx, ry, rx + rr, ry);
+                        c.closePath();
+                    }
+                }
 
-                ctx.fillStyle = 'rgba(3, 10, 24, 0.88)';
+                const fontSize = (esTienda ? 11 : 9.5) / view.scale;
+                ctx.font = (esTienda ? '600 ' : '500 ') + fontSize + 'px Inter, system-ui, -apple-system, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                const metrics = ctx.measureText(texto);
+                const padX = 7 / view.scale;
+                const padY = 4 / view.scale;
+                const tw = metrics.width + padX * 2;
+                const th = fontSize + padY * 2;
+                const tx = x - tw / 2;
+                const ty = y + (esTienda ? 34 : 14) / view.scale;
+                const acento = colorAcento || (esTienda ? COLORES.tienda : 'rgba(255, 255, 255, 0.08)');
+
+                ctx.save();
+                ctx.beginPath();
+                roundRect(ctx, tx, ty, tw, th, 5 / view.scale);
+                ctx.fillStyle = 'rgba(11, 15, 25, 0.82)';
+                ctx.fill();
+
                 ctx.strokeStyle = acento;
                 ctx.lineWidth = 1 / view.scale;
-                ctx.fillRect(tx, ty, tw, th);
-                ctx.strokeRect(tx, ty, tw, th);
+                ctx.stroke();
 
                 ctx.fillStyle = esTienda ? COLORES.textoTienda : COLORES.texto;
-                ctx.fillText(texto, x, ty + padY);
+                ctx.fillText(texto, x, ty + th / 2);
+                ctx.restore();
             }
 
             function dibujarPulsoCometa(segmentos, ciclo, colores, t) {
                 const color = typeof colores === 'string' ? colores : colores.core;
                 const glow = typeof colores === 'string' ? colores : (colores.glow || colores.core);
                 const pos = puntoEnRutaCurvas(segmentos, ciclo);
+                const trailLength = 4;
                 const cola = [];
-                for (let i = 1; i <= 5; i++) {
-                    const tCola = Math.max(0, ciclo - i * 0.018);
+
+                for (let i = 1; i <= trailLength; i++) {
+                    const tCola = Math.max(0, ciclo - i * 0.015);
                     cola.push(puntoEnRutaCurvas(segmentos, tCola));
                 }
 
+                ctx.save();
+
+                // Draw trail
                 cola.forEach(function (p, i) {
-                    const alpha = 0.55 - i * 0.1;
-                    const radio = (7 - i * 1.1) / view.scale;
+                    const alpha = (0.5 - i * 0.12);
+                    if (alpha <= 0) return;
+
+                    const radio = (4.5 - i * 0.8) / view.scale;
                     ctx.beginPath();
-                    ctx.arc(p.x, p.y, radio, 0, Math.PI * 2);
+                    ctx.arc(p.x, p.y, Math.max(0.5, radio), 0, Math.PI * 2);
                     ctx.fillStyle = color;
                     ctx.globalAlpha = alpha;
-                    ctx.shadowColor = glow;
-                    ctx.shadowBlur = (16 - i * 2) / view.scale;
                     ctx.fill();
                 });
-                ctx.globalAlpha = 1;
-                ctx.shadowBlur = 0;
 
+                // Draw glowing head
                 ctx.beginPath();
-                ctx.arc(pos.x, pos.y, 4 / view.scale, 0, Math.PI * 2);
+                ctx.arc(pos.x, pos.y, 3 / view.scale, 0, Math.PI * 2);
                 ctx.fillStyle = '#ffffff';
                 ctx.shadowColor = glow;
-                ctx.shadowBlur = 18 / view.scale;
+                ctx.shadowBlur = 10 / view.scale;
                 ctx.fill();
-                ctx.shadowBlur = 0;
+
+                ctx.restore();
             }
 
             function renderizar() {
@@ -4947,7 +4988,30 @@
 
             function animar() {
                 animId = requestAnimationFrame(animar);
+                if (!drag.activo) {
+                    // Smooth slide camera towards targets (lerp)
+                    view.panX += (targetView.panX - view.panX) * 0.12;
+                    view.panY += (targetView.panY - view.panY) * 0.12;
+                    view.scale += (targetView.scale - view.scale) * 0.12;
+                } else {
+                    // Instantly follow drag, keep target updated
+                    targetView.panX = view.panX;
+                    targetView.panY = view.panY;
+                    targetView.scale = view.scale;
+                }
                 renderizar();
+            }
+
+            function zoomEnCentro(factor) {
+                const w = canvas.clientWidth;
+                const h = canvas.clientHeight;
+                const sx = w / 2;
+                const sy = h / 2;
+                const worldAntes = pantallaAWorld(sx, sy);
+
+                targetView.scale = Math.max(0.15, Math.min(4, targetView.scale * factor));
+                targetView.panX = sx - w / 2 - worldAntes.x * targetView.scale;
+                targetView.panY = sy - h / 2 - worldAntes.y * targetView.scale;
             }
 
             function actualizarVisuales() {
@@ -4982,7 +5046,7 @@
                     const dx = worldX - tiendaNodo.x;
                     const dy = worldY - tiendaNodo.y;
                     if (Math.sqrt(dx * dx + dy * dy) <= tiendaNodo.radio + 4) {
-                        return { tipo: 'tienda', nombre: tiendaNodo.nombre };
+                        return { tipo: 'tienda', x: tiendaNodo.x, y: tiendaNodo.y, nombre: tiendaNodo.nombre };
                     }
                 }
                 for (let i = nodosCat.length - 1; i >= 0; i--) {
@@ -4990,13 +5054,14 @@
                     const dx = worldX - n.x;
                     const dy = worldY - n.y;
                     if (Math.sqrt(dx * dx + dy * dy) <= n.radio + 3) {
-                        return { tipo: 'categoria', cat: n.cat };
+                        return { tipo: 'categoria', x: n.x, y: n.y, cat: n.cat };
                     }
                 }
                 return null;
             }
 
             function onPointerDown(e) {
+                contenedor.focus();
                 drag.activo = true;
                 drag.x = e.clientX;
                 drag.y = e.clientY;
@@ -5052,13 +5117,41 @@
                 const sy = e.clientY - rect.top;
                 const worldAntes = pantallaAWorld(sx, sy);
 
-                const factor = e.deltaY > 0 ? 0.92 : 1.08;
-                view.scale = Math.max(0.15, Math.min(4, view.scale * factor));
+                const factor = e.deltaY > 0 ? 0.90 : 1.10;
+                targetView.scale = Math.max(0.15, Math.min(4, targetView.scale * factor));
 
                 const w = canvas.clientWidth;
                 const h = canvas.clientHeight;
-                view.panX = sx - w / 2 - worldAntes.x * view.scale;
-                view.panY = sy - h / 2 - worldAntes.y * view.scale;
+                targetView.panX = sx - w / 2 - worldAntes.x * targetView.scale;
+                targetView.panY = sy - h / 2 - worldAntes.y * targetView.scale;
+            }
+
+            function onDblClick(e) {
+                const rect = canvas.getBoundingClientRect();
+                const sx = e.clientX - rect.left;
+                const sy = e.clientY - rect.top;
+                const world = pantallaAWorld(sx, sy);
+                const hit = nodoEnPos(world.x, world.y);
+
+                if (hit) {
+                    targetView.scale = Math.max(1.2, targetView.scale);
+                    targetView.panX = -hit.x * targetView.scale;
+                    targetView.panY = -hit.y * targetView.scale;
+                } else {
+                    reconstruirNodos();
+                    const posMap = layoutArbol2D(flujoData.categorias || []);
+                    ajustarVistaInicial(posMap);
+                }
+            }
+
+            function onKeyDown(e) {
+                let panStep = 35 / view.scale;
+                if (e.key === 'ArrowUp') { e.preventDefault(); targetView.panY += panStep * targetView.scale; }
+                else if (e.key === 'ArrowDown') { e.preventDefault(); targetView.panY -= panStep * targetView.scale; }
+                else if (e.key === 'ArrowLeft') { e.preventDefault(); targetView.panX += panStep * targetView.scale; }
+                else if (e.key === 'ArrowRight') { e.preventDefault(); targetView.panX -= panStep * targetView.scale; }
+                else if (e.key === '+' || e.key === '=') { e.preventDefault(); zoomEnCentro(1.2); }
+                else if (e.key === '-') { e.preventDefault(); zoomEnCentro(0.8); }
             }
 
             function initCanvas() {
@@ -5074,6 +5167,7 @@
                 reconstruirNodos();
                 onResize();
 
+                contenedor.setAttribute('tabindex', '0');
                 contenedor.addEventListener('pointerdown', onPointerDown);
                 contenedor.addEventListener('pointermove', onPointerMove);
                 contenedor.addEventListener('pointerup', onPointerUp);
@@ -5083,6 +5177,23 @@
                     if (tooltip) tooltip.classList.add('hidden');
                 });
                 contenedor.addEventListener('wheel', onWheel, { passive: false });
+                contenedor.addEventListener('dblclick', onDblClick);
+                contenedor.addEventListener('keydown', onKeyDown);
+
+                // Zoom control buttons
+                const btnZoomIn = document.getElementById('mapa-neuronal-btn-zoom-in');
+                const btnZoomOut = document.getElementById('mapa-neuronal-btn-zoom-out');
+                const btnReset = document.getElementById('mapa-neuronal-btn-reset');
+
+                if (btnZoomIn) btnZoomIn.onclick = () => zoomEnCentro(1.25);
+                if (btnZoomOut) btnZoomOut.onclick = () => zoomEnCentro(0.8);
+                if (btnReset) {
+                    btnReset.onclick = () => {
+                        reconstruirNodos();
+                        const posMap = layoutArbol2D(flujoData.categorias || []);
+                        ajustarVistaInicial(posMap);
+                    };
+                }
 
                 const leyendaApis = document.getElementById('mapa-neuronal-leyenda-apis');
                 if (leyendaApis) {
@@ -5106,8 +5217,8 @@
             function setModoBotones(modo) {
                 const btnS = document.getElementById('mapa-neuronal-modo-scraping');
                 const btnM = document.getElementById('mapa-neuronal-modo-mostrar');
-                const on = 'px-3 py-1.5 text-sm rounded-lg border border-orange-500 bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 font-semibold';
-                const off = 'px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-orange-300';
+                const on = 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm font-medium px-3.5 py-1.5 text-xs rounded-md transition-all duration-150 border border-slate-200 dark:border-slate-700/50';
+                const off = 'text-slate-500 hover:text-slate-950 dark:text-slate-400 dark:hover:text-slate-200 px-3.5 py-1.5 text-xs rounded-md transition-all duration-150 border border-transparent';
                 if (btnS) btnS.className = 'mapa-neuronal-modo-btn ' + (modo === 'scrapear' ? on : off);
                 if (btnM) btnM.className = 'mapa-neuronal-modo-btn ' + (modo === 'mostrar' ? on : off);
             }
@@ -5160,6 +5271,16 @@
                     contenedor.removeEventListener('pointerup', onPointerUp);
                     contenedor.removeEventListener('pointercancel', onPointerUp);
                     contenedor.removeEventListener('wheel', onWheel);
+                    contenedor.removeEventListener('dblclick', onDblClick);
+                    contenedor.removeEventListener('keydown', onKeyDown);
+                    
+                    const btnZoomIn = document.getElementById('mapa-neuronal-btn-zoom-in');
+                    const btnZoomOut = document.getElementById('mapa-neuronal-btn-zoom-out');
+                    const btnReset = document.getElementById('mapa-neuronal-btn-reset');
+                    if (btnZoomIn) btnZoomIn.onclick = null;
+                    if (btnZoomOut) btnZoomOut.onclick = null;
+                    if (btnReset) btnReset.onclick = null;
+
                     nodosCat.length = 0;
                     tiendaNodo = null;
                     inicializado = false;

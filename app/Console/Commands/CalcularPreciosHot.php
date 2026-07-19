@@ -113,6 +113,15 @@ class CalcularPreciosHot extends Command
                         $producto->save();
                         $preciosActualizados++;
                     }
+                    
+                    // NUNCA eliminar la fila si ya existe. En su lugar, ponemos los precios a 0
+                    $registroMasBarato = \App\Models\ProductoOfertaMasBarataPorProducto::where('producto_id', $producto->id)->first();
+                    if ($registroMasBarato) {
+                        $registroMasBarato->update([
+                            'precio_total' => 0.00,
+                            'precio_unidad' => 0.0000,
+                        ]);
+                    }
                     continue;
                 }
                 
@@ -121,6 +130,24 @@ class CalcularPreciosHot extends Command
 
                 // Si el servicio devuelve una oferta válida con precio_unidad
                 if ($mejorOferta && $mejorOferta->precio_unidad !== null && $mejorOferta->precio_unidad > 0) {
+                    // Obtener la oferta original de la base de datos para guardar los datos originales
+                    $ofertaOriginal = OfertaProducto::find($mejorOferta->id);
+                    
+                    if ($ofertaOriginal) {
+                        // Actualizar o crear el registro en la tabla producto_oferta_mas_barata_por_producto
+                        \App\Models\ProductoOfertaMasBarataPorProducto::updateOrCreate(
+                            ['producto_id' => $producto->id],
+                            [
+                                'oferta_id' => $ofertaOriginal->id,
+                                'tienda_id' => $ofertaOriginal->tienda_id,
+                                'precio_total' => $mejorOferta->precio_total, // Precio con descuentos aplicados
+                                'precio_unidad' => $mejorOferta->precio_unidad, // Precio con descuentos aplicados
+                                'unidades' => $ofertaOriginal->unidades,
+                                'url' => $ofertaOriginal->url,
+                            ]
+                        );
+                    }
+
                     // El precio_unidad ya viene con descuentos y chollos aplicados del servicio
                     $precioRealMasBajo = $mejorOferta->precio_unidad;
                     

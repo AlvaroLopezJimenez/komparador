@@ -22,7 +22,7 @@ class DescargaCsvAwinTiendaService
 
     public const HORAS_ANTIGUEDAD_LIMPIEZA_DEFECTO = 2;
 
-    private const UMBRAL_DIVIDIR_BYTES = 50 * 1024 * 1024;
+    private const UMBRAL_DIVIDIR_BYTES = 1000 * 1024 * 1024;
     private const TAMANO_PARTE_BYTES = 45 * 1024 * 1024;
     private const TAMANO_LOTE_UPSERT = 500;
     private const TIMEOUT_DESCARGA_SEGUNDOS = 900;
@@ -541,12 +541,14 @@ class DescargaCsvAwinTiendaService
 
         fputcsv($out, $header);
         $partes[] = $rutaParte;
-        $tamanoParte = $this->estimarBytesFilaCsv($header);
+        
+        $bytesHeader = $this->estimarBytesFilaCsv($header);
+        $tamanoParte = $bytesHeader;
 
         while (($fila = fgetcsv($in)) !== false) {
             $bytesFila = $this->estimarBytesFilaCsv($fila);
 
-            if ($tamanoParte + $bytesFila > self::TAMANO_PARTE_BYTES && $tamanoParte > $this->estimarBytesFilaCsv($header)) {
+            if ($tamanoParte + $bytesFila > self::TAMANO_PARTE_BYTES && $tamanoParte > $bytesHeader) {
                 fclose($out);
                 $indiceParte++;
                 $rutaParte = $dirTrabajo . '/parte_' . $indiceParte . '.csv';
@@ -557,7 +559,7 @@ class DescargaCsvAwinTiendaService
                 }
                 fputcsv($out, $header);
                 $partes[] = $rutaParte;
-                $tamanoParte = $this->estimarBytesFilaCsv($header);
+                $tamanoParte = $bytesHeader;
             }
 
             fputcsv($out, $fila);
@@ -575,17 +577,17 @@ class DescargaCsvAwinTiendaService
      */
     private function estimarBytesFilaCsv(array $fila): int
     {
-        $buffer = fopen('php://temp', 'r+');
-        if ($buffer === false) {
-            return 256;
+        $len = 0;
+        foreach ($fila as $val) {
+            if ($val !== null) {
+                $vStr = (string) $val;
+                $len += strlen($vStr);
+                if (strpbrk($vStr, ",\"\r\n") !== false) {
+                    $len += 2 + substr_count($vStr, '"');
+                }
+            }
         }
-
-        fputcsv($buffer, $fila);
-        rewind($buffer);
-        $contenido = stream_get_contents($buffer) ?: '';
-        fclose($buffer);
-
-        return max(1, strlen($contenido));
+        return $len + count($fila);
     }
 
     /**
