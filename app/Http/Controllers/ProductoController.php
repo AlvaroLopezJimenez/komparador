@@ -2273,6 +2273,7 @@ public function generarContenido(Request $request)
         return response()->json([
             'especificaciones_internas' => $categoria->especificaciones_internas,
             'conteos_productos' => $this->calcularConteosProductosEspecificaciones($categoria),
+            'configuracion_formulario_producto' => $categoria->configuracion_formulario_producto ?? 'ninguno',
         ]);
     }
 
@@ -2296,6 +2297,7 @@ public function generarContenido(Request $request)
             'success' => true,
             'especificaciones_internas' => $categoria->especificaciones_internas,
             'conteos_productos' => $this->calcularConteosProductosEspecificaciones($categoria),
+            'configuracion_formulario_producto' => $categoria->configuracion_formulario_producto ?? 'ninguno',
         ]);
     }
 

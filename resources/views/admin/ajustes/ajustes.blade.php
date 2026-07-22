@@ -31,19 +31,28 @@
                     <div class="bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-700/50 p-4">
                         <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider px-3 mb-3">Secciones</h4>
                         <div class="space-y-1">
-                            <a href="#cron" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg bg-blue-600/90 text-white font-medium shadow-md shadow-blue-600/10 transition-all select-none cursor-pointer">
+                            <button type="button" onclick="cambiarTabAjustes('cron')" id="tab-btn-cron"
+                                    class="tab-ajuste-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg bg-blue-600/90 text-white font-medium shadow-md shadow-blue-600/10 transition-all select-none cursor-pointer">
                                 <svg class="w-5 h-5 text-blue-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                 </svg>
                                 <span>Cron</span>
-                            </a>
-                            <!-- Future tabs can go here -->
+                            </button>
+                            <button type="button" onclick="cambiarTabAjustes('productos')" id="tab-btn-productos"
+                                    class="tab-ajuste-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-300 hover:bg-gray-700/50 hover:text-white font-medium transition-all select-none cursor-pointer">
+                                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                                </svg>
+                                <span>Productos</span>
+                            </button>
                         </div>
                     </div>
                 </div>
 
                 <!-- Right panel: Active Tab Content Area -->
                 <div class="space-y-6" style="flex: 1; min-width: 0;">
+
+                    <div id="tab-panel-cron" class="tab-panel-ajustes space-y-6">
                     
                     <!-- Content Card Filtros (Togglable advanced style) -->
                     <div class="bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-700/50 p-5">
@@ -273,6 +282,17 @@
                                                     <div class="fila-cuadrícula relative transition-colors duration-75 bg-gray-800/10"
                                                          data-row-key="{{ $key }}"
                                                          style="height: {{ $rowH }}px">
+                                                        {{-- Celdas programadas (borde amarillo) --}}
+                                                        @foreach(($timelineScheduled[$key] ?? []) as $cellIdx)
+                                                            @php
+                                                                $schedCell = ($timelineMeta['grid_cells'] ?? [])[$cellIdx] ?? null;
+                                                            @endphp
+                                                            @if($schedCell)
+                                                                <div class="mapa-slot-programado absolute top-0 bottom-0 pointer-events-none z-[5] box-border border-2 border-yellow-400/70"
+                                                                     style="left: {{ $schedCell['left_pct'] }}%; width: {{ $schedCell['width_pct'] }}%"
+                                                                     title="Programado: {{ $schedCell['label'] }}"></div>
+                                                            @endif
+                                                        @endforeach
                                                         {{-- Barras de ejecución --}}
                                                         @foreach($bars as $bar)
                                                             @php
@@ -316,6 +336,7 @@
                                     <span class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded border border-gray-600/50 bg-gray-800/40 inline-block"></span> Cuadrícula {{ $gridInterval }} min</span>
                                 @endif
                                 <span class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded bg-sky-900/50 border border-sky-700/60 inline-block"></span> Hora en punto</span>
+                                <span class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded border-2 border-yellow-400/70 bg-transparent inline-block"></span> Programado</span>
                                 <span class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded border-2 border-amber-400 bg-transparent inline-block"></span> Ahora</span>
                                 <span class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded bg-amber-400 border border-amber-500 inline-block animate-pulse"></span> En Curso</span>
                                 <span class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded bg-emerald-500 border border-emerald-600 inline-block"></span> Ejecución Correcta</span>
@@ -466,26 +487,60 @@
                                             <td class="px-4 py-4 whitespace-nowrap text-xs text-gray-300">
                                                 @if($cron['ultima_ejecucion'])
                                                     @php
-                                                        $ultimaLogEstado = is_array($cron['ultima_ejecucion']->log) ? ($cron['ultima_ejecucion']->log['estado'] ?? '') : '';
+                                                        $ultima = $cron['ultima_ejecucion'];
+                                                        $ultimaLog = is_array($ultima->log) ? $ultima->log : [];
+                                                        $ultimaLogEstado = $ultimaLog['estado'] ?? '';
                                                         if ($key === 'cron_avisos_sin_stock_scrapear') {
                                                             $ultimaEsFallo = ($ultimaLogEstado === 'error');
                                                         } else {
-                                                            $ultimaEsFallo = ($cron['ultima_ejecucion']->total_errores > 0 || $ultimaLogEstado === 'error');
+                                                            $ultimaEsFallo = ($ultima->total_errores > 0 || $ultimaLogEstado === 'error');
+                                                        }
+                                                        $ultimaResumen = $ultimaLog['resumen'] ?? ($ultimaLog['message'] ?? null);
+                                                        if ($ultimaResumen === null && !empty($ultimaLog)) {
+                                                            $ultimaResumen = is_string($ultimaLog) ? $ultimaLog : json_encode($ultimaLog, JSON_UNESCAPED_UNICODE);
+                                                        }
+                                                        $ultimaStatus = $ultimaEsFallo ? 'error' : 'success';
+                                                        if (!$ultima->fin) {
+                                                            $ultimaStatus = 'running';
+                                                        }
+                                                        $ultimaErroresMostrar = (int) $ultima->total_errores;
+                                                        if ($key === 'cron_avisos_sin_stock_scrapear') {
+                                                            $ultimaErroresMostrar = ($ultimaLogEstado === 'error') ? $ultimaErroresMostrar : 0;
                                                         }
                                                     @endphp
-                                                    <div class="flex items-center gap-1 text-gray-200">
-                                                        @if($ultimaEsFallo)
-                                                            <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
-                                                            <span class="text-red-400 font-semibold" title="Fallo en la última ejecución">Fallo</span>
-                                                        @else
-                                                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                                            <span class="text-emerald-400 font-semibold">Éxito</span>
+                                                    <button type="button"
+                                                            onclick="mostrarDetalleModal(this)"
+                                                            class="text-left w-full rounded-lg px-1 py-0.5 -mx-1 hover:bg-gray-700/40 transition-colors cursor-pointer"
+                                                            title="Ver detalle de la última ejecución"
+                                                            data-exec-id="{{ $ultima->id }}"
+                                                            data-exec-cron-name="{{ $cron['name'] }}"
+                                                            data-exec-status="{{ $ultimaStatus }}"
+                                                            data-exec-inicio="{{ $ultima->inicio?->format('H:i:s') }} ({{ $ultima->inicio?->format('d/m/Y') }})"
+                                                            data-exec-fin="{{ $ultima->fin ? $ultima->fin->format('H:i:s') : 'En curso/Sin registrar' }}"
+                                                            data-exec-total="{{ $ultima->total ?? 0 }}"
+                                                            data-exec-guardado="{{ $ultima->total_guardado ?? 0 }}"
+                                                            data-exec-errores="{{ $ultimaErroresMostrar }}"
+                                                            data-exec-log-summary="{{ e(is_string($ultimaResumen) ? $ultimaResumen : json_encode($ultimaResumen, JSON_UNESCAPED_UNICODE)) }}"
+                                                            data-exec-history-url="">
+                                                        <div class="flex items-center gap-1 text-gray-200">
+                                                            @if($ultimaEsFallo)
+                                                                <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                                                                <span class="text-red-400 font-semibold">Fallo</span>
+                                                            @else
+                                                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                                                <span class="text-emerald-400 font-semibold">Éxito</span>
+                                                            @endif
+                                                            <span>hace {{ $ultima->inicio->diffForHumans(now(), true) }}</span>
+                                                        </div>
+                                                        <div class="text-[10px] text-gray-400 mt-0.5">
+                                                            {{ $ultima->inicio->format('d/m H:i') }}
+                                                        </div>
+                                                        @if($ultimaResumen)
+                                                            <div class="text-[10px] text-gray-500 mt-1 line-clamp-2 max-w-xs" title="{{ is_string($ultimaResumen) ? $ultimaResumen : json_encode($ultimaResumen, JSON_UNESCAPED_UNICODE) }}">
+                                                                {{ is_string($ultimaResumen) ? $ultimaResumen : json_encode($ultimaResumen, JSON_UNESCAPED_UNICODE) }}
+                                                            </div>
                                                         @endif
-                                                        <span>hace {{ $cron['ultima_ejecucion']->inicio->diffForHumans(now(), true) }}</span>
-                                                    </div>
-                                                    <div class="text-[10px] text-gray-400 mt-0.5">
-                                                        {{ $cron['ultima_ejecucion']->inicio->format('d/m H:i') }}
-                                                    </div>
+                                                    </button>
                                                 @else
                                                     <span class="text-gray-500 italic">No hay ejecuciones</span>
                                                 @endif
@@ -566,6 +621,49 @@
                         </div>
                     </div>
 
+                    </div>{{-- /tab-panel-cron --}}
+
+                    <div id="tab-panel-productos" class="tab-panel-ajustes space-y-6 hidden">
+                        <div class="bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-700/50 overflow-hidden">
+                            <div class="p-5 border-b border-gray-700/50 bg-gray-800/40">
+                                <h3 class="text-lg font-medium text-gray-200 flex items-center gap-2">
+                                    <svg class="w-5 h-5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                                    </svg>
+                                    Historial
+                                </h3>
+                            </div>
+
+                            <div class="p-6 space-y-6">
+                                <div class="rounded-xl border border-gray-700/60 bg-gray-900/30 p-5 space-y-4">
+                                    <div>
+                                        <h4 class="text-base font-semibold text-white">Rellenar huecos</h4>
+                                        <p class="text-sm text-gray-400 mt-2 leading-relaxed">
+                                            Busca días vacíos en el historial de precios de todos los productos (precio general y especificaciones internas)
+                                            y los rellena usando el precio del día anterior. Si no hay precio anterior en esa serie, usa el del día posterior.
+                                        </p>
+                                    </div>
+
+                                    <div class="flex flex-wrap items-center gap-3">
+                                        <button type="button" id="btn-rellenar-huecos" onclick="ejecutarRellenarHuecosHistorial(this)"
+                                                class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium transition-all shadow-md shadow-violet-700/20">
+                                            <svg class="w-4 h-4 btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                            </svg>
+                                            <svg class="w-4 h-4 btn-spinner hidden animate-spin" fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Rellenar huecos en todos los productos
+                                        </button>
+                                    </div>
+
+                                    <div id="resultado-rellenar-huecos" class="hidden rounded-lg border p-4 text-sm"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
             </div>
 
@@ -632,6 +730,74 @@
 
     <!-- Custom JS logic -->
     <script>
+        function cambiarTabAjustes(tab) {
+            document.querySelectorAll('.tab-panel-ajustes').forEach(panel => panel.classList.add('hidden'));
+            document.querySelectorAll('.tab-ajuste-btn').forEach(btn => {
+                btn.classList.remove('bg-blue-600/90', 'text-white', 'shadow-md', 'shadow-blue-600/10');
+                btn.classList.add('text-gray-300', 'hover:bg-gray-700/50', 'hover:text-white');
+                btn.querySelector('svg')?.classList.remove('text-blue-200');
+                btn.querySelector('svg')?.classList.add('text-gray-400');
+            });
+
+            const panel = document.getElementById('tab-panel-' + tab);
+            const btn = document.getElementById('tab-btn-' + tab);
+            if (panel) panel.classList.remove('hidden');
+            if (btn) {
+                btn.classList.add('bg-blue-600/90', 'text-white', 'shadow-md', 'shadow-blue-600/10');
+                btn.classList.remove('text-gray-300', 'hover:bg-gray-700/50', 'hover:text-white');
+                btn.querySelector('svg')?.classList.add('text-blue-200');
+                btn.querySelector('svg')?.classList.remove('text-gray-400');
+            }
+        }
+
+        async function ejecutarRellenarHuecosHistorial(button) {
+            const icon = button.querySelector('.btn-icon');
+            const spinner = button.querySelector('.btn-spinner');
+            const resultado = document.getElementById('resultado-rellenar-huecos');
+
+            button.disabled = true;
+            icon.classList.add('hidden');
+            spinner.classList.remove('hidden');
+            resultado.classList.add('hidden');
+
+            try {
+                const res = await fetch('{{ route('admin.ajustes.productos.historial.rellenar-huecos') }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json',
+                    },
+                });
+                const data = await res.json();
+
+                resultado.classList.remove('hidden');
+                if (!res.ok || data.status === 'error') {
+                    resultado.className = 'rounded-lg border border-red-500/40 bg-red-900/20 p-4 text-sm text-red-200';
+                    resultado.innerHTML = `<p class="font-semibold">Error</p><p class="mt-1">${data.message || 'No se pudo completar la operación.'}</p>`;
+                    showToast(data.message || 'Error al rellenar huecos', 'error');
+                    return;
+                }
+
+                resultado.className = 'rounded-lg border border-emerald-500/40 bg-emerald-900/20 p-4 text-sm text-emerald-100 space-y-2';
+                resultado.innerHTML = `
+                    <p class="font-semibold text-white">${data.message}</p>
+                    <p><span class="text-gray-400">Historiales de producto actualizados:</span> <strong>${data.historiales_producto ?? 0}</strong></p>
+                    <p><span class="text-gray-400">Historiales de especificación actualizados:</span> <strong>${data.historiales_especificacion ?? 0}</strong></p>
+                `;
+                showToast(data.message, 'success');
+            } catch (e) {
+                resultado.classList.remove('hidden');
+                resultado.className = 'rounded-lg border border-red-500/40 bg-red-900/20 p-4 text-sm text-red-200';
+                resultado.textContent = 'Error de conexión al ejecutar la prueba.';
+                showToast('Error de conexión', 'error');
+            } finally {
+                button.disabled = false;
+                icon.classList.remove('hidden');
+                spinner.classList.add('hidden');
+            }
+        }
+
         // Función para mostrar/ocultar filtros
         function toggleFiltros() {
             const contenidoFiltros = document.getElementById('contenidoFiltros');

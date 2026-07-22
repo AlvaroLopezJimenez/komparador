@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\Categoria;
 use App\Models\Chollo;
+use App\Models\EjecucionGlobal;
 use App\Models\OfertaProducto;
 use App\Models\PrecioHot;
 use App\Models\Producto;
@@ -19,6 +20,8 @@ use App\Services\TiemposActualizacionOfertasDinamicos;
 
 class CholloController extends Controller
 {
+    public const NOMBRE_EJECUCION_COMPROBAR_FINALIZADOS = 'ejecuciones_chollos_comprobar_finalizados';
+
     public function index(Request $request)
     {
         $perPage = (int) $request->input('perPage', 20);
@@ -1036,7 +1039,6 @@ class CholloController extends Controller
      */
     public function comprobarChollosYOfertasFinalizadas(Request $request)
     {
-        // Verificar token de seguridad
         $token = $request->query('token');
         if (!$token || $token !== env('TOKEN_ACTUALIZAR_PRECIOS')) {
             return response()->json([
@@ -1044,6 +1046,12 @@ class CholloController extends Controller
                 'message' => 'Token inválido'
             ], 403);
         }
+
+        $ejecucion = EjecucionGlobal::create([
+            'inicio' => now(),
+            'nombre' => self::NOMBRE_EJECUCION_COMPROBAR_FINALIZADOS,
+            'log' => ['estado' => 'running'],
+        ]);
 
         $ahora = Carbon::now();
         $chollosFinalizados = 0;
@@ -1054,18 +1062,15 @@ class CholloController extends Controller
         $log = [];
 
         try {
-            // 1. Buscar chollos con fecha_final < ahora y finalizada = 'no'
             $chollosVencidos = Chollo::where('finalizada', 'no')
                 ->whereNotNull('fecha_final')
                 ->where('fecha_final', '<', $ahora)
                 ->get();
 
             foreach ($chollosVencidos as $chollo) {
-                // Marcar chollo como finalizada
                 $chollo->update(['finalizada' => 'si']);
                 $chollosFinalizados++;
 
-                // 2. Buscar ofertas vinculadas a este chollo con mostrar = 'si'
                 $ofertasVinculadas = OfertaProducto::where('chollo_id', $chollo->id)
                     ->where('mostrar', 'si')
                     ->get();
@@ -1082,7 +1087,6 @@ class CholloController extends Controller
                 ];
             }
 
-            // 3. Buscar ofertas con chollo_id != null, fecha_final < ahora y mostrar = 'si'
             $ofertasVencidas = OfertaProducto::whereNotNull('chollo_id')
                 ->whereNotNull('fecha_final')
                 ->where('fecha_final', '<', $ahora)
@@ -1094,7 +1098,6 @@ class CholloController extends Controller
                 $ofertasOcultadasPorFecha++;
             }
 
-            // 4. Buscar chollos con más de un mes desde fecha_inicio, sin fecha_final y finalizada = 'no'
             $fechaLimiteUnMes = Carbon::now()->subMonth();
             $chollosAntiguos = Chollo::where('finalizada', 'no')
                 ->whereNull('fecha_final')
@@ -1103,11 +1106,9 @@ class CholloController extends Controller
                 ->get();
 
             foreach ($chollosAntiguos as $chollo) {
-                // Marcar chollo como finalizada
                 $chollo->update(['finalizada' => 'si']);
                 $chollosFinalizadosPorAntiguedad++;
 
-                // Buscar ofertas vinculadas a este chollo y ocultarlas
                 $ofertasVinculadas = OfertaProducto::where('chollo_id', $chollo->id)
                     ->where('mostrar', 'si')
                     ->get();
@@ -1125,6 +1126,29 @@ class CholloController extends Controller
                 ];
             }
 
+            $totalChollosFinalizados = $chollosFinalizados + $chollosFinalizadosPorAntiguedad;
+            $totalOfertasOcultadas = $ofertasOcultadas + $ofertasOcultadasPorFecha + $ofertasOcultadasPorAntiguedad;
+            $resumen = "Chollos finalizados: {$totalChollosFinalizados}, ofertas ocultadas: {$totalOfertasOcultadas}";
+
+            $ejecucion->update([
+                'fin' => now(),
+                'total' => $totalChollosFinalizados + $totalOfertasOcultadas,
+                'total_guardado' => $totalChollosFinalizados + $totalOfertasOcultadas,
+                'total_errores' => 0,
+                'log' => [
+                    'estado' => 'ok',
+                    'resumen' => $resumen,
+                    'chollos_finalizados' => $chollosFinalizados,
+                    'chollos_finalizados_por_antiguedad' => $chollosFinalizadosPorAntiguedad,
+                    'ofertas_ocultadas_por_chollo' => $ofertasOcultadas,
+                    'ofertas_ocultadas_por_fecha' => $ofertasOcultadasPorFecha,
+                    'ofertas_ocultadas_por_antiguedad' => $ofertasOcultadasPorAntiguedad,
+                    'total_chollos_finalizados' => $totalChollosFinalizados,
+                    'total_ofertas_ocultadas' => $totalOfertasOcultadas,
+                    'detalle' => $log,
+                ],
+            ]);
+
             return response()->json([
                 'status' => 'ok',
                 'message' => 'Proceso completado correctamente',
@@ -1133,20 +1157,32 @@ class CholloController extends Controller
                 'ofertas_ocultadas_por_chollo' => $ofertasOcultadas,
                 'ofertas_ocultadas_por_fecha' => $ofertasOcultadasPorFecha,
                 'ofertas_ocultadas_por_antiguedad' => $ofertasOcultadasPorAntiguedad,
-                'total_chollos_finalizados' => $chollosFinalizados + $chollosFinalizadosPorAntiguedad,
-                'total_ofertas_ocultadas' => $ofertasOcultadas + $ofertasOcultadasPorFecha + $ofertasOcultadasPorAntiguedad,
-                'log' => $log
+                'total_chollos_finalizados' => $totalChollosFinalizados,
+                'total_ofertas_ocultadas' => $totalOfertasOcultadas,
+                'log' => $log,
+                'ejecucion_id' => $ejecucion->id,
             ]);
-
         } catch (\Exception $e) {
             \Log::error('Error al comprobar chollos y ofertas finalizadas', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
 
+            $ejecucion->update([
+                'fin' => now(),
+                'total_errores' => 1,
+                'log' => [
+                    'estado' => 'error',
+                    'resumen' => 'Error en el proceso: ' . $e->getMessage(),
+                    'error' => $e->getMessage(),
+                    'detalle' => $log,
+                ],
+            ]);
+
             return response()->json([
                 'status' => 'error',
-                'message' => 'Error en el proceso: ' . $e->getMessage()
+                'message' => 'Error en el proceso: ' . $e->getMessage(),
+                'ejecucion_id' => $ejecucion->id,
             ], 500);
         }
     }

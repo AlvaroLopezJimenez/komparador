@@ -556,6 +556,52 @@ class CronJefeController extends Controller
         }
         unset($bars);
 
+        // Slots programados por cron (índices de celda en la cuadrícula del mapa)
+        $timelineScheduled = [];
+        $gridIntervalForSchedule = (int) ($timelineMeta['grid_interval'] ?? 60);
+        if ($gridIntervalForSchedule < 1) {
+            $gridIntervalForSchedule = 60;
+        }
+
+        foreach ($crons as $key => $cron) {
+            if (!$cron['activo']) {
+                continue;
+            }
+
+            if ($isSingleDay) {
+                $viewDate = Carbon::parse($fechaDesde)->startOfDay();
+                $minutes = $this->getScheduledMinutesOfDay(
+                    $cron['minuto'],
+                    $cron['hora'],
+                    $viewDate,
+                    $cron['dia'],
+                    $cron['mes'],
+                    $cron['dia_semana']
+                );
+                $timelineScheduled[$key] = $this->minutesToGridCellIndices($minutes, $gridIntervalForSchedule);
+            } else {
+                $rangeStart = Carbon::parse($timelineMeta['range_start'] ?? $fechaDesde)->startOfDay();
+                $rangeEnd = Carbon::parse($fechaHasta)->startOfDay();
+                $cellIndices = [];
+
+                for ($d = $rangeStart->copy(); $d->lte($rangeEnd); $d->addDay()) {
+                    $minutes = $this->getScheduledMinutesOfDay(
+                        $cron['minuto'],
+                        $cron['hora'],
+                        $d,
+                        $cron['dia'],
+                        $cron['mes'],
+                        $cron['dia_semana']
+                    );
+                    if (!empty($minutes)) {
+                        $cellIndices[] = $rangeStart->diffInDays($d);
+                    }
+                }
+
+                $timelineScheduled[$key] = array_values(array_unique($cellIndices));
+            }
+        }
+
         // Compatibilidad: heatmap vacío por si algo más lo referencia
         $heatmapData = [];
         $slots = [];
@@ -573,7 +619,8 @@ class CronJefeController extends Controller
             'slots',
             'isSingleDay',
             'timelineBars',
-            'timelineMeta'
+            'timelineMeta',
+            'timelineScheduled'
         ));
     }
 
@@ -742,9 +789,19 @@ class CronJefeController extends Controller
      */
     private function countCronFieldMatches(?string $field, int $min, int $max): int
     {
+        return count($this->expandCronField($field, $min, $max));
+    }
+
+    /**
+     * Expande un campo cron a los valores enteros que cubre en un rango inclusivo.
+     *
+     * @return int[]
+     */
+    private function expandCronField(?string $field, int $min, int $max): array
+    {
         $field = trim((string) $field);
         if ($field === '' || $field === '*') {
-            return $max - $min + 1;
+            return range($min, $max);
         }
 
         $values = [];
@@ -790,7 +847,10 @@ class CronJefeController extends Controller
             }
         }
 
-        return count($values);
+        $result = array_keys($values);
+        sort($result);
+
+        return $result;
     }
 
     /**
@@ -798,9 +858,17 @@ class CronJefeController extends Controller
      */
     private function countCronFieldMatchesDow(?string $field): int
     {
+        return count($this->expandCronFieldDow($field));
+    }
+
+    /**
+     * @return int[]
+     */
+    private function expandCronFieldDow(?string $field): array
+    {
         $field = trim((string) $field);
         if ($field === '' || $field === '*') {
-            return 7;
+            return range(0, 6);
         }
 
         $raw = [];
@@ -849,6 +917,85 @@ class CronJefeController extends Controller
             }
         }
 
-        return count($normalized) ?: 0;
+        $result = array_keys($normalized);
+        sort($result);
+
+        return $result;
+    }
+
+    private function cronMatchesDate(?string $dia, ?string $mes, ?string $diaSemana, Carbon $date): bool
+    {
+        $dayOfMonth = (int) $date->format('j');
+        $month = (int) $date->format('n');
+        $dow = (int) $date->dayOfWeek;
+
+        $diaRestricted = trim((string) $dia) !== '*' && trim((string) $dia) !== '';
+        $dowRestricted = trim((string) $diaSemana) !== '*' && trim((string) $diaSemana) !== '';
+        $mesRestricted = trim((string) $mes) !== '*' && trim((string) $mes) !== '';
+
+        if ($mesRestricted && !in_array($month, $this->expandCronField($mes, 1, 12), true)) {
+            return false;
+        }
+
+        if ($diaRestricted && $dowRestricted) {
+            return in_array($dayOfMonth, $this->expandCronField($dia, 1, 31), true)
+                || in_array($dow, $this->expandCronFieldDow($diaSemana), true);
+        }
+
+        if ($diaRestricted) {
+            return in_array($dayOfMonth, $this->expandCronField($dia, 1, 31), true);
+        }
+
+        if ($dowRestricted) {
+            return in_array($dow, $this->expandCronFieldDow($diaSemana), true);
+        }
+
+        return true;
+    }
+
+    /**
+     * Minutos del día (0-1439) en los que el cron debería ejecutarse.
+     *
+     * @return int[]
+     */
+    private function getScheduledMinutesOfDay(
+        ?string $minuto,
+        ?string $hora,
+        Carbon $date,
+        ?string $dia,
+        ?string $mes,
+        ?string $diaSemana
+    ): array {
+        if (!$this->cronMatchesDate($dia, $mes, $diaSemana, $date)) {
+            return [];
+        }
+
+        $minutes = [];
+        foreach ($this->expandCronField($minuto, 0, 59) as $m) {
+            foreach ($this->expandCronField($hora, 0, 23) as $h) {
+                $minutes[] = ($h * 60) + $m;
+            }
+        }
+
+        sort($minutes);
+
+        return array_values(array_unique($minutes));
+    }
+
+    /**
+     * @param int[] $minutes
+     * @return int[]
+     */
+    private function minutesToGridCellIndices(array $minutes, int $gridInterval): array
+    {
+        $indices = [];
+        foreach ($minutes as $minute) {
+            $indices[] = intdiv((int) $minute, $gridInterval);
+        }
+
+        $indices = array_values(array_unique($indices));
+        sort($indices);
+
+        return $indices;
     }
 }

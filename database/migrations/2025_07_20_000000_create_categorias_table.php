@@ -23,6 +23,7 @@ return new class extends Migration
             $table->enum('mostrar', ['si', 'no'])->default('si');
             $table->enum('permitir_texto_cantidad_alternativo', ['si', 'no'])->default('no');
             $table->string('unidad_de_medida')->nullable();
+            $table->string('configuracion_formulario_producto')->nullable()->default('ninguno');
             $table->timestamps();
         });
     }

@@ -1959,9 +1959,18 @@
     </script>
 
     {{-- SISTEMA DE CATEGORÍAS COMPLETAMENTE REWRITE --}}
+    @php
+        $kpConfiguracionFormularioProducto = 'ninguno';
+        $kpCategoriaIdProducto = old('categoria_id', $producto?->categoria_id ?? null);
+        if (!empty($kpCategoriaIdProducto)) {
+            $kpConfiguracionFormularioProducto = \App\Models\Categoria::where('id', $kpCategoriaIdProducto)
+                ->value('configuracion_formulario_producto') ?? 'ninguno';
+        }
+    @endphp
     <div id="datos-categorias"
         data-categorias-raiz="{{ json_encode($categoriasRaiz) }}"
-        data-categoria-id="{{ old('categoria_id', $producto->categoria_id ?? '') }}">
+        data-categoria-id="{{ old('categoria_id', $producto?->categoria_id ?? '') }}"
+        data-configuracion-formulario-producto="{{ $kpConfiguracionFormularioProducto }}">
     </div>
 
     <script>
@@ -1972,6 +1981,11 @@
         let indiceSeleccionadoCategoriaBuscador = -1;
         let categoriasActualesBuscador = [];
         let categoriaSeleccionadaBuscador = null;
+        window.kpConfiguracionFormularioProducto = document.getElementById('datos-categorias')?.dataset?.configuracionFormularioProducto || 'ninguno';
+        const KP_CONFIG_NO_COLUMNA_IMAGEN_NOMBRE_PRECIO = 'no_columna_grupo_mostrar_imagen_nombre_precio';
+        function kpEsConfigNoColumnaGrupoImagenNombrePrecio(config) {
+            return config === KP_CONFIG_NO_COLUMNA_IMAGEN_NOMBRE_PRECIO;
+        }
         let pestañaActiva = 'buscador'; // 'buscador' o 'manual'
 
         // Inicialización cuando se carga la página
@@ -2896,6 +2910,8 @@
             })
             .then(res => res.json())
             .then(data => {
+                window.kpConfiguracionFormularioProducto = data.configuracion_formulario_producto || 'ninguno';
+
                 const unidadMedida = data.unidad_de_medida;
                 if (!unidadMedida) return;
 
@@ -4961,6 +4977,7 @@
                         categoriaId: String(categoriaId),
                         especificaciones,
                         conteos: data.conteos_productos || {},
+                        configuracion_formulario_producto: data.configuracion_formulario_producto || 'ninguno',
                     };
 
                     // Mostrar los desplegables con checkboxes
@@ -4979,6 +4996,7 @@
             categoriaId: null,
             especificaciones: null,
             conteos: {},
+            configuracion_formulario_producto: 'ninguno',
         };
 
         let kpEditorGrupoDelegacionLista = false;
@@ -5465,6 +5483,9 @@
                     categoriaId: String(categoriaId),
                     especificaciones: data.especificaciones_internas,
                     conteos: data.conteos_productos || {},
+                    configuracion_formulario_producto: data.configuracion_formulario_producto
+                        || window.kpEspecificacionesCategoriaState?.configuracion_formulario_producto
+                        || 'ninguno',
                 };
 
                 const sublineaIdGuardada = kpObtenerSublineaIdDesdeBotonGuardarEditor(btnTrigger);
@@ -6130,6 +6151,8 @@
                 checkbox.addEventListener('change', function() {
                     const principalId = this.dataset.principalId;
                     const sublineaId = this.dataset.sublineaId;
+                    const configCat = window.kpEspecificacionesCategoriaState?.configuracion_formulario_producto || 'ninguno';
+                    const usarNoColumnaImagenNombrePrecio = kpEsConfigNoColumnaGrupoImagenNombrePrecio(configCat);
                     
                     // Si se marca "Mostrar", marcar también "Oferta" de la misma sublínea
                     if (this.checked) {
@@ -6138,8 +6161,13 @@
                             ofertaCheckbox.checked = true;
                         }
                         
-                        // Marcar también "Columna oferta" del grupo si aplica esa UI y no está marcado
-                        if (mostrarUIColumnaOferta) {
+                        if (usarNoColumnaImagenNombrePrecio) {
+                            const formatoSelect = contenedor.querySelector(`.formato-visualizacion-select[data-principal-id="${principalId}"]`);
+                            if (formatoSelect) {
+                                formatoSelect.value = 'imagen_texto_precio';
+                            }
+                        } else if (mostrarUIColumnaOferta) {
+                            // Marcar también "Columna oferta" del grupo si aplica esa UI y no está marcado
                             const columnaCheckbox = contenedor.querySelector(`.columna-oferta-checkbox[data-principal-id="${principalId}"]`);
                             if (columnaCheckbox && !columnaCheckbox.checked) {
                                 const columnasMarcadas = Array.from(contenedor.querySelectorAll('.columna-oferta-checkbox:checked'));
@@ -6158,7 +6186,20 @@
             
             const ofertaCheckboxes = contenedor.querySelectorAll('.especificacion-oferta-checkbox');
             ofertaCheckboxes.forEach(checkbox => {
-                checkbox.addEventListener('change', actualizarEspecificacionesElegidas);
+                checkbox.addEventListener('change', function() {
+                    if (this.checked) {
+                        const principalId = this.dataset.principalId;
+                        const configCat = window.kpEspecificacionesCategoriaState?.configuracion_formulario_producto || 'ninguno';
+                        if (kpEsConfigNoColumnaGrupoImagenNombrePrecio(configCat)) {
+                            const formatoSelect = contenedor.querySelector(`.formato-visualizacion-select[data-principal-id="${principalId}"]`);
+                            if (formatoSelect) {
+                                formatoSelect.value = 'imagen_texto_precio';
+                            }
+                        }
+                    }
+                    actualizarEspecificacionesElegidas();
+                    actualizarVisibilidadFormatoVisualizacion(contenedor);
+                });
             });
             
             // Añadir event listeners a los checkboxes de "Usar imágenes del producto"
@@ -11955,6 +11996,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const sublineas = containerSub ? Array.from(containerSub.querySelectorAll('.linea-intermedia-producto')) : [];
         const esPrimeraSublinea = sublineas[0] === divIntermedia;
         const principalId = lineaPrincipal.dataset.idUnico;
+        const usarNoColumnaImagenNombrePrecio = kpEsConfigNoColumnaGrupoImagenNombrePrecio(window.kpConfiguracionFormularioProducto);
 
         if (checkboxPrincipal && !checkboxPrincipal.checked) {
             checkboxPrincipal.checked = true;
@@ -11971,8 +12013,13 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-        // Primera sublínea del grupo: marcar también Columna oferta
-        if (esPrimeraSublinea) {
+        if (usarNoColumnaImagenNombrePrecio) {
+            const formatoSelect = lineaPrincipal.querySelector(`.formato-visualizacion-producto-select[data-principal-id="${principalId}"]`);
+            if (formatoSelect) {
+                formatoSelect.value = 'imagen_texto_precio';
+            }
+        } else if (esPrimeraSublinea) {
+            // Primera sublínea del grupo: marcar también Columna oferta
             const unidadDeMedidaSelect = document.getElementById('unidadDeMedida');
             const esUnidadUnicaLocal = unidadDeMedidaSelect && unidadDeMedidaSelect.value === 'unidadUnica';
             const maxColumnasProducto = esUnidadUnicaLocal ? 4 : 1;
@@ -12440,6 +12487,7 @@ document.addEventListener('DOMContentLoaded', function() {
         mostrarCheckbox.addEventListener('change', function() {
             const principalId = this.dataset.principalId;
             const sublineaId = this.dataset.sublineaId;
+            const usarNoColumnaImagenNombrePrecio = kpEsConfigNoColumnaGrupoImagenNombrePrecio(window.kpConfiguracionFormularioProducto);
             
             // Si se marca "Mostrar", marcar también "Oferta" de la misma sublínea
             if (this.checked) {
@@ -12447,17 +12495,24 @@ document.addEventListener('DOMContentLoaded', function() {
                     ofertaCheckbox.checked = true;
                 }
                 
-                // Marcar también "Columna oferta" del grupo (línea principal) si no está marcado
-                const unidadDeMedidaSelect = document.getElementById('unidadDeMedida');
-                const esUnidadUnicaLocal = unidadDeMedidaSelect && unidadDeMedidaSelect.value === 'unidadUnica';
-                const maxColumnasProducto = esUnidadUnicaLocal ? 4 : 1;
-                const columnaCheckbox = lineaPrincipal.querySelector(`.columna-oferta-producto-checkbox[data-principal-id="${principalId}"]`);
-                if (columnaCheckbox && !columnaCheckbox.checked) {
-                    const containerProducto = document.getElementById('especificaciones-producto-container');
-                    const columnasMarcadas = Array.from(containerProducto.querySelectorAll('.columna-oferta-producto-checkbox:checked'));
-                    if (columnasMarcadas.length < maxColumnasProducto) {
-                        columnaCheckbox.checked = true;
-                        columnaCheckbox.dispatchEvent(new Event('change'));
+                if (usarNoColumnaImagenNombrePrecio) {
+                    const formatoSelect = lineaPrincipal.querySelector(`.formato-visualizacion-producto-select[data-principal-id="${principalId}"]`);
+                    if (formatoSelect) {
+                        formatoSelect.value = 'imagen_texto_precio';
+                    }
+                } else {
+                    // Marcar también "Columna oferta" del grupo (línea principal) si no está marcado
+                    const unidadDeMedidaSelect = document.getElementById('unidadDeMedida');
+                    const esUnidadUnicaLocal = unidadDeMedidaSelect && unidadDeMedidaSelect.value === 'unidadUnica';
+                    const maxColumnasProducto = esUnidadUnicaLocal ? 4 : 1;
+                    const columnaCheckbox = lineaPrincipal.querySelector(`.columna-oferta-producto-checkbox[data-principal-id="${principalId}"]`);
+                    if (columnaCheckbox && !columnaCheckbox.checked) {
+                        const containerProducto = document.getElementById('especificaciones-producto-container');
+                        const columnasMarcadas = Array.from(containerProducto.querySelectorAll('.columna-oferta-producto-checkbox:checked'));
+                        if (columnasMarcadas.length < maxColumnasProducto) {
+                            columnaCheckbox.checked = true;
+                            columnaCheckbox.dispatchEvent(new Event('change'));
+                        }
                     }
                 }
             }
@@ -12466,7 +12521,17 @@ document.addEventListener('DOMContentLoaded', function() {
             // Actualizar visibilidad del selector de formato
             actualizarVisibilidadFormatoProducto(lineaPrincipal);
         });
-        ofertaCheckbox.addEventListener('change', actualizarJSONProducto);
+        ofertaCheckbox.addEventListener('change', function() {
+            if (this.checked && kpEsConfigNoColumnaGrupoImagenNombrePrecio(window.kpConfiguracionFormularioProducto)) {
+                const principalId = this.dataset.principalId;
+                const formatoSelect = lineaPrincipal.querySelector(`.formato-visualizacion-producto-select[data-principal-id="${principalId}"]`);
+                if (formatoSelect) {
+                    formatoSelect.value = 'imagen_texto_precio';
+                }
+                actualizarVisibilidadFormatoProducto(lineaPrincipal);
+            }
+            actualizarJSONProducto();
+        });
         usarImagenesCheckbox.addEventListener('change', function() {
             // Actualizar estado de botones de imágenes cuando cambia el checkbox de "usar imágenes del producto"
             const btnVerImagen = divIntermedia.querySelector('.btn-ver-imagenes-sublinea-producto');

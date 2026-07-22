@@ -21,7 +21,14 @@ class Kernel extends ConsoleKernel
                 
                 $crons = [
                     'clicks_actualizar_ofertas' => ['type' => 'command', 'target' => 'clicks:actualizar-ofertas --token=' . $token],
-                    'historico_guardar_productos' => ['type' => 'command', 'target' => 'historico:guardar-productos --token=' . $token],
+                    'historico_guardar_productos' => [
+                        'type' => 'callback',
+                        'target' => function() {
+                            // Misma lógica que la ejecución manual desde ajustes
+                            // (incluye histórico de especificaciones internas)
+                            app(\App\Http\Controllers\ProductoController::class)->guardarHistoricoPrecios();
+                        }
+                    ],
                     'productos_actualizar_oferta_mas_barata' => [
                         'type' => 'callback',
                         'target' => function() use ($token) {

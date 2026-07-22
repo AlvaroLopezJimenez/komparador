@@ -109,42 +109,6 @@ class UrlDescartadasController extends Controller
     }
 
     /**
-     * Elimina una URL descartada buscando por la propia URL (p. ej. desde crear-masivo).
-     */
-    public function destroyPorUrl(Request $request)
-    {
-        $validated = $request->validate([
-            'url' => 'required|string|max:2048',
-        ], [
-            'url.required' => 'Falta la URL.',
-        ]);
-
-        $url = trim($validated['url']);
-        if ($url === '') {
-            return response()->json([
-                'success' => false,
-                'message' => 'La URL está vacía.',
-            ], 422);
-        }
-
-        $fila = UrlDescartada::where('url', $url)->first();
-        if (!$fila) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Esta URL no está en descartadas.',
-            ], 404);
-        }
-
-        $resultado = $this->eliminarUna($fila);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'URL eliminada de descartadas.',
-            'resultado' => $resultado,
-        ]);
-    }
-
-    /**
      * Elimina la fila y, si la URL está en neo pero no en ofertas_producto, pone neo.aniadida = no.
      *
      * @return array{url: string, neo_actualizadas: int, existia_en_oferta: bool, existia_en_neo: bool}

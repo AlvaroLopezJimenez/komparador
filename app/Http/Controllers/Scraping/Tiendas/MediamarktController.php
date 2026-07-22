@@ -7,7 +7,9 @@ use Illuminate\Http\JsonResponse;
 class MediamarktController extends PlantillaTiendaController
 {
     /**
-     * PDP MediaMarkt: precio en data-test="mms-price" → span.mms-ui-mBgaT (ej. 7,25€).
+     * PDP MediaMarkt:
+     * - Con oferta: data-test="branded-price-whole-value" + branded-price-decimal-value (ej. 11,90).
+     * - Sin oferta: data-test="mms-price" → span.mms-ui-mBgaT (ej. 12,99€).
      */
     public function obtenerPrecio($url, $variante = null, $tienda = null, $oferta = null): JsonResponse
     {
@@ -21,7 +23,10 @@ class MediamarktController extends PlantillaTiendaController
 
         $html = html_entity_decode((string) $resultado['html'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
-        $precio = $this->extraerPrecioDesdeJsonLdProduct($html);
+        $precio = $this->extraerPrecioDesdeBrandedPrice($html);
+        if ($precio === null) {
+            $precio = $this->extraerPrecioDesdeJsonLdProduct($html);
+        }
         if ($precio === null) {
             $precio = $this->extraerPrecioDesdeBloqueMmsPrice($html);
         }
@@ -195,6 +200,10 @@ class MediamarktController extends PlantillaTiendaController
         }
 
         foreach ($bloques as $bloque) {
+            $precio = $this->extraerPrecioDesdeBrandedPrice($bloque);
+            if ($precio !== null) {
+                return $precio;
+            }
             $precio = $this->extraerPrecioDesdeSpanMmsUiMBgaT($bloque);
             if ($precio !== null) {
                 return $precio;
@@ -202,6 +211,39 @@ class MediamarktController extends PlantillaTiendaController
         }
 
         return null;
+    }
+
+    /**
+     * Precio con oferta: branded-price-whole-value (ej. "11,") + branded-price-decimal-value (ej. "90").
+     */
+    private function extraerPrecioDesdeBrandedPrice(string $html): ?float
+    {
+        if (
+            !preg_match(
+                '~<span[^>]*\bdata-test=(["\'])branded-price-whole-value\1[^>]*>\s*(?<whole>[^<]+?)\s*</span>~i',
+                $html,
+                $mWhole
+            )
+        ) {
+            return null;
+        }
+
+        $whole = html_entity_decode(trim((string) ($mWhole['whole'] ?? '')), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        $decimal = '';
+        if (
+            preg_match(
+                '~<span[^>]*\bdata-test=(["\'])branded-price-decimal-value\1[^>]*>\s*(?<dec>[^<]+?)\s*</span>~i',
+                $html,
+                $mDec
+            )
+        ) {
+            $decimal = html_entity_decode(trim((string) ($mDec['dec'] ?? '')), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
+
+        $texto = $whole . $decimal;
+
+        return $this->normalizarImporte($texto);
     }
 
     private function extraerPrecioDesdeSpanMmsUiMBgaT(string $html): ?float

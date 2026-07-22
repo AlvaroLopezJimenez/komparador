@@ -3367,6 +3367,7 @@
           {{-- _mck1: mapa clave descuento → clave modal v12 --}}
           window._mck1 = {
             '3x2': '3x2',
+            '4x3': '4x3',
             '2x1 - SoloCarrefour': '2x1',
             '2a al 50 - cheque - SoloCarrefour': '2a-al-50-cheque',
             '2a al 50': '2a-al-50',
@@ -3392,6 +3393,7 @@
             }
             const mapa = {
               '3x2': { label: '3x2', gradient: 'linear-gradient(135deg, #8b5cf6, #a855f7)', fontWeight: 'normal' },
+              '4x3': { label: '4x3', gradient: 'linear-gradient(135deg, #D30D1F, #b50b1a)', fontWeight: 'normal' },
               '2x1 - SoloCarrefour': { label: '2x1', gradient: 'linear-gradient(135deg, #10b981, #059669)', fontWeight: 'normal' },
               '2a al 50 - cheque - SoloCarrefour': { label: '2a al 50%', gradient: 'linear-gradient(135deg, #f59e0b, #d97706)', fontWeight: 'bold' },
               '2a al 70': { label: '2a AL 70%', gradient: 'linear-gradient(135deg, #f59e0b, #d97706)', fontWeight: 'normal' },
@@ -8068,6 +8070,10 @@ const v12 = {
   '3x2': {
     title: '¡Oferta 3x2!',
     text: 'Esta oferta tiene una promoción 3x2. Para obtener este precio, debes comprar 3 unidades y en el carrito se te aplicará automáticamente el descuento.'
+  },
+  '4x3': {
+    title: '¡Oferta 4x3!',
+    text: 'Esta oferta tiene una promoción 4x3. Para conseguir el precio mostrado debes comprar 4 unidades y se te descontará el precio del producto de menor valor.'
   },
   '2x1': {
     title: '¡Oferta 2x1 Acumula!',

@@ -740,6 +740,26 @@
                             
                             // Añadir parámetro cam si existe (usando función validada)
                             $up2 = _f1($up2);
+
+                            $nm1 = 0;
+                            $mbm1 = false;
+                            if (!empty($pr2->especificaciones_busqueda) && is_array($pr2->especificaciones_busqueda)) {
+                                $nm1 = count($pr2->especificaciones_busqueda);
+                            }
+                            if ($nm1 > 1) {
+                                $mbm1 = true;
+                                if (!empty($fa1) && is_array($fa1)) {
+                                    foreach ($fa1 as $lid1 => $sids1) {
+                                        if ($lid1 === 'precio_min' || $lid1 === 'precio_max') {
+                                            continue;
+                                        }
+                                        if (!empty($sids1) && is_array($sids1)) {
+                                            $mbm1 = false;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
                         @endphp
                         <a href="{{ $up2 }}"
                            class="group relative flex flex-col items-center bg-white rounded-xl shadow-md transition-all duration-300 transform hover:scale-105 hover:shadow-2xl cursor-pointer p-4">
@@ -748,7 +768,10 @@
                                     Rebajado: {{ $pr2->rebajado }}%
                                 </div>
                             @endif
-                            <div class="w-full flex justify-center mb-3">
+                            <div class="w-full flex justify-center mb-3 relative">
+                                @if($mbm1)
+                                    <span class="kk-badge-modelos kk-badge-modelos--card">+{{ $nm1 }} modelos</span>
+                                @endif
                                 @if($ip1)
                                     <img loading="lazy" src="/images/{{ $ip1 }}" alt="{{ $pr2->nombre }}" class="w-32 h-32 object-contain rounded-lg shadow-sm transition-all duration-300 group-hover:shadow-lg bg-gray-100">
                                 @else

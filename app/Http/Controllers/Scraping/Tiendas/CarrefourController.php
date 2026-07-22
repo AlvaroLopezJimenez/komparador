@@ -339,6 +339,12 @@ class CarrefourController extends PlantillaTiendaController
         return (bool) preg_match('/title\s*=\s*["\']3x2["\']/i', $html);
     }
 
+    /** Detecta ofertas 4x3 en el HTML */
+    private function detectarOferta4x3(string $html): bool
+    {
+        return (bool) preg_match('/title\s*=\s*["\']4x3["\']/i', $html);
+    }
+
     /** Detecta ofertas 2x1 Acumula en el HTML */
     private function detectarOferta2x1(string $html): bool
     {
@@ -403,6 +409,9 @@ class CarrefourController extends PlantillaTiendaController
         if ($this->detectarOferta3x2($html)) {
             $descuentosDetectados[] = '3x2';
         }
+        if ($this->detectarOferta4x3($html)) {
+            $descuentosDetectados[] = '4x3';
+        }
         if ($this->detectarOferta2x1($html)) {
             $descuentosDetectados[] = '2x1 - SoloCarrefour';
         }
@@ -442,6 +451,7 @@ class CarrefourController extends PlantillaTiendaController
 
             $textosAviso = [
                 '3x2' => 'DETECTADO DESCUENTO 3X2 - GENERADO AUTOMÁTICAMENTE',
+                '4x3' => 'DETECTADO DESCUENTO 4X3 - GENERADO AUTOMÁTICAMENTE',
                 '2x1 - SoloCarrefour' => 'DETECTADO DESCUENTO 2X1 ACUMULA - GENERADO AUTOMÁTICAMENTE',
                 '2a al 70' => 'DETECTADO DESCUENTO 2ª UNIDAD AL 70% - GENERADO AUTOMÁTICAMENTE',
                 '2a al 50 - cheque - SoloCarrefour' => 'DETECTADO DESCUENTO 50% QUE VUELVE (2ª AL 50% - CHEQUE) - GENERADO AUTOMÁTICAMENTE',

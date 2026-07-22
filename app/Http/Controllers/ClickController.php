@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Click;
+use App\Models\EjecucionGlobal;
 use App\Models\OfertaProducto;
 use App\Models\Producto;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +22,8 @@ use Carbon\Carbon;
 
 class ClickController extends Controller
 {
+    public const NOMBRE_EJECUCION_GEOLOCALIZACION = 'ejecuciones_clicks_geolocalizacion';
+
     protected $signedUrlService;
     protected VisitorTrackingService $visitorTracking;
 
@@ -1252,71 +1255,122 @@ class ClickController extends Controller
      */
     public function procesarGeolocalizacion(Request $request)
     {
-        $limit = $request->get('limit', 10); // Máximo clicks a procesar por ejecución
-        
-        // Buscar clicks sin geolocalización
-        $clicksSinGeo = Click::whereNull('ciudad')
-            ->whereNull('latitud')
-            ->whereNull('longitud')
-            ->whereNotNull('ip')
-            ->where('ip', '!=', '')
-            ->limit($limit)
-            ->get();
-        
-        if ($clicksSinGeo->isEmpty()) {
-            return response()->json([
-                'status' => 'ok',
-                'message' => 'No hay clicks pendientes de geolocalización',
-                'procesados' => 0,
-                'errores' => 0
-            ]);
-        }
-        
-        $procesados = 0;
-        $errores = 0;
-        
-        foreach ($clicksSinGeo as $click) {
-            try {
-                // Obtener geolocalización
-                $geoData = $this->obtenerGeolocalizacion($click->ip);
-                
-                if ($geoData['ciudad']) {
-                    // Actualizar el click con la geolocalización (redondear coordenadas a 7 decimales)
-                    $click->update([
-                        'ciudad' => $geoData['ciudad'],
-                        'pais' => $geoData['pais'],
-                        'latitud' => round($geoData['latitud'], 7),
-                        'longitud' => round($geoData['longitud'], 7),
-                    ]);
-                    
-                    $procesados++;
-                } else {
-                    $errores++;
-                }
-                
-                // Esperar 10 segundos entre peticiones para no sobrecargar ip.guide
-                if ($click !== $clicksSinGeo->last()) {
-                    sleep(10);
-                }
-                
-            } catch (\Exception $e) {
-                $errores++;
-                
-                Log::error("Error procesando geolocalización", [
-                    'click_id' => $click->id,
-                    'ip' => $click->ip,
-                    'error' => $e->getMessage()
+        $limit = $request->get('limit', 10);
+
+        $ejecucion = EjecucionGlobal::create([
+            'inicio' => now(),
+            'nombre' => self::NOMBRE_EJECUCION_GEOLOCALIZACION,
+            'log' => ['estado' => 'running'],
+        ]);
+
+        try {
+            $clicksSinGeo = Click::whereNull('ciudad')
+                ->whereNull('latitud')
+                ->whereNull('longitud')
+                ->whereNotNull('ip')
+                ->where('ip', '!=', '')
+                ->limit($limit)
+                ->get();
+
+            if ($clicksSinGeo->isEmpty()) {
+                $resumen = 'No hay clicks pendientes de geolocalización';
+
+                $ejecucion->update([
+                    'fin' => now(),
+                    'total' => 0,
+                    'total_guardado' => 0,
+                    'total_errores' => 0,
+                    'log' => [
+                        'estado' => 'ok',
+                        'resumen' => $resumen,
+                    ],
+                ]);
+
+                return response()->json([
+                    'status' => 'ok',
+                    'message' => $resumen,
+                    'procesados' => 0,
+                    'errores' => 0,
+                    'ejecucion_id' => $ejecucion->id,
                 ]);
             }
+
+            $procesados = 0;
+            $errores = 0;
+
+            foreach ($clicksSinGeo as $click) {
+                try {
+                    $geoData = $this->obtenerGeolocalizacion($click->ip);
+
+                    if ($geoData['ciudad']) {
+                        $click->update([
+                            'ciudad' => $geoData['ciudad'],
+                            'pais' => $geoData['pais'],
+                            'latitud' => round($geoData['latitud'], 7),
+                            'longitud' => round($geoData['longitud'], 7),
+                        ]);
+
+                        $procesados++;
+                    } else {
+                        $errores++;
+                    }
+
+                    if ($click !== $clicksSinGeo->last()) {
+                        sleep(10);
+                    }
+                } catch (\Exception $e) {
+                    $errores++;
+
+                    Log::error("Error procesando geolocalización", [
+                        'click_id' => $click->id,
+                        'ip' => $click->ip,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
+
+            $resumen = "Geolocalizados {$procesados} de {$clicksSinGeo->count()} clicks";
+            if ($errores > 0) {
+                $resumen .= " ({$errores} errores)";
+            }
+
+            $ejecucion->update([
+                'fin' => now(),
+                'total' => $clicksSinGeo->count(),
+                'total_guardado' => $procesados,
+                'total_errores' => $errores,
+                'log' => [
+                    'estado' => $errores > 0 && $procesados === 0 ? 'error' : 'ok',
+                    'resumen' => $resumen,
+                    'total_encontrados' => $clicksSinGeo->count(),
+                ],
+            ]);
+
+            return response()->json([
+                'status' => 'ok',
+                'message' => 'Geolocalización procesada',
+                'procesados' => $procesados,
+                'errores' => $errores,
+                'total_encontrados' => $clicksSinGeo->count(),
+                'ejecucion_id' => $ejecucion->id,
+            ]);
+        } catch (\Throwable $e) {
+            $ejecucion->update([
+                'fin' => now(),
+                'total_errores' => 1,
+                'log' => [
+                    'estado' => 'error',
+                    'resumen' => 'Error fatal: ' . $e->getMessage(),
+                    'error' => $e->getMessage(),
+                ],
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage(),
+                'ejecucion_id' => $ejecucion->id,
+            ], 500);
         }
-        
-        return response()->json([
-            'status' => 'ok',
-            'message' => 'Geolocalización procesada',
-            'procesados' => $procesados,
-            'errores' => $errores,
-            'total_encontrados' => $clicksSinGeo->count()
-        ]);
     }
     
     /**

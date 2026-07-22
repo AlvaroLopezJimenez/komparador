@@ -22,6 +22,7 @@ class OfertaProducto extends Model
         'fecha_actualizacion_envio',
         'frecuencia_actualizar_precio_minutos',
         'precio_unidad',
+        'multiplicador',
         'url',
         'url_cipher',
         'url_lookup',
@@ -42,6 +43,7 @@ class OfertaProducto extends Model
     ];
 
     protected $casts = [
+        'multiplicador' => 'float',
         'especificaciones_internas' => 'array',
         'aviso' => 'datetime',
         'fecha_inicio' => 'datetime',

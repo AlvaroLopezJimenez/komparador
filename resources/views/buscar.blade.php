@@ -205,8 +205,9 @@ if (!function_exists('oCV6X')) {
                 $nombrePreciosHot = $p5X8['producto_nombre'] ?? null;
                 $variante = null;
                 $esVariante = false;
+                $numModelos = null;
               } elseif (isset($p5X8['producto']) && isset($p5X8['es_variante'])) {
-                // Es una variante de producto
+                // Producto con posible variante (o general con badge de modelos)
                 $producto = $p5X8['producto'];
                 $variante = $p5X8['variante'] ?? null;
                 $precioVariante = $p5X8['precio_variante'] ?? null;
@@ -215,7 +216,8 @@ if (!function_exists('oCV6X')) {
                 $unidadMedida = $producto->unidadDeMedida;
                 $imagenPreciosHot = null;
                 $nombrePreciosHot = null;
-                $esVariante = true;
+                $esVariante = !empty($variante);
+                $numModelos = (!$esVariante && !empty($p5X8['num_modelos'])) ? (int) $p5X8['num_modelos'] : null;
                 
                 // Construir URL con variante
                 if ($variante) {
@@ -236,6 +238,7 @@ if (!function_exists('oCV6X')) {
                 $nombrePreciosHot = null;
                 $variante = null;
                 $esVariante = false;
+                $numModelos = null;
               }
               
               // Obtener imagen: prioridad 1) precios hot, 2) variante de especificación (búsqueda normal), 3) imagen general
@@ -259,7 +262,10 @@ if (!function_exists('oCV6X')) {
                   -{{ $porcentajeDescuento }}%
                 </div>
               @endif
-              <div class="w-full flex justify-center mb-3">
+              <div class="w-full flex justify-center mb-3 relative">
+                @if(!empty($numModelos))
+                  <span class="kk-badge-modelos kk-badge-modelos--card">+{{ $numModelos }} modelos</span>
+                @endif
                 @if(!empty($imagen))
                     <img loading="lazy" src="{{ asset('images/' . $imagen) }}" 
                          alt="{{ $producto->nombre }}" 

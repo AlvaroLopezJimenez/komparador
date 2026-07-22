@@ -31,7 +31,10 @@ class TiendaController extends Controller
             },
         ]);
 
+        // Si hay búsqueda, mostrar tanto si como no
         if ($request->filled('buscar')) {
+            $mostrar = ['si', 'no'];
+            $mostrarParaVista = ['si', 'no'];
             $query->where('nombre', 'like', '%' . $request->buscar . '%');
         }
 
@@ -77,6 +80,12 @@ class TiendaController extends Controller
             'conteoDirectoOfertas' => [],
             'categoriasConOfertas' => collect(),
             'filtroPorCategoria' => [],
+            'forzarActualizacionDatos' => [
+                'por_categoria' => [],
+                'parent_por_categoria' => [],
+                'total_ofertas' => 0,
+                'por_api' => [],
+            ],
         ]);
     }
 
@@ -114,7 +123,8 @@ class TiendaController extends Controller
             'scraping_categoria.*.frecuencia_maxima_unidad' => 'nullable|in:minutos,horas,dias',
             'scraping_categoria.*.scrapear' => 'nullable|in:si,no',
             'scraping_categoria.*.mostrar' => 'nullable|in:si,no',
-            'url_csv' => 'nullable|string',
+            'url_csv' => 'nullable|array',
+            'url_csv.*' => 'nullable|string',
         ]);
 
         $errorUrlCsv = $this->validarUrlCsvSiAplica($request);
@@ -336,6 +346,8 @@ class TiendaController extends Controller
             $conteoTotalOfertas
         );
 
+        $forzarActualizacionDatos = $resolverFiltroCategorias->resumenForzarActualizacionPorCategoria($tienda);
+
         return view('admin.tiendas.formulario', compact(
             'tienda', 'categorias', 'neoobjetivosPorCategoria',
             'tipoListadoCategoria', 'mensajeControlador', 'mensajeTipoListado',
@@ -343,7 +355,7 @@ class TiendaController extends Controller
             'conteoTotalOfertas', 'conteoDirectoOfertas', 'scrapingPorCategoria',
             'categoriasSinApiScraping', 'categoriasAncestrosSinApi',
             'resumenScrapingCategorias', 'categoriasConOfertas', 'filtroPorCategoria',
-            'flujoScrapingTienda'
+            'flujoScrapingTienda', 'forzarActualizacionDatos'
         ));
     }
 
@@ -383,7 +395,8 @@ class TiendaController extends Controller
             'scraping_categoria.*.frecuencia_maxima_unidad' => 'nullable|in:minutos,horas,dias',
             'scraping_categoria.*.scrapear' => 'nullable|in:si,no',
             'scraping_categoria.*.mostrar' => 'nullable|in:si,no',
-            'url_csv' => 'nullable|string',
+            'url_csv' => 'nullable|array',
+            'url_csv.*' => 'nullable|string',
         ]);
 
         $errorUrlCsv = $this->validarUrlCsvSiAplica($request);
@@ -1382,21 +1395,9 @@ class TiendaController extends Controller
      */
     private function procesarUrlCsvDesdeRequest(Request $request): ?array
     {
-        $raw = $request->input('url_csv');
-        if (!is_string($raw)) {
-            return null;
-        }
+        $urls = Tienda::normalizarUrlsCsvValor($request->input('url_csv'));
 
-        $lineas = preg_split('/\r\n|\r|\n/', $raw) ?: [];
-        $urls = [];
-        foreach ($lineas as $linea) {
-            $url = trim($linea);
-            if ($url !== '') {
-                $urls[] = $url;
-            }
-        }
-
-        return $urls === [] ? null : array_values($urls);
+        return $urls === [] ? null : $urls;
     }
 
     /**

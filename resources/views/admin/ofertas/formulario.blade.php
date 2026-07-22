@@ -82,6 +82,13 @@
                 if (isset($producto) && $producto->categoria) {
                     $urlProductoPublicoInicial = $producto->categoria->construirUrlCategorias($producto->slug);
                 }
+
+                $comoScrapearOfertaValor = strtolower(trim((string) old('como_scrapear', $oferta->como_scrapear ?? '')));
+                $comoScrapearTiendaValor = strtolower(trim((string) (
+                    ($tiendaAvisoEdit?->como_scrapear ?? null)
+                    ?? ($oferta?->tienda?->como_scrapear ?? null)
+                    ?? ''
+                )));
             @endphp
 
             {{-- INFORMACIÓN GENERAL --}}
@@ -89,14 +96,28 @@
                 <legend class="flex flex-wrap items-baseline justify-between gap-x-4 w-full text-lg font-semibold text-gray-700 dark:text-gray-200 mb-0 pb-0 float-none">
                     <span>Información general</span>
                     <span id="oferta-api-scraping-wrap" class="text-sm font-normal text-gray-500 dark:text-gray-400 {{ !empty($apiScrapingOferta) ? '' : 'hidden' }} shrink-0 flex flex-wrap items-baseline justify-end gap-x-4">
-                        <span id="oferta-api-tienda-line" class="whitespace-nowrap">
-                            API tienda:
+                        <label id="oferta-api-tienda-line" class="whitespace-nowrap flex items-center gap-2 cursor-pointer">
+                            <input
+                                type="radio"
+                                name="api_scraping_select"
+                                id="api_scraping_select_tienda"
+                                value="tienda"
+                                data-api="{{ data_get($apiScrapingOferta, 'api_tienda', '') }}"
+                                checked>
+                            <span>API tienda:</span>
                             <span id="oferta-api-tienda-nombre" class="text-gray-700 dark:text-gray-300" title="{{ data_get($apiScrapingOferta, 'api_tienda', '') }}">{{ data_get($apiScrapingOferta, 'api_tienda_nombre', '') }}</span>
-                        </span>
-                        <span id="oferta-api-categoria-line" class="whitespace-nowrap {{ data_get($apiScrapingOferta, 'tiene_dos_apis') ? '' : 'hidden' }}">
-                            API categoría:
+                        </label>
+
+                        <label id="oferta-api-categoria-line" class="whitespace-nowrap flex items-center gap-2 cursor-pointer {{ data_get($apiScrapingOferta, 'tiene_dos_apis') ? '' : 'hidden' }}">
+                            <input
+                                type="radio"
+                                name="api_scraping_select"
+                                id="api_scraping_select_categoria"
+                                value="categoria"
+                                data-api="{{ data_get($apiScrapingOferta, 'api_categoria', '') }}">
+                            <span>API categoría:</span>
                             <span id="oferta-api-categoria-nombre" class="text-gray-700 dark:text-gray-300" title="{{ data_get($apiScrapingOferta, 'api_categoria', '') }}">{{ data_get($apiScrapingOferta, 'api_categoria_nombre', '') }}</span>
-                        </span>
+                        </label>
                     </span>
                 </legend>
 
@@ -187,7 +208,7 @@
                                 <input type="number" name="envio" id="envio_input" step="0.01" min="0" max="99.99"
                                     value="{{ old('envio', $oferta->envio ?? '') }}"
                                     placeholder="(opcional)"
-                                    class="w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    class="w-24 px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 <p id="envio_error" class="text-sm text-red-500 mt-1 hidden"></p>
                                 @error('envio')
                                 <p class="text-sm text-red-500 mt-1">{{ $message }}</p>
@@ -206,14 +227,14 @@
 
                     {{-- PRECIO TOTAL Y PRECIO POR UNIDAD --}}
                     <div>
-                        <div class="grid gap-4" style="grid-template-columns: 0.85fr 1.15fr;">
+                        <div class="grid gap-4" style="grid-template-columns: 0.65fr 1.15fr 0.35fr;">
                             {{-- PRECIO TOTAL --}}
                             <div>
-                                <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">Precio total (€) *</label>
+                                <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">Precio total *</label>
                                 <div class="flex gap-2">
                                     <input type="number" name="precio_total" step="0.001" max="99999.999" required
                                         value="{{ old('precio_total', $oferta->precio_total ?? '') }}"
-                                        class="flex-1 px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                        class="w-32 flex-none px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border focus:outline-none focus:ring-2 focus:ring-blue-500">
                                     <button type="button" id="btnObtenerPrecio" onclick="obtenerPrecioAutomatico()"
                                         class="px-3 py-2 bg-green-500 hover:bg-green-600 text-white rounded transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                                         title="Obtener Precio">
@@ -226,11 +247,38 @@
 
                             {{-- PRECIO POR UNIDAD --}}
                             <div>
-                                <label id="label_precio_unidad" class="block mb-1 font-medium text-gray-700 dark:text-gray-200">Precio por unidad (€) *</label>
+                                <label id="label_precio_unidad" class="block mb-1 font-medium text-gray-700 dark:text-gray-200">Precio por unidad *</label>
                                 <input type="number" name="precio_unidad" step="0.001" max="99999.999" required
                                     value="{{ old('precio_unidad', $oferta->precio_unidad ?? '') }}"
                                     class="w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 @error('precio_unidad')
+                                <p class="text-sm text-red-500 mt-1">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            {{-- MULTIPLICADOR --}}
+                            <div>
+                                <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200 flex items-center gap-2">
+                                    <span class="whitespace-nowrap">Multi.</span>
+                                    <div class="relative inline-block group">
+                                        <button type="button"
+                                            class="w-5 h-5 rounded-full bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold flex items-center justify-center cursor-help focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            onclick="document.getElementById('multiplicador-tooltip').classList.toggle('hidden')"
+                                            onblur="setTimeout(() => document.getElementById('multiplicador-tooltip').classList.add('hidden'), 200)">
+                                            ?
+                                        </button>
+                                        <div id="multiplicador-tooltip"
+                                            class="hidden absolute z-50 w-72 p-3 mt-2 text-sm text-white bg-gray-800 dark:bg-gray-700 rounded-lg shadow-lg left-0 bottom-full mb-2">
+                                            Multiplicador: Para cuando la tienda da precio de una unidad, pero te obliga a comprar varias unidades.
+                                            <div class="absolute left-4 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800 dark:border-t-gray-700"></div>
+                                        </div>
+                                    </div>
+                                </label>
+                                <input type="number" name="multiplicador" id="multiplicador_input" step="0.01" min="0.01" max="99"
+                                    value="{{ old('multiplicador', $oferta->multiplicador ?? '') }}"
+                                    placeholder="—"
+                                    class="w-full px-2 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border focus:outline-none focus:ring-2 focus:ring-blue-500 text-center">
+                                @error('multiplicador')
                                 <p class="text-sm text-red-500 mt-1">{{ $message }}</p>
                                 @enderror
                             </div>
@@ -556,10 +604,14 @@
                             <div>
                                 <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">¿Cómo scrapear? *</label>
                                 <select name="como_scrapear" id="como_scrapear" required
+                                    data-como-scrapear-oferta="{{ $comoScrapearOfertaValor }}"
+                                    data-como-scrapear-tienda="{{ $comoScrapearTiendaValor }}"
                                     class="w-full px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                    <option value="">Selecciona una opción</option>
-                                    <option value="automatico" id="opcion_automatico" {{ old('como_scrapear', $oferta->como_scrapear ?? '') === 'automatico' ? 'selected' : '' }}>Automático</option>
-                                    <option value="manual" id="opcion_manual" {{ old('como_scrapear', $oferta->como_scrapear ?? '') === 'manual' ? 'selected' : '' }}>Manual</option>
+                                    @if($comoScrapearOfertaValor === '')
+                                        <option value="">Selecciona una opción</option>
+                                    @endif
+                                    <option value="automatico" id="opcion_automatico" {{ $comoScrapearOfertaValor === 'automatico' ? 'selected' : '' }}>Automático</option>
+                                    <option value="manual" id="opcion_manual" {{ $comoScrapearOfertaValor === 'manual' ? 'selected' : '' }}>Manual</option>
                                 </select>
                                 @error('como_scrapear')
                                 <p class="text-sm text-red-500 mt-1">{{ $message }}</p>
@@ -1285,6 +1337,23 @@
 
 
     <style>
+        /* Ocultar flechas (spinners) en input number en navegadores comunes */
+        input[name="unidades"]::-webkit-outer-spin-button,
+        input[name="unidades"]::-webkit-inner-spin-button,
+        input[name="envio"]::-webkit-outer-spin-button,
+        input[name="envio"]::-webkit-inner-spin-button,
+        input[name="precio_total"]::-webkit-outer-spin-button,
+        input[name="precio_total"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        input[name="unidades"],
+        input[name="envio"],
+        input[name="precio_total"] {
+            -moz-appearance: textfield;
+        }
+
         /* Estilos para el select de tiendas con búsqueda */
         .tienda-select-container {
             position: relative;
@@ -1619,10 +1688,12 @@
              const nombreTienda = document.getElementById('oferta-api-tienda-nombre');
              const lineCategoria = document.getElementById('oferta-api-categoria-line');
              const nombreCategoria = document.getElementById('oferta-api-categoria-nombre');
+             const radioTienda = document.getElementById('api_scraping_select_tienda');
+             const radioCategoria = document.getElementById('api_scraping_select_categoria');
              const productoId = document.getElementById('producto_id')?.value;
              const tiendaId = document.getElementById('tienda_id')?.value;
 
-             if (!apiWrap || !nombreTienda || !lineCategoria || !nombreCategoria) {
+             if (!apiWrap || !nombreTienda || !lineCategoria || !nombreCategoria || !radioTienda || !radioCategoria) {
                  return;
              }
 
@@ -1643,11 +1714,19 @@
                  nombreCategoria.textContent = apis.api_categoria_nombre || apis.api_categoria;
                  nombreCategoria.title = apis.api_categoria;
                  lineCategoria.classList.remove('hidden');
+
+                 radioCategoria.dataset.api = apis.api_categoria || '';
              } else {
                  nombreCategoria.textContent = '';
                  nombreCategoria.removeAttribute('title');
                  lineCategoria.classList.add('hidden');
+
+                 radioCategoria.checked = false;
              }
+
+             // Por defecto siempre seleccionamos la API de la tienda.
+             radioTienda.dataset.api = apis.api_tienda || '';
+             radioTienda.checked = true;
 
              apiWrap.classList.remove('hidden');
          }
@@ -1749,13 +1828,13 @@
          };
 
          const ETIQUETAS_PRECIO_UNIDAD_OFERTA = {
-             unidad: 'Precio por unidad (€)',
-             kilos: 'Precio por kilo (€)',
-             litros: 'Precio por litro (€)',
-             unidadMilesima: 'Precio por unidad (€)',
-             unidadUnica: 'Precio (€)',
-             '800gramos': 'Precio por 800 gramos (€)',
-             '100ml': 'Precio por 100 ml (€)',
+             unidad: 'Precio por unidad',
+            kilos: 'Precio por kilo',
+            litros: 'Precio por litro',
+            unidadMilesima: 'Precio por unidad',
+            unidadUnica: 'Precio',
+            '800gramos': 'Precio por 800 gramos',
+            '100ml': 'Precio por 100 ml',
          };
 
          let unidadMedidaProductoActual = null;
@@ -1987,7 +2066,7 @@
          }
 
          function etiquetaPrecioUnidadOferta(codigo) {
-             return ETIQUETAS_PRECIO_UNIDAD_OFERTA[codigo] || 'Precio por unidad (€)';
+            return ETIQUETAS_PRECIO_UNIDAD_OFERTA[codigo] || 'Precio por unidad';
          }
 
          function actualizarEtiquetasUnidadMedida(unidadDeMedida) {
@@ -2198,100 +2277,86 @@
          }
 
          // Función para actualizar el desplegable de como_scrapear según la tienda
-         async function actualizarComoScrapearSegunTienda(tiendaId) {
+         function aplicarRestriccionesComoScrapearSelect(comoScrapearTienda, valorOfertaPreferido, esNuevaOferta) {
              const comoScrapearSelect = document.getElementById('como_scrapear');
              const opcionAutomatico = document.getElementById('opcion_automatico');
              const opcionManual = document.getElementById('opcion_manual');
-             
+
              if (!comoScrapearSelect || !opcionAutomatico || !opcionManual) {
                  return;
              }
-             
+
+             const modoTienda = String(comoScrapearTienda || '').toLowerCase().trim();
+             const valorPreferido = String(
+                 valorOfertaPreferido
+                 || comoScrapearSelect.dataset.comoScrapearOferta
+                 || comoScrapearSelect.value
+                 || ''
+             ).toLowerCase().trim();
+
+             let valorFinal = '';
+             if (modoTienda === 'automatico') {
+                 valorFinal = 'automatico';
+             } else if (modoTienda === 'manual') {
+                 valorFinal = 'manual';
+             } else if (modoTienda === 'ambos') {
+                 if (valorPreferido === 'automatico' || valorPreferido === 'manual') {
+                     valorFinal = valorPreferido;
+                 } else {
+                     valorFinal = esNuevaOferta ? 'automatico' : '';
+                 }
+             }
+
+             if (valorFinal) {
+                 comoScrapearSelect.value = valorFinal;
+                 comoScrapearSelect.dataset.comoScrapearOferta = valorFinal;
+             }
+
+             opcionAutomatico.disabled = modoTienda === 'manual';
+             opcionManual.disabled = modoTienda === 'automatico';
+             opcionAutomatico.style.opacity = modoTienda === 'manual' ? '0.5' : '1';
+             opcionManual.style.opacity = modoTienda === 'automatico' ? '0.5' : '1';
+         }
+
+         async function actualizarComoScrapearSegunTienda(tiendaId) {
+             const comoScrapearSelect = document.getElementById('como_scrapear');
+             if (!comoScrapearSelect) {
+                 return;
+             }
+
              const ofertaId = {{ $oferta ? $oferta->id : 'null' }};
              const esNuevaOferta = ofertaId === 'null' || ofertaId === null;
-             const valorActual = comoScrapearSelect.value;
-             
+             const valorPreferido = comoScrapearSelect.dataset.comoScrapearOferta || comoScrapearSelect.value;
+             const modoTiendaFallback = comoScrapearSelect.dataset.comoScrapearTienda || '';
+
+             if (modoTiendaFallback) {
+                 aplicarRestriccionesComoScrapearSelect(modoTiendaFallback, valorPreferido, esNuevaOferta);
+             }
+
+             if (!tiendaId) {
+                 return;
+             }
+
              try {
-                 // Obtener información de la tienda
                  const response = await fetch(`/panel-privado/tiendas/${tiendaId}`);
+                 if (!response.ok) {
+                     throw new Error('No se pudo obtener la tienda');
+                 }
+
                  const tienda = await response.json();
-                 
-                 if (!tienda || !tienda.como_scrapear) {
-                     // Si no hay información, dejar vacío
-                     comoScrapearSelect.value = '';
-                     opcionAutomatico.disabled = false;
-                     opcionManual.disabled = false;
-                     opcionAutomatico.style.opacity = '1';
-                     opcionManual.style.opacity = '1';
+                 const modoTienda = String(tienda?.como_scrapear || modoTiendaFallback || '').toLowerCase().trim();
+
+                 if (!modoTienda) {
                      return;
                  }
-                 
-                 const comoScrapearTienda = tienda.como_scrapear.toLowerCase();
-                 
-                 if (comoScrapearTienda === 'automatico') {
-                     // Solo permitir automático
-                     opcionAutomatico.disabled = false;
-                     opcionManual.disabled = true;
-                     opcionAutomatico.style.opacity = '1';
-                     opcionManual.style.opacity = '0.5';
-                     
-                     // Si es nueva oferta, establecer automático. Si es edición, verificar que el valor actual sea válido
-                     if (esNuevaOferta) {
-                         comoScrapearSelect.value = 'automatico';
-                     } else {
-                         // Si el valor actual no es automático, cambiarlo
-                         if (valorActual !== 'automatico') {
-                             comoScrapearSelect.value = 'automatico';
-                         }
-                     }
-                 } else if (comoScrapearTienda === 'manual') {
-                     // Solo permitir manual
-                     opcionAutomatico.disabled = true;
-                     opcionManual.disabled = false;
-                     opcionAutomatico.style.opacity = '0.5';
-                     opcionManual.style.opacity = '1';
-                     
-                     // Si es nueva oferta, establecer manual. Si es edición, verificar que el valor actual sea válido
-                     if (esNuevaOferta) {
-                         comoScrapearSelect.value = 'manual';
-                     } else {
-                         // Si el valor actual no es manual, cambiarlo
-                         if (valorActual !== 'manual') {
-                             comoScrapearSelect.value = 'manual';
-                         }
-                     }
-                 } else if (comoScrapearTienda === 'ambos') {
-                     // Permitir ambos
-                     opcionAutomatico.disabled = false;
-                     opcionManual.disabled = false;
-                     opcionAutomatico.style.opacity = '1';
-                     opcionManual.style.opacity = '1';
-                     
-                     // Si es nueva oferta, establecer automático por defecto. Si es edición, mantener el valor actual si es válido
-                     if (esNuevaOferta) {
-                         comoScrapearSelect.value = 'automatico';
-                     } else {
-                         // Si el valor actual no es válido (no es automático ni manual), establecer automático
-                         if (valorActual !== 'automatico' && valorActual !== 'manual') {
-                             comoScrapearSelect.value = 'automatico';
-                         }
-                     }
-                 } else {
-                     // Valor desconocido, dejar vacío
-                     comoScrapearSelect.value = '';
-                     opcionAutomatico.disabled = false;
-                     opcionManual.disabled = false;
-                     opcionAutomatico.style.opacity = '1';
-                     opcionManual.style.opacity = '1';
-                 }
+
+                 comoScrapearSelect.dataset.comoScrapearTienda = modoTienda;
+                 aplicarRestriccionesComoScrapearSelect(modoTienda, valorPreferido, esNuevaOferta);
              } catch (error) {
                  console.error('Error al obtener información de la tienda:', error);
-                 // En caso de error, dejar vacío
-                 comoScrapearSelect.value = '';
-                 opcionAutomatico.disabled = false;
-                 opcionManual.disabled = false;
-                 opcionAutomatico.style.opacity = '1';
-                 opcionManual.style.opacity = '1';
+                 if (modoTiendaFallback) {
+                     aplicarRestriccionesComoScrapearSelect(modoTiendaFallback, valorPreferido, esNuevaOferta);
+                 }
              }
          }
 
@@ -2616,6 +2681,22 @@
             });
         }
 
+        const multiplicadorInput = document.getElementById('multiplicador_input');
+        if (multiplicadorInput) {
+            multiplicadorInput.addEventListener('input', function() {
+                if (!this.value) return;
+                let v = this.value.replace(',', '.');
+                if (!/^\d{0,2}(\.\d{0,2})?$/.test(v)) {
+                    v = v.slice(0, -1);
+                }
+                const num = parseFloat(v);
+                if (!isNaN(num) && num > 99) {
+                    v = '99';
+                }
+                this.value = v;
+            });
+        }
+
         // Gestión de múltiples descuentos
         const descuentosLista = document.getElementById('descuentos_lista');
         const descuentosHidden = document.getElementById('descuentos_hidden');
@@ -2627,6 +2708,7 @@
             { value: 'cupon', label: 'Cupón' },
             { value: '2a-cupon', label: '-x% 2ª unidad cupón' },
             { value: '3x2', label: '3x2' },
+            { value: '4x3', label: '4x3' },
             { value: '+Juego', label: '+Juego' },
             { value: '2x1 - SoloCarrefour', label: '2x1 - SoloCarrefour' },
             { value: '2a al 70', label: '2ª al 70%' },
@@ -2967,6 +3049,15 @@
 
                 if (opciones.apiForzada) {
                     datos.api_forzada = opciones.apiForzada;
+                } else {
+                    // Si se ha seleccionado la API alternativa (categoría), forzamos esa API.
+                    const radioSeleccionado = document.querySelector('input[name="api_scraping_select"]:checked');
+                    if (radioSeleccionado && radioSeleccionado.value === 'categoria') {
+                        const apiForzada = radioSeleccionado.dataset.api;
+                        if (apiForzada) {
+                            datos.api_forzada = apiForzada;
+                        }
+                    }
                 }
 
                 const response = await fetch('{{ route("admin.ofertas.scraper.obtener-precio") }}', {
@@ -3140,6 +3231,14 @@
 
             // Si hay una tienda seleccionada al cargar (editando oferta), actualizar como_scrapear
             const tiendaIdAlCargar = document.getElementById('tienda_id')?.value;
+            const comoScrapearSelect = document.getElementById('como_scrapear');
+            if (comoScrapearSelect) {
+                comoScrapearSelect.addEventListener('change', function() {
+                    if (this.value) {
+                        this.dataset.comoScrapearOferta = this.value;
+                    }
+                });
+            }
             if (tiendaIdAlCargar) {
                 actualizarComoScrapearSegunTienda(tiendaIdAlCargar);
                 actualizarAvisosVisibilidadOferta();

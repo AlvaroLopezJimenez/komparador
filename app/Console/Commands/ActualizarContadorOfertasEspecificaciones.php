@@ -2,13 +2,15 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Command;
-use App\Models\Producto;
+use App\Models\EjecucionGlobal;
 use App\Models\OfertaProducto;
+use App\Models\Producto;
 use Carbon\Carbon;
+use Illuminate\Console\Command;
 
 class ActualizarContadorOfertasEspecificaciones extends Command
 {
+    public const NOMBRE_EJECUCION_GLOBAL = 'ejecuciones_contador_especificaciones';
     /**
      * The name and signature of the console command.
      *
@@ -28,23 +30,30 @@ class ActualizarContadorOfertasEspecificaciones extends Command
      */
     public function handle()
     {
+        $ejecucion = EjecucionGlobal::create([
+            'inicio' => now(),
+            'nombre' => self::NOMBRE_EJECUCION_GLOBAL,
+            'log' => ['estado' => 'running'],
+        ]);
+
         $this->info('Iniciando actualización de contadores de ofertas por especificaciones...');
-        
+
         $ahora = Carbon::now();
-        
-        // Obtener productos con especificaciones internas configuradas
-        $productos = Producto::whereNotNull('categoria_id_especificaciones_internas')
-            ->whereNotNull('categoria_especificaciones_internas_elegidas')
-            ->where('categoria_especificaciones_internas_elegidas', '!=', 'null')
-            ->where('categoria_especificaciones_internas_elegidas', '!=', '')
-            ->get();
-        
-        $this->info("Encontrados {$productos->count()} productos con especificaciones internas.");
-        
-        $procesados = 0;
-        $actualizados = 0;
-        
-        foreach ($productos as $producto) {
+        $errores = 0;
+
+        try {
+            $productos = Producto::whereNotNull('categoria_id_especificaciones_internas')
+                ->whereNotNull('categoria_especificaciones_internas_elegidas')
+                ->where('categoria_especificaciones_internas_elegidas', '!=', 'null')
+                ->where('categoria_especificaciones_internas_elegidas', '!=', '')
+                ->get();
+
+            $this->info("Encontrados {$productos->count()} productos con especificaciones internas.");
+
+            $procesados = 0;
+
+            foreach ($productos as $producto) {
+                try {
             $especificaciones = $producto->categoria_especificaciones_internas_elegidas;
             
             // Si es string, intentar decodificar JSON
@@ -229,15 +238,50 @@ class ActualizarContadorOfertasEspecificaciones extends Command
             $producto->categoria_especificaciones_internas_elegidas = $especificaciones;
             $producto->save();
             
-            $procesados++;
-            if ($procesados % 100 === 0) {
-                $this->info("Procesados {$procesados} productos...");
+                    $procesados++;
+                    if ($procesados % 100 === 0) {
+                        $this->info("Procesados {$procesados} productos...");
+                    }
+                } catch (\Throwable $e) {
+                    $errores++;
+                    $this->error("Error en producto {$producto->id}: {$e->getMessage()}");
+                }
             }
+
+            $resumen = "Procesados {$procesados} de {$productos->count()} productos con especificaciones";
+            if ($errores > 0) {
+                $resumen .= " ({$errores} errores)";
+            }
+
+            $ejecucion->update([
+                'fin' => now(),
+                'total' => $productos->count(),
+                'total_guardado' => $procesados,
+                'total_errores' => $errores,
+                'log' => [
+                    'estado' => $errores > 0 ? 'error' : 'ok',
+                    'resumen' => $resumen,
+                ],
+            ]);
+
+            $this->info("Proceso completado. Total procesados: {$procesados} productos.");
+
+            return $errores > 0 ? Command::FAILURE : Command::SUCCESS;
+        } catch (\Throwable $e) {
+            $ejecucion->update([
+                'fin' => now(),
+                'total_errores' => 1,
+                'log' => [
+                    'estado' => 'error',
+                    'resumen' => 'Error fatal: ' . $e->getMessage(),
+                    'error' => $e->getMessage(),
+                ],
+            ]);
+
+            $this->error('Error en el proceso: ' . $e->getMessage());
+
+            return Command::FAILURE;
         }
-        
-        $this->info("Proceso completado. Total procesados: {$procesados} productos.");
-        
-        return Command::SUCCESS;
     }
 }
 

@@ -2184,18 +2184,7 @@ class CronBuscarProductosAmazonController extends Controller
 
     private function tiendaTieneEnlaceDescargaCsv(Tienda $tienda): bool
     {
-        $urls = $tienda->url_csv;
-        if (!is_array($urls)) {
-            return false;
-        }
-
-        foreach ($urls as $url) {
-            if (trim((string) $url) !== '') {
-                return true;
-            }
-        }
-
-        return false;
+        return $tienda->tieneUrlsCsv();
     }
 
     /**

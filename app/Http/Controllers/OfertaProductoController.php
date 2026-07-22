@@ -199,6 +199,26 @@ class OfertaProductoController extends Controller
         $perPage = $request->input('perPage', 20);
         $busqueda = $request->input('busqueda');
         $mostrar = $request->input('mostrar', ['si']); // Por defecto solo mostrar las que tienen 'si'
+
+        $normalizarArray = function ($value): array {
+            if ($value === null) {
+                return [];
+            }
+
+            if (is_string($value)) {
+                $value = trim($value);
+                return $value === '' ? [] : [$value];
+            }
+
+            if (!is_array($value)) {
+                return [$value];
+            }
+
+            return array_values(array_filter(
+                $value,
+                fn ($v) => $v !== null && $v !== ''
+            ));
+        };
         
         // Si hay búsqueda y no se ha especificado manualmente el filtro 'no', incluirlo automáticamente
         if ($busqueda && !in_array('no', $mostrar)) {
@@ -207,6 +227,12 @@ class OfertaProductoController extends Controller
         
         // Crear variable para las vistas que refleje el estado real de los checkboxes
         $mostrarParaVista = $mostrar;
+
+        $tiendaIdsSeleccionadas = $normalizarArray($request->input('tienda_ids', []));
+        $categoriaIdsSeleccionadas = $normalizarArray($request->input('categoria_ids', []));
+        $productoIdsSeleccionadas = $normalizarArray($request->input('producto_ids', []));
+        $unidadesSeleccionadas = $normalizarArray($request->input('unidades', []));
+        $textoAlternativoNumSeleccionadas = $normalizarArray($request->input('texto_alternativo_num', []));
 
         $ofertas = OfertaProducto::with(['tienda', 'producto'])
             ->when($busqueda, function ($query, $busqueda) {
@@ -225,6 +251,27 @@ class OfertaProductoController extends Controller
                             ->orWhereRaw('LOWER(modelo) LIKE ?', ["%{$busqueda}%"])
                             ->orWhereRaw('LOWER(talla) LIKE ?', ["%{$busqueda}%"]);
                     });
+                });
+            })
+            ->when(count($tiendaIdsSeleccionadas) > 0, function ($query) use ($tiendaIdsSeleccionadas) {
+                $query->whereIn('tienda_id', $tiendaIdsSeleccionadas);
+            })
+            ->when(count($categoriaIdsSeleccionadas) > 0, function ($query) use ($categoriaIdsSeleccionadas) {
+                $query->whereHas('producto', function ($q2) use ($categoriaIdsSeleccionadas) {
+                    $q2->whereIn('categoria_id', $categoriaIdsSeleccionadas);
+                });
+            })
+            ->when(count($productoIdsSeleccionadas) > 0, function ($query) use ($productoIdsSeleccionadas) {
+                $query->whereIn('producto_id', $productoIdsSeleccionadas);
+            })
+            ->when(count($unidadesSeleccionadas) > 0, function ($query) use ($unidadesSeleccionadas) {
+                $query->whereIn('unidades', $unidadesSeleccionadas);
+            })
+            ->when(count($textoAlternativoNumSeleccionadas) > 0, function ($query) use ($textoAlternativoNumSeleccionadas) {
+                $query->where(function ($q) use ($textoAlternativoNumSeleccionadas) {
+                    foreach ($textoAlternativoNumSeleccionadas as $texto) {
+                        $q->orWhere('texto_cantidad_alternativo', 'like', '%' . $texto . '%');
+                    }
                 });
             })
             ->when($mostrar, function ($query, $mostrar) {
@@ -246,7 +293,130 @@ class OfertaProductoController extends Controller
                 ->get();
         }
 
-        return view('admin.ofertas.todas', compact('ofertas', 'perPage', 'mostrarParaVista', 'urlsDescartadasCoincidentes'));
+        if ($request->ajax()) {
+            return view('admin.ofertas.partials._todas_listado', compact('ofertas', 'urlsDescartadasCoincidentes'));
+        }
+
+        $tiendaIdToNombre = Tienda::query()
+            ->whereIn('id', $tiendaIdsSeleccionadas)
+            ->pluck('nombre', 'id')
+            ->toArray();
+
+        $categoriaIdToNombre = Categoria::query()
+            ->whereIn('id', $categoriaIdsSeleccionadas)
+            ->pluck('nombre', 'id')
+            ->toArray();
+
+        $productoIdToLabel = Producto::query()
+            ->whereIn('id', $productoIdsSeleccionadas)
+            ->get(['id', 'nombre'])
+            ->mapWithKeys(fn ($p) => [$p->id => $p->nombre])
+            ->toArray();
+
+        return view('admin.ofertas.todas', compact(
+            'ofertas',
+            'perPage',
+            'mostrarParaVista',
+            'urlsDescartadasCoincidentes',
+            'tiendaIdsSeleccionadas',
+            'categoriaIdsSeleccionadas',
+            'productoIdsSeleccionadas',
+            'unidadesSeleccionadas',
+            'textoAlternativoNumSeleccionadas',
+            'tiendaIdToNombre',
+            'categoriaIdToNombre',
+            'productoIdToLabel'
+        ));
+    }
+
+    /**
+     * Sugerencias para los filtros del listado /ofertas.
+     * - tienda/categoria/producto: se reutilizan endpoints del BuscadorController (header).
+     * - unidades/texto_cantidad_alternativo: se resuelven aquí con DISTINCT.
+     */
+    public function sugerenciasFiltros(Request $request)
+    {
+        $tipo = (string) $request->input('tipo', '');
+        $q = trim((string) $request->input('q', ''));
+
+        if (mb_strlen($q) < 2) {
+            return response()->json([]);
+        }
+
+        $normalizarArray = function ($value): array {
+            if ($value === null) {
+                return [];
+            }
+
+            if (is_string($value)) {
+                $value = trim($value);
+                return $value === '' ? [] : [$value];
+            }
+
+            if (!is_array($value)) {
+                return [$value];
+            }
+
+            return array_values(array_filter(
+                $value,
+                fn ($v) => $v !== null && $v !== ''
+            ));
+        };
+
+        $mostrar = $request->input('mostrar', ['si']);
+        if (!is_array($mostrar)) {
+            $mostrar = [$mostrar];
+        }
+
+        $tiendaIdsSeleccionadas = $normalizarArray($request->input('tienda_ids', []));
+        $categoriaIdsSeleccionadas = $normalizarArray($request->input('categoria_ids', []));
+        $productoIdsSeleccionadas = $normalizarArray($request->input('producto_ids', []));
+
+        $baseQuery = OfertaProducto::query();
+
+        if (!empty($mostrar)) {
+            $baseQuery->whereIn('mostrar', $mostrar);
+        }
+
+        if (count($tiendaIdsSeleccionadas) > 0) {
+            $baseQuery->whereIn('tienda_id', $tiendaIdsSeleccionadas);
+        }
+
+        if (count($categoriaIdsSeleccionadas) > 0) {
+            $baseQuery->whereHas('producto', function ($q2) use ($categoriaIdsSeleccionadas) {
+                $q2->whereIn('categoria_id', $categoriaIdsSeleccionadas);
+            });
+        }
+
+        if (count($productoIdsSeleccionadas) > 0) {
+            $baseQuery->whereIn('producto_id', $productoIdsSeleccionadas);
+        }
+
+        $limit = 12;
+
+        if ($tipo === 'unidades') {
+            $valores = (clone $baseQuery)
+                ->whereNotNull('unidades')
+                ->where('unidades', 'like', '%' . $q . '%')
+                ->distinct()
+                ->limit($limit)
+                ->pluck('unidades');
+
+            return response()->json($valores->values()->map(fn ($v) => ['id' => $v, 'nombre' => $v]));
+        }
+
+        if ($tipo === 'texto_alternativo_num') {
+            $valores = (clone $baseQuery)
+                ->whereNotNull('texto_cantidad_alternativo')
+                ->where('texto_cantidad_alternativo', 'like', '%' . $q . '%')
+                ->distinct()
+                ->limit($limit)
+                ->pluck('texto_cantidad_alternativo');
+
+            return response()->json($valores->values()->map(fn ($v) => ['id' => $v, 'nombre' => $v]));
+        }
+
+        return response()->json([]);
     }
 
     /**
@@ -405,6 +575,7 @@ class OfertaProductoController extends Controller
         $request->merge([
             'precio_total' => str_replace(',', '.', $request->precio_total),
             'precio_unidad' => str_replace(',', '.', $request->precio_unidad),
+            'multiplicador' => $request->filled('multiplicador') ? str_replace(',', '.', $request->multiplicador) : null,
             'envio' => $request->filled('envio') ? str_replace(',', '.', $request->envio) : null,
         ]);
 
@@ -414,6 +585,7 @@ class OfertaProductoController extends Controller
             'unidades' => 'required|numeric|min:0.01',
             'precio_total' => 'required|numeric|min:0',
             'precio_unidad' => 'required|numeric|min:0',
+            'multiplicador' => 'nullable|numeric|min:0.01|max:99',
             'envio' => 'nullable|numeric|min:0|max:99.99',
             'url' => UrlOfertaValidacion::rules(),
             'variante' => 'nullable|string|max:255',
@@ -439,6 +611,8 @@ class OfertaProductoController extends Controller
                 'url' => 'Esta URL está descartada y no se puede utilizar para editar ofertas.',
             ]);
         }
+
+        $this->validarComoScrapearOfertaConTienda((int) $validated['tienda_id'], $validated['como_scrapear']);
 
         $esOfertaChollo = $request->boolean('es_chollo') || $request->filled('chollo_id');
 
@@ -1124,6 +1298,7 @@ class OfertaProductoController extends Controller
         $request->merge([
             'precio_total' => str_replace(',', '.', $request->precio_total),
             'precio_unidad' => str_replace(',', '.', $request->precio_unidad),
+            'multiplicador' => $request->filled('multiplicador') ? str_replace(',', '.', $request->multiplicador) : null,
             'envio' => $request->filled('envio') ? str_replace(',', '.', $request->envio) : null,
         ]);
 
@@ -1135,6 +1310,7 @@ class OfertaProductoController extends Controller
                 'unidades' => 'required|numeric|min:0.01',
                 'precio_total' => 'required|numeric|min:0',
                 'precio_unidad' => 'required|numeric|min:0',
+                'multiplicador' => 'nullable|numeric|min:0.01|max:99',
                 'envio' => 'nullable|numeric|min:0|max:99.99',
                 'url' => UrlOfertaValidacion::rules(),
                 'variante' => 'nullable|string|max:255',
@@ -1165,6 +1341,8 @@ class OfertaProductoController extends Controller
                 'url' => 'Esta URL está descartada y no se puede utilizar para crear ofertas.',
             ]);
         }
+
+        $this->validarComoScrapearOfertaConTienda((int) $validated['tienda_id'], $validated['como_scrapear']);
 
         $esOfertaChollo = $request->boolean('es_chollo') || $request->filled('chollo_id');
 
@@ -3363,9 +3541,12 @@ class OfertaProductoController extends Controller
         }
 
         // Comprobar si la URL está descartada (no se puede usar)
-        if (UrlDescartada::where('url', $url)->exists()) {
+        $urlDescartada = UrlDescartada::where('url', $url)->first();
+        if ($urlDescartada) {
             return response()->json([
                 'tipo' => 'descartada',
+                'descartada' => true,
+                'url_descartada_id' => $urlDescartada->id,
                 'mensaje' => 'Esta URL está descartada y no se puede utilizar para crear o editar ofertas.'
             ]);
         }
@@ -4879,6 +5060,17 @@ class OfertaProductoController extends Controller
         return $producto
             && $producto->categoria
             && ($producto->categoria->permitir_texto_cantidad_alternativo ?? 'no') === 'si';
+    }
+
+    private function validarComoScrapearOfertaConTienda(int $tiendaId, string $comoScrapear): void
+    {
+        $tienda = Tienda::findOrFail($tiendaId);
+
+        if (!$tienda->esComoScrapearOfertaValido($comoScrapear)) {
+            throw ValidationException::withMessages([
+                'como_scrapear' => 'El modo de scrapeo seleccionado no está permitido para la configuración de la tienda.',
+            ]);
+        }
     }
 
     /**

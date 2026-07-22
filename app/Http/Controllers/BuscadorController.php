@@ -513,6 +513,191 @@ class BuscadorController extends Controller
     }
 
     /**
+     * Texto del producto base (sin variantes) para decidir si la búsqueda apunta al general o a un modelo.
+     */
+    private function obtenerTextoBaseProducto($producto): string
+    {
+        return trim($this->normalizarTextoBusqueda(trim(implode(' ', array_filter([
+            $producto->nombre,
+            $producto->marca,
+            $producto->modelo,
+            $producto->talla,
+        ])))) . ' ' . $this->obtenerTextoJerarquiaProducto($producto));
+    }
+
+    /**
+     * Separa palabras cubiertas por el producto base de las que solo pueden venir de una variante.
+     *
+     * @return array{0: array<int, string>, 1: array<int, string>}
+     */
+    private function separarPalabrasBaseYRestantes(string $textoBase, array $palabras): array
+    {
+        $palabrasBase = [];
+        $palabrasRestantes = [];
+
+        foreach ($palabras as $palabra) {
+            if ($this->coincidePalabraEnTexto($textoBase, $palabra)) {
+                $palabrasBase[] = $palabra;
+            } else {
+                $palabrasRestantes[] = $palabra;
+            }
+        }
+
+        return [$palabrasBase, $palabrasRestantes];
+    }
+
+    /**
+     * Cuenta modelos indexados en especificaciones_busqueda.
+     */
+    private function contarModelosEnEspecificacionesBusqueda(?array $especificacionesBusqueda): int
+    {
+        if (!$especificacionesBusqueda || !is_array($especificacionesBusqueda)) {
+            return 0;
+        }
+
+        return count($especificacionesBusqueda);
+    }
+
+    /**
+     * Busca variantes cuyo texto cubre todas las palabras indicadas (sin mezclar con el nombre base).
+     */
+    private function buscarVariantesPorPalabras(array $especificacionesBusqueda, array $palabras): array
+    {
+        if (empty($palabras)) {
+            return [];
+        }
+
+        $coincidencias = [];
+
+        foreach ($especificacionesBusqueda as $textoEspecificacion => $datos) {
+            $textoOriginal = $datos['texto'] ?? $textoEspecificacion;
+            $textoVariante = $this->normalizarTextoBusqueda($textoOriginal);
+
+            if (!$this->coincidenTodasLasPalabrasEnTexto($textoVariante, $palabras)) {
+                continue;
+            }
+
+            $varianteId = $datos['id'] ?? null;
+            $claveUnica = $varianteId
+                ? 'v_' . $varianteId
+                : $textoEspecificacion . '_' . md5($textoOriginal);
+
+            if (!isset($coincidencias[$claveUnica])) {
+                $coincidencias[$claveUnica] = [
+                    'texto_especificacion' => $textoEspecificacion,
+                    'datos' => $datos,
+                ];
+            }
+        }
+
+        return $coincidencias;
+    }
+
+    /**
+     * Crea un item interno de resultado de búsqueda (antes de formatear para API/vista).
+     */
+    private function crearItemResultadoBusqueda(
+        $producto,
+        ?string $variante = null,
+        $precioVariante = null,
+        $imagenVariante = null,
+        ?int $numModelos = null
+    ): array {
+        return [
+            'producto' => $producto,
+            'variante' => $variante,
+            'precio_variante' => $precioVariante,
+            'imagen_variante' => $imagenVariante,
+            'es_variante' => $variante !== null,
+            'num_modelos' => ($variante === null && $numModelos !== null && $numModelos > 1) ? $numModelos : null,
+        ];
+    }
+
+    /**
+     * Expande coincidencias de variantes calculando precio e imagen por sublínea.
+     */
+    private function expandirVariantesCoincidentes($producto, array $coincidencias, $servicioOfertas)
+    {
+        $resultados = collect();
+        $especificacionesElegidas = $producto->categoria_especificaciones_internas_elegidas;
+        $categoriaEspecificaciones = $producto->categoriaEspecificaciones;
+        $todasLasOfertas = ($categoriaEspecificaciones && $especificacionesElegidas)
+            ? $servicioOfertas->obtenerTodas($producto)
+            : null;
+
+        foreach ($coincidencias as $item) {
+            $textoEspecificacion = $item['texto_especificacion'];
+            $datos = $item['datos'];
+            $textoParaMostrar = $datos['texto'] ?? $textoEspecificacion;
+            $sublineaId = $datos['id'] ?? null;
+            $lineaId = null;
+            $precioMasBarato = $datos['precio_unidad'] ?? $producto->precio;
+
+            if ($todasLasOfertas && $especificacionesElegidas && $sublineaId) {
+                foreach ($especificacionesElegidas as $lineaIdKey => $sublineasProducto) {
+                    if (strpos($lineaIdKey, '_') === 0) {
+                        continue;
+                    }
+
+                    $sublineasArray = is_array($sublineasProducto) ? $sublineasProducto : [$sublineasProducto];
+                    foreach ($sublineasArray as $sublineaProducto) {
+                        $sublineaIdProducto = is_array($sublineaProducto)
+                            ? ($sublineaProducto['id'] ?? null)
+                            : strval($sublineaProducto);
+
+                        if (strval($sublineaIdProducto) === strval($sublineaId)) {
+                            $lineaId = $lineaIdKey;
+                            break 2;
+                        }
+                    }
+                }
+
+                if ($lineaId && $sublineaId) {
+                    $ofertasVariante = $todasLasOfertas->filter(function ($oferta) use ($lineaId, $sublineaId) {
+                        $especificacionesOferta = $oferta->especificaciones_internas;
+
+                        if (!$especificacionesOferta || !is_array($especificacionesOferta)) {
+                            return false;
+                        }
+
+                        $ofertaLinea = $especificacionesOferta[$lineaId] ?? null;
+                        if (!$ofertaLinea) {
+                            return false;
+                        }
+
+                        $ofertaSublineas = is_array($ofertaLinea) ? $ofertaLinea : [$ofertaLinea];
+
+                        foreach ($ofertaSublineas as $ofertaItem) {
+                            $itemId = (is_array($ofertaItem) && isset($ofertaItem['id']))
+                                ? strval($ofertaItem['id'])
+                                : strval($ofertaItem);
+
+                            if (strval($itemId) === strval($sublineaId)) {
+                                return true;
+                            }
+                        }
+
+                        return false;
+                    });
+
+                    if ($ofertasVariante->isNotEmpty()) {
+                        $precioMasBarato = $ofertasVariante->min('precio_unidad');
+                    }
+                }
+            }
+
+            $resultados->push($this->crearItemResultadoBusqueda(
+                $producto,
+                $textoParaMostrar,
+                $precioMasBarato,
+                $datos['imagen'] ?? null
+            ));
+        }
+
+        return $resultados;
+    }
+
+    /**
      * Texto normalizado de la jerarquía de categorías de un producto (para búsquedas tipo "cerveza mahou").
      */
     private function obtenerTextoJerarquiaProducto($producto): string
@@ -707,16 +892,60 @@ class BuscadorController extends Controller
     }
 
     /**
+     * Elimina palabras que no aparecen en ningún producto del catálogo (ej. typos como "xyz").
+     * La expansión de variantes sigue usando la consulta original completa.
+     */
+    private function filtrarPalabrasConCoincidenciaEnCatalogo(array $palabras): array
+    {
+        $palabrasValidas = [];
+
+        foreach ($palabras as $palabra) {
+            $like = '%' . $this->normalizarTextoBusqueda($palabra) . '%';
+
+            $existe = Producto::where('obsoleto', 'no')
+                ->where('mostrar', 'si')
+                ->where(function ($q) use ($palabra, $like) {
+                    $this->agregarCoincidenciaTerminoEnCamposProducto($q, $palabra, 'where');
+
+                    $categoriaIds = $this->obtenerCategoriaIdsPorPalabraIndividual($palabra);
+                    if (!empty($categoriaIds)) {
+                        $q->orWhereIn('categoria_id', $categoriaIds);
+                    }
+
+                    $q->orWhere(function ($specQ) use ($like) {
+                        $specQ->whereNotNull('especificaciones_busqueda_texto')
+                            ->whereRaw(
+                                $this->expresionCampoTextoBusqueda('especificaciones_busqueda_texto') . ' LIKE ?',
+                                [$like]
+                            );
+                    });
+                })
+                ->exists();
+
+            if ($existe) {
+                $palabrasValidas[] = $palabra;
+            }
+        }
+
+        return $palabrasValidas;
+    }
+
+    /**
      * Método común que obtiene productos ordenados por relevancia
      * Usado tanto por buscar() como por productos() para garantizar resultados idénticos
      */
     private function obtenerProductosOrdenadosPorRelevancia(array $palabras, string $queryCompleta, int $limiteProductos = null, bool $sinVariantes = false)
     {
+        $palabrasSql = $this->filtrarPalabrasConCoincidenciaEnCatalogo($palabras);
+        if (empty($palabrasSql)) {
+            return collect();
+        }
+
         $query = Producto::where('obsoleto', 'no')
             ->where('mostrar', 'si')
-            ->where(function($q) use ($palabras, $queryCompleta) {
+            ->where(function($q) use ($palabrasSql, $queryCompleta) {
                 // Cada palabra debe coincidir en nombre/marca/modelo/talla, categoría o especificaciones
-                foreach ($palabras as $palabra) {
+                foreach ($palabrasSql as $palabra) {
                     $q->where(function($wordQ) use ($palabra) {
                         $this->agregarCoincidenciaTerminoEnCamposProducto($wordQ, $palabra, 'where');
 
@@ -737,7 +966,7 @@ class BuscadorController extends Controller
                 }
 
                 // También aceptar coincidencia de la frase completa en campos del producto
-                if (count($palabras) > 1) {
+                if (count($palabrasSql) > 1) {
                     $q->orWhere(function($fullQ) use ($queryCompleta) {
                         $this->agregarCoincidenciaTerminoEnCamposProducto($fullQ, $queryCompleta, 'where');
                     });
@@ -871,9 +1100,10 @@ class BuscadorController extends Controller
                 $variante = $item['variante'] ?? null;
                 $precioVariante = $item['precio_variante'] ?? null;
                 $imagenVariante = $item['imagen_variante'] ?? null;
-                
+                $numModelos = $item['num_modelos'] ?? null;
+
                 // Usar formatearResultadoProducto para mantener compatibilidad con el formato de sugerencias
-                return $this->formatearResultadoProducto($producto, $variante, $precioVariante, $imagenVariante);
+                return $this->formatearResultadoProducto($producto, $variante, $precioVariante, $imagenVariante, $numModelos);
             });
 
             return $resultados;
@@ -946,6 +1176,11 @@ class BuscadorController extends Controller
 
     /**
      * Genera variantes de productos para la búsqueda principal (buscar.blade.php)
+     *
+     * Reglas:
+     * - Si la búsqueda la cubre el producto base → general con badge +N modelos
+     * - Si hay palabras que solo encajan en variantes → solo esas variantes
+     * - Si hay palabras sueltas sin variante (ej. "dolce gusto leche xyz") → general con badge
      */
     private function generarVariantesProductosParaBuscar($productos, array $palabras, string $queryCompleta)
     {
@@ -957,132 +1192,35 @@ class BuscadorController extends Controller
 
             if (!$especificacionesBusqueda || !is_array($especificacionesBusqueda) || empty($especificacionesBusqueda)) {
                 if ($this->productoCoincideBusqueda($producto, $palabras)) {
-                    $resultados->push([
-                        'producto' => $producto,
-                        'variante' => null,
-                        'precio_variante' => null,
-                        'es_variante' => false
-                    ]);
+                    $resultados->push($this->crearItemResultadoBusqueda($producto));
                 }
                 continue;
             }
 
-            $coincidencias = [];
-            $queryNorm = $this->normalizarTextoBusqueda($queryCompleta);
-            $textoBaseProducto = trim($this->normalizarTextoBusqueda($producto->nombre . ' ' . $producto->marca . ' ' . $producto->modelo)
-                . ' ' . $this->obtenerTextoJerarquiaProducto($producto));
+            $textoBaseProducto = $this->obtenerTextoBaseProducto($producto);
+            [$palabrasBase, $palabrasRestantes] = $this->separarPalabrasBaseYRestantes($textoBaseProducto, $palabras);
+            $numModelos = $this->contarModelosEnEspecificacionesBusqueda($especificacionesBusqueda);
 
-            foreach ($especificacionesBusqueda as $textoEspecificacion => $datos) {
-                $textoOriginal = $datos['texto'] ?? $textoEspecificacion;
-                $textoCompletoVariante = trim($textoBaseProducto . ' ' . $this->normalizarTextoBusqueda($textoOriginal));
-
-                if ($this->coincidenTodasLasPalabrasEnTexto($textoCompletoVariante, $palabras)
-                    || $this->coincidenTodasLasPalabrasEnTexto($textoCompletoVariante, [$queryNorm])) {
-                    $varianteId = $datos['id'] ?? null;
-                    $claveUnica = $varianteId ? 'v_' . $varianteId : $textoEspecificacion . '_' . md5($textoOriginal);
-
-                    if (!isset($coincidencias[$claveUnica])) {
-                        $coincidencias[$claveUnica] = [
-                            'texto_especificacion' => $textoEspecificacion,
-                            'datos' => $datos
-                        ];
-                    }
-                }
-            }
-
-            if (empty($coincidencias)) {
-                if ($this->productoCoincideBusqueda($producto, $palabras)) {
-                    $resultados->push([
-                        'producto' => $producto,
-                        'variante' => null,
-                        'precio_variante' => null,
-                        'es_variante' => false
-                    ]);
+            if (empty($palabrasRestantes)) {
+                if ($this->coincidenTodasLasPalabrasEnTexto($textoBaseProducto, $palabras)
+                    || $this->productoCoincideBusqueda($producto, $palabras)) {
+                    $resultados->push($this->crearItemResultadoBusqueda($producto, null, null, null, $numModelos));
                 }
                 continue;
             }
 
-            $especificacionesElegidas = $producto->categoria_especificaciones_internas_elegidas;
-            $categoriaEspecificaciones = $producto->categoriaEspecificaciones;
+            $coincidencias = $this->buscarVariantesPorPalabras($especificacionesBusqueda, $palabrasRestantes);
 
-            if ($categoriaEspecificaciones && $especificacionesElegidas) {
-                $todasLasOfertas = $servicioOfertas->obtenerTodas($producto);
+            if (!empty($coincidencias)) {
+                $resultados = $resultados->merge(
+                    $this->expandirVariantesCoincidentes($producto, $coincidencias, $servicioOfertas)
+                );
+                continue;
+            }
 
-                foreach ($coincidencias as $item) {
-                    $textoEspecificacion = $item['texto_especificacion'];
-                    $datos = $item['datos'];
-                    $textoParaMostrar = $datos['texto'] ?? $textoEspecificacion;
-                    $sublineaId = $datos['id'] ?? null;
-                    $lineaId = null;
-
-                    foreach ($especificacionesElegidas as $lineaIdKey => $sublineasProducto) {
-                        if (strpos($lineaIdKey, '_') === 0) {
-                            continue;
-                        }
-
-                        $sublineasArray = is_array($sublineasProducto) ? $sublineasProducto : [$sublineasProducto];
-                        foreach ($sublineasArray as $sublineaProducto) {
-                            $sublineaIdProducto = is_array($sublineaProducto) ? ($sublineaProducto['id'] ?? null) : strval($sublineaProducto);
-                            if (strval($sublineaIdProducto) === strval($sublineaId)) {
-                                $lineaId = $lineaIdKey;
-                                break 2;
-                            }
-                        }
-                    }
-
-                    if ($lineaId && $sublineaId) {
-                        $ofertasVariante = $todasLasOfertas->filter(function($oferta) use ($lineaId, $sublineaId) {
-                            $especificacionesOferta = $oferta->especificaciones_internas;
-
-                            if (!$especificacionesOferta || !is_array($especificacionesOferta)) {
-                                return false;
-                            }
-
-                            $ofertaLinea = $especificacionesOferta[$lineaId] ?? null;
-                            if (!$ofertaLinea) {
-                                return false;
-                            }
-
-                            $ofertaSublineas = is_array($ofertaLinea) ? $ofertaLinea : [$ofertaLinea];
-
-                            foreach ($ofertaSublineas as $ofertaItem) {
-                                $itemId = (is_array($ofertaItem) && isset($ofertaItem['id'])) ? strval($ofertaItem['id']) : strval($ofertaItem);
-                                if (strval($itemId) === strval($sublineaId)) {
-                                    return true;
-                                }
-                            }
-
-                            return false;
-                        });
-
-                        $precioMasBarato = $ofertasVariante->isNotEmpty()
-                            ? $ofertasVariante->min('precio_unidad')
-                            : ($datos['precio_unidad'] ?? $producto->precio);
-                    } else {
-                        $precioMasBarato = $datos['precio_unidad'] ?? $producto->precio;
-                    }
-
-                    $resultados->push([
-                        'producto' => $producto,
-                        'variante' => $textoParaMostrar,
-                        'precio_variante' => $precioMasBarato,
-                        'imagen_variante' => $datos['imagen'] ?? null,
-                        'es_variante' => true
-                    ]);
-                }
-            } else {
-                foreach ($coincidencias as $item) {
-                    $datos = $item['datos'];
-                    $textoParaMostrar = $datos['texto'] ?? $item['texto_especificacion'];
-
-                    $resultados->push([
-                        'producto' => $producto,
-                        'variante' => $textoParaMostrar,
-                        'precio_variante' => $datos['precio_unidad'] ?? $producto->precio,
-                        'imagen_variante' => $datos['imagen'] ?? null,
-                        'es_variante' => true
-                    ]);
-                }
+            // Palabras sueltas sin variante coincidente: mostrar general si el base encaja
+            if (!empty($palabrasBase) && $this->coincidenTodasLasPalabrasEnTexto($textoBaseProducto, $palabrasBase)) {
+                $resultados->push($this->crearItemResultadoBusqueda($producto, null, null, null, $numModelos));
             }
         }
 
@@ -1092,7 +1230,7 @@ class BuscadorController extends Controller
     /**
      * Formatea un resultado de producto para el buscador
      */
-    private function formatearResultadoProducto($producto, $variante = null, $precioVariante = null, $imagenVariante = null)
+    private function formatearResultadoProducto($producto, $variante = null, $precioVariante = null, $imagenVariante = null, $numModelos = null)
     {
         // Si hay variante, usar su precio; si no, usar el precio del producto
         $precio = $precioVariante !== null ? $precioVariante : $producto->precio;
@@ -1143,7 +1281,8 @@ class BuscadorController extends Controller
                 : number_format($precio, 2, ',', '.'),
             'unidadDeMedida' => $producto->unidadDeMedida,
             'url' => $urlBase,
-            'tipo' => 'producto'
+            'tipo' => 'producto',
+            'num_modelos' => ($variante === null && $numModelos !== null && $numModelos > 1) ? $numModelos : null,
         ];
     }
 

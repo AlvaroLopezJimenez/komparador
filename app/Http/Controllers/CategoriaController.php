@@ -98,6 +98,7 @@ class CategoriaController extends Controller
             'especificaciones_internas' => 'nullable|string',
             'info_adicional_chatgpt' => 'nullable|string',
             'unidad_de_medida' => 'nullable|string|in:unidad,kilos,litros,unidadMilesima,unidadUnica,800gramos,100ml',
+            'configuracion_formulario_producto' => 'nullable|string|in:ninguno,no_columna_grupo_mostrar_imagen_nombre_precio',
         ], [
             'slug.unique' => 'El slug ya existe. Por favor, elige otro.',
         ]);
@@ -126,6 +127,7 @@ class CategoriaController extends Controller
             'especificaciones_internas' => $especificacionesInternas,
             'info_adicional_chatgpt' => $request->info_adicional_chatgpt,
             'unidad_de_medida' => $request->filled('unidad_de_medida') ? $request->unidad_de_medida : null,
+            'configuracion_formulario_producto' => $request->input('configuracion_formulario_producto', 'ninguno') ?: 'ninguno',
         ]);
 
         return redirect()->route('admin.categorias.index')->with('success', 'Categoría creada correctamente.');
@@ -150,6 +152,7 @@ class CategoriaController extends Controller
             'especificaciones_internas' => 'nullable|string',
             'info_adicional_chatgpt' => 'nullable|string',
             'unidad_de_medida' => 'nullable|string|in:unidad,kilos,litros,unidadMilesima,unidadUnica,800gramos,100ml',
+            'configuracion_formulario_producto' => 'nullable|string|in:ninguno,no_columna_grupo_mostrar_imagen_nombre_precio',
         ]);
 
         // Si el slug es diferente al actual, verificar que no exista en otra categoría
@@ -178,6 +181,7 @@ class CategoriaController extends Controller
             'especificaciones_internas' => $especificacionesInternas,
             'info_adicional_chatgpt' => $request->info_adicional_chatgpt,
             'unidad_de_medida' => $request->filled('unidad_de_medida') ? $request->unidad_de_medida : null,
+            'configuracion_formulario_producto' => $request->input('configuracion_formulario_producto', 'ninguno') ?: 'ninguno',
         ]);
 
         return redirect()->route('admin.categorias.index')->with('success', 'Categoría actualizada correctamente.');
@@ -218,6 +222,7 @@ class CategoriaController extends Controller
                 'id' => $categoriaActual->id,
                 'nombre' => $categoriaActual->nombre,
                 'unidad_de_medida' => $categoriaActual->unidad_de_medida,
+                'configuracion_formulario_producto' => $categoriaActual->configuracion_formulario_producto ?? 'ninguno',
             ]);
             $categoriaActual = $categoriaActual->parent;
         }
@@ -225,6 +230,7 @@ class CategoriaController extends Controller
         return response()->json([
             'jerarquia' => $jerarquia,
             'unidad_de_medida' => $categoria->unidad_de_medida,
+            'configuracion_formulario_producto' => $categoria->configuracion_formulario_producto ?? 'ninguno',
         ]);
     }
     

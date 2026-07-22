@@ -921,6 +921,7 @@ class NeoController extends Controller
             'success' => true,
             'message' => 'URL descartada correctamente.',
             'url' => $url,
+            'url_descartada_id' => $urlDescartada->id,
             'neo_actualizadas' => $filasActualizadas,
         ]);
     }

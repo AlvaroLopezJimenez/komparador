@@ -90,6 +90,7 @@ class ScraperSegundoPlanoController extends ScraperBaseController
 
         $tiendaId = $request->input('tienda_id');
         $cantidad = $request->input('cantidad', null);
+        $categoriaIds = array_values(array_filter(array_map('intval', (array) $request->input('categoria_ids', []))));
 
         if (!$tiendaId) {
             return response()->json([
@@ -107,13 +108,13 @@ class ScraperSegundoPlanoController extends ScraperBaseController
             ], 404);
         }
 
-        return $this->procesarScraperOfertas($token, $tiendaId, $cantidad);
+        return $this->procesarScraperOfertas($token, $tiendaId, $cantidad, $categoriaIds);
     }
 
     /**
      * Ejecutar scraping de ofertas (método principal)
      */
-    private function procesarScraperOfertas($token = null, $tiendaId = null, $cantidad = null)
+    private function procesarScraperOfertas($token = null, $tiendaId = null, $cantidad = null, array $categoriaIds = [])
     {
         $ejecucion = null;
         
@@ -173,7 +174,7 @@ class ScraperSegundoPlanoController extends ScraperBaseController
 
             // 1) Selección de ofertas a procesar ANTES de crear la ejecución
             if ($tiendaId) {
-                $ofertas = $this->obtenerOfertasTienda($tiendaId, $cantidad);
+                $ofertas = $this->obtenerOfertasTienda($tiendaId, $cantidad, $categoriaIds);
             } else {
                 $ofertasNoCsv = $this->obtenerOfertasElegibles(50);
                 $ofertasCsv = $this->scraping()->obtenerOfertasElegiblesCsvAwin();
@@ -487,13 +488,28 @@ class ScraperSegundoPlanoController extends ScraperBaseController
     /**
      * Obtener ofertas de una tienda específica
      */
-    protected function obtenerOfertasTienda($tiendaId, $cantidad = null)
+    protected function obtenerOfertasTienda($tiendaId, $cantidad = null, array $categoriaIds = [])
     {
         $query = OfertaProducto::with(['producto', 'tienda'])
             ->where('tienda_id', $tiendaId)
             ->where('mostrar', 'si')
             ->where('como_scrapear', 'automatico')
             ->whereNull('chollo_id');
+
+        if ($categoriaIds !== []) {
+            $idsCategoriasProducto = [];
+            foreach ($categoriaIds as $categoriaId) {
+                $idsCategoriasProducto = array_merge(
+                    $idsCategoriasProducto,
+                    \App\Models\Categoria::idsSelfAndDescendants((int) $categoriaId)
+                );
+            }
+            $idsCategoriasProducto = array_values(array_unique(array_map('intval', $idsCategoriasProducto)));
+
+            $query->whereHas('producto', function ($q) use ($idsCategoriasProducto) {
+                $q->whereIn('categoria_id', $idsCategoriasProducto);
+            });
+        }
 
         if ($cantidad) {
             $query->limit($cantidad);

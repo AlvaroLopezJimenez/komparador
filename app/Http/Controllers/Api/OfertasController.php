@@ -400,10 +400,14 @@ class OfertasController extends Controller
                 $path = \App\Helpers\CategoriaHelper::construirUrlCategorias($producto->categoria->id, $producto->slug);
                 $urlProducto = url($path);
             }
-            foreach ([$producto->imagen_grande ?? [], $producto->imagen_pequena ?? []] as $val) {
-                $imagenesProducto = array_merge($imagenesProducto, is_array($val) ? $val : ($val ? [$val] : []));
+            // Solo un juego de imágenes (grandes; si no hay, pequeñas)
+            $valGrande = $producto->imagen_grande ?? [];
+            $valPequena = $producto->imagen_pequena ?? [];
+            $lista = is_array($valGrande) ? $valGrande : ($valGrande ? [$valGrande] : []);
+            if ($lista === []) {
+                $lista = is_array($valPequena) ? $valPequena : ($valPequena ? [$valPequena] : []);
             }
-            $imagenesProducto = array_values(array_unique(array_filter($imagenesProducto)));
+            $imagenesProducto = array_values(array_unique(array_filter($lista)));
         }
 
         $especificaciones = $this->obtenerEspecificacionesProducto($productoId);
@@ -810,9 +814,10 @@ class OfertasController extends Controller
                 ? $this->construirVocabularioTokensDesdeCategoria($categoriaUrlId)
                 : $vocabularioCategoria;
 
-            if (UrlDescartada::where('url', $urlParaMostrar)->exists()) {
+            if (($urlDescartada = UrlDescartada::where('url', $urlParaMostrar)->first())) {
                 $item['existe'] = true;
                 $item['descartada'] = true;
+                $item['url_descartada_id'] = $urlDescartada->id;
             } else {
                 $verificacion = $this->verificarUrlExistente($urlParaMostrar);
                 if ($verificacion['existe_mismo_producto']) {
@@ -1522,6 +1527,7 @@ Responde ÚNICAMENTE con el JSON.";
             'url' => UrlOfertaValidacion::rules(),
             'producto_id' => 'required|exists:productos,id',
             'tienda_id' => 'required|exists:tiendas,id',
+            'como_scrapear' => 'nullable|in:automatico,manual',
             'especificaciones_internas' => 'nullable|string',
             'generar_sin_precio' => 'nullable|boolean',
             'generar_segunda_mano' => 'nullable|boolean',
@@ -1630,7 +1636,13 @@ Responde ÚNICAMENTE con el JSON.";
             [$envio, $envioPlaceholderGratis] = $this->calcularEnvioDesdeTienda($tienda);
             $envioFinal = $envioPlaceholderGratis ? null : (is_numeric($envio) ? round((float) $envio, 2) : null);
         }
-        $comoScrapear = $this->obtenerComoScrapearTienda($tienda);
+        $comoScrapear = $this->resolverComoScrapearOfertaCrearMasivo($tienda, $request->input('como_scrapear'));
+        if ($comoScrapear === null) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Debes indicar cómo scrapear esta oferta (automático o manual).',
+            ], 422);
+        }
         $resolverScraping = new TiendaScrapingConfigResolver();
         $frecuenciaMinutos = $resolverScraping->resolverFrecuenciaInicialOferta(
             $tienda,
@@ -3064,9 +3076,13 @@ Responde ÚNICAMENTE con el JSON.";
                 $urlProducto = url($path);
             }
             $imgs = [];
-            foreach ([$p->imagen_grande ?? [], $p->imagen_pequena ?? []] as $val) {
-                $imgs = array_merge($imgs, is_array($val) ? $val : ($val ? [$val] : []));
+            $valGrande = $p->imagen_grande ?? [];
+            $valPequena = $p->imagen_pequena ?? [];
+            $lista = is_array($valGrande) ? $valGrande : ($valGrande ? [$valGrande] : []);
+            if ($lista === []) {
+                $lista = is_array($valPequena) ? $valPequena : ($valPequena ? [$valPequena] : []);
             }
+            $imgs = array_values(array_unique(array_filter($lista)));
             return [
                 'id' => $p->id,
                 'nombre' => $p->nombre,
@@ -3077,7 +3093,7 @@ Responde ÚNICAMENTE con el JSON.";
                 'url_producto' => $urlProducto,
                 'imagen_grande' => $p->imagen_grande,
                 'imagen_pequena' => $p->imagen_pequena,
-                'imagenes_producto' => array_values(array_unique(array_filter($imgs))),
+                'imagenes_producto' => $imgs,
                 'unidad_de_medida' => $p->unidadDeMedida ?? 'unidad',
                 'permitir_texto_cantidad_alternativo' => ($p->categoria?->permitir_texto_cantidad_alternativo ?? 'no'),
                 'puntuacion' => $item['puntuacion'],
@@ -3101,10 +3117,13 @@ Responde ÚNICAMENTE con el JSON.";
             $urlProducto = url($path);
         }
         $imgs = [];
-        foreach ([$p->imagen_grande ?? [], $p->imagen_pequena ?? []] as $val) {
-            $imgs = array_merge($imgs, is_array($val) ? $val : ($val ? [$val] : []));
+        $valGrande = $p->imagen_grande ?? [];
+        $valPequena = $p->imagen_pequena ?? [];
+        $lista = is_array($valGrande) ? $valGrande : ($valGrande ? [$valGrande] : []);
+        if ($lista === []) {
+            $lista = is_array($valPequena) ? $valPequena : ($valPequena ? [$valPequena] : []);
         }
-        $imgs = array_values(array_unique(array_filter($imgs)));
+        $imgs = array_values(array_unique(array_filter($lista)));
         $especs = $this->obtenerEspecificacionesProducto($productoId);
         $tieneEspecs = $especs && !empty($especs['filtros'] ?? []);
 
@@ -3302,10 +3321,25 @@ Responde ÚNICAMENTE con el JSON.";
         return [null, false];
     }
 
+    private function resolverComoScrapearOfertaCrearMasivo(Tienda $tienda, ?string $comoScrapearSolicitado): ?string
+    {
+        $modoTienda = $tienda->normalizarComoScrapear();
+
+        if ($modoTienda === 'ambos') {
+            $solicitado = strtolower(trim((string) ($comoScrapearSolicitado ?? '')));
+            if ($solicitado === '') {
+                return null;
+            }
+
+            return $tienda->esComoScrapearOfertaValido($solicitado) ? $solicitado : null;
+        }
+
+        return $tienda->resolverComoScrapearOfertaPorDefecto($comoScrapearSolicitado);
+    }
+
     private function obtenerComoScrapearTienda(Tienda $tienda)
     {
-        $cs = strtolower(trim($tienda->como_scrapear ?? 'manual'));
-        return in_array($cs, ['automatico', 'manual', 'ambos']) ? ($cs === 'ambos' ? 'automatico' : $cs) : 'manual';
+        return $tienda->resolverComoScrapearOfertaPorDefecto();
     }
 
     /**

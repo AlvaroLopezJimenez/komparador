@@ -217,27 +217,13 @@ class DescargaCsvAwinTiendaService
     }
 
     /**
+     * Acepta formato nuevo (JSON array) y legacy (una sola URL en texto plano).
+     *
      * @return list<string>
      */
     private function normalizarUrlsTienda(Tienda $tienda): array
     {
-        $raw = $tienda->url_csv;
-        if (!is_array($raw)) {
-            return [];
-        }
-
-        $urls = [];
-        foreach ($raw as $url) {
-            if (!is_string($url)) {
-                continue;
-            }
-            $url = trim($url);
-            if ($url !== '') {
-                $urls[] = $url;
-            }
-        }
-
-        return array_values(array_unique($urls));
+        return $tienda->urlsCsv();
     }
 
     private function crearDirectorioTrabajo(int $tiendaId, int $indiceUrl): string

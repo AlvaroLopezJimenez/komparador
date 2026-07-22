@@ -648,6 +648,10 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
     // Ruta para ver todas las ofertas (sin producto asociado)
     Route::get('ofertas', [OfertaProductoController::class, 'todas'])->name('ofertas.todas');
 
+    // Sugerencias para filtros del listado de ofertas (unidades / texto alternativo)
+    Route::get('ofertas/todas/sugerencias-filtros', [OfertaProductoController::class, 'sugerenciasFiltros'])
+        ->name('ofertas.todas.sugerencias_filtros');
+
     // Importación temporal desde chollopañales
     Route::get('ofertas/importar-chollo', [ImportarOfertasCholloController::class, 'index'])->name('ofertas.importar-chollo');
     Route::post('ofertas/importar-chollo/analizar', [ImportarOfertasCholloController::class, 'analizar'])->name('ofertas.importar-chollo.analizar');
@@ -659,7 +663,6 @@ Route::middleware(['web', 'auth', 'ensure_session'])->prefix('panel-privado')->n
     // URLs descartadas (no se pueden usar para crear ofertas)
     Route::get('ofertas/urls-descartadas', [UrlDescartadasController::class, 'index'])->name('ofertas.url_descartadas');
     Route::post('ofertas/urls-descartadas/eliminar-bulk', [UrlDescartadasController::class, 'destroyBulk'])->name('ofertas.url_descartadas.destroy-bulk');
-    Route::post('ofertas/urls-descartadas/eliminar-por-url', [UrlDescartadasController::class, 'destroyPorUrl'])->name('ofertas.url_descartadas.destroy-por-url');
     Route::delete('ofertas/urls-descartadas/{urlDescartada}', [UrlDescartadasController::class, 'destroy'])->name('ofertas.url_descartadas.destroy');
 
     // Ruta para crear una oferta sin producto
@@ -1108,6 +1111,8 @@ Route::get('productos/oferta-mas-barata/ejecutar-segundo-plano', [ProductoContro
     Route::get('ajustes', [\App\Http\Controllers\Crons\CronJefeController::class, 'index'])->name('ajustes.index');
     Route::post('ajustes/actualizar', [\App\Http\Controllers\Crons\CronJefeController::class, 'actualizarAjuste'])->name('ajustes.actualizar');
     Route::post('ajustes/ejecutar/{key}', [\App\Http\Controllers\Crons\CronJefeController::class, 'ejecutarCronManual'])->name('ajustes.ejecutar');
+    Route::post('ajustes/productos/historial/rellenar-huecos', [\App\Http\Controllers\Productos\Historial\RellenarEspaciosVaciosHistorialController::class, 'ejecutar'])
+        ->name('ajustes.productos.historial.rellenar-huecos');
 });
 
 // Ruta de redirección para mantener compatibilidad - COMENTADA PARA EVITAR CONFLICTOS

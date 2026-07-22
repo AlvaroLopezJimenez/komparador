@@ -155,6 +155,37 @@ if (!function_exists('_f1')) {
     .kk-suggest-item.kk-suggest-active:hover {
         background: #fef3e7;
     }
+    @keyframes kk-badge-modelos-shift {
+        0%, 100% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+    }
+    .kk-badge-modelos {
+        display: inline-flex;
+        align-items: center;
+        font-weight: 700;
+        line-height: 1.2;
+        color: #1f2937;
+        border-radius: 0.4rem;
+        background: linear-gradient(90deg, #fde047, #fbbf24, #f97316, #fb923c, #fde047);
+        background-size: 220% 220%;
+        animation: kk-badge-modelos-shift 2.4s ease infinite;
+        box-shadow: 0 2px 6px rgba(249, 115, 22, 0.35);
+        white-space: nowrap;
+    }
+    .kk-badge-modelos--suggest {
+        font-size: 13px;
+        padding: 0.12rem 0.42rem;
+        margin-left: 0.5rem;
+        vertical-align: middle;
+    }
+    .kk-badge-modelos--card {
+        position: absolute;
+        top: -4px;
+        right: -10px;
+        z-index: 10;
+        font-size: 13px;
+        padding: 0.22rem 0.52rem;
+    }
     button.kk-suggest-item.kk-suggest-active,
     button.kk-suggest-item.kk-suggest-active:hover {
         background-color: #4d7a1a;
@@ -437,6 +468,10 @@ if (!function_exists('_f1')) {
                                 const _u2 = _e1(_f2(_it.url || '#'));
                                 const _p1 = _e1(_it.precio || '0');
                                 const _um = _it.unidadDeMedida || '';
+                                const _numModelos = parseInt(_it.num_modelos, 10) || 0;
+                                const _badgeModelos = _numModelos > 1
+                                    ? `<span class="kk-badge-modelos kk-badge-modelos--suggest">+${_numModelos} modelos</span>`
+                                    : '';
                                 let _uh = '';
                                 if (_um === 'unidad') {
                                     _uh = '<span class="text-xs text-gray-500">/Und.</span>';
@@ -453,17 +488,19 @@ if (!function_exists('_f1')) {
                                 }
                                 const _p1Num = parseFloat(_p1.replace(/\./g, '').replace(',', '.'));
                                 const precioHtml = _p1Num > 0
-                                    ? `<p class="text-lg font-bold" style="color: #73b112;">${_p1}€${_uh}</p>`
-                                    : `<p class="text-sm font-semibold text-gray-500">Sin Ofertas Disponibles</p>`;
+                                    ? `<p class="text-lg font-bold flex items-center gap-3 flex-wrap" style="color: #73b112;">${_p1}€${_uh}${_badgeModelos}</p>`
+                                    : `<p class="text-sm font-semibold text-gray-500 flex items-center gap-3 flex-wrap">Sin Ofertas Disponibles${_badgeModelos}</p>`;
                                 return `
                                     <a href="${_u2}"
                                        data-url="${_u2}"
                                        role="option"
                                        class="kk-suggest-item block px-4 py-3 hover:bg-gray-100 border-b border-gray-200 last:border-b-0">
                                         <div class="flex items-center space-x-3">
-                                            <img src="/images/${_img2}"
-                                                 alt="${_n2}"
-                                                 class="w-12 h-12 object-cover rounded">
+                                            <div class="relative shrink-0">
+                                                <img src="/images/${_img2}"
+                                                     alt="${_n2}"
+                                                     class="w-12 h-12 object-cover rounded">
+                                            </div>
                                             <div class="flex-1 min-w-0">
                                                 <p class="text-sm font-medium text-gray-900 truncate">${_n2}</p>
                                                 ${precioHtml}

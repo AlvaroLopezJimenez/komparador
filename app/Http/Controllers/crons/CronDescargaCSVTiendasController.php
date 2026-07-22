@@ -103,9 +103,11 @@ class CronDescargaCSVTiendasController extends Controller
         try {
             $tiendas = Tienda::query()
                 ->whereNotNull('url_csv')
+                ->where('url_csv', '!=', '')
+                ->where('url_csv', '!=', '[]')
                 ->orderBy('id')
                 ->get()
-                ->filter(fn (Tienda $tienda) => is_array($tienda->url_csv) && $tienda->url_csv !== [])
+                ->filter(fn (Tienda $tienda) => $tienda->tieneUrlsCsv())
                 ->values();
 
             $this->actualizarEjecucionPaso($ejecucion, 'consulta_tiendas', [

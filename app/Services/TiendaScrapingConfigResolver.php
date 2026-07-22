@@ -704,4 +704,73 @@ class TiendaScrapingConfigResolver
             ],
         ];
     }
+
+    /**
+     * Ofertas elegibles para forzar actualización, agrupadas por categoría del producto y API efectiva.
+     *
+     * @return array{
+     *     por_categoria: array<int, array{ofertas: int, api_base: ?string, api_icon: array}>,
+     *     parent_por_categoria: array<int, ?int>,
+     *     total_ofertas: int,
+     *     por_api: list<array{base: string, count: int, icon: array}>
+     * }
+     */
+    public function resumenForzarActualizacionPorCategoria(Tienda $tienda): array
+    {
+        $conteosDirectos = OfertaProducto::query()
+            ->where('ofertas_producto.tienda_id', $tienda->id)
+            ->where('ofertas_producto.mostrar', 'si')
+            ->where('ofertas_producto.como_scrapear', 'automatico')
+            ->whereNull('ofertas_producto.chollo_id')
+            ->join('productos', 'ofertas_producto.producto_id', '=', 'productos.id')
+            ->whereNotNull('productos.categoria_id')
+            ->groupBy('productos.categoria_id')
+            ->selectRaw('productos.categoria_id as cat_id, COUNT(*) as total')
+            ->pluck('total', 'cat_id');
+
+        $porCategoria = [];
+        $porApi = [];
+        $totalOfertas = 0;
+
+        foreach ($conteosDirectos as $catId => $total) {
+            $catId = (int) $catId;
+            $ofertas = (int) $total;
+            $apiEfectiva = $this->resolverApi($tienda, $catId);
+            $apiBase = self::apiBase($apiEfectiva) ?? '__sin_api__';
+            $apiIcon = self::metaIconoApi($apiEfectiva);
+
+            $porCategoria[$catId] = [
+                'ofertas' => $ofertas,
+                'api_base' => $apiBase === '__sin_api__' ? null : $apiBase,
+                'api_icon' => $apiIcon,
+            ];
+
+            $porApi[$apiBase] = ($porApi[$apiBase] ?? 0) + $ofertas;
+            $totalOfertas += $ofertas;
+        }
+
+        arsort($porApi);
+
+        $porApiListado = collect($porApi)->map(function ($count, $base) {
+            $apiParaIcono = $base === '__sin_api__' ? null : $base;
+
+            return [
+                'base' => $base === '__sin_api__' ? 'sin_api' : $base,
+                'count' => (int) $count,
+                'icon' => self::metaIconoApi($apiParaIcono),
+            ];
+        })->values()->all();
+
+        $parentPorCategoria = Categoria::query()
+            ->pluck('parent_id', 'id')
+            ->map(fn ($parentId) => $parentId !== null ? (int) $parentId : null)
+            ->all();
+
+        return [
+            'por_categoria' => $porCategoria,
+            'parent_por_categoria' => $parentPorCategoria,
+            'total_ofertas' => $totalOfertas,
+            'por_api' => $porApiListado,
+        ];
+    }
 }

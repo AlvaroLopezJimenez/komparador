@@ -247,6 +247,26 @@
                     @error('unidad_de_medida') <p class="text-red-500 text-sm mt-1">{{ $message }}</p> @enderror
                 </div>
 
+                <div>
+                    <label class="block mb-1 font-medium text-gray-700 dark:text-gray-200">Configuracion formulario producto</label>
+                    <div class="flex items-center gap-2">
+                        @php
+                            $configFormProducto = old('configuracion_formulario_producto', $categoria?->configuracion_formulario_producto ?? 'ninguno');
+                        @endphp
+                        <select name="configuracion_formulario_producto" id="configuracion_formulario_producto"
+                            class="flex-1 px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-white border @error('configuracion_formulario_producto') border-red-500 @enderror">
+                            <option value="ninguno" {{ $configFormProducto === 'ninguno' ? 'selected' : '' }}>Ninguno</option>
+                            <option value="no_columna_grupo_mostrar_imagen_nombre_precio" {{ $configFormProducto === 'no_columna_grupo_mostrar_imagen_nombre_precio' ? 'selected' : '' }}>No columna, Grupo mostrar Imagen-nombre-precio</option>
+                        </select>
+                        <button type="button"
+                            id="ayuda-configuracion-formulario-producto"
+                            class="{{ $configFormProducto === 'no_columna_grupo_mostrar_imagen_nombre_precio' ? '' : 'hidden' }} inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-gray-100 text-sm font-bold hover:bg-gray-400 dark:hover:bg-gray-500 focus:outline-none shrink-0"
+                            aria-label="Ayuda sobre configuración formulario producto"
+                            data-tooltip="Al marcar en una subespecificación el check de oferta o mostrar, ya no se marcará la columna automáticamente y se pondrá dicho grupo a mostrar como «Imagen-texto-precio».">?</button>
+                    </div>
+                    @error('configuracion_formulario_producto') <p class="text-red-500 text-sm mt-1">{{ $message }}</p> @enderror
+                </div>
+
                 @if(!$categoria)
                 {{-- IMÁGENES (nueva categoría: después de datos básicos) --}}
                 <fieldset class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 space-y-4 border border-gray-200 dark:border-gray-700">
@@ -1432,6 +1452,63 @@ if (!window.kpInternaGlobalRegistrar) {
                 if (tip) tip.classList.add('hidden');
             });
         });
+
+        (function initAyudaConfigFormularioProducto() {
+            const selectConfig = document.getElementById('configuracion_formulario_producto');
+            const btnAyuda = document.getElementById('ayuda-configuracion-formulario-producto');
+            if (!selectConfig || !btnAyuda) return;
+
+            const valorConAyuda = 'no_columna_grupo_mostrar_imagen_nombre_precio';
+            let tooltipActual = null;
+
+            function actualizarVisibilidadAyuda() {
+                if (selectConfig.value === valorConAyuda) {
+                    btnAyuda.classList.remove('hidden');
+                } else {
+                    btnAyuda.classList.add('hidden');
+                    if (tooltipActual) {
+                        tooltipActual.remove();
+                        tooltipActual = null;
+                    }
+                }
+            }
+
+            selectConfig.addEventListener('change', actualizarVisibilidadAyuda);
+            actualizarVisibilidadAyuda();
+
+            btnAyuda.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const texto = this.getAttribute('data-tooltip');
+                if (!texto) return;
+
+                if (tooltipActual) {
+                    tooltipActual.remove();
+                    tooltipActual = null;
+                    return;
+                }
+
+                const tooltip = document.createElement('div');
+                tooltip.className = 'fixed z-[9999] max-w-sm px-3 py-2 text-xs text-white bg-gray-900 rounded shadow-lg leading-relaxed';
+                tooltip.textContent = texto;
+                document.body.appendChild(tooltip);
+                const rect = this.getBoundingClientRect();
+                tooltip.style.left = Math.min(rect.left, window.innerWidth - 320) + 'px';
+                tooltip.style.top = (rect.bottom + 6) + 'px';
+                tooltipActual = tooltip;
+
+                const cerrar = function(ev) {
+                    if (tooltipActual && ev.target !== btnAyuda) {
+                        tooltipActual.remove();
+                        tooltipActual = null;
+                        document.removeEventListener('click', cerrar);
+                    }
+                };
+                setTimeout(function() {
+                    document.addEventListener('click', cerrar);
+                }, 0);
+            });
+        })();
 
         const formCatImg = document.getElementById('form-categoria');
         if (!formCatImg) return;

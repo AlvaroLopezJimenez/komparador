@@ -20,13 +20,6 @@
             </div>
         @endif
 
-        <div class="mb-4 flex flex-wrap justify-end gap-2">
-            <a href="{{ route('admin.ofertas.todas') }}"
-                class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 text-sm">
-                Todas las ofertas
-            </a>
-        </div>
-
         <form method="GET" class="mb-6 flex flex-wrap items-end gap-3">
             <div class="flex-1 min-w-[240px]">
                 <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">Buscar por URL (completa o parte)</label>
