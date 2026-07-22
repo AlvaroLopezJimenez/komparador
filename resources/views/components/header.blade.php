@@ -186,6 +186,22 @@ if (!function_exists('_f1')) {
         font-size: 13px;
         padding: 0.22rem 0.52rem;
     }
+    .kk-badge-modelos--card-stack {
+        position: static;
+        font-size: 13px;
+        padding: 0.22rem 0.52rem;
+    }
+    .kk-card-badges {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        z-index: 10;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 0.35rem;
+        max-width: calc(100% - 1rem);
+    }
     button.kk-suggest-item.kk-suggest-active,
     button.kk-suggest-item.kk-suggest-active:hover {
         background-color: #4d7a1a;

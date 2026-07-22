@@ -4501,14 +4501,41 @@
         return out;
     }
 
+    function rutasImagenesDesdeSpecCheckboxCrearMasivo(div, cb) {
+        if (!cb || cb.dataset.tieneImagenes !== '1') return [];
+        if (cb.dataset.usarImagenesProducto === '1') {
+            const producto = div && div.__rowData ? div.__rowData.producto : null;
+            return rutasImagenesProductoCrearMasivo(producto);
+        }
+        const key = cb.dataset.imagenesKey || '';
+        if (key && window.__crearMasivoImagenesSublinea && Array.isArray(window.__crearMasivoImagenesSublinea[key])) {
+            return window.__crearMasivoImagenesSublinea[key].slice();
+        }
+        return [];
+    }
+
+    function rutasPreviewActivasFilaCrearMasivo(div) {
+        if (!div) return [];
+        let rutasSpec = null;
+        div.querySelectorAll('.spec-checkbox:checked').forEach(function(cb) {
+            const r = rutasImagenesDesdeSpecCheckboxCrearMasivo(div, cb);
+            if (r.length) rutasSpec = r;
+        });
+        if (rutasSpec) return rutasSpec;
+        const producto = div.__rowData && div.__rowData.producto ? div.__rowData.producto : null;
+        return rutasImagenesProductoCrearMasivo(producto);
+    }
+
     function primeraRutaImagenProductoCrearMasivo(producto) {
         const rutas = rutasImagenesProductoCrearMasivo(producto);
         return rutas.length ? rutas[0] : '';
     }
 
     /** Miniatura bajo Generar oferta + flechas debajo para recorrer imágenes. */
-    function htmlMiniaturaProductoBajoGenerarCrearMasivo(producto) {
-        const rutas = rutasImagenesProductoCrearMasivo(producto);
+    function htmlMiniaturaProductoBajoGenerarCrearMasivo(producto, rutasOverride) {
+        const rutas = (Array.isArray(rutasOverride) && rutasOverride.length)
+            ? rutasOverride
+            : rutasImagenesProductoCrearMasivo(producto);
         if (!rutas.length) return '';
         const src = resolverUrlImagenCrearMasivo(rutas[0]);
         if (!src) return '';
@@ -4725,7 +4752,8 @@
         const goWrap = div.querySelector('.generar-oferta-wrap');
         const colBtn = div.querySelector('.cm-generar-oferta-btn-col');
         const producto = div.__rowData && div.__rowData.producto ? div.__rowData.producto : null;
-        const html = producto ? htmlMiniaturaProductoBajoGenerarCrearMasivo(producto) : '';
+        const rutas = rutasPreviewActivasFilaCrearMasivo(div);
+        const html = producto && rutas.length ? htmlMiniaturaProductoBajoGenerarCrearMasivo(producto, rutas) : '';
         const slot = div.querySelector('.producto-preview-bajo-generar');
         const host = colBtn || goWrap;
         if (window.__cmHoverZoomBtn && slot && slot.contains(window.__cmHoverZoomBtn)) {
@@ -6126,6 +6154,7 @@
         renderUrlResaltadaFilaCrearMasivo(div);
         actualizarConteosOpcionesEspecsFila(div);
         actualizarAvisosSinImagenEspecsFila(div);
+        sincronizarPreviewProductoFilaCrearMasivo(div);
     }
 
     function urlRecargarEspecificacionesCrearMasivo(productoId, urlOferta) {
@@ -7262,6 +7291,7 @@
                 renderUrlResaltadaFilaCrearMasivo(div);
                 actualizarConteosOpcionesEspecsFila(div);
                 actualizarAvisosSinImagenEspecsFila(div);
+                sincronizarPreviewProductoFilaCrearMasivo(div);
                 clearTimeout(div.__mismasEspecsTimeout);
                 div.__mismasEspecsTimeout = setTimeout(() => buscarOfertasMismasEspecsYMostrar(div), 400);
             });

@@ -134,6 +134,8 @@ if (!function_exists('oCV6X')) {
           $esPreciosHot = $esPreciosHotPagina ?? (strtolower(trim($q1X2 ?? '')) === 'precios hot');
           $esMasVendidos = in_array(strtolower(trim($q1X2 ?? '')), ['más vendidos', 'mas vendidos', 'más vendido', 'mas vendido']);
           $diasSeleccionado = $diasSeleccionado ?? 7;
+          $o1 = $o1 ?? 'relevancia';
+          $mostrarOrdenBusqueda = !$esPreciosHot && !$esMasVendidos && $p4X7->count() > 0;
         @endphp
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -181,12 +183,35 @@ if (!function_exists('oCV6X')) {
               @endforeach
             </div>
           @endif
+
+          {{-- ORDENACIÓN (búsqueda normal) --}}
+          @if($mostrarOrdenBusqueda)
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-sm font-medium text-gray-700">Ordenar por:</span>
+              @php
+                $urlOrdenRelevancia = route('buscar', array_filter(['q' => $q1X2, 'orden' => 'relevancia', 'cam' => oCV6X()]));
+                $urlOrdenPrecio = route('buscar', array_filter(['q' => $q1X2, 'orden' => 'precio', 'cam' => oCV6X()]));
+              @endphp
+              <a href="{{ aC4X($urlOrdenRelevancia) }}"
+                 class="px-4 py-2 text-sm font-semibold rounded border transition-colors {{ $o1 === 'relevancia' ? 'text-white' : 'bg-white hover:bg-green-50' }}"
+                 style="{{ $o1 === 'relevancia' ? 'background-color: #5f8c21; border-color: #4d7a1a;' : 'color: #5f8c21; border-color: #5f8c21;' }}">
+                Relevancia
+              </a>
+              <a href="{{ aC4X($urlOrdenPrecio) }}"
+                 class="px-4 py-2 text-sm font-semibold rounded border transition-colors {{ $o1 === 'precio' ? 'text-white' : 'bg-white hover:bg-green-50' }}"
+                 style="{{ $o1 === 'precio' ? 'background-color: #5f8c21; border-color: #4d7a1a;' : 'color: #5f8c21; border-color: #5f8c21;' }}">
+                Precio
+              </a>
+            </div>
+          @endif
         </div>
       </div>
 
       {{-- $p4X7 -> $productos --}}
       @php
         $esMasVendidos = $esMasVendidos ?? in_array(strtolower(trim($q1X2 ?? '')), ['más vendidos', 'mas vendidos', 'más vendido', 'mas vendido']);
+        $o1 = $o1 ?? 'relevancia';
+        $mostrarOrdenBusqueda = $mostrarOrdenBusqueda ?? (!$esPreciosHot && !$esMasVendidos);
       @endphp
       @if($p4X7->count() > 0)
         <div class="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -328,7 +353,8 @@ if (!function_exists('oCV6X')) {
             $paramsPaginacion = array_filter([
               'q' => $q1X2, 
               'cam' => oCV6X(),
-              'dias' => ($esMasVendidos && isset($diasSeleccionado)) ? $diasSeleccionado : null
+              'dias' => ($esMasVendidos && isset($diasSeleccionado)) ? $diasSeleccionado : null,
+              'orden' => ($mostrarOrdenBusqueda && ($o1 ?? 'relevancia') !== 'relevancia') ? $o1 : null,
             ]);
           @endphp
           {{ $p4X7->appends($paramsPaginacion)->links() }}

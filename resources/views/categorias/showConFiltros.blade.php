@@ -763,13 +763,20 @@
                         @endphp
                         <a href="{{ $up2 }}"
                            class="group relative flex flex-col items-center bg-white rounded-xl shadow-md transition-all duration-300 transform hover:scale-105 hover:shadow-2xl cursor-pointer p-4">
-                            @if($pr2->rebajado)
+                            @if($pr2->rebajado && $mbm1)
+                                <div class="kk-card-badges">
+                                    <div class="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-md shadow-md">
+                                        Rebajado: {{ $pr2->rebajado }}%
+                                    </div>
+                                    <span class="kk-badge-modelos kk-badge-modelos--card-stack">+{{ $nm1 }} modelos</span>
+                                </div>
+                            @elseif($pr2->rebajado)
                                 <div class="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-md shadow-md z-10">
                                     Rebajado: {{ $pr2->rebajado }}%
                                 </div>
                             @endif
                             <div class="w-full flex justify-center mb-3 relative">
-                                @if($mbm1)
+                                @if($mbm1 && !$pr2->rebajado)
                                     <span class="kk-badge-modelos kk-badge-modelos--card">+{{ $nm1 }} modelos</span>
                                 @endif
                                 @if($ip1)

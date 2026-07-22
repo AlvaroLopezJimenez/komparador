@@ -535,11 +535,6 @@
                                                         <div class="text-[10px] text-gray-400 mt-0.5">
                                                             {{ $ultima->inicio->format('d/m H:i') }}
                                                         </div>
-                                                        @if($ultimaResumen)
-                                                            <div class="text-[10px] text-gray-500 mt-1 line-clamp-2 max-w-xs" title="{{ is_string($ultimaResumen) ? $ultimaResumen : json_encode($ultimaResumen, JSON_UNESCAPED_UNICODE) }}">
-                                                                {{ is_string($ultimaResumen) ? $ultimaResumen : json_encode($ultimaResumen, JSON_UNESCAPED_UNICODE) }}
-                                                            </div>
-                                                        @endif
                                                     </button>
                                                 @else
                                                     <span class="text-gray-500 italic">No hay ejecuciones</span>

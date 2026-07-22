@@ -122,6 +122,10 @@ class BuscadorController extends Controller
         $perPage = 20;
         $currentPage = Paginator::resolveCurrentPage() ?: 1;
         $maxPages = 5;
+        $o1 = $request->input('orden', 'relevancia');
+        if (!in_array($o1, ['relevancia', 'precio'], true)) {
+            $o1 = 'relevancia';
+        }
         
         // Validar que la página no sea mayor a 5 - si lo es, redirigir a página 1
         if ($currentPage > $maxPages) {
@@ -132,6 +136,16 @@ class BuscadorController extends Controller
         
         // Usar el mismo método común que buscarProductos() para garantizar resultados idénticos
         $productosConVariantes = $this->obtenerProductosOrdenadosPorRelevancia($palabras, $queryNorm, $maxProductos * 2);
+
+        if ($o1 === 'precio') {
+            $productosConVariantes = $productosConVariantes->sortBy(function ($item) {
+                $precio = $item['precio_variante'] ?? ($item['producto']->precio ?? null);
+                if ($precio === null || $precio === '' || (float) $precio <= 0) {
+                    return 999999999;
+                }
+                return (float) $precio;
+            })->values();
+        }
         
         // Paginación manual
         $items = $productosConVariantes->slice(($currentPage - 1) * $perPage, $perPage)->values();
@@ -145,7 +159,7 @@ class BuscadorController extends Controller
 
         $q1X2 = $query;
 
-        return view('buscar', compact('p4X7', 'q1X2'));
+        return view('buscar', compact('p4X7', 'q1X2', 'o1'));
     }
 
     /**
