@@ -11,6 +11,9 @@ class PeticionApiHTMLController extends Controller
     /** HTML enviado por el programa externo (una petición por oferta). */
     private static ?string $htmlInyectado = null;
 
+    /** Último log de petición API (sin HTML completo), para vistas de diagnóstico como test-precio. */
+    private static ?array $ultimoLogApi = null;
+
     /** PROVEEDOR PREFERIDO: 'bright_unlocker' | 'scrapingant' | 'scrapestack' */
     private $apiProveedorPreferido;
 
@@ -74,6 +77,21 @@ class PeticionApiHTMLController extends Controller
         self::$htmlInyectado = null;
     }
 
+    /**
+     * Log de la última llamada a obtenerHTML (sin volcar HTML gigante).
+     *
+     * @return array<string, mixed>|null
+     */
+    public static function getUltimoLogApi(): ?array
+    {
+        return self::$ultimoLogApi;
+    }
+
+    public static function clearUltimoLogApi(): void
+    {
+        self::$ultimoLogApi = null;
+    }
+
     public function __construct()
     {
         $this->apiProveedorPreferido = env('SCRAPING_PROVEEDOR_PREFERIDO', 'bright_unlocker');
@@ -117,22 +135,27 @@ class PeticionApiHTMLController extends Controller
      */
     public function obtenerHTML(string $url, ?string $forzarProveedor = null, ?string $apiTienda = null, ?string $vpsCargarMasSelector = null): array
     {
+        $tiempoInicio = microtime(true);
+
         if (self::$htmlInyectado !== null && self::$htmlInyectado !== '') {
             $html = self::$htmlInyectado;
             self::$htmlInyectado = null;
 
-            return [
+            $resultado = [
                 'success'   => true,
                 'html'      => "<!-- PROVEEDOR: NAVEGADOR_LOCAL -->\n" . $html,
                 'proveedor' => 'navegador_local',
             ];
+
+            return $this->devolverYRegistrarLogApi($resultado, $url, $apiTienda, $forzarProveedor, $tiempoInicio);
         }
 
         if ($apiTienda && strtolower($apiTienda) === 'navegadorlocal') {
-            return [
+            return $this->devolverYRegistrarLogApi([
                 'success' => false,
                 'error'   => 'Esta tienda usa navegador local; el HTML debe enviarse desde el programa externo (API scraping-programa-externo).',
-            ];
+                'proveedor' => 'navegador_local',
+            ], $url, $apiTienda, $forzarProveedor, $tiempoInicio);
         }
 
         $host = strtolower(parse_url($url, PHP_URL_HOST) ?: '');
@@ -150,6 +173,7 @@ class PeticionApiHTMLController extends Controller
         }
 
         $errores = [];
+        $ultimoResultadoFallido = null;
         foreach ($proveedores as $prov) {
             $resultado = $this->llamarProveedor($prov, $url, $apiTienda, $vpsCargarMasSelector);
             if ($prov === 'vps_html' && empty($resultado['vps_log'])) {
@@ -160,19 +184,80 @@ class PeticionApiHTMLController extends Controller
                 // Proveedores HTML -> validamos 'html' y anotamos proveedor
                 if (in_array($prov, ['bright_unlocker', 'scrapingant', 'scrapestack', 'cloudflare', 'vps_html'], true)) {
                     if (!isset($resultado['html']) || $resultado['html'] === '') {
-                        return ['success' => false, 'error' => 'Respuesta vacia de ' . $prov];
+                        return $this->devolverYRegistrarLogApi(
+                            ['success' => false, 'error' => 'Respuesta vacia de ' . $prov, 'proveedor' => $prov],
+                            $url,
+                            $apiTienda,
+                            $forzarProveedor,
+                            $tiempoInicio
+                        );
                     }
                     if (stripos($resultado['html'], 'PROVEEDOR:') === false) {
                         $resultado['html'] = "<!-- PROVEEDOR: " . strtoupper($prov) . " -->\n" . $resultado['html'];
                     }
                     $resultado['proveedor'] = $prov;
                 }
-                return $resultado;
+                return $this->devolverYRegistrarLogApi($resultado, $url, $apiTienda, $forzarProveedor, $tiempoInicio);
             }
+            $ultimoResultadoFallido = $resultado;
             $errores[$prov] = $resultado['error'] ?? 'Error desconocido';
         }
 
-        return ['success' => false, 'error' => $this->formatearErrores($errores)];
+        $fallo = [
+            'success' => false,
+            'error' => $this->formatearErrores($errores),
+            'proveedor' => $prefer,
+        ];
+        if (is_array($ultimoResultadoFallido) && !empty($ultimoResultadoFallido['vps_log'])) {
+            $fallo['vps_log'] = $ultimoResultadoFallido['vps_log'];
+        }
+
+        return $this->devolverYRegistrarLogApi($fallo, $url, $apiTienda, $forzarProveedor, $tiempoInicio);
+    }
+
+    /**
+     * Guarda un log diagnóstico (sin HTML) y devuelve el resultado original.
+     *
+     * @param  array<string, mixed>  $resultado
+     * @return array<string, mixed>
+     */
+    private function devolverYRegistrarLogApi(
+        array $resultado,
+        string $url,
+        ?string $apiTienda,
+        ?string $forzarProveedor,
+        float $tiempoInicio
+    ): array {
+        $ms = round((microtime(true) - $tiempoInicio) * 1000, 2);
+        $log = [
+            'url' => $url,
+            'api_tienda' => $apiTienda,
+            'forzar_proveedor' => $forzarProveedor,
+            'proveedor' => $resultado['proveedor'] ?? null,
+            'success' => $resultado['success'] ?? null,
+            'error' => $resultado['error'] ?? null,
+            'tiempo_api_ms' => $ms,
+            'html_length' => isset($resultado['html']) && is_string($resultado['html'])
+                ? strlen($resultado['html'])
+                : null,
+        ];
+
+        if (!empty($resultado['vps_log']) && is_array($resultado['vps_log'])) {
+            $log['vps_log'] = $resultado['vps_log'];
+        }
+        if (!empty($resultado['debug']) && is_array($resultado['debug'])) {
+            $log['debug'] = $resultado['debug'];
+        }
+        if (array_key_exists('precio', $resultado) && $resultado['precio'] !== null) {
+            $log['precio_api'] = $resultado['precio'];
+        }
+        if (!empty($resultado['raw']) && is_array($resultado['raw'])) {
+            $log['raw_keys'] = array_keys($resultado['raw']);
+        }
+
+        self::$ultimoLogApi = $log;
+
+        return $resultado;
     }
 
     private function llamarProveedor(string $proveedor, string $url, ?string $apiTienda = null, ?string $vpsCargarMasSelector = null): array

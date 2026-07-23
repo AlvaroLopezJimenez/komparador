@@ -39,7 +39,7 @@ final class UrlOfertaValidacion
         return [
             'required',
             'string',
-            'max:255',
+            'max:2048',
             function (string $attribute, mixed $value, \Closure $fail): void {
                 if (! self::pasa($value)) {
                     $fail('La URL no es válida (se espera http o https).');

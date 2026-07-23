@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Scraping;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Tienda;
+use Illuminate\Validation\ValidationException;
 
 class TestPrecioController extends Controller
 {
@@ -20,54 +21,133 @@ class TestPrecioController extends Controller
     }
 
     /**
-     * Procesar una URL para obtener el precio
+     * Procesar una URL para obtener el precio.
+     * Siempre responde JSON con detalle del fallo (aunque APP_DEBUG esté off).
      */
     public function procesarUrl(Request $request)
     {
-        $request->validate([
-            'url' => 'required|url',
-            'tienda' => 'required|string'
-        ]);
+        $tiempoInicio = microtime(true);
 
         try {
-            // Medir tiempo de inicio
-            $tiempoInicio = microtime(true);
-            
-            // Usar el sistema de scraping interno
+            $this->limpiarLogApiSeguro();
+
+            $request->validate([
+                'url' => 'required|string',
+                'tienda' => 'required|string'
+            ]);
+
             $scrapingController = new ScrapingController();
             $scrapingRequest = new \Illuminate\Http\Request();
+            $scrapingRequest->headers->set('Accept', 'application/json');
             $scrapingRequest->merge([
-                'url' => $request->url,
-                'tienda' => $request->tienda,
-                'variante' => $request->variante ?? null
+                'url' => $request->input('url'),
+                'tienda' => $request->input('tienda'),
+                'variante' => $request->input('variante') ?? null
             ]);
-            
+
             $response = $scrapingController->obtenerPrecio($scrapingRequest);
-            $responseData = $response->getData(true);
-            
-            // Calcular tiempo de respuesta
-            $tiempoFin = microtime(true);
-            $tiempoRespuesta = round(($tiempoFin - $tiempoInicio) * 1000, 2); // Convertir a milisegundos
-            
-            // Añadir tiempo de respuesta a los datos
+            $responseData = method_exists($response, 'getData')
+                ? $response->getData(true)
+                : ['success' => false, 'error' => 'Respuesta no JSON del scraping'];
+
+            if (!is_array($responseData)) {
+                $responseData = ['success' => false, 'error' => 'Respuesta de scraping no es array', 'raw' => $responseData];
+            }
+
+            $tiempoRespuesta = round((microtime(true) - $tiempoInicio) * 1000, 2);
             $responseData['tiempo_respuesta'] = $tiempoRespuesta;
-            
+            $responseData['api_log'] = $this->obtenerLogApiSeguro();
+
+            $ok = !empty($responseData['success']);
+
             return response()->json([
-                'success' => true,
-                'data' => $responseData
-            ]);
-            
-        } catch (\Exception $e) {
-            // Calcular tiempo incluso si hay error
-            $tiempoFin = microtime(true);
-            $tiempoRespuesta = round(($tiempoFin - $tiempoInicio) * 1000, 2);
-            
-            return response()->json([
-                'success' => false,
-                'error' => $e->getMessage(),
-                'tiempo_respuesta' => $tiempoRespuesta
-            ], 500);
+                'success' => $ok,
+                'data' => $responseData,
+                'error' => $ok ? null : ($responseData['error'] ?? 'Scraping sin éxito (sin campo error)'),
+                'debug' => $responseData['debug'] ?? null,
+                'api_log' => $responseData['api_log'],
+                'tiempo_respuesta' => $tiempoRespuesta,
+                'http_status_scraping' => method_exists($response, 'getStatusCode') ? $response->getStatusCode() : null,
+            ], $ok ? 200 : 200); // 200 siempre para que el front lea el JSON aunque falle el scraping
+
+        } catch (ValidationException $e) {
+            return $this->jsonError(
+                'Validación: ' . collect($e->errors())->flatten()->implode(' '),
+                $tiempoInicio,
+                [
+                    'exception' => ValidationException::class,
+                    'validation_errors' => $e->errors(),
+                ],
+                422
+            );
+        } catch (\Throwable $e) {
+            return $this->jsonError(
+                $e->getMessage() !== '' ? $e->getMessage() : 'Excepción sin mensaje',
+                $tiempoInicio,
+                [
+                    'exception' => get_class($e),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'trace' => collect($e->getTrace())->take(8)->map(function ($frame) {
+                        return [
+                            'file' => $frame['file'] ?? null,
+                            'line' => $frame['line'] ?? null,
+                            'function' => $frame['function'] ?? null,
+                            'class' => $frame['class'] ?? null,
+                        ];
+                    })->values()->all(),
+                ],
+                500
+            );
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $debug
+     */
+    private function jsonError(string $error, float $tiempoInicio, array $debug = [], int $status = 500)
+    {
+        $tiempoRespuesta = round((microtime(true) - $tiempoInicio) * 1000, 2);
+
+        return response()->json([
+            'success' => false,
+            'error' => $error,
+            'message' => $error, // por si el front u otras capas miran "message"
+            'debug' => $debug,
+            'api_log' => $this->obtenerLogApiSeguro(),
+            'tiempo_respuesta' => $tiempoRespuesta,
+            'data' => [
+                'success' => false,
+                'error' => $error,
+                'debug' => $debug,
+                'api_log' => $this->obtenerLogApiSeguro(),
+                'tiempo_respuesta' => $tiempoRespuesta,
+            ],
+        ], $status);
+    }
+
+    private function limpiarLogApiSeguro(): void
+    {
+        try {
+            if (method_exists(PeticionApiHTMLController::class, 'clearUltimoLogApi')) {
+                PeticionApiHTMLController::clearUltimoLogApi();
+            }
+        } catch (\Throwable $e) {
+            // no tumbar el test por el log
+        }
+    }
+
+    private function obtenerLogApiSeguro(): ?array
+    {
+        try {
+            if (method_exists(PeticionApiHTMLController::class, 'getUltimoLogApi')) {
+                return PeticionApiHTMLController::getUltimoLogApi();
+            }
+        } catch (\Throwable $e) {
+            return ['error_leyendo_log' => $e->getMessage()];
+        }
+
+        return null;
     }
 
     /**
@@ -75,8 +155,6 @@ class TestPrecioController extends Controller
      */
     private function obtenerTiendasDisponibles()
     {
-        // Usamos las tiendas existentes en BD para que el parámetro "tienda"
-        // coincida con Tienda::nombre (tal como hace ScrapingController).
         return Tienda::query()
             ->select('nombre')
             ->orderBy('nombre', 'asc')

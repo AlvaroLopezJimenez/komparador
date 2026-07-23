@@ -5,12 +5,14 @@ namespace App\Http\Controllers\Scraping\Tiendas;
 use App\Http\Controllers\Scraping\Tiendas\PlantillaTiendaController;
 use Illuminate\Http\JsonResponse;
 
-class FarmaciasDirectController extends PlantillaTiendaController
+class FarmaciasdirectController extends PlantillaTiendaController
 {
     /**
      * Extrae el precio de una página de FarmadiasDirect.
-     * - Prioriza <meta property="og:price:amount" content="…">.
-     * - Fallback visible: <span class="price-item price-item--regular">5,66€</span>.
+     * - Prioriza el bloque visible de precio (parte entera + decimales en spans).
+     *   Si hay oferta, el tachado (line-through) es el PVP anterior; el real es el de los spans.
+     * - Fallback: <meta property="og:price:amount" content="…">.
+     * - Fallback: <span class="price-item price-item--regular">5,66€</span>.
      * - Devuelve número sin símbolo €; normaliza coma/punto y entidades (&nbsp;).
      */
     public function obtenerPrecio($url, $variante = null, $tienda = null, $oferta = null): JsonResponse
@@ -33,7 +35,14 @@ class FarmaciasDirectController extends PlantillaTiendaController
         // Hay productos que no tienen el descuento 2ª al 70%, pero si aparece. asi que lo quitamos
         // $this->detectarDescuento2aAl70($html, $oferta);
 
-        // 1) <meta property="og:price:amount" content="5,66">
+        // 1) Bloque visible: precio real en spans (ignora el tachado line-through si hay oferta)
+        //    <span>4</span><span>,54</span><span>€</span>  …  <div class="… line-through">5,95 €</div>
+        $precioVisible = $this->extraerPrecioVisible($html);
+        if ($precioVisible !== null) {
+            return response()->json(['success' => true, 'precio' => $precioVisible]);
+        }
+
+        // 2) <meta property="og:price:amount" content="5,66">
         if (preg_match(
             '~<meta[^>]*\bproperty\s*=\s*["\']og:price:amount["\'][^>]*\bcontent\s*=\s*["\'](?<p>[\d\.,]+)["\'][^>]*>~i',
             $html,
@@ -44,7 +53,7 @@ class FarmaciasDirectController extends PlantillaTiendaController
             }
         }
 
-        // 2) Visible: <span class="price-item price-item--regular">5,66€</span>
+        // 3) Visible: <span class="price-item price-item--regular">5,66€</span>
         if (preg_match(
             '~<span[^>]*class=["\'][^"\']*\bprice-item\b[^"\']*\bprice-item--regular\b[^"\']*["\'][^>]*>\s*(?<p>\d{1,3}(?:[.\s]\d{3})*(?:[.,]\d{2}))\s*(?:€|&euro;)?\s*</span>~si',
             $html,
@@ -59,6 +68,30 @@ class FarmaciasDirectController extends PlantillaTiendaController
             'success' => false,
             'error'   => 'No se pudo encontrar el precio en la página de FarmadiasDirect',
         ]);
+    }
+
+    /**
+     * Extrae el precio actual del bloque:
+     *   <div class="flex items-center gap-3">
+     *     <span class="… tabular-nums …"><span>4</span><span>,54</span><span>€</span></span>
+     *     <div class="… line-through">5,95 €</div>  <!-- opcional: PVP tachado, se ignora -->
+     *   </div>
+     */
+    private function extraerPrecioVisible(string $html): ?float
+    {
+        if (!preg_match(
+            '~<div[^>]*class=["\'][^"\']*\bflex\b[^"\']*\bitems-center\b[^"\']*\bgap-3\b[^"\']*["\'][^>]*>\s*'
+            . '<span[^>]*class=["\'][^"\']*\btabular-nums\b[^"\']*["\'][^>]*>\s*'
+            . '<span[^>]*>\s*(?<ent>\d+)\s*</span>\s*'
+            . '<span[^>]*>\s*(?<dec>[.,]\d{1,2})\s*</span>\s*'
+            . '<span[^>]*>\s*(?:€|&euro;)\s*</span>~si',
+            $html,
+            $m
+        )) {
+            return null;
+        }
+
+        return $this->normalizarImporte($m['ent'] . $m['dec']);
     }
 
     /**

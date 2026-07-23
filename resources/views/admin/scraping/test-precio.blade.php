@@ -371,6 +371,7 @@
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Accept': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                 },
                 body: JSON.stringify({
@@ -379,22 +380,185 @@
                     variante: variante
                 })
             })
-            .then(response => response.json())
-            .then(data => {
+            .then(async response => {
+                const texto = await response.text();
+                let data = null;
+                let parseError = null;
+                try {
+                    data = JSON.parse(texto);
+                } catch (e) {
+                    parseError = e.message;
+                }
+                return {
+                    data,
+                    status: response.status,
+                    texto,
+                    parseError,
+                };
+            })
+            .then(resultado => {
                 document.getElementById('loadingResultados').classList.add('hidden');
                 document.getElementById('btnProcesar').disabled = false;
-                
-                if (data.success) {
-                    mostrarResultados(data.data, url, tienda, variante);
-                } else {
-                    mostrarError(data.error || 'Error desconocido', data.tiempo_respuesta);
-                }
+                mostrarRespuestaServidor(resultado, url, tienda, variante);
             })
             .catch(error => {
                 document.getElementById('loadingResultados').classList.add('hidden');
                 document.getElementById('btnProcesar').disabled = false;
-                mostrarError('Error de conexión: ' + error.message);
+                mostrarRespuestaServidor({
+                    data: null,
+                    status: null,
+                    texto: null,
+                    parseError: error.message,
+                    networkError: true,
+                }, url, tienda, variante);
             });
+        }
+
+        function extraerMensajeError(payload) {
+            if (!payload || typeof payload !== 'object') return null;
+            if (payload.error) return String(payload.error);
+            if (payload.message) return String(payload.message);
+            if (payload.data && payload.data.error) return String(payload.data.error);
+            if (payload.exception) return String(payload.exception);
+            return null;
+        }
+
+        function esExitoScraping(payload) {
+            if (!payload || typeof payload !== 'object') return false;
+            // TestPrecio envuelve: { success: true, data: { success, precio, ... } }
+            if (payload.success === true && payload.data && typeof payload.data === 'object') {
+                return payload.data.success === true && payload.data.precio != null;
+            }
+            return payload.success === true && payload.precio != null;
+        }
+
+        function datosScraping(payload) {
+            if (payload && payload.data && typeof payload.data === 'object') {
+                return payload.data;
+            }
+            return payload || {};
+        }
+
+        function htmlBloqueRespuestaServidor(resultado) {
+            const meta = [
+                resultado.status != null ? `HTTP ${resultado.status}` : null,
+                resultado.parseError ? `Parse JSON: ${resultado.parseError}` : null,
+                resultado.networkError ? 'Error de red/fetch' : null,
+            ].filter(Boolean).join(' · ') || 'sin meta';
+
+            const cuerpo = resultado.data != null
+                ? JSON.stringify(resultado.data, null, 2)
+                : (resultado.texto || '(sin cuerpo)');
+
+            return `
+                <div class="mt-4 bg-gray-50 dark:bg-gray-900/50 border border-gray-300 dark:border-gray-600 rounded-lg p-4">
+                    <h5 class="font-semibold text-gray-800 dark:text-gray-200 mb-1">Respuesta del servidor</h5>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">${escapeHtml(meta)}</p>
+                    <pre class="p-3 bg-gray-100 dark:bg-gray-950 rounded text-xs overflow-x-auto max-h-[32rem] overflow-y-auto whitespace-pre-wrap border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200">${escapeHtml(cuerpo)}</pre>
+                </div>
+            `;
+        }
+
+        function htmlBloqueDebug(debug) {
+            if (!debug || (typeof debug === 'object' && Object.keys(debug).length === 0)) {
+                return '';
+            }
+            return `
+                <div class="mt-4 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700 rounded-lg p-4">
+                    <h5 class="font-semibold text-indigo-800 dark:text-indigo-200 mb-2">Debug / dónde falló</h5>
+                    <pre class="p-3 bg-gray-100 dark:bg-gray-900 rounded text-xs overflow-x-auto max-h-80 overflow-y-auto whitespace-pre-wrap border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200">${escapeHtml(JSON.stringify(debug, null, 2))}</pre>
+                </div>
+            `;
+        }
+
+        function mostrarRespuestaServidor(resultado, url, tienda, variante) {
+            const resultadosDiv = document.getElementById('resultados');
+            const payload = resultado.data;
+            const ok = !resultado.parseError && !resultado.networkError && esExitoScraping(payload);
+            const data = datosScraping(payload);
+            const apiLog = (payload && payload.api_log) || data.api_log || null;
+            const debug = (payload && payload.debug) || data.debug || null;
+            const tiempo = (payload && payload.tiempo_respuesta) || data.tiempo_respuesta || null;
+            const mensajeError = extraerMensajeError(payload)
+                || resultado.parseError
+                || (resultado.networkError ? resultado.parseError : null)
+                || 'Sin mensaje de error en la respuesta (mira el JSON completo abajo)';
+
+            let html = '';
+            if (ok) {
+                html += `
+                <div class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-4">
+                    <h4 class="font-semibold text-green-800 dark:text-green-200 mb-2">✅ Procesamiento Exitoso</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <strong class="text-gray-700 dark:text-gray-300">URL:</strong>
+                            <p class="text-sm text-gray-600 dark:text-gray-400 break-all">${escapeHtml(url)}</p>
+                        </div>
+                        <div>
+                            <strong class="text-gray-700 dark:text-gray-300">Tienda:</strong>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">${escapeHtml(tienda)}</p>
+                        </div>
+                    </div>
+                    ${variante ? `
+                    <div class="mb-4">
+                        <strong class="text-gray-700 dark:text-gray-300">Variante:</strong>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">${escapeHtml(variante)}</p>
+                    </div>` : ''}
+                    <div class="bg-white dark:bg-gray-700 rounded-lg p-4 border">
+                        <h5 class="font-semibold text-gray-800 dark:text-gray-200 mb-2">Datos Extraídos:</h5>
+                        <div class="space-y-2">
+                            <div>
+                                <strong class="text-gray-700 dark:text-gray-300">Precio:</strong>
+                                <span class="text-lg font-bold text-green-600 dark:text-green-400 ml-2">${escapeHtml(String(data.precio))}€</span>
+                            </div>
+                            ${tiempo != null ? `
+                            <div>
+                                <strong class="text-gray-700 dark:text-gray-300">Tiempo total:</strong>
+                                <span class="ml-2 text-gray-600 dark:text-gray-400">${escapeHtml(String(tiempo))}ms</span>
+                            </div>` : ''}
+                            ${data.api_log && data.api_log.tiempo_api_ms != null ? `
+                            <div>
+                                <strong class="text-gray-700 dark:text-gray-300">Tiempo API (obtenerHTML):</strong>
+                                <span class="ml-2 text-gray-600 dark:text-gray-400">${escapeHtml(String(data.api_log.tiempo_api_ms))}ms</span>
+                            </div>` : ''}
+                            ${(data.descuentos_detectados && data.descuentos_detectados.length) || data.descuentos ? `
+                            <div>
+                                <strong class="text-gray-700 dark:text-gray-300">Descuentos detectados:</strong>
+                                <ul class="mt-1 ml-4 list-disc text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                                    ${(data.descuentos_detectados && data.descuentos_detectados.length
+                                        ? data.descuentos_detectados
+                                        : String(data.descuentos || '').split('||').filter(Boolean)
+                                    ).map(descuento => `<li><code class="text-xs bg-gray-100 dark:bg-gray-800 px-1 rounded">${escapeHtml(descuento)}</code> — ${escapeHtml(formatearDescuentoDetectado(descuento))}</li>`).join('')}
+                                </ul>
+                            </div>` : `
+                            <div>
+                                <strong class="text-gray-700 dark:text-gray-300">Descuentos detectados:</strong>
+                                <span class="ml-2 text-gray-500 dark:text-gray-400">Ninguno</span>
+                            </div>`}
+                        </div>
+                    </div>
+                </div>`;
+            } else {
+                html += `
+                <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-4">
+                    <h4 class="font-semibold text-red-800 dark:text-red-200 mb-2">❌ Error en el Procesamiento</h4>
+                    <p class="text-red-700 dark:text-red-300 break-words">${escapeHtml(mensajeError)}</p>
+                    ${tiempo != null ? `
+                    <div class="mt-3 pt-3 border-t border-red-200 dark:border-red-700">
+                        <strong class="text-gray-700 dark:text-gray-300">Tiempo total:</strong>
+                        <span class="ml-2 text-gray-600 dark:text-gray-400">${escapeHtml(String(tiempo))}ms</span>
+                    </div>` : ''}
+                    <div class="mt-3 text-sm text-gray-600 dark:text-gray-400">
+                        <div><strong>URL:</strong> <span class="break-all">${escapeHtml(url)}</span></div>
+                        <div><strong>Tienda:</strong> ${escapeHtml(tienda)}</div>
+                    </div>
+                </div>`;
+            }
+
+            html += htmlBloqueDebug(debug);
+            html += htmlBloqueApiLog(apiLog);
+            html += htmlBloqueRespuestaServidor(resultado);
+            resultadosDiv.innerHTML = html;
         }
 
         function formatearDescuentoDetectado(descuento) {
@@ -414,99 +578,42 @@
             return item;
         }
 
-        function mostrarResultados(data, url, tienda, variante) {
-            const resultadosDiv = document.getElementById('resultados');
-            
-            let html = `
-                <div class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-4">
-                    <h4 class="font-semibold text-green-800 dark:text-green-200 mb-2">✅ Procesamiento Exitoso</h4>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div>
-                            <strong class="text-gray-700 dark:text-gray-300">URL:</strong>
-                            <p class="text-sm text-gray-600 dark:text-gray-400 break-all">${url}</p>
-                        </div>
-                        <div>
-                            <strong class="text-gray-700 dark:text-gray-300">Tienda:</strong>
-                            <p class="text-sm text-gray-600 dark:text-gray-400">${tienda}</p>
-                        </div>
-                    </div>
-                    
-                    ${variante ? `
-                    <div class="mb-4">
-                        <strong class="text-gray-700 dark:text-gray-300">Variante:</strong>
-                        <p class="text-sm text-gray-600 dark:text-gray-400">${variante}</p>
-                    </div>
-                    ` : ''}
-                    
-                    <div class="bg-white dark:bg-gray-700 rounded-lg p-4 border">
-                        <h5 class="font-semibold text-gray-800 dark:text-gray-200 mb-2">Datos Extraídos:</h5>
-                        <div class="space-y-2">
-                            <div>
-                                <strong class="text-gray-700 dark:text-gray-300">Precio:</strong>
-                                <span class="text-lg font-bold text-green-600 dark:text-green-400 ml-2">${data.precio}€</span>
-                            </div>
-                            <div>
-                                <strong class="text-gray-700 dark:text-gray-300">Éxito:</strong>
-                                <span class="ml-2 ${data.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}">
-                                    ${data.success ? '✅ Sí' : '❌ No'}
-                                </span>
-                            </div>
-                            ${data.tiempo_respuesta ? `
-                            <div>
-                                <strong class="text-gray-700 dark:text-gray-300">Tiempo de respuesta:</strong>
-                                <span class="ml-2 text-gray-600 dark:text-gray-400">${data.tiempo_respuesta}ms</span>
-                            </div>
-                            ` : ''}
-                            ${(data.descuentos_detectados && data.descuentos_detectados.length) || data.descuentos ? `
-                            <div>
-                                <strong class="text-gray-700 dark:text-gray-300">Descuentos detectados:</strong>
-                                <ul class="mt-1 ml-4 list-disc text-sm text-gray-600 dark:text-gray-400 space-y-1">
-                                    ${(data.descuentos_detectados && data.descuentos_detectados.length
-                                        ? data.descuentos_detectados
-                                        : String(data.descuentos || '').split('||').filter(Boolean)
-                                    ).map(descuento => `<li><code class="text-xs bg-gray-100 dark:bg-gray-800 px-1 rounded">${descuento}</code> — ${formatearDescuentoDetectado(descuento)}</li>`).join('')}
-                                </ul>
-                                ${data.descuentos ? `
-                                <p class="mt-2 text-xs text-gray-500 dark:text-gray-400 break-all">
-                                    <strong>Valor serializado:</strong> <code>${data.descuentos}</code>
-                                </p>
-                                ` : ''}
-                            </div>
-                            ` : `
-                            <div>
-                                <strong class="text-gray-700 dark:text-gray-300">Descuentos detectados:</strong>
-                                <span class="ml-2 text-gray-500 dark:text-gray-400">Ninguno</span>
-                            </div>
-                            `}
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            resultadosDiv.innerHTML = html;
-        }
-
-        function mostrarError(error, tiempoRespuesta = null) {
-            const resultadosDiv = document.getElementById('resultados');
-            
-            let html = `
-                <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-4">
-                    <h4 class="font-semibold text-red-800 dark:text-red-200 mb-2">❌ Error en el Procesamiento</h4>
-                    <p class="text-red-700 dark:text-red-300">${error}</p>
-            `;
-            
-            if (tiempoRespuesta) {
-                html += `
-                    <div class="mt-3 pt-3 border-t border-red-200 dark:border-red-700">
-                        <strong class="text-gray-700 dark:text-gray-300">Tiempo de respuesta:</strong>
-                        <span class="ml-2 text-gray-600 dark:text-gray-400">${tiempoRespuesta}ms</span>
+        function htmlBloqueApiLog(apiLog) {
+            if (!apiLog) {
+                return `
+                    <div class="mt-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg p-4">
+                        <h5 class="font-semibold text-amber-800 dark:text-amber-200 mb-1">Log API</h5>
+                        <p class="text-sm text-amber-700 dark:text-amber-300">
+                            No hay log de API. La petición no pasó por <code>obtenerHTML</code>
+                            (p. ej. error previo, CSV Awin, o controlador sin llamada a la API).
+                        </p>
                     </div>
                 `;
             }
-            
-            html += '</div>';
-            resultadosDiv.innerHTML = html;
+
+            const json = JSON.stringify(apiLog, null, 2);
+            const tiempoApi = apiLog.tiempo_api_ms != null ? `${apiLog.tiempo_api_ms}ms` : '—';
+            const proveedor = apiLog.proveedor || '—';
+
+            return `
+                <div class="mt-4 bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-600 rounded-lg p-4">
+                    <h5 class="font-semibold text-gray-800 dark:text-gray-200 mb-2">Log API</h5>
+                    <div class="flex flex-wrap gap-4 text-sm mb-3 text-gray-600 dark:text-gray-400">
+                        <div><strong class="text-gray-700 dark:text-gray-300">Proveedor:</strong> ${escapeHtml(String(proveedor))}</div>
+                        <div><strong class="text-gray-700 dark:text-gray-300">Tiempo API:</strong> ${escapeHtml(tiempoApi)}</div>
+                        <div><strong class="text-gray-700 dark:text-gray-300">HTML:</strong> ${apiLog.html_length != null ? escapeHtml(String(apiLog.html_length)) + ' bytes' : '—'}</div>
+                    </div>
+                    <pre class="p-3 bg-gray-100 dark:bg-gray-900 rounded text-xs overflow-x-auto max-h-96 overflow-y-auto whitespace-pre-wrap border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200">${escapeHtml(json)}</pre>
+                </div>
+            `;
+        }
+
+        function escapeHtml(text) {
+            return String(text)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
         }
 
         function limpiarResultados() {

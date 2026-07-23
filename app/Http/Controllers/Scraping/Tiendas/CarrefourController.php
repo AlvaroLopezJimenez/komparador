@@ -39,19 +39,23 @@ class CarrefourController extends PlantillaTiendaController
 
         $html = html_entity_decode((string)$resultado['html'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
-        // Sin stock: página de categoría (category-name__title) en lugar de PDP/PLP de producto
-        if (str_contains($html, 'category-name__title') && $oferta && $oferta instanceof \App\Models\OfertaProducto) {
-            $oferta->update(['mostrar' => 'no']);
-            \DB::table('avisos')->insertGetId([
-                'texto_aviso'     => 'sin stock 1a vez - GENERADO AUTOMATICAMENTE',
-                'fecha_aviso'     => now()->addDays(4),
-                'user_id'         => 1,
-                'avisoable_type'  => \App\Models\OfertaProducto::class,
-                'avisoable_id'    => $oferta->id,
-                'oculto'          => 0,
-                'created_at'      => now(),
-                'updated_at'      => now(),
-            ]);
+        // Sin stock: Carrefour redirige el producto agotado a la PLP de categoría
+        // (canonical/next → /catNNNN/c, o category-name__title) en lugar de PDP /R-XXXX/p
+        if ($this->esPaginaCategoria($html)) {
+            if ($oferta && $oferta instanceof \App\Models\OfertaProducto) {
+                $oferta->update(['mostrar' => 'no']);
+                \DB::table('avisos')->insertGetId([
+                    'texto_aviso'     => 'sin stock 1a vez - GENERADO AUTOMATICAMENTE',
+                    'fecha_aviso'     => now()->addDays(4),
+                    'user_id'         => 1,
+                    'avisoable_type'  => \App\Models\OfertaProducto::class,
+                    'avisoable_id'    => $oferta->id,
+                    'oculto'          => 0,
+                    'created_at'      => now(),
+                    'updated_at'      => now(),
+                ]);
+            }
+            return response()->json(['success' => false, 'error' => 'Producto sin stock (redirige a categoría)']);
         }
 
         $esPdp = $this->esPdp($html, $url);
@@ -97,11 +101,34 @@ class CarrefourController extends PlantillaTiendaController
         return response()->json(['success' => true, 'precio' => $precio]);
     }
 
-    /** Detecta PDP por URL /R-XXXX/p o por <link rel="canonical"> hacia /R-XXXX/p */
+    /**
+     * Detecta PLP de categoría (producto sin stock / redirección).
+     * Señales: canonical o next hacia /catNNNN/c (?offset=N opcional), o category-name__title.
+     */
+    private function esPaginaCategoria(string $html): bool
+    {
+        // <link rel="canonical|next" href=".../cat26102046/c"> o con ?offset=24
+        if (preg_match('~<link[^>]+rel=(["\'])(?:canonical|next)\1[^>]+href=(["\'])[^"\']*/cat\d+/c(?:\?[^"\']*)?\2~i', $html)) {
+            return true;
+        }
+        // Orden inverso: href antes de rel
+        if (preg_match('~<link[^>]+href=(["\'])[^"\']*/cat\d+/c(?:\?[^"\']*)?\1[^>]+rel=(["\'])(?:canonical|next)\2~i', $html)) {
+            return true;
+        }
+        if (str_contains($html, 'category-name__title')) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /** Detecta PDP por <link rel="canonical"> hacia /R-XXXX/p (o URL pedida si el HTML lo confirma) */
     private function esPdp(string $html, string $url): bool
     {
-        if (preg_match('~/R-[^/]+/p$~i', rtrim($url, '/'))) return true;
         if (preg_match('~<link[^>]+rel=(["\'])canonical\1[^>]+href=(["\'])([^"\']*/R-[^/\']*/p)\2~i', $html)) return true;
+        if (preg_match('~<link[^>]+href=(["\'])([^"\']*/R-[^/\']*/p)\1[^>]+rel=(["\'])canonical\3~i', $html)) return true;
+        // Solo confiar en la URL pedida si el HTML no es claramente otra cosa
+        if (preg_match('~/R-[^/]+/p$~i', rtrim($url, '/')) && !preg_match('~/cat\d+/c~i', $html)) return true;
         return false;
     }
 

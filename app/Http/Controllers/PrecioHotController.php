@@ -432,6 +432,8 @@ class PrecioHotController extends Controller
                 'precio_oferta' => $precioOferta,
                 'precio_formateado' => $precioFormateado,
                 'porcentaje_diferencia' => round($diferencia, 2),
+                // Bajada de precio justo hoy (ayer no estaba a este precio), aunque hace semanas sí lo estuviera
+                'nuevo_hoy' => $diasRachaPrecioBajo === 0,
                 'url_oferta' => route('click.redirigir', ['ofertaId' => $mejorOferta->id]),
                 'url_producto' => $this->generarUrlProducto($producto),
                 'producto_nombre' => $producto->nombre,
@@ -1633,6 +1635,8 @@ class PrecioHotController extends Controller
                         'precio_oferta' => $precioOfertaEspecificacion,
                         'precio_formateado' => $precioFormateado,
                         'porcentaje_diferencia' => round($diferencia, 2),
+                        // Bajada de precio justo hoy (ayer no estaba a este precio), aunque hace semanas sí lo estuviera
+                        'nuevo_hoy' => $diasRachaPrecioBajoSpec === 0,
                         'url_oferta' => route('click.redirigir', ['ofertaId' => $mejorOfertaEspecificacion->id]),
                         'url_producto' => $urlProducto,
                         'producto_nombre' => $nombreCompleto,

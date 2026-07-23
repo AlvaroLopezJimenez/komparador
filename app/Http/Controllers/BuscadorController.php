@@ -197,6 +197,7 @@ class BuscadorController extends Controller
                     'url_producto' => $item['url_producto'] ?? ($producto->categoria ? $producto->categoria->construirUrlCategorias($producto->slug) : '#'),
                     'img_producto' => $item['img_producto'] ?? null, // Imagen específica de precios hot
                     'producto_nombre' => $item['producto_nombre'] ?? null, // Nombre específico de precios hot
+                    'nuevo_hoy' => !empty($item['nuevo_hoy']),
                 ];
             })
             ->filter()

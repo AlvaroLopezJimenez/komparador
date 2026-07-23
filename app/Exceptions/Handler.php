@@ -26,5 +26,45 @@ class Handler extends ExceptionHandler
         $this->reportable(function (Throwable $e) {
             //
         });
+
+        // En test-precio / scraping admin: devolver siempre el error real en JSON
+        // (con APP_DEBUG=false Laravel solo manda {"message":"Server Error"}).
+        $this->renderable(function (Throwable $e, $request) {
+            $path = (string) $request->path();
+            $esScrapingAdmin = str_contains($path, 'admin/scraping')
+                || str_contains($path, 'scraping/test-precio');
+
+            if (!$esScrapingAdmin) {
+                return null;
+            }
+
+            $wantsJson = $request->expectsJson()
+                || $request->ajax()
+                || str_contains((string) $request->header('Accept'), 'application/json')
+                || str_contains($path, 'test-precio/procesar');
+
+            if (!$wantsJson) {
+                return null;
+            }
+
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage() !== '' ? $e->getMessage() : 'Excepción sin mensaje',
+                'message' => $e->getMessage() !== '' ? $e->getMessage() : 'Excepción sin mensaje',
+                'debug' => [
+                    'exception' => get_class($e),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'trace' => collect($e->getTrace())->take(10)->map(function ($frame) {
+                        return [
+                            'file' => $frame['file'] ?? null,
+                            'line' => $frame['line'] ?? null,
+                            'function' => $frame['function'] ?? null,
+                            'class' => $frame['class'] ?? null,
+                        ];
+                    })->values()->all(),
+                ],
+            ], method_exists($e, 'getStatusCode') ? (int) $e->getStatusCode() : 500);
+        });
     }
 }

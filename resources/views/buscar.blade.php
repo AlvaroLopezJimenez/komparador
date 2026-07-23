@@ -228,6 +228,7 @@ if (!function_exists('oCV6X')) {
                 // Usar imagen y nombre de precios hot si están disponibles, sino del producto
                 $imagenPreciosHot = $p5X8['img_producto'] ?? null;
                 $nombrePreciosHot = $p5X8['producto_nombre'] ?? null;
+                $nuevoHoy = !empty($p5X8['nuevo_hoy']);
                 $variante = null;
                 $esVariante = false;
                 $numModelos = null;
@@ -241,6 +242,7 @@ if (!function_exists('oCV6X')) {
                 $unidadMedida = $producto->unidadDeMedida;
                 $imagenPreciosHot = null;
                 $nombrePreciosHot = null;
+                $nuevoHoy = false;
                 $esVariante = !empty($variante);
                 $numModelos = (!$esVariante && !empty($p5X8['num_modelos'])) ? (int) $p5X8['num_modelos'] : null;
                 
@@ -261,6 +263,7 @@ if (!function_exists('oCV6X')) {
                 $urlProducto = $producto->categoria ? $producto->categoria->construirUrlCategorias($producto->slug) : '#';
                 $imagenPreciosHot = null;
                 $nombrePreciosHot = null;
+                $nuevoHoy = false;
                 $variante = null;
                 $esVariante = false;
                 $numModelos = null;
@@ -283,8 +286,13 @@ if (!function_exists('oCV6X')) {
                class="group flex flex-col items-center bg-white rounded-xl shadow-md transition-all duration-300 transform hover:scale-105 hover:shadow-2xl cursor-pointer p-4 relative">
               {{-- Badge de descuento (solo para precios hot) --}}
               @if($esPreciosHot && $porcentajeDescuento > 0)
-                <div class="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-md shadow-md z-10">
-                  -{{ $porcentajeDescuento }}%
+                <div class="absolute top-2 right-2 z-10 inline-flex items-center gap-1">
+                  <div class="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-md shadow-md">
+                    -{{ $porcentajeDescuento }}%
+                  </div>
+                  @if(!empty($nuevoHoy))
+                    <span class="kk-fuego-nuevo-hoy" aria-label="Bajada de precio hoy" title="Bajada de precio hoy">🔥</span>
+                  @endif
                 </div>
               @endif
               <div class="w-full flex justify-center mb-3 relative">
@@ -382,6 +390,33 @@ if (!function_exists('oCV6X')) {
         -webkit-line-clamp: 2;
         -webkit-box-orient: vertical;
         overflow: hidden;
+    }
+    .kk-fuego-nuevo-hoy {
+        display: inline-block;
+        font-size: 0.95em;
+        line-height: 1;
+        transform-origin: 50% 85%;
+        animation: kkFuegoFlicker 0.55s ease-in-out infinite alternate;
+        filter: drop-shadow(0 0 2px rgba(255, 200, 50, 0.85));
+    }
+    @keyframes kkFuegoFlicker {
+        0% {
+            transform: scale(1) rotate(-6deg) translateY(0);
+            opacity: 0.92;
+        }
+        40% {
+            transform: scale(1.12) rotate(4deg) translateY(-1px);
+            opacity: 1;
+        }
+        100% {
+            transform: scale(1.05) rotate(-3deg) translateY(-0.5px);
+            opacity: 0.96;
+        }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .kk-fuego-nuevo-hoy {
+            animation: none;
+        }
     }
 </style>
 </body>
